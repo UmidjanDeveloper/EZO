@@ -51,6 +51,82 @@ export interface MessageMetadata {
   truncated?: boolean;
   memories_used?: string[];
   memories_saved?: number;
+  /** Sources the answer actually cites, verified by the API (never invented). */
+  citations?: SourceCitation[];
+  sources_considered?: number;
+}
+
+/** One numbered source behind an answer: a file passage or a web page. */
+export interface SourceCitation {
+  n: number;
+  kind: "file" | "web_page" | "web";
+  title: string;
+  excerpt: string;
+  source_name: string;
+  url: string | null;
+  date: string | null;
+  document_id: string | null;
+  revision_number: number | null;
+  chunk_index: number | null;
+  page_start: number | null;
+  page_end: number | null;
+  heading: string | null;
+  location: string;
+  reliability: number;
+  primary: boolean;
+}
+
+export type KnowledgeStatus = "queued" | "processing" | "indexed" | "partial" | "needs_ocr" | "failed";
+
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  filename: string | null;
+  source_id: string;
+  source_type: "upload" | "url" | "connector";
+  source_name: string;
+  project_id: string | null;
+  mime_type: string;
+  source_url: string | null;
+  size_bytes: number;
+  language: string | null;
+  status: KnowledgeStatus;
+  error: string | null;
+  chunk_count: number;
+  current_revision: number | null;
+  created_at: string;
+  updated_at: string;
+  indexed_at: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface KnowledgeDocumentDetail extends KnowledgeDocument {
+  revisions: { id: string; revision_number: number; content_hash: string; chars: number; created_at: string; current: boolean }[];
+  chunks_preview: { chunk_index: number; text: string; metadata: Record<string, unknown> }[];
+}
+
+export interface KnowledgeUploadResult {
+  document: KnowledgeDocument;
+  duplicate: boolean;
+  new_revision: boolean;
+}
+
+export interface KnowledgeOverview {
+  vector_store: string;
+  embedding_model: string | null;
+  semantic_search: boolean;
+  web_search: string | null;
+  max_upload_mb: number;
+  allowed_extensions: string[];
+  documents: number;
+  chunks: number;
+  by_status: Record<string, number>;
+}
+
+export interface KnowledgeSearchResult {
+  mode: "hybrid" | "keyword" | "vector" | "none";
+  results: SourceCitation[];
+  diagnostics: Record<string, unknown>;
 }
 
 export interface Message {

@@ -7,6 +7,7 @@ import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { HistoryButton } from "../layout/shell-context";
 import { EzoStatus } from "../robot/EzoPresence";
+import { AttachmentList, useAttachments } from "./Attachments";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
@@ -27,6 +28,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
   const session = useChatSession({ conversationId, projectId });
   const { title, project, messages, loading, loadError, streaming, presence, send, stop } = session;
 
+  const attachments = useAttachments(project?.id ?? projectId);
   const [mode, setMode] = useState<Mode>("text");
   const [traceRunId, setTraceRunId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -139,6 +141,8 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
             onSend={sendText}
             onStop={stop}
             onVoice={() => setMode("voice")}
+            onAttach={attachments.attach}
+            above={<AttachmentList items={attachments.items} onDismiss={attachments.dismiss} />}
             autoFocus
           />
         </>

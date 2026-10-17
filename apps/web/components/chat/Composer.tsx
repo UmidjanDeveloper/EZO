@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@ezo/ui";
-import { ArrowUp, AudioLines, Square } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowUp, AudioLines, Paperclip, Square } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/context";
 
 interface ComposerProps {
@@ -11,15 +11,20 @@ interface ComposerProps {
   onStop: () => void;
   /** Switch to voice conversation (hidden when not provided). */
   onVoice?: () => void;
+  /** Add files to EZO's knowledge (hidden when not provided). */
+  onAttach?: (files: File[]) => void;
+  /** Shown above the input, e.g. attached files and their status. */
+  above?: ReactNode;
   autoFocus?: boolean;
 }
 
 const MAX_HEIGHT = 220;
 
-export function Composer({ streaming, onSend, onStop, onVoice, autoFocus }: ComposerProps) {
+export function Composer({ streaming, onSend, onStop, onVoice, onAttach, above, autoFocus }: ComposerProps) {
   const { m } = useI18n();
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -44,7 +49,36 @@ export function Composer({ streaming, onSend, onStop, onVoice, autoFocus }: Comp
 
   return (
     <div className="mx-auto w-full max-w-3xl px-3 pb-3 sm:px-4 sm:pb-4">
+      {above}
       <div className="flex items-end gap-2 rounded-2xl border border-line bg-surface p-2 shadow-card focus-within:border-accent/60">
+        {onAttach ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileRef.current?.click()}
+              aria-label={m.knowledge.attach}
+              title={m.knowledge.attach}
+              data-testid="composer-attach"
+            >
+              <Paperclip size={18} />
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              data-testid="composer-file-input"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                if (files.length) onAttach(files);
+              }}
+            />
+          </>
+        ) : null}
         <label htmlFor="composer" className="sr-only">
           {m.chat.placeholder}
         </label>

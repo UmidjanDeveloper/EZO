@@ -8,6 +8,11 @@ import type {
   ChatRequestBody,
   ChatStreamEvent,
   Conversation,
+  KnowledgeDocument,
+  KnowledgeDocumentDetail,
+  KnowledgeOverview,
+  KnowledgeSearchResult,
+  KnowledgeUploadResult,
   Memory,
   MemoryCategory,
   Message,
@@ -58,7 +63,11 @@ export function createApiClient(options: ApiClientOptions) {
     try {
       response = await doFetch(`${base}${path}`, {
         ...init,
-        headers: { ...headers(init.body !== undefined), ...(init.headers ?? {}) },
+        // FormData sets its own multipart Content-Type (with boundary).
+        headers: {
+          ...headers(init.body !== undefined && !(init.body instanceof FormData)),
+          ...(init.headers ?? {}),
+        },
       });
     } catch {
       throw new ApiError(
@@ -128,6 +137,33 @@ export function createApiClient(options: ApiClientOptions) {
       request<Memory>(`/api/memories/${id}`, { method: "PATCH", ...json(changes) }),
     deleteMemory: (id: string) => request<void>(`/api/memories/${id}`, { method: "DELETE" }),
     deleteAllMemories: () => request<void>("/api/memories?confirm=true", { method: "DELETE" }),
+
+    knowledgeStatus: () => request<KnowledgeOverview>("/api/knowledge/status"),
+    listDocuments: (projectId?: string) =>
+      request<KnowledgeDocument[]>(
+        `/api/knowledge/documents${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`,
+      ),
+    getDocument: (id: string) => request<KnowledgeDocumentDetail>(`/api/knowledge/documents/${id}`),
+    /** Upload a file to EZO's knowledge base (PDF, DOCX, XLSX, CSV, TXT, Markdown, images). */
+    uploadDocument: (file: Blob, filename: string, projectId?: string | null) => {
+      const form = new FormData();
+      form.append("file", file, filename);
+      if (projectId) form.append("project_id", projectId);
+      return request<KnowledgeUploadResult>("/api/knowledge/documents", { method: "POST", body: form });
+    },
+    addUrl: (url: string, projectId?: string | null) =>
+      request<KnowledgeUploadResult>("/api/knowledge/urls", {
+        method: "POST",
+        ...json({ url, project_id: projectId ?? null }),
+      }),
+    reindexDocument: (id: string) =>
+      request<KnowledgeDocument>(`/api/knowledge/documents/${id}/reindex`, { method: "POST" }),
+    deleteDocument: (id: string) => request<void>(`/api/knowledge/documents/${id}`, { method: "DELETE" }),
+    searchKnowledge: (query: string, projectId?: string | null) =>
+      request<KnowledgeSearchResult>("/api/knowledge/search", {
+        method: "POST",
+        ...json({ query, project_id: projectId ?? null }),
+      }),
 
     getAgentRun: (id: string) => request<AgentRun>(`/api/agent-runs/${id}`),
 

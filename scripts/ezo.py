@@ -332,12 +332,15 @@ def cmd_api(args: argparse.Namespace) -> int:
     """Run only the API. `--e2e` uses a fresh SQLite database and offline mode."""
     env = dict(os.environ)
     if args.e2e:
-        db_path = Path(tempfile.mkdtemp(prefix="ezo-e2e-")) / "e2e.db"
+        e2e_dir = Path(tempfile.mkdtemp(prefix="ezo-e2e-"))
+        db_path = e2e_dir / "e2e.db"
         env.update(
             DATABASE_URL=f"sqlite:///{db_path.as_posix()}",
+            EZO_STORAGE_DIR=str(e2e_dir / "storage"),
             ANTHROPIC_API_KEY="",
             OPENAI_API_KEY="",
             GEMINI_API_KEY="",
+            TAVILY_API_KEY="",
             EZO_ENV="test",
             EZO_AUTH_MODE="local",
             EZO_RATE_LIMIT_CHAT="1000",

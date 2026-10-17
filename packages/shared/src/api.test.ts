@@ -27,6 +27,25 @@ describe("createApiClient", () => {
     expect(seen?.get("Authorization")).toBe("Bearer tok");
   });
 
+  it("uploads files as multipart form data, not JSON", async () => {
+    let seenHeaders: Headers | undefined;
+    let seenBody: unknown;
+    const client = createApiClient({
+      baseUrl: "http://api",
+      fetchImpl: async (_url, init) => {
+        seenHeaders = new Headers(init?.headers);
+        seenBody = init?.body;
+        return Response.json({ document: { id: "d1" }, duplicate: false, new_revision: false }, { status: 201 });
+      },
+    });
+    const result = await client.uploadDocument(new Blob(["salom"]), "a.txt", "p1");
+    expect(result.document.id).toBe("d1");
+    expect(seenHeaders?.get("Content-Type")).toBeNull(); // the browser adds the multipart boundary
+    expect(seenBody).toBeInstanceOf(FormData);
+    expect((seenBody as FormData).get("project_id")).toBe("p1");
+    expect(((seenBody as FormData).get("file") as File).name).toBe("a.txt");
+  });
+
   it("turns API errors into ApiError with code and message", async () => {
     const client = createApiClient({
       baseUrl: "http://api",

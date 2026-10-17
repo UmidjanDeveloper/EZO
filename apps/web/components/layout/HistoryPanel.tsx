@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@ezo/ui";
-import { Brain, FolderKanban, PanelLeftClose, Plus, Settings, Trash2 } from "lucide-react";
+import { Brain, FileStack, FolderKanban, PanelLeftClose, Plus, Settings, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -24,6 +24,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
   }
 
   const footer = [
+    { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/settings", label: m.nav.settings, icon: Settings },

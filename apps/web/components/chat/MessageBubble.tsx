@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { speak, speechSynthesisSupported, toSpeakableText } from "@/lib/speech";
 import { EzoRobot } from "../robot/EzoRobot";
 import { Markdown } from "./Markdown";
+import { Sources } from "./Sources";
 import type { UiMessage } from "./types";
 
 interface Props {
@@ -71,6 +72,10 @@ export function MessageBubble({ message, onShowTrace }: Props) {
         ) : (
           <p className="animate-pulse pt-1.5 text-sm text-ink-muted">{m.chat.thinking}</p>
         )}
+
+        {!message.streaming && message.metadata?.citations?.length ? (
+          <Sources citations={message.metadata.citations} />
+        ) : null}
 
         {!message.streaming && message.content && !message.error ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-ink-faint">
