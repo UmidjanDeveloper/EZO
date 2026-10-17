@@ -20,6 +20,7 @@ from ezo_api.db.models import Artifact, ArtifactVersion, Conversation, Message, 
 from ezo_api.schemas.artifacts import (
     ArtifactCreateIn,
     ArtifactDetailOut,
+    ArtifactExportOut,
     ArtifactOut,
     ArtifactRenameIn,
     ArtifactTextVersionIn,
@@ -49,6 +50,18 @@ def _error(exc: ArtifactError, status: int = 422) -> HTTPException:
 
 
 def version_out(version: ArtifactVersion, current_id: uuid.UUID | None) -> ArtifactVersionOut:
+    metadata = dict(version.generation_metadata or {})
+    raw_exports = metadata.pop("exports", None) or {}
+    exports = [
+        ArtifactExportOut(
+            name=name,
+            filename=str(entry.get("filename", name)),
+            mime_type=str(entry.get("mime_type", "application/octet-stream")),
+            size=int(entry.get("size", 0)),
+        )
+        for name, entry in (raw_exports.items() if isinstance(raw_exports, dict) else [])
+        if isinstance(entry, dict)
+    ]
     return ArtifactVersionOut(
         id=version.id,
         version_number=version.version_number,
@@ -61,11 +74,12 @@ def version_out(version: ArtifactVersion, current_id: uuid.UUID | None) -> Artif
         created_by=version.created_by,
         change_summary=version.change_summary,
         parent_version_id=version.parent_version_id,
-        generation_metadata=version.generation_metadata or {},
+        generation_metadata=metadata,  # storage keys of exports are internal
         source_references=version.source_references or [],
         created_at=version.created_at,
         current=version.id == current_id,
         is_text=is_text(version.filename),
+        exports=exports,
     )
 
 
@@ -284,20 +298,46 @@ async def download_version(
         data = await services.artifacts.read(version)
     except ArtifactError as exc:
         raise _error(exc, 410) from exc
-    ascii_name = version.filename.encode("ascii", "ignore").decode() or "artifact"
-    disposition = (
-        f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(version.filename)}"
-    )
+    return _file_response(data, version.filename, version.mime_type)
+
+
+def _file_response(data: bytes, filename: str, mime_type: str, *, inline: bool = False) -> Response:
+    ascii_name = filename.encode("ascii", "ignore").decode() or "artifact"
+    kind = "inline" if inline else "attachment"
+    disposition = f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
     return Response(
         content=data,
-        media_type=version.mime_type,
+        media_type=mime_type,
         headers={
-            # Always a download, never rendered in the API's origin (HTML/SVG cannot run here).
+            # Downloads are never rendered as active content in the API's origin
+            # (HTML/SVG cannot run here); only PNG previews are shown inline.
             "Content-Disposition": disposition,
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "sandbox",
             "Cache-Control": "private, no-store",
         },
+    )
+
+
+@router.get("/{artifact_id}/versions/{number}/exports/{name}")
+async def download_export(
+    artifact_id: uuid.UUID,
+    number: int,
+    name: str,
+    session: SessionDep,
+    user: CurrentUser,
+    services: ServicesDep,
+) -> Response:
+    """A file derived from a version: ``pdf``, ``html``, ``spec`` or ``preview-<n>``."""
+    artifact = await _owned(session, user.id, artifact_id)
+    try:
+        version = await services.artifacts.version(session, artifact.id, number)
+        entry, data = await services.artifacts.read_export(version, name)
+    except ArtifactError as exc:
+        raise _error(exc, 410) from exc
+    mime_type = str(entry["mime_type"])
+    return _file_response(
+        data, str(entry["filename"]), mime_type, inline=mime_type.startswith("image/png")
     )
 
 

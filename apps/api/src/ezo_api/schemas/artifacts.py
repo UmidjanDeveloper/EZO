@@ -23,6 +23,15 @@ ArtifactType = Literal[
 TextFormat = Literal["markdown", "text", "csv", "json", "html"]
 
 
+class ArtifactExportOut(BaseModel):
+    """A file derived from a version (e.g. a presentation's PDF, web version, slide previews)."""
+
+    name: str
+    filename: str
+    mime_type: str
+    size: int
+
+
 class ArtifactVersionOut(BaseModel):
     id: uuid.UUID
     version_number: int
@@ -40,6 +49,7 @@ class ArtifactVersionOut(BaseModel):
     created_at: datetime
     current: bool
     is_text: bool
+    exports: list[ArtifactExportOut] = Field(default_factory=list)
 
 
 class ArtifactOut(BaseModel):

@@ -6,11 +6,16 @@ Rules:
 - Content is stored through the StorageProvider under content-addressed keys
   (``artifacts/<user>/<hash[:2]>/<hash>.<ext>``); identical content is stored once.
 - The MIME type is decided by EZO from the file extension, never by the caller.
+- A version may carry *exports* (e.g. a presentation's PDF, web version and slide
+  previews). They are stored under ``artifacts/<user>/exports/<artifact>/…`` and
+  listed in ``generation_metadata["exports"]``; they belong to the artifact and
+  are deleted with it.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -60,6 +65,10 @@ TEXT_EXTENSIONS = frozenset(
 )
 
 
+EXPORT_NAME = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+MAX_EXPORTS = 80
+
+
 class ArtifactError(Exception):
     """A request about an artifact cannot be fulfilled. `message` is safe to show."""
 
@@ -107,6 +116,47 @@ class ArtifactService:
             await self.storage.put(key, data)
         return key, content_hash
 
+    async def _store_exports(
+        self, artifact: Artifact, exports: dict[str, tuple[str, bytes]]
+    ) -> dict[str, dict[str, Any]]:
+        """Store derived files of a version. Names are fixed identifiers (pdf, html, preview-1…)."""
+        if len(exports) > MAX_EXPORTS:
+            raise ArtifactError("too_many_exports", "Too many exported files for one version.")
+        stored: dict[str, dict[str, Any]] = {}
+        for name, (filename, data) in exports.items():
+            if not EXPORT_NAME.match(name):
+                raise ArtifactError("invalid_export", f"Invalid export name: {name!r}.")
+            safe_name = sanitize_filename(filename)
+            mime_type = mime_for(safe_name)
+            if not data or len(data) > MAX_ARTIFACT_BYTES:
+                raise ArtifactError("invalid_export", f"The {name} export is empty or too large.")
+            content_hash = sha256_hex(data)
+            key = (
+                f"artifacts/{artifact.user_id}/exports/{artifact.id}/"
+                f"{content_hash}{extension_of(safe_name)}"
+            )
+            if not await self.storage.exists(key):
+                await self.storage.put(key, data)
+            stored[name] = {
+                "filename": safe_name,
+                "mime_type": mime_type,
+                "size": len(data),
+                "key": key,
+            }
+        return stored
+
+    async def read_export(
+        self, version: ArtifactVersion, name: str
+    ) -> tuple[dict[str, Any], bytes]:
+        exports = (version.generation_metadata or {}).get("exports") or {}
+        entry = exports.get(name) if isinstance(exports, dict) else None
+        if not isinstance(entry, dict) or not isinstance(entry.get("key"), str):
+            raise ArtifactError("not_found", f"This version has no {name!r} export.")
+        try:
+            return entry, await self.storage.get(entry["key"])
+        except StorageError as exc:
+            raise ArtifactError("missing_file", "The exported file is missing.") from exc
+
     async def create(
         self,
         session: AsyncSession,
@@ -125,6 +175,8 @@ class ArtifactService:
         generation_metadata: dict[str, Any] | None = None,
         source_references: list[dict[str, Any]] | None = None,
         status: str = "ready",
+        exports: dict[str, tuple[str, bytes]] | None = None,
+        change_summary: str = "Created",
     ) -> VersionResult:
         if artifact_type not in ARTIFACT_TYPES:
             raise ArtifactError("invalid_type", f"Unknown artifact type: {artifact_type}.")
@@ -155,7 +207,8 @@ class ArtifactService:
             model=model,
             generation_metadata=generation_metadata,
             source_references=source_references,
-            change_summary="Created",
+            change_summary=change_summary or "Created",
+            exports=exports,
         )
 
     async def current_version(
@@ -179,6 +232,7 @@ class ArtifactService:
         source_references: list[dict[str, Any]] | None = None,
         change_summary: str | None = None,
         parent_version_id: uuid.UUID | None = None,
+        exports: dict[str, tuple[str, bytes]] | None = None,
     ) -> VersionResult:
         """Add a new immutable version and make it current. Identical content is a no-op."""
         safe_name = sanitize_filename(filename)
@@ -193,6 +247,9 @@ class ArtifactService:
             return VersionResult(artifact, current, created=False)
 
         key, content_hash = await self._store(artifact.user_id, safe_name, data)
+        metadata = dict(generation_metadata or {})
+        if exports:
+            metadata["exports"] = await self._store_exports(artifact, exports)
         last = await session.scalar(
             select(func.max(ArtifactVersion.version_number)).where(
                 ArtifactVersion.artifact_id == artifact.id
@@ -213,7 +270,7 @@ class ArtifactService:
             parent_version_id=parent_version_id
             if parent_version_id
             else (current.id if current else None),
-            generation_metadata=generation_metadata or {},
+            generation_metadata=metadata,
             source_references=source_references or [],
         )
         session.add(version)
@@ -303,7 +360,14 @@ class ArtifactService:
 
     async def delete(self, session: AsyncSession, artifact: Artifact) -> None:
         """Delete an artifact and all its versions (explicit user action only)."""
-        keys = {v.storage_key for v in await self.versions(session, artifact.id)}
+        versions = await self.versions(session, artifact.id)
+        keys = {v.storage_key for v in versions}
+        export_keys = {
+            entry["key"]
+            for v in versions
+            for entry in ((v.generation_metadata or {}).get("exports") or {}).values()
+            if isinstance(entry, dict) and isinstance(entry.get("key"), str)
+        }
         artifact.current_version_id = None
         await session.flush()
         await session.delete(artifact)
@@ -319,6 +383,13 @@ class ArtifactService:
                     await self.storage.delete(key)
                 except StorageError:
                     logger.warning("Could not delete stored artifact file %s", key)
+        prefix = f"artifacts/{artifact.user_id}/exports/{artifact.id}/"
+        for key in export_keys:
+            if key.startswith(prefix):  # exports are private to this artifact
+                try:
+                    await self.storage.delete(key)
+                except StorageError:
+                    logger.warning("Could not delete artifact export %s", key)
 
 
 def _clean_title(title: str) -> str:
