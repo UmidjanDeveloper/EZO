@@ -98,12 +98,26 @@ class Settings(BaseSettings):
         default=False, alias="EZO_FETCH_ALLOW_PRIVATE_NETWORKS"
     )
 
+    # Voice (server-side speech). The browser's speech features stay as fallback.
+    voice_providers: Annotated[list[str], NoDecode] = Field(
+        default=["auto"], alias="EZO_VOICE_PROVIDERS"
+    )
+    voicestudio_url: str | None = Field(default=None, alias="VOICESTUDIO_URL")
+    voicestudio_api_key: SecretStr | None = Field(default=None, alias="VOICESTUDIO_API_KEY")
+    voicestudio_voice: str = Field(default="default", alias="VOICESTUDIO_VOICE")
+    openai_stt_model: str = Field(default="gpt-4o-mini-transcribe", alias="EZO_OPENAI_STT_MODEL")
+    openai_tts_model: str = Field(default="gpt-4o-mini-tts", alias="EZO_OPENAI_TTS_MODEL")
+    openai_tts_voice: str = Field(default="alloy", alias="EZO_OPENAI_TTS_VOICE")
+    voice_max_audio_mb: int = Field(default=10, alias="EZO_VOICE_MAX_AUDIO_MB")
+    voice_timeout_seconds: float = Field(default=60.0, alias="EZO_VOICE_TIMEOUT_SECONDS")
+
     @field_validator(
         "openai_api_key",
         "anthropic_api_key",
         "gemini_api_key",
         "api_token",
         "tavily_api_key",
+        "voicestudio_api_key",
         mode="before",
     )
     @classmethod
@@ -112,7 +126,7 @@ class Settings(BaseSettings):
             return None
         return value
 
-    @field_validator("preferred_provider", "openai_base_url", mode="before")
+    @field_validator("preferred_provider", "openai_base_url", "voicestudio_url", mode="before")
     @classmethod
     def _blank_str_is_none(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
@@ -132,6 +146,14 @@ class Settings(BaseSettings):
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("voice_providers", mode="before")
+    @classmethod
+    def _split_voice_providers(cls, value: object) -> object:
+        if isinstance(value, str):
+            names = [name.strip().lower() for name in value.split(",") if name.strip()]
+            return names or ["auto"]
         return value
 
     @property

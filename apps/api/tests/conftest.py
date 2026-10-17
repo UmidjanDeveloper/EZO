@@ -65,6 +65,8 @@ def make_settings(database_url: str, **overrides: object) -> Settings:
         "EZO_PREFERRED_PROVIDER": "",
         "EZO_AUTH_MODE": "local",
         "EZO_API_TOKEN": "",
+        "VOICESTUDIO_URL": "",
+        "EZO_VOICE_PROVIDERS": "auto",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

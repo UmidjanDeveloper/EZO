@@ -28,6 +28,7 @@ from ezo_api.storage.local import LocalStorageProvider
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
 from ezo_api.tools.web_search import WebSearchProvider, build_web_search
+from ezo_api.voice.service import VoiceService, build_voice_service
 
 
 class ConfigurationError(RuntimeError):
@@ -54,6 +55,7 @@ class Services:
     web_search: WebSearchProvider | None
     tools: ToolRegistry
     memory_index: MemoryIndex
+    voice: VoiceService
 
 
 def build_services(
@@ -61,8 +63,9 @@ def build_services(
     providers: dict[str, ModelProvider] | None = None,
     web_search: WebSearchProvider | Literal["auto"] | None = "auto",
     fetcher: SafeFetcher | None = None,
+    voice: VoiceService | None = None,
 ) -> Services:
-    """Wire everything together. Tests can inject providers, web search and a fetcher."""
+    """Wire everything together. Tests can inject providers, web search, fetcher and voice."""
     if settings.auth_mode == "token" and settings.api_token is None:
         raise ConfigurationError(
             "EZO_AUTH_MODE=token requires EZO_API_TOKEN to be set in .env (any long random string)."
@@ -123,6 +126,7 @@ def build_services(
         web_search=web_search,
         tools=ToolRegistry([KnowledgeSearchTool(), WebSearchTool(), WebFetchTool()]),
         memory_index=memory_index,
+        voice=voice or build_voice_service(settings),
     )
     core.services = services
     core.memory_index = memory_index

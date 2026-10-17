@@ -20,6 +20,13 @@ from ezo_api.providers.types import (
     Usage,
 )
 from ezo_api.tools.web_search import WebResult, WebSearchError, WebSearchProvider
+from ezo_api.voice.base import (
+    SpeechAudio,
+    SpeechToTextProvider,
+    TextToSpeechProvider,
+    Transcript,
+    VoiceError,
+)
 
 EMBED_DIM = 64
 
@@ -101,3 +108,29 @@ class FakeWebSearch(WebSearchProvider):
         if self.error:
             raise WebSearchError(self.error)
         return self.results[:max_results]
+
+
+class FakeVoice(SpeechToTextProvider, TextToSpeechProvider):
+    """Voice provider for tests: returns a fixed transcript / audio or fails with `fail_kind`."""
+
+    def __init__(
+        self, name: str, transcript: str = "Salom EZO", fail_kind: str | None = None
+    ) -> None:
+        self.name = name
+        self.transcript = transcript
+        self.fail_kind = fail_kind
+        self.calls: list[tuple[str, int, str | None]] = []
+
+    async def transcribe(
+        self, audio: bytes, mime_type: str, filename: str, language: str | None
+    ) -> Transcript:
+        self.calls.append(("stt", len(audio), language))
+        if self.fail_kind:
+            raise VoiceError(self.fail_kind, f"{self.name}: failed")  # type: ignore[arg-type]
+        return Transcript(text=self.transcript, language=language or "uz", provider=self.name)
+
+    async def synthesize(self, text: str, language: str | None) -> SpeechAudio:
+        self.calls.append(("tts", len(text), language))
+        if self.fail_kind:
+            raise VoiceError(self.fail_kind, f"{self.name}: failed")  # type: ignore[arg-type]
+        return SpeechAudio(data=b"ID3fake-mp3", mime_type="audio/mpeg", provider=self.name)
