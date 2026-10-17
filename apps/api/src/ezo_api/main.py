@@ -22,6 +22,7 @@ from ezo_api.api.routes import (
     chat,
     conversations,
     knowledge,
+    language,
     memory,
     projects,
     stories,
@@ -166,6 +167,7 @@ def create_app(
         voice,
         artifacts,
         stories,
+        language,
     ):
         app.include_router(module.router)
 

@@ -57,6 +57,13 @@ FEATURES: tuple[Feature, ...] = (
         "experimental",
         "in-memory, not started from chat yet",
     ),
+    Feature(
+        "language_coach",
+        "Language Coach, IELTS-style simulator, progress",
+        "Phase 5",
+        "alpha",
+        "estimated bands only; pronunciation transcript-assisted",
+    ),
     Feature("ocr", "OCR for scans and images", "Phase 6.5", "planned"),
     Feature("jobs", "Durable background jobs / worker", "Infrastructure", "planned"),
     Feature("realtime_voice", "Realtime streaming voice", "Phase 7", "planned"),

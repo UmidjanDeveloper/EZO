@@ -29,6 +29,10 @@ class AgentTurn:
     intent: IntentResult
     requested: AgentSpec
     """The agent the intent asked for (may be unavailable and covered by another)."""
+    channel: str = "text"
+    """"voice" when the user spoke the message."""
+    speech_seconds: float | None = None
+    """Measured speaking time of a voice message (None when typed or not measured)."""
 
 
 @dataclass(frozen=True, slots=True)

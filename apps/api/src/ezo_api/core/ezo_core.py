@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.core import messages
-from ezo_api.core.intent import IntentResult, classify_intent
+from ezo_api.core.intent import Intent, IntentResult, classify_intent
 from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
@@ -39,6 +39,7 @@ from ezo_api.knowledge.retrieval.citations import (
     verify_citations,
 )
 from ezo_api.knowledge.retrieval.sources import number_sources
+from ezo_api.language.service import active_session as active_language_session
 from ezo_api.memory.service import MemoryIndex, MemoryService, RetrievedMemory
 from ezo_api.personality.profile import HumorLevel, PersonalityProfile
 from ezo_api.personality.prompt import PromptContext, PromptMemory, build_system_prompt
@@ -78,6 +79,7 @@ class TurnInput:
     project_id: uuid.UUID | None = None
     forced_agent: str | None = None
     channel: Literal["text", "voice"] = "text"
+    speech_seconds: float | None = None
 
 
 @dataclass(slots=True)
@@ -94,6 +96,7 @@ class PreparedTurn:
     tracer: Tracer
     created_conversation: bool
     channel: Literal["text", "voice"] = "text"
+    speech_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +197,16 @@ class EzoCore:
 
         with tracer.step("classify_intent") as step:
             intent = classify_intent(turn.text)
+            if (
+                intent.intent == Intent.GENERAL
+                and turn.forced_agent is None
+                and await active_language_session(session, user.id, conversation.id) is not None
+            ):
+                # An ongoing practice session keeps the coach: learner answers are ordinary
+                # sentences that would otherwise look like general chat.
+                intent = IntentResult(
+                    Intent.LANGUAGE_COACH, 1.0, ("active_language_session",), intent.scores
+                )
             step.summary = f"{intent.intent.value} ({intent.confidence:.2f})" + (
                 f" signals={list(intent.signals)}" if intent.signals else ""
             )
@@ -240,6 +253,7 @@ class EzoCore:
             tracer=tracer,
             created_conversation=created,
             channel=turn.channel,
+            speech_seconds=turn.speech_seconds,
         )
 
     async def _load_conversation(
@@ -446,6 +460,8 @@ class EzoCore:
                         language=prepared.language,
                         intent=prepared.intent,
                         requested=selection.requested,
+                        channel=prepared.channel,
+                        speech_seconds=prepared.speech_seconds,
                     ),
                     tools=ToolContext(
                         session=session,
@@ -474,6 +490,8 @@ class EzoCore:
                     language=prepared.language,
                     intent=prepared.intent,
                     requested=selection.requested,
+                    channel=prepared.channel,
+                    speech_seconds=prepared.speech_seconds,
                 )
             )
             step.summary = f"route={plan.route} mode={plan.context_mode} steps={len(plan.steps)}"

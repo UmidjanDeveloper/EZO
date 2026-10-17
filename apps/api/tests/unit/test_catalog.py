@@ -12,7 +12,7 @@ ROADMAP = (API_DIR.parent.parent / "ROADMAP.md").read_text(encoding="utf-8")
 
 def test_available_agents_are_exactly_the_implemented_ones() -> None:
     available = {spec.key for spec in AGENTS.values() if spec.available}
-    assert available == {"general", "research", "document", "presentation"}
+    assert available == {"general", "research", "document", "presentation", "language_coach"}
     registry = AgentRegistry()
     for spec in AGENTS.values():
         selected = registry.select(spec.intent).agent.spec.key

@@ -50,18 +50,11 @@ AGENTS: dict[Intent, AgentSpec] = {
             "language_coach",
             Intent.LANGUAGE_COACH,
             {"uz": "Til murabbiyi", "en": "Language Coach", "ru": "Языковой тренер"},
-            "Speaking practice, IELTS-style simulator, grammar and vocabulary coaching.",
-            maturity="planned",
+            "Practice sessions, IELTS-style speaking simulator (estimated bands), progress.",
+            maturity="alpha",
             phase="Phase 5",
             context_mode="teacher",
             route="chat",
-            limitation_note=(
-                "The dedicated Language Coach (IELTS-style simulator, progress tracking, "
-                "session reports) is not available yet. You can still practise conversation "
-                "with the user in a friendly teacher style, but do not claim to give official "
-                "or calibrated IELTS band scores, and mention once that full speaking practice "
-                "with reports arrives in a later EZO update."
-            ),
         ),
         AgentSpec(
             "presentation",

@@ -104,6 +104,12 @@ class ChatIn(BaseModel):
     channel: Literal["text", "voice"] = Field(
         default="text", description="'voice' when the user speaks and hears the reply"
     )
+    speech_seconds: float | None = Field(
+        default=None,
+        ge=0,
+        le=600,
+        description="Measured speaking time of a voice message (used by the Language Coach)",
+    )
 
 
 class ChatOut(BaseModel):
