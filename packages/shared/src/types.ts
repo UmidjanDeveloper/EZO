@@ -211,7 +211,20 @@ export interface AgentInfo {
   names: Record<LanguageCode, string>;
   description: string;
   available: boolean;
-  milestone: number;
+  /** planned | experimental | alpha | beta | stable */
+  maturity: Maturity;
+  /** Roadmap section (ROADMAP.md). */
+  phase: string;
+}
+
+export type Maturity = "planned" | "experimental" | "alpha" | "beta" | "stable";
+
+export interface FeatureInfo {
+  key: string;
+  name: string;
+  phase: string;
+  maturity: Maturity;
+  note: string;
 }
 
 export interface RouteCandidate {
@@ -232,6 +245,7 @@ export interface SystemStatus {
     routes: Record<string, { description: string; active_candidates: RouteCandidate[] }>;
   };
   agents: AgentInfo[];
+  features: FeatureInfo[];
   personality: {
     name: string;
     tagline: string;

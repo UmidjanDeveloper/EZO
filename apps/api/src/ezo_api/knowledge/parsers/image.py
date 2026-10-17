@@ -1,4 +1,4 @@
-"""Images: stored as-is. Text extraction needs OCR (OCRProvider arrives in Milestone 4)."""
+"""Images: stored as-is. Text extraction needs OCR (OCR arrives in ROADMAP Phase 6.5)."""
 
 from __future__ import annotations
 

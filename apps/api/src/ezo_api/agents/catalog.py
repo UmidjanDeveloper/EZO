@@ -1,7 +1,8 @@
-"""Catalog of EZO agents and their availability.
+"""Catalog of EZO agents, their roadmap phase and maturity.
 
-Agents that are not implemented yet are listed with the milestone that will
-deliver them. EzoCore never pretends an unavailable agent ran.
+Agents that are not implemented yet are listed as ``planned`` with the roadmap
+phase that will deliver them (ROADMAP.md). EzoCore never pretends an
+unavailable agent ran: availability is derived from the maturity label.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ezo_api.core.intent import Intent
+from ezo_api.maturity import Maturity
 from ezo_api.personality.profile import ContextMode
 
 
@@ -18,12 +20,17 @@ class AgentSpec:
     intent: Intent
     names: dict[str, str]  # uz / en / ru
     description: str
-    available: bool
-    milestone: int
+    maturity: Maturity
+    phase: str
+    """Roadmap section that delivered (or will deliver) the agent."""
     context_mode: ContextMode
     route: str
     limitation_note: str = ""
     """Extra instructions for GeneralAgent when it covers for this agent."""
+
+    @property
+    def available(self) -> bool:
+        return self.maturity != "planned"
 
 
 AGENTS: dict[Intent, AgentSpec] = {
@@ -34,8 +41,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.GENERAL,
             {"uz": "Umumiy hamroh", "en": "General Companion", "ru": "Общий компаньон"},
             "Natural conversation, brainstorming, goals and personal assistance.",
-            available=True,
-            milestone=1,
+            maturity="alpha",
+            phase="Foundation",
             context_mode="casual",
             route="chat",
         ),
@@ -44,8 +51,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.LANGUAGE_COACH,
             {"uz": "Til murabbiyi", "en": "Language Coach", "ru": "Языковой тренер"},
             "Speaking practice, IELTS-style simulator, grammar and vocabulary coaching.",
-            available=False,
-            milestone=3,
+            maturity="planned",
+            phase="Phase 5",
             context_mode="teacher",
             route="chat",
             limitation_note=(
@@ -61,8 +68,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.PRESENTATION,
             {"uz": "Taqdimot agenti", "en": "Presentation Agent", "ru": "Агент презентаций"},
             "Narrative, slide architecture, layout QA and PPTX/PDF/web export.",
-            available=True,
-            milestone=4,
+            maturity="alpha",
+            phase="Presentations",
             context_mode="professional",
             route="reasoning",
         ),
@@ -71,8 +78,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.DEVELOPER,
             {"uz": "Dasturchi agent", "en": "Developer Agent", "ru": "Агент-разработчик"},
             "Repository understanding, debugging, tests, diffs and pull requests.",
-            available=False,
-            milestone=6,
+            maturity="planned",
+            phase="Phase 9",
             context_mode="technical",
             route="coding",
             limitation_note=(
@@ -91,8 +98,8 @@ AGENTS: dict[Intent, AgentSpec] = {
                 "ru": "Агент правовых исследований",
             },
             "Uzbekistan legislation with official sources (LEX.UZ) and currentness checks.",
-            available=False,
-            milestone=5,
+            maturity="planned",
+            phase="Phase 8",
             context_mode="professional",
             route="reasoning",
             limitation_note=(
@@ -108,8 +115,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.RESEARCH,
             {"uz": "Tadqiqot agenti", "en": "Research Agent", "ru": "Исследовательский агент"},
             "Current web research, source comparison and citations.",
-            available=True,
-            milestone=2,
+            maturity="alpha",
+            phase="Knowledge",
             context_mode="professional",
             route="research",
         ),
@@ -118,8 +125,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.DOCUMENT,
             {"uz": "Hujjat agenti", "en": "Document Agent", "ru": "Агент документов"},
             "Reading, creating, editing, comparing and converting DOCX, PDF, XLSX and CSV.",
-            available=True,
-            milestone=4,
+            maturity="alpha",
+            phase="Documents",
             context_mode="professional",
             route="chat",
         ),
@@ -128,8 +135,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.BUSINESS,
             {"uz": "Biznes agenti", "en": "Business Agent", "ru": "Бизнес-агент"},
             "Idea evaluation, market and competitor research, strategy.",
-            available=False,
-            milestone=8,
+            maturity="planned",
+            phase="Business",
             context_mode="professional",
             route="reasoning",
             limitation_note=(
@@ -143,8 +150,8 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.VISUAL,
             {"uz": "Vizual agent", "en": "Visual Agent", "ru": "Визуальный агент"},
             "Image generation and editing, logos, diagrams.",
-            available=False,
-            milestone=4,
+            maturity="planned",
+            phase="Phase 6",
             context_mode="casual",
             route="chat",
             limitation_note=(

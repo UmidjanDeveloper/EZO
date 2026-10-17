@@ -30,7 +30,7 @@ class ToolContext:
     conversation_id: uuid.UUID | None = None
     """Conversation of the turn (artifacts created by tools are linked to it)."""
     allow_dangerous: bool = False
-    """Only set after an explicit user confirmation (used from Milestone 6)."""
+    """Only set after an explicit user confirmation (approval-gated tools, ROADMAP Phase 9)."""
     on_activity: Callable[[str], None] | None = None
     """Told what EZO is visibly doing (e.g. "searching") when a tool starts."""
 

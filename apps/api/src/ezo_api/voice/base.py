@@ -69,7 +69,7 @@ class RealtimeEvent:
 class RealtimeVoiceProvider(ABC):
     """Full-duplex streaming voice (microphone in, speech out, barge-in).
 
-    Interface only: no realtime provider is implemented yet (Milestone 7).
+    Interface only: no realtime provider is implemented yet (ROADMAP Phase 7).
     EZO's voice mode currently works turn by turn (record → transcribe → answer
     → speak) and supports interruption on the client.
     """

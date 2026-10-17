@@ -191,7 +191,18 @@ class AgentInfo(BaseModel):
     names: dict[str, str]
     description: str
     available: bool
-    milestone: int
+    maturity: str
+    """planned | experimental | alpha | beta | stable (see ezo_api/maturity.py)."""
+    phase: str
+    """Roadmap section (ROADMAP.md)."""
+
+
+class FeatureInfo(BaseModel):
+    key: str
+    name: str
+    phase: str
+    maturity: str
+    note: str
 
 
 class SystemStatus(BaseModel):
@@ -202,5 +213,6 @@ class SystemStatus(BaseModel):
     providers: list[ProviderStatus]
     routing: dict[str, Any]
     agents: list[AgentInfo]
+    features: list[FeatureInfo]
     personality: dict[str, Any]
     debug_traces: bool

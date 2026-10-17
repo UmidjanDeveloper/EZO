@@ -12,10 +12,12 @@ from ezo_api import __version__
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.api.serializers import user_out
 from ezo_api.db.models import AgentRun, User
+from ezo_api.maturity import FEATURES
 from ezo_api.providers.registry import KNOWN_PROVIDERS
 from ezo_api.schemas.api import (
     AgentInfo,
     AgentRunOut,
+    FeatureInfo,
     Preferences,
     PreferencesUpdate,
     ProviderStatus,
@@ -71,9 +73,14 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
                 names=spec.names,
                 description=spec.description,
                 available=spec.available,
-                milestone=spec.milestone,
+                maturity=spec.maturity,
+                phase=spec.phase,
             )
             for spec in services.agents.catalog()
+        ],
+        features=[
+            FeatureInfo(key=f.key, name=f.name, phase=f.phase, maturity=f.maturity, note=f.note)
+            for f in FEATURES
         ],
         personality={
             "name": profile.name,

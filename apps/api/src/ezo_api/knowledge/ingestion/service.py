@@ -282,7 +282,7 @@ class KnowledgeService:
             document.status = "needs_ocr"
             document.error = (
                 "This file is a scan or an image, so it has no readable text. It is stored; "
-                "reading text from images (OCR) arrives in Milestone 4."
+                "reading text from images and scans (OCR) arrives in a later EZO update."
             )
             await self._clear_index(session, document)
             return
