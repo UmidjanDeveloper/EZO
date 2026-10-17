@@ -265,6 +265,25 @@ version's `generation_metadata.exports` (keys are internal; the API returns `exp
 name, filename, type and size). `GET /api/artifacts/{id}/versions/{n}/exports/{name}`
 serves them (PNG previews inline, everything else as attachments).
 
+### Language Coach (Phase 5)
+
+`agents/language_coach.py` keeps real session state (`db/models/language.py`, migration 0004).
+`language/` holds the parts that need no model:
+- `analysis.py`: exact metrics from the transcript;
+- `modes.py`: mode, CEFR, command and goal detection;
+- `ielts.py`: the original question bank, the Part 1 → 2 → 3 state machine and band maths;
+- `assessment.py`: the assessor prompt and validation of its JSON (invented mistakes dropped,
+  bands rounded and clamped, too-short samples get no band, pronunciation transcript-assisted
+  and excluded from the range);
+- `service.py`: sessions, turns, saving results, recurring mistakes and progress;
+- `report.py`: the localized report artifact.
+
+EzoCore keeps a conversation with an **active language session** on the coach. A general-intent
+message, which is how most learner answers classify, is routed to the coach instead. Voice
+messages may carry `speech_seconds` (measured by the web VAD), stored per turn for
+words-per-minute. Practice replies use the `chat` route and the assessment uses `reasoning`.
+Details: [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md).
+
 ### Orchestration (prepared, not wired into chat)
 
 `orchestration/` holds optional multi-agent **missions** behind one interface,

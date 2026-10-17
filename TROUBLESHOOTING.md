@@ -164,3 +164,17 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
   `.swarm/`, `CLAUDE.md` and `.mcp.json`, and pre-approves all of its tools. Remove those files
   (check with `git status`) and the “Ruflo Integration” block it appended to
   `~/.claude/CLAUDE.md`.
+
+## Language practice
+
+- **My English answer was treated as normal chat.** The coach stays active only inside the
+  conversation where the practice started and until it is finished. Start again with “English
+  speaking qilamiz” or “IELTS speaking qilamiz”.
+- **“No band estimate was given.”** Fewer than 40 learner words were recorded. Speak or write a
+  little more before asking for feedback.
+- **Pronunciation says “not assessed”.** The session was typed, or no reliable estimate was
+  possible. EZO does not invent pronunciation scores from text.
+- **No words-per-minute number.** It appears only when every turn was spoken through server voice
+  (the browser's own speech recognition does not report timing).
+- **Wrong mode.** Name it clearly: “IELTS”, “job interview”, “travel”, “grammar”, “vocabulary”,
+  “debate”, “business English”.

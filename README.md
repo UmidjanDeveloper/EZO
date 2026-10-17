@@ -9,8 +9,9 @@ learns to research, create documents and presentations, coach languages, write c
 longer workflows. The interface is Uzbek first, with English and Russian built in.
 
 > **Status: alpha.** Working today: chat with memory, files and research with sources,
-> turn-by-turn voice, documents (DOCX/PDF/XLSX), presentations (PPTX/PDF/web) and versioned
-> “Created” files. Next: the Language Coach (IELTS-style speaking practice).
+> turn-by-turn voice, documents (DOCX/PDF/XLSX), presentations (PPTX/PDF/web), versioned
+> “Created” files and English practice with an IELTS-style speaking simulator (estimated bands).
+> Next: the Visual Agent (images).
 > The screen shows only the EZO robot and your conversation history. You can type, talk to EZO
 > out loud, give it your files, or ask it to research the web — answers come with sources.
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
@@ -235,6 +236,27 @@ Every presentation goes through a layout check (text that does not fit, tiny fon
 outside the slide, broken chart data…). EZO repairs problems once automatically and tells you
 honestly if anything remains. Images are abstract visuals for now (image generation arrives
 with the Visual Agent). Scanned PDFs need OCR, which is not built in yet.
+
+## Language practice (Til mashg'ulotlari)
+
+Practise English by simply talking to EZO, by typing or by voice:
+
+- “**English speaking qilamiz**” starts a friendly conversation in English. “**IELTS speaking
+  qilamiz**” runs an IELTS-style speaking simulator: Part 1, a Part 2 task card, Part 3, then
+  feedback. Job interview, travel, grammar, vocabulary, debate and business English modes
+  also exist.
+- EZO keeps the conversation going and does not interrupt every mistake. Say “**Feedback
+  ber**” at any time, or finish the IELTS parts, and you get an **estimated band range**,
+  strengths, weaknesses, your real mistakes with corrections, better sentences, new words and
+  one practice target. A report file is also saved.
+- Ask “**Grammarim yaxshilandimi?**” or “**Eng ko'p qiladigan 5 ta xatom nima?**” to get
+  progress from your past sessions. Set a goal with “**Maqsadim IELTS 7**”.
+- The graduation-cap icon opens **Til mashg'ulotlari**: goal, trends, recurring mistakes,
+  sessions and vocabulary.
+- **Honest by design:** EZO is a *simulator*, and every band is an *estimate*, never an
+  official IELTS score. Pronunciation is not judged from typed text; from voice it is at most a
+  transcript-assisted estimate and is not counted in the band. Details:
+  [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md).
 
 ## Optional integrations
 
