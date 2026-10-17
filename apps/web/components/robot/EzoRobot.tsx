@@ -12,6 +12,8 @@ interface EzoRobotProps {
   className?: string;
   /** Decorative halo rings and floating motion (off for tiny avatars). */
   showHalo?: boolean;
+  /** Overrides the light colour (e.g. success / danger from EzoPresence). */
+  color?: string;
 }
 
 const EYE_COLOR: Record<RobotState, string> = {
@@ -32,11 +34,11 @@ const loop = (duration: number, extra: Transition = {}): Transition => ({
  * EZO's face: a calm, futuristic robot whose eyes, mouth and core light
  * react to what EZO is doing (idle, listening, thinking, speaking).
  */
-export function EzoRobot({ size = 240, state = "idle", className, showHalo = true }: EzoRobotProps) {
+export function EzoRobot({ size = 240, state = "idle", className, showHalo = true, color }: EzoRobotProps) {
   const reduce = useReducedMotion() ?? false;
   const uid = useId().replace(/:/g, "");
   const id = (name: string) => `${name}-${uid}`;
-  const eye = EYE_COLOR[state];
+  const eye = color ?? EYE_COLOR[state];
   const animate = !reduce;
 
   // Eyes: blink when idle, widen when listening, look around when thinking.

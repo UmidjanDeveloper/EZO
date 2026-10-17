@@ -204,8 +204,14 @@ export interface ChatErrorEvent {
   attempts: ProviderAttempt[];
 }
 
+/** What EZO is visibly doing before it answers: "searching", "reading", "working", … */
+export interface ChatActivityEvent {
+  stage: string;
+}
+
 export type ChatStreamEvent =
   | { type: "meta"; data: ChatMetaEvent }
+  | { type: "activity"; data: ChatActivityEvent }
   | { type: "delta"; data: ChatDeltaEvent }
   | { type: "done"; data: ChatDoneEvent }
   | { type: "error"; data: ChatErrorEvent };

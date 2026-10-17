@@ -37,7 +37,7 @@ export interface ApiClientOptions {
   fetchImpl?: typeof fetch;
 }
 
-const STREAM_EVENTS = new Set(["meta", "delta", "done", "error"]);
+const STREAM_EVENTS = new Set(["meta", "activity", "delta", "done", "error"]);
 
 export function createApiClient(options: ApiClientOptions) {
   const baseUrl = () =>

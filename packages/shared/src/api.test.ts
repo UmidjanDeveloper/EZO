@@ -56,14 +56,14 @@ describe("createApiClient", () => {
       baseUrl: "http://api",
       fetchImpl: async () =>
         streamResponse([
-          'event: meta\ndata: {"conversation_id":"c1"}\n\nevent: del',
+          'event: meta\ndata: {"conversation_id":"c1"}\n\nevent: activity\ndata: {"stage":"searching"}\n\nevent: del',
           'ta\ndata: {"text":"Sal"}\n\nevent: delta\ndata: {"text":"om"}\n\n',
           'event: done\ndata: {"message":{"content":"Salom"}}\n\n',
         ]),
     });
     const events = [];
     for await (const event of client.streamChat({ message: "hi" })) events.push(event);
-    expect(events.map((e) => e.type)).toEqual(["meta", "delta", "delta", "done"]);
+    expect(events.map((e) => e.type)).toEqual(["meta", "activity", "delta", "delta", "done"]);
     const text = events.flatMap((e) => (e.type === "delta" ? [e.data.text] : [])).join("");
     expect(text).toBe("Salom");
   });

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { HistoryButton } from "../layout/shell-context";
+import { EzoStatus } from "../robot/EzoPresence";
 import { Composer } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { MessageBubble } from "./MessageBubble";
@@ -24,7 +25,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
   const { m } = useI18n();
   const { status } = useApp();
   const session = useChatSession({ conversationId, projectId });
-  const { title, project, messages, loading, loadError, streaming, send, stop } = session;
+  const { title, project, messages, loading, loadError, streaming, presence, send, stop } = session;
 
   const [mode, setMode] = useState<Mode>("text");
   const [traceRunId, setTraceRunId] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
         <h1 className="min-w-0 flex-1 truncate text-sm text-ink-muted" data-testid="chat-title">
           {title}
         </h1>
+        {mode === "text" ? <EzoStatus state={presence} label={m.presence[presence]} /> : null}
         {project ? (
           <Badge tone="accent">
             <FolderKanban size={12} /> {project.name}

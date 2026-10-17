@@ -14,11 +14,13 @@ import {
   stopSpeaking,
   toSpeakableText,
 } from "@/lib/speech";
+import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
-import { EzoRobot, type RobotState } from "../robot/EzoRobot";
+import { EzoPresence } from "../robot/EzoPresence";
 import type { useChatSession } from "./useChatSession";
 
 type Session = ReturnType<typeof useChatSession>;
+
 
 const LANGUAGES: LanguageCode[] = ["uz", "en", "ru"];
 const storedVoiceLanguage = createStoredValue<LanguageCode | "">(
@@ -36,7 +38,7 @@ export function VoiceStage({ session }: { session: Session }) {
   const storedLanguage = storedVoiceLanguage.useValue();
   const language: LanguageCode = storedLanguage || uiLanguage;
 
-  const [phase, setPhase] = useState<RobotState>("idle");
+  const [phase, setPhase] = useState<VoicePhase>("idle");
   const [heard, setHeard] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [supported] = useState(() => speechRecognitionSupported());
@@ -47,6 +49,7 @@ export function VoiceStage({ session }: { session: Session }) {
   const listenRef = useRef<() => void>(() => undefined);
 
   const { send, stop: stopStreaming, messages } = session;
+  const visible = voicePresence(phase, session.presence);
   const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const caption = lastAssistant?.error ? lastAssistant.error.message : lastAssistant?.content ?? "";
 
@@ -138,7 +141,9 @@ export function VoiceStage({ session }: { session: Session }) {
     : phase === "listening"
       ? m.voice.listening
       : phase === "thinking"
-        ? m.voice.thinking
+        ? visible === "thinking"
+          ? m.voice.thinking
+          : m.presence[visible]
         : phase === "speaking"
           ? m.voice.speaking
           : m.voice.idle;
@@ -169,7 +174,7 @@ export function VoiceStage({ session }: { session: Session }) {
           className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
           aria-label={status}
         >
-          <EzoRobot size={280} state={phase} className="max-h-[42vh] max-w-[70vw]" />
+          <EzoPresence state={visible} size={290} className="max-h-[44vh] max-w-[72vw]" />
         </button>
 
         <p className="text-sm font-medium tracking-wide text-ink-muted" aria-live="polite" data-testid="voice-status">

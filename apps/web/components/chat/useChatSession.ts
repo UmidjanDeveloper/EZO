@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
+import { nextEzoState, SETTLE_AFTER_MS, type EzoEvent, type EzoState } from "@/lib/ezo-state";
 import type { UiMessage } from "./types";
 
 export function fromApi(message: Message): UiMessage {
@@ -45,7 +46,18 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
   const [loading, setLoading] = useState(Boolean(initialId));
   const [loadError, setLoadError] = useState<UiMessage["error"] | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [presence, setPresence] = useState<EzoState>("idle");
   const abortRef = useRef<AbortController | null>(null);
+
+  const signal = useCallback((event: EzoEvent) => setPresence((current) => nextEzoState(current, event)), []);
+
+  // "Done" and "error" stay visible for a moment, then EZO returns to idle.
+  useEffect(() => {
+    const delay = SETTLE_AFTER_MS[presence];
+    if (delay === undefined) return;
+    const timer = window.setTimeout(() => signal({ type: "settle" }), delay);
+    return () => window.clearTimeout(timer);
+  }, [presence, signal]);
 
   // Load an existing conversation.
   useEffect(() => {
@@ -102,6 +114,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       const controller = new AbortController();
       abortRef.current = controller;
       setStreaming(true);
+      signal({ type: "send" });
       setMessages((current) => [
         ...current,
         { id: `local-user-${Date.now()}`, role: "user", content: text, metadata: { channel } },
@@ -128,24 +141,31 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
               window.history.replaceState(null, "", `/chat/${meta.conversation_id}`);
             }
             updateLast((message) => ({ ...message, agent: meta.agent, runId: meta.run_id, language: meta.language }));
+          } else if (event.type === "activity") {
+            signal({ type: "activity", stage: event.data.stage });
           } else if (event.type === "delta") {
+            signal({ type: "delta" });
             const chunk = event.data.text;
             updateLast((message) => ({ ...message, content: message.content + chunk }));
           } else if (event.type === "done") {
+            signal({ type: "done" });
             final = { ...fromApi(event.data.message), streaming: false };
             const done = final;
             updateLast(() => done);
           } else {
             const error = event.data;
+            signal({ type: "error" });
             final = null;
             updateLast((message) => ({ ...message, streaming: false, error, runId: error.run_id }));
           }
         }
       } catch (error) {
         if (!controller.signal.aborted) {
+          signal({ type: "error" });
           updateLast((message) => ({ ...message, streaming: false, error: errorOf(error) }));
         }
       } finally {
+        signal({ type: "stopped" });
         updateLast((message) => ({ ...message, streaming: false }));
         setStreaming(false);
         abortRef.current = null;
@@ -153,10 +173,10 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       }
       return final;
     },
-    [conversationId, projectId, refreshConversations, streaming, updateLast],
+    [conversationId, projectId, refreshConversations, signal, streaming, updateLast],
   );
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  return { conversationId, title, project, messages, loading, loadError, streaming, send, stop };
+  return { conversationId, title, project, messages, loading, loadError, streaming, presence, send, stop };
 }
