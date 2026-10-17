@@ -54,6 +54,17 @@ images) plus the extended local checks listed for that phase.
 - Docker images built and smoke-tested in CI, dependency audits, `docs/SECURITY.md`,
   Git workflow and licence decision documented for the owner
 
+### Phase 5 — Language Coach + IELTS — alpha
+- LanguageCoachAgent with persistent sessions, turns, metrics, mistakes, goals, vocabulary
+  (migration 0004); an active session keeps learner answers with the coach
+- Modes: free conversation, IELTS-style speaking (Parts 1–3, original questions, *estimated*
+  bands), teacher, grammar, vocabulary, debate, job interview, travel, business English
+- CEFR adaptation, recurring-mistake practice without nagging, feedback after the session,
+  report artifact, progress answers from stored facts, goals
+- Exact computed metrics (incl. words per minute from measured voice time); pronunciation
+  only transcript-assisted and excluded from bands; licensed knowledge via the user's own files
+- “Til mashg'ulotlari” page; details in [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md)
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
@@ -61,16 +72,7 @@ images) plus the extended local checks listed for that phase.
 
 ## Next (in this order)
 
-### Phase 5 — Language Coach + IELTS ← current
-- LanguageCoachAgent with persistent sessions, turns, metrics, mistakes, goals, vocabulary
-- Modes: free conversation, IELTS-style speaking (Parts 1–3, *estimated* bands, never
-  "official"), teacher, grammar, vocabulary, debate, job interview, travel, business English
-- CEFR A1–C2 adaptation; recurring-mistake tracking reused in later sessions
-- Feedback after sections, not interruptions; session report artifacts; progress questions
-- Pronunciation labelled limited / transcript-assisted until acoustic analysis exists
-- Licensed knowledge only (official public IELTS material, descriptors, OER) via RAG
-
-### Phase 6 — Visual Agent
+### Phase 6 — Visual Agent ← current
 - `ImageProvider` / `ImageEditProvider` (OpenAI, Gemini, later local), configurable models
 - Image generation and editing, diagrams, social graphics, logo concepts, product visuals
 - PresentationAgent requests visuals; honest placeholders when no provider is available

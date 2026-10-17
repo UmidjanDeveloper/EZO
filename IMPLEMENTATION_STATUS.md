@@ -53,7 +53,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | DocumentAgent + document formats | Documents | alpha |
 | PresentationAgent + slide engine | Presentations | alpha |
 | Native missions (in memory, not in chat) | Orchestration foundation | experimental |
-| LanguageCoachAgent | Phase 5 | planned |
+| LanguageCoachAgent, IELTS-style simulator, progress | Phase 5 | alpha |
 | VisualAgent | Phase 6 | planned |
 | OCR | Phase 6.5 | planned |
 | Durable jobs / worker | Infrastructure | planned |
@@ -68,25 +68,25 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #12 (CI) and #1 (Security), commit `04f24e1`, all jobs green:
+**CI verified** — run #20 (CI), commit `c286b73`, all jobs green:
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 341 | 337 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
-| API · PostgreSQL | 341 | 338 | 0 | 3 | 3 LibreOffice not installed |
-| Web unit (Vitest) | 36 | 36 | 0 | 0 | — |
+| API · SQLite | 353 | 349 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
+| API · PostgreSQL | 353 | 350 | 0 | 3 | 3 LibreOffice not installed |
+| Web unit (Vitest) | 38 | 38 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 19 | 19 | 0 | 0 | — |
+| Playwright e2e | 20 | 20 | 0 | 0 | — |
 
-Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL, ESLint,
-TypeScript, the web production build, the Docker job (Compose config including the `voice`
-profile, API image build, web image build, API container migrates and answers `/api/health`,
-web container serves `/`), `pip-audit` and `pnpm audit --prod` (no known vulnerabilities).
+Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migration
+0004 included), ESLint, TypeScript, the web production build and the Docker job (Compose
+config including the `voice` profile, API and web image builds, API container migrates and
+answers `/api/health`, web container serves `/`).
 
-**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 340 passed + 1
-skipped). Docker images were also built in the development sandbox using a mirror and the
-sandbox certificate; the API container became healthy after about 24 s and the web
-container served the app (322 MB image).
+**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 352 passed
++ 1 skipped; PostgreSQL 353 passed). Migration 0004 was also run up → `alembic check` → down
+→ up on both SQLite and PostgreSQL. The API Docker image was rebuilt in the sandbox; it
+migrated to 0004 and `/api/language/progress` answered.
 
 ## Sprint 0 — Stabilization (2026-10-17)
 
@@ -132,6 +132,64 @@ repository's default branch.
 **How the owner can test:** open the Actions tab → latest *CI* run → each job's summary
 shows the test table. `curl localhost:8000/api/status` lists agents with
 `maturity`/`phase`.
+
+## Phase 5 — Language Coach + IELTS-style simulator (2026-10-17) — alpha
+
+**What changed**
+- `LanguageCoachAgent`: real practice sessions with recorded learner and coach turns,
+  computed metrics, a validated assessment, recurring-mistake tracking, goals, vocabulary and
+  progress over time. EZO stays one assistant: an active session keeps ordinary English
+  answers with the coach ("sticky" routing) until it is finished.
+- Modes: free conversation, IELTS-style speaking (Part 1 → Part 2 task card → Part 3, with
+  original questions), teacher, grammar, vocabulary, debate, job interview, travel, business
+  English. CEFR adaptation from the request or the active goal.
+- Assessment once per session on the `reasoning` route; practice turns on the cheap `chat`
+  route. Model output is checked by rules: bands rounded and clamped, estimated range from the
+  criteria mean (wider below 150 words), no band below 40 learner words, mistakes kept only if
+  the learner really said the quoted text, unknown categories mapped to `other`.
+- Exact computed metrics: words, moving-window lexical diversity, fillers per 100 words,
+  repeated words, words per minute (only from measured voice time).
+- Report artifact (DOCX with PDF and Markdown exports) in uz/en/ru.
+- Web: “Til mashg'ulotlari” page (goal, trends, recurring mistakes, sessions, vocabulary,
+  reports, delete with confirmation); voice turns send their measured speaking time.
+
+**Files added:** `apps/api/src/ezo_api/db/models/language.py`,
+`apps/api/migrations/versions/0004_language_coach.py`,
+`apps/api/src/ezo_api/language/{analysis,modes,ielts,assessment,service,report}.py`,
+`apps/api/src/ezo_api/agents/language_coach.py`, `apps/api/src/ezo_api/schemas/language.py`,
+`apps/api/src/ezo_api/api/routes/language.py`, `apps/api/tests/unit/test_language.py`,
+`apps/api/tests/integration/test_language_coach.py`,
+`apps/web/components/language/LanguagePage.tsx` (+ test), `apps/web/app/language/page.tsx`,
+`tests/e2e/specs/language.spec.ts`, `docs/LANGUAGE_COACH.md`.
+**Files modified:** EzoCore (sticky routing, `speech_seconds`), intent rules, agent catalog,
+`maturity.py`, chat schema and route, `main.py`, voice VAD/engine/speech, VoiceStage,
+useChatSession, shared types and API client, history navigation, i18n (uz/en/ru), voice e2e
+spec, README, ARCHITECTURE, TROUBLESHOOTING, ROADMAP.
+**Database migrations:** `0004_language_coach` — `language_sessions`, `language_turns`,
+`language_metrics`, `language_mistakes`, `language_goals`, `language_vocabulary`.
+
+**Tests added:** 17 unit tests (metrics, mode/level/command/goal detection, IELTS flow, band
+rounding and ranges, validation, localised honest report) and 5 integration tests (full
+three-part simulator with assessment and report, free practice + finish + progress +
+recurring mistakes, goals/API/privacy delete, too little speech, offline mode); one web unit
+test; one Playwright spec; the voice e2e spec checks the measured speaking time.
+
+**Security changes:** language data is per user (every query filtered by user); deleting a
+session needs `?confirm=true` and removes its transcript, metrics and mistakes; raw audio is
+never stored; the transcript is passed to the assessor as delimited data.
+
+**User-visible changes:** say “IELTS speaking qilamiz” or “English speaking qilamiz” in chat
+or voice; “Feedback ber” finishes a session; progress questions answer from stored results;
+new “Til mashg'ulotlari” page.
+
+**Known limitations:** English only; rule-based mode/command detection; the Part 2
+preparation minute is not timed; pronunciation is transcript-assisted at best (acoustic
+analysis is planned with realtime voice); bands are practice estimates, not calibrated
+against real exam results. See `docs/LANGUAGE_COACH.md`.
+
+**How the owner can test:** with an API key, open chat → “IELTS speaking qilamiz, B2
+darajada” → answer the questions (typing or **Gaplashish**) → after Part 3 EZO gives
+feedback and a report card → open **Til mashg'ulotlari**.
 
 ## Phase history (records made at the time)
 
@@ -413,6 +471,7 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-**Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator** (estimated bands, never
-“official” scores), then VisualAgent. Ruflo orchestration is audited and its architecture is
+**Phase 6 — VisualAgent** (image providers behind an interface, versioned image artifacts,
+PresentationAgent visuals, honest placeholders without a provider), then OCR and document
+fidelity. Ruflo orchestration is audited and its architecture is
 prepared (`docs/RUFLO_INTEGRATION_PLAN.md`); execution is scheduled after the foundations.
