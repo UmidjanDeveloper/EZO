@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import { rmsOf, vadStart, vadStep, type VadAction, type VadConfig } from "./vad";
+
+const config: VadConfig = { threshold: 0.1, endSilenceMs: 1000, noSpeechMs: 3000, maxMs: 10_000 };
+
+function feed(levels: [number, number][]): VadAction[] {
+  let state = vadStart(0);
+  return levels.map(([time, rms]) => {
+    const [next, action] = vadStep(state, rms, time, config);
+    state = next;
+    return action;
+  });
+}
+
+describe("voice activity detection", () => {
+  it("ends the utterance after a pause that follows speech", () => {
+    expect(feed([[100, 0.01], [500, 0.3], [900, 0.25], [1500, 0.02], [1950, 0.01]])).toEqual([
+      "continue", "continue", "continue", "continue", "end",
+    ]);
+  });
+
+  it("short pauses inside speech do not end it", () => {
+    expect(feed([[100, 0.3], [600, 0.0], [1000, 0.3], [1900, 0.0]])).toEqual(["continue", "continue", "continue", "continue"]);
+  });
+
+  it("reports no speech when the user says nothing", () => {
+    expect(feed([[1000, 0.01], [2999, 0.02], [3000, 0.01]])).toEqual(["continue", "continue", "no-speech"]);
+  });
+
+  it("stops at the maximum length", () => {
+    expect(feed([[100, 0.5], [10_000, 0.5]])).toEqual(["continue", "end"]);
+  });
+
+  it("computes RMS", () => {
+    expect(rmsOf(new Float32Array([0.5, -0.5, 0.5, -0.5]))).toBeCloseTo(0.5);
+    expect(rmsOf(new Float32Array())).toBe(0);
+  });
+});

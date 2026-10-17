@@ -300,3 +300,27 @@ export interface ChatRequestBody {
   /** "voice" asks EZO for short, spoken-style replies. */
   channel?: ChatChannel;
 }
+
+export interface VoiceAttempt {
+  provider: string;
+  ok: boolean;
+  kind: string | null;
+  message: string | null;
+}
+
+/** Server-side speech providers. Empty lists mean the browser's speech features are used. */
+export interface VoiceStatus {
+  speech_to_text: string[];
+  text_to_speech: string[];
+  realtime: boolean;
+  max_audio_mb: number;
+  stores_audio: boolean;
+  browser_fallback: boolean;
+}
+
+export interface VoiceTranscript {
+  text: string;
+  language: string | null;
+  provider: string;
+  attempts: VoiceAttempt[];
+}

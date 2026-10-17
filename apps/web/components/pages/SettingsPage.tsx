@@ -11,10 +11,11 @@ import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "./PageFrame";
 
 export function SettingsPage() {
-  const { m, language, setLanguage } = useI18n();
+  const { m, f, language, setLanguage } = useI18n();
   const { choice, setChoice } = useTheme();
   const { status, statusError, refreshStatus, showDebug, setShowDebug } = useApp();
   const { data: loadedUser, error: loadError } = useApiData(useCallback(() => api.me(), []));
+  const { data: voiceStatus } = useApiData(useCallback(() => api.voiceStatus(), []));
   const [updatedUser, setUser] = useState<User | null>(null);
   const user = updatedUser ?? loadedUser;
   const [actionError, setError] = useState<string | null>(null);
@@ -186,6 +187,18 @@ export function SettingsPage() {
                     </li>
                   ))}
                 </ul>
+              </section>
+
+              <section data-testid="voice-settings">
+                <h3 className="mb-2 font-medium">{m.settings.voice}</h3>
+                <p className="text-ink-muted">
+                  {voiceStatus && voiceStatus.speech_to_text.length + voiceStatus.text_to_speech.length > 0
+                    ? f(m.settings.voiceServer, {
+                        providers: [...new Set([...voiceStatus.speech_to_text, ...voiceStatus.text_to_speech])].join(" → "),
+                      })
+                    : m.settings.voiceBrowser}
+                </p>
+                <p className="mt-1 text-xs text-ink-faint">{m.settings.voiceNoAudio}</p>
               </section>
 
               <section>

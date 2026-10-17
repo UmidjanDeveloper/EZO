@@ -5,15 +5,19 @@ import { cn } from "@ezo/ui";
 import { AnimatePresence, motion } from "framer-motion";
 import { Mic, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import { hasVoiceFor, speechRecognitionSupported, toSpeakableText } from "@/lib/speech";
+import { useApiData } from "@/lib/use-api-data";
 import {
-  hasVoiceFor,
-  listenOnce,
-  speak,
-  speechRecognitionSupported,
-  stopSpeaking,
-  toSpeakableText,
-} from "@/lib/speech";
+  listenWithBrowser,
+  listenWithServer,
+  pickListener,
+  SERVER_FAILED,
+  serverRecordingSupported,
+  speakReply,
+  stopVoice,
+} from "@/lib/voice/engine";
 import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
 import { EzoPresence } from "../robot/EzoPresence";
@@ -41,7 +45,14 @@ export function VoiceStage({ session }: { session: Session }) {
   const [phase, setPhase] = useState<VoicePhase>("idle");
   const [heard, setHeard] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const [supported] = useState(() => speechRecognitionSupported());
+  // Server voice (VoiceStudio, OpenAI…) when the API has a provider; the browser otherwise.
+  const fetchVoiceStatus = useCallback(() => api.voiceStatus(), []);
+  const { data: voiceStatus } = useApiData(fetchVoiceStatus);
+  const [serverFailed, setServerFailed] = useState(false);
+  const serverFailedRef = useRef(false);
+  const [canRecord] = useState(() => serverRecordingSupported() || speechRecognitionSupported());
+  const engine = canRecord ? pickListener(voiceStatus, serverFailed) : null;
+  const supported = engine !== null;
 
   const stopListeningRef = useRef<(() => void) | null>(null);
   const turnRef = useRef(0); // increments on every user action; stale callbacks check it
@@ -65,13 +76,16 @@ export function VoiceStage({ session }: { session: Session }) {
 
   const listen = useCallback(() => {
     const turn = ++turnRef.current;
-    stopSpeaking();
-    setNotice(null);
+    stopVoice();
     setHeard("");
     setPhase("listening");
     let gotText = false;
 
-    stopListeningRef.current = listenOnce(language, {
+    const useServer = pickListener(voiceStatus, serverFailedRef.current) === "server";
+    if (!useServer) setNotice((current) => (serverFailedRef.current ? current : null));
+    else setNotice(null);
+    const listenFn = useServer ? listenWithServer : listenWithBrowser;
+    stopListeningRef.current = listenFn(language, {
       onInterim: (text) => turn === turnRef.current && setHeard(text),
       onFinal: (text) => {
         if (turn !== turnRef.current) return;
@@ -82,8 +96,18 @@ export function VoiceStage({ session }: { session: Session }) {
       onEnd: (error) => {
         stopListeningRef.current = null;
         if (turn !== turnRef.current || gotText) return;
+        if (error === SERVER_FAILED) {
+          // The server voice is down: say so once and continue with the browser's speech.
+          serverFailedRef.current = true;
+          setServerFailed(true);
+          setNotice(m.voice.serverFallback);
+          if (speechRecognitionSupported()) {
+            listenRef.current();
+            return;
+          }
+        }
         setPhase("idle");
-        if (error) setNotice(errorNotice(error));
+        if (error && error !== SERVER_FAILED) setNotice(errorNotice(error));
       },
     });
 
@@ -96,15 +120,16 @@ export function VoiceStage({ session }: { session: Session }) {
         return;
       }
       const replyLanguage = reply.language ?? language;
-      if (!hasVoiceFor(replyLanguage)) {
+      const serverSpeech = (voiceStatus?.text_to_speech.length ?? 0) > 0;
+      if (!serverSpeech && !hasVoiceFor(replyLanguage)) {
         setNotice(f(m.voice.noVoice, { language: m.voice.languages[replyLanguage] }));
       }
       setPhase("speaking");
-      await speak(toSpeakableText(reply.content), replyLanguage);
+      await speakReply(toSpeakableText(reply.content), replyLanguage, voiceStatus);
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
       listenRef.current(); // keep the conversation going
     }
-  }, [errorNotice, f, language, m.voice, send]);
+  }, [errorNotice, f, language, m.voice, send, voiceStatus]);
 
   useEffect(() => {
     listenRef.current = listen;
@@ -121,7 +146,7 @@ export function VoiceStage({ session }: { session: Session }) {
       turnRef.current += 1;
       stopListeningRef.current?.();
       stopStreaming();
-      stopSpeaking();
+      stopVoice();
       setPhase("idle");
     }
   }, [listen, phase, stopStreaming, supported]);
@@ -132,7 +157,7 @@ export function VoiceStage({ session }: { session: Session }) {
       mountedRef.current = false;
       turnRef.current += 1;
       stopListeningRef.current?.();
-      stopSpeaking();
+      stopVoice();
     };
   }, []);
 
@@ -149,7 +174,7 @@ export function VoiceStage({ session }: { session: Session }) {
           : m.voice.idle;
 
   return (
-    <div className="flex h-full flex-col items-center px-4 pb-6 pt-2" data-testid="voice-stage">
+    <div className="flex h-full flex-col items-center px-4 pb-6 pt-2" data-testid="voice-stage" data-engine={engine ?? "none"}>
       <div className="flex w-full max-w-2xl justify-end gap-1" role="group" aria-label={m.voice.language}>
         {LANGUAGES.map((code) => (
           <button

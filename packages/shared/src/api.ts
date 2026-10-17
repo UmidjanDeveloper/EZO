@@ -20,6 +20,8 @@ import type {
   Project,
   SystemStatus,
   User,
+  VoiceStatus,
+  VoiceTranscript,
 } from "./types";
 
 export class ApiError extends Error {
@@ -164,6 +166,20 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
         ...json({ query, project_id: projectId ?? null }),
       }),
+
+    voiceStatus: () => request<VoiceStatus>("/api/voice/status"),
+    /** Send a short recording; the API transcribes it and keeps no audio. */
+    transcribe: (audio: Blob, filename: string, language?: string | null, signal?: AbortSignal) => {
+      const form = new FormData();
+      form.append("audio", audio, filename);
+      if (language) form.append("language", language);
+      return request<VoiceTranscript>("/api/voice/transcribe", { method: "POST", body: form, signal });
+    },
+    /** Read text aloud with the server voice; resolves to MP3 audio. */
+    speak: async (text: string, language?: string | null, signal?: AbortSignal): Promise<Blob> => {
+      const response = await send("/api/voice/speak", { method: "POST", ...json({ text, language }), signal });
+      return response.blob();
+    },
 
     getAgentRun: (id: string) => request<AgentRun>(`/api/agent-runs/${id}`),
 
