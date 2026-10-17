@@ -67,6 +67,8 @@ class Gathered:
     notes: list[str] = field(default_factory=list)
     """Facts about the gathering itself (e.g. 'web search not configured') for the prompt."""
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    artifacts: list[dict[str, Any]] = field(default_factory=list)
+    """Artifacts created during this turn ({id, title, type, version}); shown under the answer."""
 
 
 async def run_tool(

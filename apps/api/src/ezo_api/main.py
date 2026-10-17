@@ -17,7 +17,17 @@ from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ezo_api import __version__
-from ezo_api.api.routes import chat, conversations, knowledge, memory, projects, system, voice
+from ezo_api.api.routes import (
+    artifacts,
+    chat,
+    conversations,
+    knowledge,
+    memory,
+    projects,
+    stories,
+    system,
+    voice,
+)
 from ezo_api.auth.base import AuthError
 from ezo_api.providers.base import ModelProvider
 from ezo_api.security.rate_limit import RateLimitExceededError
@@ -144,7 +154,17 @@ def create_app(
         logger.exception("Unhandled error", exc_info=exc)
         return _error(500, "internal_error", "Unexpected server error. See the API logs.")
 
-    for module in (system, chat, conversations, memory, projects, knowledge, voice):
+    for module in (
+        system,
+        chat,
+        conversations,
+        memory,
+        projects,
+        knowledge,
+        voice,
+        artifacts,
+        stories,
+    ):
         app.include_router(module.router)
 
     @app.get("/", include_in_schema=False)

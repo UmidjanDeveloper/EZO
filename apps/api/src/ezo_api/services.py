@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from ezo_api.agents.registry import AgentRegistry
+from ezo_api.artifacts.service import ArtifactService
 from ezo_api.auth.local import LocalOwnerAuth
 from ezo_api.core.ezo_core import EzoCore
 from ezo_api.db.session import Database
@@ -25,6 +26,7 @@ from ezo_api.security.rate_limit import SlidingWindowRateLimiter
 from ezo_api.settings import Settings
 from ezo_api.storage.base import StorageProvider
 from ezo_api.storage.local import LocalStorageProvider
+from ezo_api.story.service import StoryService
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
 from ezo_api.tools.web_search import WebSearchProvider, build_web_search
@@ -56,6 +58,8 @@ class Services:
     tools: ToolRegistry
     memory_index: MemoryIndex
     voice: VoiceService
+    artifacts: ArtifactService
+    stories: StoryService
 
 
 def build_services(
@@ -127,6 +131,8 @@ def build_services(
         tools=ToolRegistry([KnowledgeSearchTool(), WebSearchTool(), WebFetchTool()]),
         memory_index=memory_index,
         voice=voice or build_voice_service(settings),
+        artifacts=ArtifactService(storage),
+        stories=StoryService(),
     )
     core.services = services
     core.memory_index = memory_index

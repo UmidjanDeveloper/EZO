@@ -596,6 +596,7 @@ class EzoCore:
                 "memories_saved": saved_memories,
                 "citations": quality.get("citation_sources", []),
                 "sources_considered": len(gathered.sources),
+                "artifacts": gathered.artifacts,
             },
         )
         session.add(message)
