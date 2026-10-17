@@ -49,6 +49,11 @@ images) plus the extended local checks listed for that phase.
   tables, PDF, web version, PNG previews, layout QA with one repair round
 - PresentationAgent with sources slide, StoryProject link and edits as new versions
 
+### Sprint 0 — Stabilization
+- One roadmap, catalog phases and maturity labels, verification convention (CI vs local)
+- Docker images built and smoke-tested in CI, dependency audits, `docs/SECURITY.md`,
+  Git workflow and licence decision documented for the owner
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
@@ -56,11 +61,7 @@ images) plus the extended local checks listed for that phase.
 
 ## Next (in this order)
 
-### Sprint 0 — Stabilization ← current
-- One roadmap, accurate catalog phases and maturity labels, verification convention
-- Docker images built in CI, dependency audits, `docs/SECURITY.md`, Git workflow and licence notes
-
-### Phase 5 — Language Coach + IELTS
+### Phase 5 — Language Coach + IELTS ← current
 - LanguageCoachAgent with persistent sessions, turns, metrics, mistakes, goals, vocabulary
 - Modes: free conversation, IELTS-style speaking (Parts 1–3, *estimated* bands, never
   "official"), teacher, grammar, vocabulary, debate, job interview, travel, business English

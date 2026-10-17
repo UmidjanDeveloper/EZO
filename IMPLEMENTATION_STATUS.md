@@ -66,25 +66,72 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 Planned agents are never shown as working: the GeneralAgent answers and states the
 limitation.
 
-## Latest verified baseline (before Sprint 0)
+## Latest verified baseline
 
-**CI verified** — run #11, commit `4c1fd00`, all jobs green:
+**CI verified** — run #12 (CI) and #1 (Security), commit `04f24e1`, all jobs green:
 
-| Suite | Passed | Skipped | Skip reasons |
-|---|---:|---:|---|
-| API · SQLite | 333 | 4 | 1 pgvector (needs PostgreSQL), 3 LibreOffice not installed |
-| API · PostgreSQL | 334 | 3 | 3 LibreOffice not installed |
-| Playwright e2e | 19 | 0 | — |
-| Lint, types, web build, `alembic check` | pass | | |
-| Web/shared unit tests (Vitest) | pass | | count not printed in that run's summary; reported from Sprint 0 on |
+| Suite | Collected | Passed | Failed | Skipped | Skip reasons |
+|---|---:|---:|---:|---:|---|
+| API · SQLite | 341 | 337 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
+| API · PostgreSQL | 341 | 338 | 0 | 3 | 3 LibreOffice not installed |
+| Web unit (Vitest) | 36 | 36 | 0 | 0 | — |
+| Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
+| Playwright e2e | 19 | 19 | 0 | 0 | — |
 
-**Extended local verification** (not in CI): the 3 LibreOffice tests pass locally (SQLite
-336 passed + 1 skipped, PostgreSQL 337 passed). API and web Docker images were built
-in the sandbox, and the API container migrated and served `/api/health`.
+Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL, ESLint,
+TypeScript, the web production build, the Docker job (Compose config including the `voice`
+profile, API image build, web image build, API container migrates and answers `/api/health`,
+web container serves `/`), `pip-audit` and `pnpm audit --prod` (no known vulnerabilities).
+
+**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 340 passed + 1
+skipped). Docker images were also built in the development sandbox using a mirror and the
+sandbox certificate; the API container became healthy after about 24 s and the web
+container served the app (322 MB image).
 
 ## Sprint 0 — Stabilization (2026-10-17)
 
-See the end of this file for the Sprint 0 report.
+**What changed**
+- One authoritative ROADMAP (Done / Next in the agreed order); the old milestone structure
+  is removed everywhere (docs, code comments, one user-visible OCR message).
+- The agent catalog has a roadmap `phase` and a `maturity` label instead of milestone
+  numbers. Availability is derived from maturity, so a planned agent can never run. A new
+  `maturity.py` covers non-agent capabilities; both are exposed in `/api/status` (`agents`,
+  `features`).
+- Verification convention: `scripts/test_report.py` reads JUnit reports from pytest,
+  Vitest and Playwright, and prints the same table in CI (job log and run summary) and
+  locally (`python scripts/ezo.py test`).
+- CI Docker job: Compose validation, API and web image builds, API and web smoke tests.
+  Optional services (VoiceStudio) are not built.
+- Security: `security.yml` (pip-audit, pnpm audit; weekly and on dependency changes),
+  Dependabot (opens PRs only, minor and patch, no majors), `docs/SECURITY.md`.
+- Owner documents: `docs/GIT_WORKFLOW.md` (no `main` or branch protection exists yet; exact
+  steps given) and `docs/OWNER_DECISIONS.md` (EZO has no LICENSE — not chosen on the owner's
+  behalf).
+
+**Files added:** `apps/api/src/ezo_api/maturity.py`, `apps/api/tests/unit/test_catalog.py`,
+`scripts/test_report.py`, `.github/workflows/security.yml`, `.github/dependabot.yml`,
+`docs/SECURITY.md`, `docs/GIT_WORKFLOW.md`, `docs/OWNER_DECISIONS.md`.
+**Files modified:** agent catalog, status schema and route, shared types, CI workflow,
+Playwright config, `scripts/ezo.py`, `.gitignore`, ROADMAP, IMPLEMENTATION_STATUS, README,
+ARCHITECTURE, TROUBLESHOOTING, `.env.example`, a few code comments.
+**Database migrations:** none.
+
+**Tests added:** catalog consistency (exactly the implemented agents are available, planned
+agents have limitation notes, every phase exists in ROADMAP, unique feature keys).
+
+**Security changes:** dependency audits and update policy, documented security model.
+
+**User-visible changes:** none in the UI. `/api/status` returns `maturity`, `phase` and
+`features`; the "needs OCR" message no longer names an obsolete milestone.
+
+**Known limitations / not done:** branch protection and `main` need the owner. The CI
+actions still run on Node 20 (GitHub forces them to Node 24 and shows a warning; no
+failure). Dependabot has started scanning and may open PRs on this branch, since it is the
+repository's default branch.
+
+**How the owner can test:** open the Actions tab → latest *CI* run → each job's summary
+shows the test table. `curl localhost:8000/api/status` lists agents with
+`maturity`/`phase`.
 
 ## Phase history (records made at the time)
 
