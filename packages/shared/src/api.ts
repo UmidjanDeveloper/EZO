@@ -96,6 +96,16 @@ export function createApiClient(options: ApiClientOptions) {
 
   const json = (body: unknown): RequestInit => ({ body: JSON.stringify(body) });
 
+  /** Download a file, keeping the server's (UTF-8) filename. Works with token auth. */
+  async function fetchFile(path: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await send(path);
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const plain = /filename="([^"]+)"/i.exec(disposition)?.[1];
+    const filename = encoded ? decodeURIComponent(encoded) : (plain ?? "artifact");
+    return { blob: await response.blob(), filename };
+  }
+
   return {
     get baseUrl() {
       return baseUrl();
@@ -217,14 +227,11 @@ export function createApiClient(options: ApiClientOptions) {
       request<ArtifactDetail>(`/api/artifacts/${id}/versions/${version}/restore`, { method: "POST" }),
     artifactText: (id: string, version: number) =>
       request<{ version_number: number; filename: string; text: string }>(`/api/artifacts/${id}/versions/${version}/text`),
-    downloadArtifact: async (id: string, version: number): Promise<{ blob: Blob; filename: string }> => {
-      const response = await send(`/api/artifacts/${id}/versions/${version}/download`);
-      const disposition = response.headers.get("Content-Disposition") ?? "";
-      const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
-      const plain = /filename="([^"]+)"/i.exec(disposition)?.[1];
-      const filename = encoded ? decodeURIComponent(encoded) : (plain ?? "artifact");
-      return { blob: await response.blob(), filename };
-    },
+    downloadArtifact: (id: string, version: number) =>
+      fetchFile(`/api/artifacts/${id}/versions/${version}/download`),
+    /** A derived file of a version: "pdf", "html", "docx", "markdown", "csv", "preview-1", … */
+    downloadExport: (id: string, version: number, name: string) =>
+      fetchFile(`/api/artifacts/${id}/versions/${version}/exports/${encodeURIComponent(name)}`),
     deleteArtifact: (id: string) => request<void>(`/api/artifacts/${id}?confirm=true`, { method: "DELETE" }),
 
     listStories: (projectId?: string) =>

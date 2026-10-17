@@ -347,6 +347,14 @@ export interface ArtifactRef {
 }
 
 /** One immutable version of an artifact. */
+/** A file derived from a version: a presentation's PDF, web version and slide previews, … */
+export interface ArtifactExport {
+  name: string;
+  filename: string;
+  mime_type: string;
+  size: number;
+}
+
 export interface ArtifactVersion {
   id: string;
   version_number: number;
@@ -364,6 +372,7 @@ export interface ArtifactVersion {
   created_at: string;
   current: boolean;
   is_text: boolean;
+  exports: ArtifactExport[];
 }
 
 export interface Artifact {

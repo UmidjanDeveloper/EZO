@@ -12,6 +12,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "../pages/PageFrame";
 import { ArtifactIcon } from "./ArtifactIcon";
+import { VersionExports } from "./VersionExports";
 
 const STATUS_TONE = { draft: "neutral", generating: "accent", ready: "success", failed: "danger" } as const;
 
@@ -248,6 +249,8 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
           <Trash2 size={14} /> {m.artifacts.delete}
         </Button>
       </div>
+
+      {current ? <VersionExports artifactId={id} version={current} /> : null}
 
       {renaming ? (
         <form onSubmit={saveTitle} className="mt-3 flex gap-2">
