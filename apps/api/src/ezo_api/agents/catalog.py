@@ -113,15 +113,10 @@ AGENTS: dict[Intent, AgentSpec] = {
             Intent.RESEARCH,
             {"uz": "Tadqiqot agenti", "en": "Research Agent", "ru": "Исследовательский агент"},
             "Current web research, source comparison and citations.",
-            available=False,
+            available=True,
             milestone=2,
             context_mode="professional",
-            route="reasoning",
-            limitation_note=(
-                "The Research Agent (live web search with citations) is not available yet. "
-                "Answer from general knowledge, clearly mark what may be outdated, and never "
-                "invent sources, links or statistics."
-            ),
+            route="research",
         ),
         AgentSpec(
             "document",
@@ -133,9 +128,11 @@ AGENTS: dict[Intent, AgentSpec] = {
             context_mode="professional",
             route="chat",
             limitation_note=(
-                "The Document Agent (file upload, PDF/DOCX/XLSX reading and creation) is not "
-                "available yet. You cannot open files. Help with text the user pastes, and "
-                "say that file handling arrives in a later EZO update."
+                "EZO can already search the user's uploaded files (knowledge base) and cite "
+                "them: if relevant passages are provided below as sources, use and cite them. "
+                "Creating, converting or editing files (PDF/DOCX/XLSX export, OCR for scans) "
+                "is not available yet — say so if the user asks for it. If no source passages "
+                "are provided, ask the user to upload the file (paperclip button) first."
             ),
         ),
         AgentSpec(

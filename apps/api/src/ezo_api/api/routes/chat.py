@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ezo_api.api.deps import CurrentUser, ServicesDep, rate_limit
 from ezo_api.api.serializers import message_out
 from ezo_api.core.ezo_core import (
+    CoreActivity,
     CoreDelta,
     CoreDone,
     CoreError,
@@ -76,6 +77,8 @@ def _event_payload(event: CoreEvent) -> dict[str, Any]:
         }
     if isinstance(event, CoreDelta):
         return {"text": event.text}
+    if isinstance(event, CoreActivity):
+        return {"stage": event.stage}
     if isinstance(event, CoreDone):
         return {
             "message": message_out(event.message).model_dump(mode="json"),

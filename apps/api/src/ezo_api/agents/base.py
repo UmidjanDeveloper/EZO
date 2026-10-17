@@ -8,11 +8,16 @@ the shared pipeline (context, memory, model call, persistence, tracing).
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from ezo_api.agents.catalog import AgentSpec
 from ezo_api.core.intent import IntentResult
+from ezo_api.knowledge.retrieval.sources import SourceRef
 from ezo_api.personality.profile import ContextMode
+
+if TYPE_CHECKING:
+    from ezo_api.tools.base import ToolContext
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,3 +45,36 @@ class Agent(ABC):
     @abstractmethod
     def plan(self, turn: AgentTurn) -> AgentPlan:
         """Decide route, style and instructions for this turn."""
+
+    async def gather(self, ctx: GatherContext) -> Gathered:
+        """Collect sources with tools before the answer (default: nothing)."""
+        return Gathered()
+
+
+@dataclass(slots=True)
+class GatherContext:
+    """What an agent can use to collect information before EZO answers."""
+
+    turn: AgentTurn
+    tools: ToolContext
+    history_hint: str = ""
+    """The previous user message, to help interpret follow-up questions."""
+
+
+@dataclass(slots=True)
+class Gathered:
+    sources: list[SourceRef] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+    """Facts about the gathering itself (e.g. 'web search not configured') for the prompt."""
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+
+
+async def run_tool(
+    gathered: Gathered, ctx: ToolContext, name: str, arguments: dict[str, Any]
+) -> list[SourceRef]:
+    """Execute a registered tool, record a trace entry, return its sources."""
+    result = await ctx.services.tools.execute(name, arguments, ctx)
+    gathered.tool_calls.append(
+        {"tool": name, "ok": result.ok, "summary": result.summary, "error": result.error}
+    )
+    return list(result.sources) if result.ok else []

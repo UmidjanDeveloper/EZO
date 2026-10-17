@@ -17,14 +17,14 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from zoneinfo import ZoneInfo
 
 import anyio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ezo_api.agents.base import AgentPlan, AgentTurn
+from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.core import messages
 from ezo_api.core.intent import IntentResult, classify_intent
@@ -32,7 +32,13 @@ from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import AgentRun, Conversation, Message, Project, User
-from ezo_api.memory.service import MemoryService, RetrievedMemory
+from ezo_api.knowledge.retrieval.citations import (
+    CITATION_RULES,
+    format_sources_for_prompt,
+    verify_citations,
+)
+from ezo_api.knowledge.retrieval.sources import number_sources
+from ezo_api.memory.service import MemoryIndex, MemoryService, RetrievedMemory
 from ezo_api.personality.profile import HumorLevel, PersonalityProfile
 from ezo_api.personality.prompt import PromptContext, PromptMemory, build_system_prompt
 from ezo_api.providers.router import (
@@ -43,6 +49,10 @@ from ezo_api.providers.router import (
     StreamInterruptedError,
 )
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
+from ezo_api.tools.base import ToolContext
+
+if TYPE_CHECKING:
+    from ezo_api.services import Services
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +112,14 @@ class CoreMeta:
 
 
 @dataclass(frozen=True, slots=True)
+class CoreActivity:
+    """What EZO is doing before it starts answering (e.g. researching)."""
+
+    stage: str
+    type: Literal["activity"] = "activity"
+
+
+@dataclass(frozen=True, slots=True)
 class CoreDelta:
     text: str
     type: Literal["delta"] = "delta"
@@ -124,7 +142,7 @@ class CoreError:
     type: Literal["error"] = "error"
 
 
-CoreEvent = CoreMeta | CoreDelta | CoreDone | CoreError
+CoreEvent = CoreMeta | CoreActivity | CoreDelta | CoreDone | CoreError
 
 
 def make_title(text: str) -> str:
@@ -153,6 +171,9 @@ class EzoCore:
         self.context_message_limit = context_message_limit
         self.context_char_budget = context_char_budget
         self.max_output_tokens = max_output_tokens
+        # Set by build_services once all services exist (tools need them).
+        self.services: Services | None = None
+        self.memory_index: MemoryIndex | None = None
 
     # ------------------------------------------------------------------ prepare
 
@@ -274,7 +295,10 @@ class EzoCore:
             history = await self._load_history(session, prepared)
             memories = await self._retrieve_memories(session, prepared)
             plan = self._plan(prepared)
-            system_prompt = self._compose_prompt(prepared, plan, memories)
+            if selection.agent.spec.key == "research":
+                yield CoreActivity("researching")
+            gathered = await self._gather(session, prepared, history)
+            system_prompt = self._compose_prompt(prepared, plan, memories, gathered)
 
             with tracer.step("route_model") as step:
                 routed = self.router.open(plan.route)
@@ -310,8 +334,20 @@ class EzoCore:
             if quality.get("appended"):
                 yield CoreDelta(str(quality["appended"]))
 
+            with tracer.step("verify_citations") as step:
+                check = verify_citations(reply, gathered.sources)
+                reply = check.text
+                quality["citations"] = len(check.cited)
+                if check.invalid_numbers:
+                    quality["invalid_citations_removed"] = check.invalid_numbers
+                step.summary = (
+                    f"sources={len(gathered.sources)} cited={len(check.cited)} "
+                    f"removed={check.invalid_numbers}"
+                )
+            quality["citation_sources"] = [source.to_metadata() for source in check.cited]
+
             message = await self._finish_success(
-                session, prepared, routed, end, reply, quality, memories
+                session, prepared, routed, end, reply, quality, memories, gathered
             )
             yield CoreDone(message=message, run=prepared.run)
         except (AllProvidersFailedError, StreamInterruptedError, RoutingConfigError) as exc:
@@ -352,13 +388,47 @@ class EzoCore:
         self, session: AsyncSession, prepared: PreparedTurn
     ) -> list[RetrievedMemory]:
         with prepared.tracer.step("retrieve_memory") as step:
-            retrieved = await MemoryService(session).retrieve(
+            retrieved = await MemoryService(session, self.memory_index).retrieve(
                 prepared.user.id,
                 prepared.user_message.content,
                 prepared.conversation.project_id,
             )
             step.summary = f"{len(retrieved)} memories"
             return retrieved
+
+    async def _gather(
+        self, session: AsyncSession, prepared: PreparedTurn, history: list[ChatMessage]
+    ) -> Gathered:
+        """Let the agent collect sources with tools (knowledge base, web)."""
+        with prepared.tracer.step("gather") as step:
+            if self.services is None:
+                step.summary = "tools unavailable"
+                return Gathered()
+            earlier_user = [m.content for m in history[:-1] if m.role == "user"]
+            selection = prepared.selection
+            gathered = await selection.agent.gather(
+                GatherContext(
+                    turn=AgentTurn(
+                        text=prepared.user_message.content,
+                        language=prepared.language,
+                        intent=prepared.intent,
+                        requested=selection.requested,
+                    ),
+                    tools=ToolContext(
+                        session=session,
+                        services=self.services,
+                        user_id=prepared.user.id,
+                        run_id=prepared.run.id,
+                        project_scope=prepared.conversation.project_id,
+                    ),
+                    history_hint=earlier_user[-1][:500] if earlier_user else "",
+                )
+            )
+            number_sources(gathered.sources)
+            step.summary = f"sources={len(gathered.sources)} tools=" + ",".join(
+                f"{c['tool']}:{'ok' if c['ok'] else 'failed'}" for c in gathered.tool_calls
+            )
+            return gathered
 
     def _plan(self, prepared: PreparedTurn) -> AgentPlan:
         with prepared.tracer.step("plan") as step:
@@ -375,7 +445,11 @@ class EzoCore:
             return plan
 
     def _compose_prompt(
-        self, prepared: PreparedTurn, plan: AgentPlan, memories: list[RetrievedMemory]
+        self,
+        prepared: PreparedTurn,
+        plan: AgentPlan,
+        memories: list[RetrievedMemory],
+        gathered: Gathered,
     ) -> str:
         with prepared.tracer.step("compose_prompt") as step:
             humor_pref = (prepared.user.preferences or {}).get("humor", "default")
@@ -398,6 +472,12 @@ class EzoCore:
                         for m in memories
                     ],
                     agent_instructions=plan.instructions,
+                    sources=(
+                        CITATION_RULES + "\n\n" + format_sources_for_prompt(gathered.sources)
+                        if gathered.sources
+                        else ""
+                    ),
+                    notes=tuple(gathered.notes),
                     voice=prepared.channel == "voice",
                 ),
             )
@@ -440,6 +520,7 @@ class EzoCore:
         reply: str,
         quality: dict[str, Any],
         memories: list[RetrievedMemory],
+        gathered: Gathered,
     ) -> Message:
         run = prepared.run
         selected = routed.selected
@@ -448,7 +529,7 @@ class EzoCore:
         saved_memories = 0
         with prepared.tracer.step("save_memory") as step:
             if (prepared.user.preferences or {}).get("auto_memory", True):
-                capture = await MemoryService(session).capture_from_message(
+                capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,
                     prepared.user_message.content,
                     prepared.conversation.id,
@@ -479,6 +560,8 @@ class EzoCore:
                 "truncated": quality.get("truncated", False),
                 "memories_used": [str(m.memory.id) for m in memories],
                 "memories_saved": saved_memories,
+                "citations": quality.get("citation_sources", []),
+                "sources_considered": len(gathered.sources),
             },
         )
         session.add(message)
@@ -489,6 +572,7 @@ class EzoCore:
         run.input_tokens = usage.input_tokens
         run.output_tokens = usage.output_tokens
         run.attempts = [a.as_dict() for a in routed.attempts]
+        run.tool_calls = gathered.tool_calls
         run.latency_ms = prepared.tracer.elapsed_ms()
         run.steps = prepared.tracer.as_list()
         run.finished_at = utcnow()

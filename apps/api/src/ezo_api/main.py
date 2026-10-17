@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -16,7 +17,7 @@ from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ezo_api import __version__
-from ezo_api.api.routes import chat, conversations, memory, projects, system
+from ezo_api.api.routes import chat, conversations, knowledge, memory, projects, system
 from ezo_api.auth.base import AuthError
 from ezo_api.providers.base import ModelProvider
 from ezo_api.security.rate_limit import RateLimitExceededError
@@ -61,14 +62,17 @@ def _error(status: int, code: str, message: str, **extra: object) -> JSONRespons
 
 
 def create_app(
-    settings: Settings | None = None, providers: dict[str, ModelProvider] | None = None
+    settings: Settings | None = None,
+    providers: dict[str, ModelProvider] | None = None,
+    **overrides: Any,
 ) -> FastAPI:
+    """Build the app. `overrides` (web_search, fetcher) are for tests."""
     settings = settings or get_settings()
     logging.basicConfig(
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    services: Services = build_services(settings, providers)
+    services: Services = build_services(settings, providers, **overrides)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -83,7 +87,11 @@ def create_app(
             mode,
             "sqlite" if settings.is_sqlite else "postgresql",
         )
+        resumed = await services.ingestion.resume_unfinished()
+        if resumed:
+            logger.info("Resumed ingestion of %s unfinished document(s)", resumed)
         yield
+        await services.ingestion.shutdown()
         await services.db.dispose()
 
     app = FastAPI(
@@ -136,7 +144,7 @@ def create_app(
         logger.exception("Unhandled error", exc_info=exc)
         return _error(500, "internal_error", "Unexpected server error. See the API logs.")
 
-    for module in (system, chat, conversations, memory, projects):
+    for module in (system, chat, conversations, memory, projects, knowledge):
         app.include_router(module.router)
 
     @app.get("/", include_in_schema=False)

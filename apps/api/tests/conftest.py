@@ -7,6 +7,7 @@ PostgreSQL URL to run them against PostgreSQL (the schema is reset each test).
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -53,6 +54,10 @@ def database_url(tmp_path: Path) -> Iterator[str]:
 def make_settings(database_url: str, **overrides: object) -> Settings:
     values: dict[str, object] = {
         "EZO_ENV": "test",
+        "EZO_INGESTION_MODE": "inline",
+        "EZO_STORAGE_DIR": str(Path(tempfile.mkdtemp(prefix="ezo-storage-"))),
+        "TAVILY_API_KEY": "",
+        "EZO_WEB_SEARCH_PROVIDER": "auto",
         "DATABASE_URL": database_url,
         "OPENAI_API_KEY": "",
         "ANTHROPIC_API_KEY": "",
@@ -72,7 +77,10 @@ def fake_anthropic() -> FakeProvider:
 
 @pytest.fixture
 def fake_openai() -> FakeProvider:
-    return FakeProvider(name="openai", reply="Hello from the fallback provider.")
+    # Also the embedding provider (first in models.toml [embeddings]).
+    return FakeProvider(
+        name="openai", reply="Hello from the fallback provider.", supports_embeddings=True
+    )
 
 
 @pytest.fixture

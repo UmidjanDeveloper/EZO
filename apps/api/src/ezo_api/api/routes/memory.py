@@ -8,9 +8,10 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import delete, select
 
-from ezo_api.api.deps import CurrentUser, SessionDep, rate_limit
+from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.models import Memory, Project
 from ezo_api.memory.sensitive import sensitive_reason
+from ezo_api.memory.service import MemoryService
 from ezo_api.schemas.api import MemoryCreate, MemoryOut, MemoryUpdate
 from ezo_api.security.audit import audit
 
@@ -44,7 +45,9 @@ async def list_memories(
 
 
 @router.post("", status_code=201)
-async def create_memory(body: MemoryCreate, session: SessionDep, user: CurrentUser) -> MemoryOut:
+async def create_memory(
+    body: MemoryCreate, session: SessionDep, user: CurrentUser, services: ServicesDep
+) -> MemoryOut:
     if body.memory_type == "project":
         if body.project_id is None:
             raise HTTPException(422, detail="project_id is required for project memories.")
@@ -66,6 +69,7 @@ async def create_memory(body: MemoryCreate, session: SessionDep, user: CurrentUs
     )
     session.add(memory)
     await session.flush()
+    await MemoryService(session, services.memory_index).index_memories([memory])
     audit(session, user.id, "memory.create", "memory", memory.id, {"source": "user"})
     await session.commit()
     return MemoryOut.model_validate(memory)
@@ -73,12 +77,17 @@ async def create_memory(body: MemoryCreate, session: SessionDep, user: CurrentUs
 
 @router.patch("/{memory_id}")
 async def update_memory(
-    memory_id: uuid.UUID, body: MemoryUpdate, session: SessionDep, user: CurrentUser
+    memory_id: uuid.UUID,
+    body: MemoryUpdate,
+    session: SessionDep,
+    user: CurrentUser,
+    services: ServicesDep,
 ) -> MemoryOut:
     memory = await _owned(session, user.id, memory_id)
     if body.content is not None:
         memory.content = body.content.strip()
         memory.sensitive = sensitive_reason(memory.content) is not None
+        await MemoryService(session, services.memory_index).index_memories([memory])
     if body.importance is not None:
         memory.importance = body.importance
     if body.category is not None:
@@ -96,8 +105,11 @@ async def update_memory(
 
 
 @router.delete("/{memory_id}", status_code=204)
-async def delete_memory(memory_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> Response:
+async def delete_memory(
+    memory_id: uuid.UUID, session: SessionDep, user: CurrentUser, services: ServicesDep
+) -> Response:
     memory = await _owned(session, user.id, memory_id)
+    await MemoryService(session, services.memory_index).forget_vectors([memory.id])
     audit(session, user.id, "memory.delete", "memory", memory.id, {"category": memory.category})
     await session.delete(memory)
     await session.commit()
@@ -106,10 +118,15 @@ async def delete_memory(memory_id: uuid.UUID, session: SessionDep, user: Current
 
 @router.delete("", status_code=204)
 async def delete_all_memories(
-    session: SessionDep, user: CurrentUser, confirm: bool = Query(default=False)
+    session: SessionDep,
+    user: CurrentUser,
+    services: ServicesDep,
+    confirm: bool = Query(default=False),
 ) -> Response:
     if not confirm:
         raise HTTPException(422, detail="Pass confirm=true to delete all memories.")
+    ids = list((await session.scalars(select(Memory.id).where(Memory.user_id == user.id))).all())
+    await MemoryService(session, services.memory_index).forget_vectors(ids)
     result = await session.execute(delete(Memory).where(Memory.user_id == user.id))
     audit(
         session,

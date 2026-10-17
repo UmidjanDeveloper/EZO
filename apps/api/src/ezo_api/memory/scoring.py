@@ -29,12 +29,17 @@ WEIGHT_RECENCY = 0.15
 RECENCY_HALF_LIFE_DAYS = 30.0
 
 
-def stems(text: str) -> set[str]:
-    return {
+def stem_tokens(text: str) -> list[str]:
+    """Word stems in order (with repeats), stopwords removed."""
+    return [
         token[:STEM_LENGTH]
         for token in tokenize(text)
         if token not in _STOPWORDS and (len(token) > 2 or token.isdigit())
-    }
+    ]
+
+
+def stems(text: str) -> set[str]:
+    return set(stem_tokens(text))
 
 
 def relevance(query_stems: set[str], memory_text: str) -> float:
@@ -55,4 +60,29 @@ def combined_score(rel: float, importance: float, updated_at: datetime, now: dat
         WEIGHT_RELEVANCE * rel
         + WEIGHT_IMPORTANCE * importance
         + WEIGHT_RECENCY * recency(updated_at, now)
+    )
+
+
+# Hybrid weights when a semantic (embedding) score is available.
+H_SEMANTIC = 0.45
+H_LEXICAL = 0.15
+H_IMPORTANCE = 0.2
+H_RECENCY = 0.1
+H_PROJECT = 0.1
+
+
+def hybrid_score(
+    semantic: float,
+    lexical: float,
+    importance: float,
+    updated_at: datetime,
+    now: datetime,
+    project_match: bool,
+) -> float:
+    return (
+        H_SEMANTIC * max(semantic, 0.0)
+        + H_LEXICAL * lexical
+        + H_IMPORTANCE * importance
+        + H_RECENCY * recency(updated_at, now)
+        + H_PROJECT * (1.0 if project_match else 0.0)
     )

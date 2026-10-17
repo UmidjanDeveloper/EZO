@@ -34,6 +34,10 @@ class PromptContext:
     agent_instructions: str = ""
     voice: bool = False
     """The user is speaking and will hear the reply through text-to-speech."""
+    sources: str = ""
+    """Numbered sources with citation rules (empty when nothing was retrieved)."""
+    notes: Sequence[str] = ()
+    """Facts about how information was gathered (e.g. web search unavailable)."""
 
 
 def build_system_prompt(profile: PersonalityProfile, ctx: PromptContext) -> str:
@@ -85,6 +89,12 @@ def build_system_prompt(profile: PersonalityProfile, ctx: PromptContext) -> str:
             "What you remember about the user (from earlier conversations; may be outdated, "
             "use only when relevant, do not recite it unprompted):\n" + lines
         )
+
+    if ctx.notes:
+        sections.append("Notes about this turn:\n" + "\n".join(f"- {note}" for note in ctx.notes))
+
+    if ctx.sources:
+        sections.append(ctx.sources)
 
     sections.append(f"Current date and time: {ctx.now:%Y-%m-%d %H:%M} ({ctx.now.tzname()}).")
     return "\n\n".join(section for section in sections if section)

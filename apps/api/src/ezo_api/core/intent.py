@@ -122,6 +122,16 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\bновост", 2),
         (r"\bsolishtir", 1.5),
         (r"\bcompare\b", 1.5),
+        # explicit "look it up online" requests
+        (r"\binternetdan\b", 3),
+        (r"\bonlayn qidir", 3),
+        (r"\b(search|look up|browse) (the )?(web|internet|online)\b", 3),
+        (r"\bgoogle (it|this|that)\b", 3),
+        (r"\bв интернете\b", 3),
+        (r"\bпогугли", 3),
+        (r"\bso'nggi|\bso‘nggi|\bэнг сўнгги", 1),
+        (r"\blatest\b", 1),
+        (r"\bпоследн", 1),
     ],
     Intent.DOCUMENT: [
         (r"\bpdf\b", 3),

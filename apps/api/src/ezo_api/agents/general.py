@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import re
 
-from ezo_api.agents.base import Agent, AgentPlan, AgentTurn
+from ezo_api.agents.base import Agent, AgentPlan, AgentTurn, GatherContext, Gathered, run_tool
 from ezo_api.agents.catalog import AGENTS
 from ezo_api.core.intent import Intent
 from ezo_api.core.text import normalize
+from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.personality.profile import ContextMode
 
 # Signals that a general request needs deeper reasoning than quick chat.
@@ -69,3 +70,18 @@ class GeneralAgent(Agent):
             )
 
         return AgentPlan(route=route, context_mode=mode, instructions=instructions, steps=steps)
+
+    async def gather(self, ctx: GatherContext) -> Gathered:
+        """Look into the user's files when they may be relevant (no extra tools otherwise)."""
+        gathered = Gathered()
+        tools = ctx.tools
+        if not await has_searchable_documents(tools.session, tools.user_id, tools.project_scope):
+            return gathered
+        about_documents = ctx.turn.requested.key == "document"
+        gathered.sources = await run_tool(
+            gathered,
+            tools,
+            "knowledge_search",
+            {"query": ctx.turn.text[:500], "limit": 5, "strict": not about_documents},
+        )
+        return gathered
