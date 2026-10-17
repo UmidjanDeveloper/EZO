@@ -1,0 +1,59 @@
+name: Security
+
+# Dependency audits. Separate from CI so a newly published advisory does not block unrelated
+# work; it still fails visibly (red run) and runs weekly. See docs/SECURITY.md.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "apps/api/pyproject.toml"
+      - "apps/api/uv.lock"
+      - "pnpm-lock.yaml"
+      - "**/package.json"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "apps/api/pyproject.toml"
+      - "apps/api/uv.lock"
+      - "pnpm-lock.yaml"
+      - "**/package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python dependencies (pip-audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - name: Export the locked runtime dependencies
+        run: uv export --frozen --no-dev --no-hashes --no-emit-project > requirements-audit.txt
+      - name: Audit against known vulnerabilities (PyPI advisory database / OSV)
+        run: uvx pip-audit -r requirements-audit.txt --progress-spinner off
+
+  node:
+    name: Node dependencies (pnpm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies (high and critical fail)
+        run: pnpm audit --prod --audit-level high
+      - name: Full report including development tools (informational)
+        if: always()
+        run: pnpm audit || true
