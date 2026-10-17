@@ -19,6 +19,21 @@ if config.config_file_name is not None and not os.environ.get("EZO_ALEMBIC_SKIP_
 
 target_metadata = Base.metadata
 
+# Tables managed with raw SQL (only on PostgreSQL with pgvector); not in the ORM.
+RAW_SQL_TABLES = {"pgvector_entries"}
+RAW_SQL_INDEXES = {"ix_knowledge_chunks_fts"}
+
+
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    if type_ == "table" and name in RAW_SQL_TABLES:
+        return False
+    if type_ == "index" and name in RAW_SQL_INDEXES:
+        return False
+    table = getattr(obj, "table", None)
+    return not (type_ in ("index", "column") and getattr(table, "name", None) in RAW_SQL_TABLES)
+
 
 def _database_url() -> str:
     override = config.attributes.get("database_url")
@@ -33,6 +48,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         render_as_batch=url.startswith("sqlite"),
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -46,6 +62,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             render_as_batch=url.startswith("sqlite"),
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()

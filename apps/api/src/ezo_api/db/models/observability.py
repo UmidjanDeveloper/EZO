@@ -60,3 +60,23 @@ class AuditLog(UUIDPrimaryKey, Base):
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utcnow, index=True, nullable=False
     )
+
+
+class ToolCall(UUIDPrimaryKey, Base):
+    """One execution of an agent tool (arguments are stored redacted and size-limited)."""
+
+    __tablename__ = "tool_calls"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    agent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    tool_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    arguments: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # ok | error | denied
+    result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

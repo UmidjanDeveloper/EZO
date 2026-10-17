@@ -104,3 +104,34 @@ model = "gpt-5.6-sol"
 [[routes.vision.candidates]]
 provider = "gemini"
 model = "gemini-3.6-flash"
+
+[routes.research]
+description = "Research answers that compare and cite sources"
+
+[[routes.research.candidates]]
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+effort = "medium"
+
+[[routes.research.candidates]]
+provider = "openai"
+model = "gpt-5.6-sol"
+effort = "medium"
+
+[[routes.research.candidates]]
+provider = "gemini"
+model = "gemini-3.1-pro-preview"
+
+# Embeddings turn text into vectors for semantic search (knowledge base and
+# memory). The first provider with an API key is used for everything.
+# Anthropic has no embeddings API, so add an OpenAI or Gemini key for
+# semantic search; without one EZO still finds documents by keywords.
+# If you change the model later, press "Reindex" on the Knowledge page.
+
+[[embeddings.candidates]]
+provider = "openai"
+model = "text-embedding-3-small"
+
+[[embeddings.candidates]]
+provider = "gemini"
+model = "gemini-embedding-001"

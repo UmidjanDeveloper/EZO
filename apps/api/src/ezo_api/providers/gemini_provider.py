@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, Literal
 
 from google import genai
 from google.genai import errors as genai_errors
@@ -31,7 +31,9 @@ _THINKING_LEVELS = {
 class GeminiProvider(ModelProvider):
     name = "gemini"
     display_name = "Google Gemini"
-    capabilities = frozenset({Capability.CHAT, Capability.STREAMING, Capability.REASONING})
+    capabilities = frozenset(
+        {Capability.CHAT, Capability.STREAMING, Capability.REASONING, Capability.EMBEDDINGS}
+    )
 
     def __init__(self, api_key: str, timeout: float, client: Any | None = None) -> None:
         self._client: Any = client or genai.Client(
@@ -95,3 +97,25 @@ class GeminiProvider(ModelProvider):
             raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
 
         yield StreamEnd(model=model, usage=usage, finish_reason=finish_reason or None)
+
+    async def embed(
+        self,
+        texts: Sequence[str],
+        model: str,
+        purpose: Literal["document", "query"] = "document",
+    ) -> list[list[float]]:
+        task = "RETRIEVAL_QUERY" if purpose == "query" else "RETRIEVAL_DOCUMENT"
+        try:
+            response = await self._client.aio.models.embed_content(
+                model=model,
+                contents=list(texts),
+                config=genai_types.EmbedContentConfig(task_type=task),
+            )
+        except genai_errors.APIError as exc:
+            status = exc.code if isinstance(exc.code, int) else None
+            raise ProviderError(self.name, kind_from_status(status), str(exc), status) from exc
+        except TimeoutError as exc:
+            raise ProviderError(self.name, ProviderErrorKind.TIMEOUT, str(exc)) from exc
+        except OSError as exc:
+            raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
+        return [list(item.values or []) for item in response.embeddings or []]

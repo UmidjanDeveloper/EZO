@@ -44,6 +44,7 @@ class RouteConfig:
 class RoutingConfig:
     routes: Mapping[str, RouteConfig]
     max_output_tokens: int = 16_000
+    embeddings: tuple[CandidateConfig, ...] = ()
 
 
 class RoutingConfigError(ValueError):
@@ -82,7 +83,15 @@ def parse_routing_config(raw: dict[str, Any], source: str = "models.toml") -> Ro
     if DEFAULT_ROUTE not in routes:
         raise RoutingConfigError(f"{source}: a [routes.{DEFAULT_ROUTE}] section is required")
     max_tokens = int((raw.get("defaults") or {}).get("max_output_tokens", 16_000))
-    return RoutingConfig(routes=routes, max_output_tokens=max_tokens)
+    embeddings: list[CandidateConfig] = []
+    for index, item in enumerate((raw.get("embeddings") or {}).get("candidates") or []):
+        provider, model = item.get("provider"), item.get("model")
+        if not isinstance(provider, str) or not isinstance(model, str):
+            raise RoutingConfigError(
+                f"{source}: embeddings.candidates[{index}] needs 'provider' and 'model'"
+            )
+        embeddings.append(CandidateConfig(provider, model))
+    return RoutingConfig(routes=routes, max_output_tokens=max_tokens, embeddings=tuple(embeddings))
 
 
 @dataclass(frozen=True, slots=True)

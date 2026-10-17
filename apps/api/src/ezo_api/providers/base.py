@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Sequence
+from typing import Literal
 
 from ezo_api.providers.errors import CapabilityNotAvailableError
 from ezo_api.providers.types import (
@@ -49,5 +50,11 @@ class ModelProvider(ABC):
             text="".join(parts), model=end.model, usage=end.usage, finish_reason=end.finish_reason
         )
 
-    async def embed(self, texts: Sequence[str], model: str) -> list[list[float]]:
-        raise CapabilityNotAvailableError(self.name, Capability.EMBEDDINGS, "Milestone 2")
+    async def embed(
+        self,
+        texts: Sequence[str],
+        model: str,
+        purpose: Literal["document", "query"] = "document",
+    ) -> list[list[float]]:
+        """Embed texts for semantic search. Adapters without embeddings raise."""
+        raise CapabilityNotAvailableError(self.name, Capability.EMBEDDINGS, "not supported")

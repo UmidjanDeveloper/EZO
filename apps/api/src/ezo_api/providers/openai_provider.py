@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Any
+from collections.abc import AsyncIterator, Sequence
+from typing import Any, Literal
 
 import openai
 
@@ -23,7 +23,9 @@ from ezo_api.providers.types import (
 class OpenAIProvider(ModelProvider):
     name = "openai"
     display_name = "OpenAI"
-    capabilities = frozenset({Capability.CHAT, Capability.STREAMING, Capability.REASONING})
+    capabilities = frozenset(
+        {Capability.CHAT, Capability.STREAMING, Capability.REASONING, Capability.EMBEDDINGS}
+    )
 
     def __init__(
         self,
@@ -83,3 +85,22 @@ class OpenAIProvider(ModelProvider):
             ) from exc
 
         yield StreamEnd(model=model, usage=usage, finish_reason=finish_reason)
+
+    async def embed(
+        self,
+        texts: Sequence[str],
+        model: str,
+        purpose: Literal["document", "query"] = "document",
+    ) -> list[list[float]]:
+        try:
+            response = await self._client.embeddings.create(model=model, input=list(texts))
+        except openai.APITimeoutError as exc:
+            raise ProviderError(self.name, ProviderErrorKind.TIMEOUT, str(exc)) from exc
+        except openai.APIConnectionError as exc:
+            raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
+        except openai.APIStatusError as exc:
+            raise ProviderError(
+                self.name, kind_from_status(exc.status_code), exc.message, exc.status_code
+            ) from exc
+        rows = sorted(response.data, key=lambda item: item.index)
+        return [list(row.embedding) for row in rows]
