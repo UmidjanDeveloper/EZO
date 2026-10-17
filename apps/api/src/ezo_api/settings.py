@@ -105,6 +105,17 @@ class Settings(BaseSettings):
     voicestudio_url: str | None = Field(default=None, alias="VOICESTUDIO_URL")
     voicestudio_api_key: SecretStr | None = Field(default=None, alias="VOICESTUDIO_API_KEY")
     voicestudio_voice: str = Field(default="default", alias="VOICESTUDIO_VOICE")
+
+    # Optional multi-agent orchestration (docs/RUFLO_INTEGRATION_PLAN.md). Native is the
+    # default; Ruflo is never required and is off unless explicitly enabled.
+    orchestration_provider: Literal["native", "ruflo"] = Field(
+        default="native", alias="EZO_ORCHESTRATION_PROVIDER"
+    )
+    ruflo_enabled: bool = Field(default=False, alias="EZO_RUFLO_ENABLED")
+    ruflo_command: str = Field(default="", alias="EZO_RUFLO_COMMAND")
+    ruflo_timeout_seconds: float = Field(
+        default=600.0, ge=10, le=7200, alias="EZO_RUFLO_TIMEOUT_SECONDS"
+    )
     openai_stt_model: str = Field(default="gpt-4o-mini-transcribe", alias="EZO_OPENAI_STT_MODEL")
     openai_tts_model: str = Field(default="gpt-4o-mini-tts", alias="EZO_OPENAI_TTS_MODEL")
     openai_tts_voice: str = Field(default="alloy", alias="EZO_OPENAI_TTS_VOICE")
