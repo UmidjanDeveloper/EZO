@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* Scan the shared component package for class names. */
+@source "../../../packages/ui/src";
+
+/* Dark mode follows the `dark` class on <html> (set by the theme script). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * EZO design tokens.
+ * Palette inspired by Samarkand tilework: turquoise (accent) and lapis (accent-2)
+ * over calm graphite (dark) or warm paper (light).
+ */
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #f0efe9;
+  --line: #e2e0d8;
+  --line-strong: #c9c6bb;
+  --ink: #16181d;
+  --ink-muted: #5c606b;
+  --ink-faint: #9a9da6;
+  --accent: #0f8f86;
+  --accent-strong: #0b7a72;
+  --on-accent: #ffffff;
+  --accent-2: #2f55c8;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #c2410c;
+  --shadow-card: 0 1px 2px rgb(20 22 28 / 0.04), 0 8px 24px -12px rgb(20 22 28 / 0.12);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0a0b0f;
+  --surface: #111319;
+  --surface-2: #171a22;
+  --line: #232733;
+  --line-strong: #353b4b;
+  --ink: #eceef3;
+  --ink-muted: #9aa0ae;
+  --ink-faint: #646b7b;
+  --accent: #2ec4b6;
+  --accent-strong: #25a99c;
+  --on-accent: #041513;
+  --accent-2: #5b7ff0;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #fb7c4f;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-accent-2: var(--accent-2);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --shadow-card: var(--shadow-card);
+  --font-sans:
+    "Inter", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, -apple-system, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Quiet scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Rendered Markdown inside assistant messages. */
+.prose-ezo {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.prose-ezo > * + * {
+  margin-top: 0.75em;
+}
+.prose-ezo h1,
+.prose-ezo h2,
+.prose-ezo h3 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.2em;
+}
+.prose-ezo h1 {
+  font-size: 1.35em;
+}
+.prose-ezo h2 {
+  font-size: 1.2em;
+}
+.prose-ezo h3 {
+  font-size: 1.05em;
+}
+.prose-ezo ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.prose-ezo ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.prose-ezo li + li {
+  margin-top: 0.25em;
+}
+.prose-ezo a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-ezo strong {
+  font-weight: 600;
+}
+.prose-ezo code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+}
+.prose-ezo pre {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+}
+.prose-ezo pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.prose-ezo blockquote {
+  border-left: 3px solid var(--line-strong);
+  padding-left: 0.9em;
+  color: var(--ink-muted);
+}
+.prose-ezo table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  display: block;
+  overflow-x: auto;
+}
+.prose-ezo th,
+.prose-ezo td {
+  border: 1px solid var(--line);
+  padding: 0.4em 0.65em;
+  text-align: left;
+}
+.prose-ezo th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

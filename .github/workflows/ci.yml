@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API (lint, types, tests on SQLite + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ezo
+          POSTGRES_PASSWORD: ezo
+          POSTGRES_DB: ezo_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ezo -d ezo_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: uv sync --frozen
+      - run: uv run ruff check src tests migrations ../../scripts
+      - run: uv run ruff format --check src tests migrations ../../scripts
+      - run: uv run mypy
+      - name: Tests (SQLite)
+        run: uv run pytest -q
+      - name: Tests (PostgreSQL)
+        run: uv run pytest -q
+        env:
+          EZO_TEST_DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
+      - name: Migrations are in sync with the models
+        run: uv run alembic upgrade head && uv run alembic check
+        env:
+          DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
+
+  web:
+    name: Web (lint, types, unit tests, build, e2e)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build:web
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - run: pnpm --filter @ezo/e2e exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

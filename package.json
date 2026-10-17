@@ -1,0 +1,17 @@
+{
+  "name": "ezo",
+  "private": true,
+  "description": "EZO — Sen bilan o‘sadigan shaxsiy sun’iy intellekt.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @ezo/web dev",
+    "build:web": "pnpm --filter @ezo/web build",
+    "lint": "pnpm -r --filter=!@ezo/e2e run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r --filter=!@ezo/e2e run test",
+    "test:e2e": "pnpm --filter @ezo/e2e test"
+  }
+}

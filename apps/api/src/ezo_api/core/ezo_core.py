@@ -1,0 +1,559 @@
+"""EzoCore: the turn pipeline behind every conversation.
+
+    prepare  -> detect language, classify intent, select agent,
+                persist the user message and open an AgentRun
+    execute  -> load context, retrieve memory, plan, compose the prompt,
+                stream from the routed model (with fallback), verify quality,
+                persist the reply, capture memories, close the AgentRun
+
+Every step is recorded in the AgentRun trace (names, timings, summaries —
+never hidden model reasoning).
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Literal
+from zoneinfo import ZoneInfo
+
+import anyio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ezo_api.agents.base import AgentPlan, AgentTurn
+from ezo_api.agents.registry import AgentRegistry, AgentSelection
+from ezo_api.core import messages
+from ezo_api.core.intent import IntentResult, classify_intent
+from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
+from ezo_api.core.trace import Tracer
+from ezo_api.db.base import utcnow
+from ezo_api.db.models import AgentRun, Conversation, Message, Project, User
+from ezo_api.memory.service import MemoryService, RetrievedMemory
+from ezo_api.personality.profile import HumorLevel, PersonalityProfile
+from ezo_api.personality.prompt import PromptContext, PromptMemory, build_system_prompt
+from ezo_api.providers.router import (
+    AllProvidersFailedError,
+    ModelRouter,
+    RoutedStream,
+    RoutingConfigError,
+    StreamInterruptedError,
+)
+from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
+
+logger = logging.getLogger(__name__)
+
+TITLE_MAX_CHARS = 60
+TRUNCATION_REASONS = {"max_tokens", "length", "MAX_TOKENS"}
+
+
+class TurnError(Exception):
+    """A request problem detected before streaming starts (maps to 4xx)."""
+
+    def __init__(self, status: int, code: str, message: str) -> None:
+        self.status = status
+        self.code = code
+        self.message = message
+        super().__init__(message)
+
+
+@dataclass(frozen=True, slots=True)
+class TurnInput:
+    text: str
+    conversation_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
+    forced_agent: str | None = None
+
+
+@dataclass(slots=True)
+class PreparedTurn:
+    user: User
+    conversation: Conversation
+    project: Project | None
+    user_message: Message
+    run: AgentRun
+    language: str
+    language_is_fixed: bool
+    intent: IntentResult
+    selection: AgentSelection
+    tracer: Tracer
+    created_conversation: bool
+
+
+@dataclass(frozen=True, slots=True)
+class CoreMeta:
+    conversation_id: uuid.UUID
+    conversation_title: str
+    created_conversation: bool
+    user_message_id: uuid.UUID
+    run_id: uuid.UUID
+    intent: str
+    intent_confidence: float
+    agent: str
+    requested_agent: str
+    requested_agent_available: bool
+    language: str
+    type: Literal["meta"] = "meta"
+
+
+@dataclass(frozen=True, slots=True)
+class CoreDelta:
+    text: str
+    type: Literal["delta"] = "delta"
+
+
+@dataclass(frozen=True, slots=True)
+class CoreDone:
+    message: Message
+    run: AgentRun
+    type: Literal["done"] = "done"
+
+
+@dataclass(frozen=True, slots=True)
+class CoreError:
+    code: str
+    message: str
+    hint: str
+    run_id: uuid.UUID
+    attempts: list[dict[str, Any]] = field(default_factory=list)
+    type: Literal["error"] = "error"
+
+
+CoreEvent = CoreMeta | CoreDelta | CoreDone | CoreError
+
+
+def make_title(text: str) -> str:
+    title = " ".join(text.split())
+    if len(title) <= TITLE_MAX_CHARS:
+        return title
+    cut = title[:TITLE_MAX_CHARS].rsplit(" ", 1)[0]
+    return (cut or title[:TITLE_MAX_CHARS]) + "…"
+
+
+class EzoCore:
+    def __init__(
+        self,
+        router: ModelRouter,
+        agents: AgentRegistry,
+        personality: PersonalityProfile,
+        timezone: str,
+        context_message_limit: int,
+        context_char_budget: int,
+        max_output_tokens: int,
+    ) -> None:
+        self.router = router
+        self.agents = agents
+        self.personality = personality
+        self.tz = ZoneInfo(timezone)
+        self.context_message_limit = context_message_limit
+        self.context_char_budget = context_char_budget
+        self.max_output_tokens = max_output_tokens
+
+    # ------------------------------------------------------------------ prepare
+
+    async def prepare(self, session: AsyncSession, user: User, turn: TurnInput) -> PreparedTurn:
+        tracer = Tracer()
+        conversation, project, created = await self._load_conversation(session, user, turn)
+
+        preferences = user.preferences or {}
+        fixed = preferences.get("response_language")
+        with tracer.step("detect_language") as step:
+            if fixed in SUPPORTED_LANGUAGES:
+                language, language_is_fixed = str(fixed), True
+                step.summary = f"{language} (user preference)"
+            else:
+                language, language_is_fixed = detect_language(turn.text), False
+                step.summary = language
+
+        with tracer.step("classify_intent") as step:
+            intent = classify_intent(turn.text)
+            step.summary = f"{intent.intent.value} ({intent.confidence:.2f})" + (
+                f" signals={list(intent.signals)}" if intent.signals else ""
+            )
+
+        with tracer.step("select_agent") as step:
+            selection = self.agents.select(intent.intent, turn.forced_agent)
+            step.summary = selection.agent.spec.key + (
+                f" covering unavailable {selection.requested.key}" if selection.is_fallback else ""
+            )
+
+        user_message = Message(
+            conversation_id=conversation.id,
+            role="user",
+            content=turn.text,
+            language=language,
+            meta={},
+        )
+        run = AgentRun(
+            user_id=user.id,
+            conversation_id=conversation.id,
+            status="running",
+            intent=intent.intent.value,
+            intent_confidence=intent.confidence,
+            agent=selection.agent.spec.key,
+            language=language,
+            steps=[],
+            attempts=[],
+            tool_calls=[],
+        )
+        conversation.updated_at = utcnow()
+        session.add_all([user_message, run])
+        await session.commit()
+
+        return PreparedTurn(
+            user=user,
+            conversation=conversation,
+            project=project,
+            user_message=user_message,
+            run=run,
+            language=language,
+            language_is_fixed=language_is_fixed,
+            intent=intent,
+            selection=selection,
+            tracer=tracer,
+            created_conversation=created,
+        )
+
+    async def _load_conversation(
+        self, session: AsyncSession, user: User, turn: TurnInput
+    ) -> tuple[Conversation, Project | None, bool]:
+        if turn.conversation_id is not None:
+            conversation = await session.get(Conversation, turn.conversation_id)
+            if conversation is None or conversation.user_id != user.id:
+                raise TurnError(404, "conversation_not_found", "Conversation not found.")
+            project = (
+                await session.get(Project, conversation.project_id)
+                if conversation.project_id
+                else None
+            )
+            return conversation, project, False
+
+        project = None
+        if turn.project_id is not None:
+            project = await session.get(Project, turn.project_id)
+            if project is None or project.user_id != user.id:
+                raise TurnError(404, "project_not_found", "Project not found.")
+        conversation = Conversation(
+            user_id=user.id,
+            project_id=project.id if project else None,
+            title=make_title(turn.text),
+        )
+        session.add(conversation)
+        await session.flush()
+        return conversation, project, True
+
+    # ------------------------------------------------------------------ execute
+
+    async def execute(
+        self, session: AsyncSession, prepared: PreparedTurn
+    ) -> AsyncIterator[CoreEvent]:
+        selection = prepared.selection
+        yield CoreMeta(
+            conversation_id=prepared.conversation.id,
+            conversation_title=prepared.conversation.title,
+            created_conversation=prepared.created_conversation,
+            user_message_id=prepared.user_message.id,
+            run_id=prepared.run.id,
+            intent=prepared.intent.intent.value,
+            intent_confidence=prepared.intent.confidence,
+            agent=selection.agent.spec.key,
+            requested_agent=selection.requested.key,
+            requested_agent_available=selection.requested.available,
+            language=prepared.language,
+        )
+
+        tracer = prepared.tracer
+        routed: RoutedStream | None = None
+        try:
+            history = await self._load_history(session, prepared)
+            memories = await self._retrieve_memories(session, prepared)
+            plan = self._plan(prepared)
+            system_prompt = self._compose_prompt(prepared, plan, memories)
+
+            with tracer.step("route_model") as step:
+                routed = self.router.open(plan.route)
+                step.summary = f"route={plan.route} candidates=" + ",".join(
+                    f"{c.provider.name}/{c.model}" for c in routed.candidates
+                )
+            prepared.run.route = plan.route
+
+            request = ChatRequest(
+                model="",  # filled per candidate by the router
+                messages=history,
+                system=system_prompt,
+                max_output_tokens=self.max_output_tokens,
+                hints={"language": prepared.language, "agent": selection.agent.spec.key},
+            )
+            parts: list[str] = []
+            end: StreamEnd | None = None
+            with tracer.step("generate") as step:
+                async for event in routed.stream(request):
+                    if isinstance(event, TextDelta):
+                        parts.append(event.text)
+                        yield CoreDelta(event.text)
+                    else:
+                        end = event
+                selected = routed.selected
+                step.summary = (
+                    f"{selected.provider.name}/{end.model if end else selected.model}"
+                    if selected
+                    else ""
+                )
+
+            reply, quality = self._verify(prepared, "".join(parts), end)
+            if quality.get("appended"):
+                yield CoreDelta(str(quality["appended"]))
+
+            message = await self._finish_success(
+                session, prepared, routed, end, reply, quality, memories
+            )
+            yield CoreDone(message=message, run=prepared.run)
+        except (AllProvidersFailedError, StreamInterruptedError, RoutingConfigError) as exc:
+            yield await self._finish_failure(session, prepared, routed, exc)
+        except BaseException as exc:
+            # Includes client disconnects (cancellation): record the failure in the
+            # trace, shielded from the cancellation, then let the exception propagate.
+            with anyio.CancelScope(shield=True):
+                await self._record_abort(session, prepared, routed, exc)
+            raise
+
+    async def _load_history(
+        self, session: AsyncSession, prepared: PreparedTurn
+    ) -> list[ChatMessage]:
+        with prepared.tracer.step("load_context") as step:
+            rows = (
+                await session.scalars(
+                    select(Message)
+                    .where(Message.conversation_id == prepared.conversation.id)
+                    .order_by(Message.created_at.desc())
+                    .limit(self.context_message_limit)
+                )
+            ).all()
+            history: list[ChatMessage] = []
+            used = 0
+            for row in rows:  # newest first
+                if row.role not in ("user", "assistant"):
+                    continue
+                if history and used + len(row.content) > self.context_char_budget:
+                    break
+                used += len(row.content)
+                history.append(ChatMessage(row.role, row.content))  # type: ignore[arg-type]
+            history.reverse()
+            step.summary = f"{len(history)} messages, {used} chars"
+            return history
+
+    async def _retrieve_memories(
+        self, session: AsyncSession, prepared: PreparedTurn
+    ) -> list[RetrievedMemory]:
+        with prepared.tracer.step("retrieve_memory") as step:
+            retrieved = await MemoryService(session).retrieve(
+                prepared.user.id,
+                prepared.user_message.content,
+                prepared.conversation.project_id,
+            )
+            step.summary = f"{len(retrieved)} memories"
+            return retrieved
+
+    def _plan(self, prepared: PreparedTurn) -> AgentPlan:
+        with prepared.tracer.step("plan") as step:
+            selection = prepared.selection
+            plan = selection.agent.plan(
+                AgentTurn(
+                    text=prepared.user_message.content,
+                    language=prepared.language,
+                    intent=prepared.intent,
+                    requested=selection.requested,
+                )
+            )
+            step.summary = f"route={plan.route} mode={plan.context_mode} steps={len(plan.steps)}"
+            return plan
+
+    def _compose_prompt(
+        self, prepared: PreparedTurn, plan: AgentPlan, memories: list[RetrievedMemory]
+    ) -> str:
+        with prepared.tracer.step("compose_prompt") as step:
+            humor_pref = (prepared.user.preferences or {}).get("humor", "default")
+            humor: HumorLevel = (
+                humor_pref if humor_pref in ("off", "light", "normal") else self.personality.humor
+            )
+            project = prepared.project
+            prompt = build_system_prompt(
+                self.personality,
+                PromptContext(
+                    mode=plan.context_mode,
+                    language=prepared.language,
+                    language_is_fixed=prepared.language_is_fixed,
+                    humor=humor,
+                    now=datetime.now(self.tz),
+                    project_name=project.name if project else None,
+                    project_description=project.description if project else None,
+                    memories=[
+                        PromptMemory(m.memory.memory_type, m.memory.category, m.memory.content)
+                        for m in memories
+                    ],
+                    agent_instructions=plan.instructions,
+                ),
+            )
+            step.summary = f"mode={plan.context_mode} humor={humor} chars={len(prompt)}"
+            return prompt
+
+    def _verify(
+        self, prepared: PreparedTurn, raw_reply: str, end: StreamEnd | None
+    ) -> tuple[str, dict[str, Any]]:
+        """Quality checks on the final reply (cheap, deterministic)."""
+        with prepared.tracer.step("verify") as step:
+            reply = raw_reply.strip()
+            finish = end.finish_reason if end else None
+            quality: dict[str, Any] = {"finish_reason": finish, "truncated": False}
+            if not reply:
+                reply = messages.text(
+                    "refusal" if finish == "refusal" else "empty_reply", prepared.language
+                )
+                quality["appended"] = reply
+                quality["replaced_empty"] = True
+            elif finish in TRUNCATION_REASONS:
+                notice = "\n\n" + messages.text("truncated", prepared.language)
+                reply += notice
+                quality["appended"] = notice
+                quality["truncated"] = True
+            step.summary = (
+                ", ".join(f"{k}={v}" for k, v in quality.items() if k != "appended" and v) or "ok"
+            )
+            return reply, quality
+
+    async def _finish_success(
+        self,
+        session: AsyncSession,
+        prepared: PreparedTurn,
+        routed: RoutedStream,
+        end: StreamEnd | None,
+        reply: str,
+        quality: dict[str, Any],
+        memories: list[RetrievedMemory],
+    ) -> Message:
+        run = prepared.run
+        selected = routed.selected
+        usage = end.usage if end else Usage()
+
+        saved_memories = 0
+        with prepared.tracer.step("save_memory") as step:
+            if (prepared.user.preferences or {}).get("auto_memory", True):
+                capture = await MemoryService(session).capture_from_message(
+                    prepared.user.id,
+                    prepared.user_message.content,
+                    prepared.conversation.id,
+                    prepared.conversation.project_id,
+                )
+                saved_memories = len(capture.created)
+                step.summary = (
+                    f"created={len(capture.created)} reinforced={len(capture.reinforced)} "
+                    f"skipped_sensitive={capture.skipped_sensitive}"
+                )
+            else:
+                step.summary = "disabled by user preference"
+
+        message = Message(
+            conversation_id=prepared.conversation.id,
+            role="assistant",
+            content=reply,
+            language=prepared.language,
+            agent=prepared.selection.agent.spec.key,
+            agent_run_id=run.id,
+            meta={
+                "provider": selected.provider.name if selected else None,
+                "model": end.model if end else (selected.model if selected else None),
+                "route": run.route,
+                "requested_agent": prepared.selection.requested.key,
+                "requested_agent_available": prepared.selection.requested.available,
+                "finish_reason": quality.get("finish_reason"),
+                "truncated": quality.get("truncated", False),
+                "memories_used": [str(m.memory.id) for m in memories],
+                "memories_saved": saved_memories,
+            },
+        )
+        session.add(message)
+
+        run.status = "completed"
+        run.provider = selected.provider.name if selected else None
+        run.model = end.model if end else (selected.model if selected else None)
+        run.input_tokens = usage.input_tokens
+        run.output_tokens = usage.output_tokens
+        run.attempts = [a.as_dict() for a in routed.attempts]
+        run.latency_ms = prepared.tracer.elapsed_ms()
+        run.steps = prepared.tracer.as_list()
+        run.finished_at = utcnow()
+        prepared.conversation.updated_at = utcnow()
+        await session.commit()
+        return message
+
+    async def _finish_failure(
+        self,
+        session: AsyncSession,
+        prepared: PreparedTurn,
+        routed: RoutedStream | None,
+        exc: Exception,
+    ) -> CoreError:
+        language = prepared.language
+        if isinstance(exc, AllProvidersFailedError):
+            code, message = "all_providers_failed", messages.text("all_providers_failed", language)
+            hints = sorted({a.error_kind or "unknown" for a in exc.attempts})
+            hint = _provider_hint(hints)
+        elif isinstance(exc, StreamInterruptedError):
+            code, message = "stream_interrupted", messages.text("stream_interrupted", language)
+            hint = exc.error.hint
+        else:
+            code, message = "config_error", messages.text("config_error", language)
+            hint = str(exc)
+        logger.warning("Turn failed (%s): %s", code, exc)
+
+        run = prepared.run
+        attempts = [a.as_dict() for a in routed.attempts] if routed else []
+        run.status = "failed"
+        run.error = f"{code}: {exc}"[:2000]
+        run.attempts = attempts
+        run.latency_ms = prepared.tracer.elapsed_ms()
+        run.steps = prepared.tracer.as_list()
+        run.finished_at = utcnow()
+        await session.commit()
+        return CoreError(code=code, message=message, hint=hint, run_id=run.id, attempts=attempts)
+
+    async def _record_abort(
+        self,
+        session: AsyncSession,
+        prepared: PreparedTurn,
+        routed: RoutedStream | None,
+        exc: BaseException,
+    ) -> None:
+        try:
+            await session.rollback()
+            run = await session.get(AgentRun, prepared.run.id)
+            if run is None:
+                return
+            run.status = "failed"
+            run.error = f"aborted: {type(exc).__name__}: {exc}"[:2000]
+            run.attempts = [a.as_dict() for a in routed.attempts] if routed else []
+            run.steps = prepared.tracer.as_list()
+            run.latency_ms = prepared.tracer.elapsed_ms()
+            run.finished_at = utcnow()
+            await session.commit()
+        except Exception:
+            logger.exception("Could not record aborted run %s", prepared.run.id)
+        if not isinstance(exc, Exception):
+            logger.info("Turn %s aborted (%s)", prepared.run.id, type(exc).__name__)
+        else:
+            logger.error("Turn %s crashed", prepared.run.id, exc_info=exc)
+
+
+def _provider_hint(kinds: list[str]) -> str:
+    if "auth" in kinds:
+        return "An API key was rejected. Check the keys in your .env file."
+    if "model_not_found" in kinds:
+        return "A model name is not available. Check apps/api/config/models.toml."
+    if "rate_limit" in kinds:
+        return "The provider is rate limiting or the account has no credit. Try again later."
+    if "unavailable" in kinds or "timeout" in kinds:
+        return "Could not reach the provider. Check your internet connection."
+    return "See the API logs for details (Settings → Debug shows the attempts)."

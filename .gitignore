@@ -1,0 +1,39 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Databases created in quick (SQLite) mode
+*.db
+*.db-journal
+
+# JavaScript
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.turbo/
+
+# Tests
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+coverage/
+
+# Local storage for development uploads (from Milestone 2)
+storage/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

@@ -1,0 +1,51 @@
+import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
+
+/**
+ * End-to-end tests run a real browser against EZO on dedicated ports
+ * (web 3100, API 8100) with a fresh SQLite database and no AI keys
+ * (offline mode), so results are deterministic and never cost money.
+ */
+const ROOT = path.resolve(__dirname, "../..");
+const PYTHON = process.env.EZO_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
+const WEB_PORT = 3100;
+const API_PORT = 8100;
+
+export default defineConfig({
+  testDir: "./specs",
+  fullyParallel: false,
+  workers: 1,
+  retries: 0,
+  timeout: 30_000,
+  expect: { timeout: 10_000 },
+  reporter: [["list"]],
+  use: {
+    baseURL: `http://localhost:${WEB_PORT}`,
+    trace: "retain-on-failure",
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+      ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } }
+      : {}),
+  },
+  projects: [
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile\.spec\.ts/ },
+    { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ },
+  ],
+  webServer: [
+    {
+      command: `${PYTHON} scripts/ezo.py api --e2e --port ${API_PORT}`,
+      cwd: ROOT,
+      url: `http://localhost:${API_PORT}/api/health`,
+      timeout: 120_000,
+      reuseExistingServer: false,
+      env: { EZO_CORS_ORIGINS: `http://localhost:${WEB_PORT}` },
+    },
+    {
+      command: `pnpm --filter @ezo/web build && pnpm --filter @ezo/web exec next start --port ${WEB_PORT}`,
+      cwd: ROOT,
+      url: `http://localhost:${WEB_PORT}`,
+      timeout: 300_000,
+      reuseExistingServer: false,
+      env: { EZO_API_URL: `http://localhost:${API_PORT}` },
+    },
+  ],
+});
