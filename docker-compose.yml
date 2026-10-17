@@ -4,6 +4,8 @@
 #   docker compose up -d db        start only the database (for `python scripts/ezo.py dev`)
 #   docker compose down            stop (data is kept in the "ezo-db" and "ezo-storage" volumes)
 #
+#   docker compose --profile voice up   also start the optional VoiceStudio voice service
+#
 # Secrets (API keys) come from the .env file in this folder.
 
 services:
@@ -55,6 +57,33 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Optional server-side voice (speech-to-text + text-to-speech). VoiceStudio is a separate
+  # AGPL-3.0 project; EZO talks to it only over its HTTP API (see docs/OPEN_SOURCE_AUDIT.md).
+  # Its default voice model weights are licensed for NON-COMMERCIAL use only.
+  # The first start downloads several GB of models. Enable with:
+  #   1. in .env: VOICESTUDIO_URL=http://voicestudio:3900 and VOICESTUDIO_API_KEY=<long random text>
+  #   2. docker compose --profile voice up
+  voicestudio:
+    image: ghcr.io/debpalash/voicestudio:stable
+    profiles: ["voice"]
+    expose:
+      - "3900" # reachable by the EZO API inside Docker only; not published on your network
+    volumes:
+      - voicestudio-data:/app/omnivoice_data
+    environment:
+      HF_HOME: /app/omnivoice_data/huggingface
+      OMNIVOICE_DATA_DIR: /app/omnivoice_data
+      OMNIVOICE_SERVER_MODE: "1"
+      OMNIVOICE_API_KEY: ${VOICESTUDIO_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3900/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    restart: unless-stopped
+
 volumes:
   ezo-db:
   ezo-storage:
+  voicestudio-data:
