@@ -36,15 +36,22 @@ jobs:
       - run: uv run ruff format --check src tests migrations ../../scripts
       - run: uv run mypy
       - name: Tests (SQLite)
-        run: uv run pytest -q
+        run: uv run pytest -q -rs --junitxml=reports/sqlite.xml
       - name: Tests (PostgreSQL)
-        run: uv run pytest -q
+        run: uv run pytest -q -rs --junitxml=reports/postgres.xml
         env:
           EZO_TEST_DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
       - name: Migrations are in sync with the models
         run: uv run alembic upgrade head && uv run alembic check
         env:
           DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
+      - name: Test report (exact numbers for IMPLEMENTATION_STATUS)
+        if: always()
+        working-directory: .
+        run: >-
+          python3 scripts/test_report.py
+          "API · SQLite=apps/api/reports/sqlite.xml"
+          "API · PostgreSQL=apps/api/reports/postgres.xml"
 
   web:
     name: Web (lint, types, unit tests, build, e2e)
@@ -62,9 +69,48 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test
+      - name: Unit tests
+        run: pnpm test --reporter=default --reporter=junit --outputFile=reports/vitest.xml
       - run: pnpm build:web
       - run: uv sync --frozen
         working-directory: apps/api
       - run: pnpm --filter @ezo/e2e exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - name: Test report (exact numbers for IMPLEMENTATION_STATUS)
+        if: always()
+        run: >-
+          python3 scripts/test_report.py
+          "Web unit=apps/web/reports/vitest.xml"
+          "Shared unit=packages/shared/reports/vitest.xml"
+          "Playwright e2e=tests/e2e/reports/junit.xml"
+
+  docker:
+    name: Docker (API + web images, Compose config, API smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compose file is valid (optional profiles included)
+        run: docker compose --profile voice config --quiet
+      - name: Build API image
+        run: docker build -t ezo-api:ci apps/api
+      - name: Build web image
+        run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
+      - name: API image starts, migrates and answers /api/health
+        run: |
+          docker run -d --name ezo-api -p 8000:8000 \
+            -e DATABASE_URL=sqlite:////app/storage/ci.db -e EZO_ENV=test ezo-api:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/health 2>/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs ezo-api
+          exit 1
+      - name: Web image starts and serves the app
+        run: |
+          docker run -d --name ezo-web -p 3000:3000 -e EZO_API_URL=http://localhost:8000 ezo-web:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:3000/ 2>/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs ezo-web
+          exit 1

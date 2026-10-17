@@ -18,7 +18,7 @@ export default defineConfig({
   retries: 0,
   timeout: 30_000,
   expect: { timeout: 10_000 },
-  reporter: [["list"]],
+  reporter: [["list"], ["junit", { outputFile: "reports/junit.xml" }]],
   use: {
     baseURL: `http://localhost:${WEB_PORT}`,
     trace: "retain-on-failure",

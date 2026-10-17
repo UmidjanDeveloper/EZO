@@ -359,15 +359,41 @@ def cmd_test(args: argparse.Namespace) -> int:
     run(["uv", "run", "ruff", "check", "src", "tests", "migrations"], cwd=API_DIR)
     run(["uv", "run", "ruff", "format", "--check", "src", "tests", "migrations"], cwd=API_DIR)
     run(["uv", "run", "mypy"], cwd=API_DIR)
-    run(["uv", "run", "pytest", "-q"], cwd=API_DIR)
+    # JUnit reports feed scripts/test_report.py: the same table as in CI (see
+    # IMPLEMENTATION_STATUS.md, "Verification convention").
+    reports = [f"API · SQLite={API_DIR / 'reports' / 'sqlite.xml'}"]
+    sqlite_env = {k: v for k, v in os.environ.items() if k != "EZO_TEST_DATABASE_URL"}
+    run(
+        ["uv", "run", "pytest", "-q", "-rs", "--junitxml=reports/sqlite.xml"],
+        cwd=API_DIR,
+        env=sqlite_env,
+    )
+    if os.environ.get("EZO_TEST_DATABASE_URL"):
+        run(["uv", "run", "pytest", "-q", "-rs", "--junitxml=reports/postgres.xml"], cwd=API_DIR)
+        reports.append(f"API · PostgreSQL={API_DIR / 'reports' / 'postgres.xml'}")
     run(["pnpm", "lint"])
     run(["pnpm", "typecheck"])
-    run(["pnpm", "test"])
+    run(
+        [
+            "pnpm",
+            "test",
+            "--reporter=default",
+            "--reporter=junit",
+            "--outputFile=reports/vitest.xml",
+        ]
+    )
+    reports += [
+        f"Web unit={ROOT / 'apps' / 'web' / 'reports' / 'vitest.xml'}",
+        f"Shared unit={ROOT / 'packages' / 'shared' / 'reports' / 'vitest.xml'}",
+    ]
     if args.e2e:
         env = dict(os.environ, EZO_PYTHON=sys.executable)
         run(["pnpm", "test:e2e"], env=env)
+        reports.append(f"Playwright e2e={ROOT / 'tests' / 'e2e' / 'reports' / 'junit.xml'}")
     print()
-    ok("All checks passed.")
+    run([sys.executable, str(ROOT / "scripts" / "test_report.py"), *reports])
+    print()
+    ok("All checks passed (local verification — CI numbers are reported separately).")
     return 0
 
 

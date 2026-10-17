@@ -26,6 +26,9 @@ next-env.d.ts
 # Tests
 tests/e2e/test-results/
 tests/e2e/playwright-report/
+# JUnit test reports (scripts/test_report.py)
+reports/
+requirements-audit.txt
 coverage/
 
 # Local storage for development uploads (from Milestone 2)
