@@ -315,6 +315,8 @@ export interface ChatRequestBody {
   agent?: string | null;
   /** "voice" asks EZO for short, spoken-style replies. */
   channel?: ChatChannel;
+  /** Measured speaking time of a voice message, in seconds (Language Coach). */
+  speech_seconds?: number | null;
 }
 
 export interface VoiceAttempt {
@@ -447,4 +449,78 @@ export interface Story extends StorySummary {
   scenes: StoryScene[];
   timeline: { scene_id: string; start_seconds: number; end_seconds: number; animation: Record<string, unknown> }[];
   total_seconds: number;
+}
+
+// --- Language Coach -----------------------------------------------------------------------
+
+export type PronunciationConfidence = "not_assessed" | "transcript_assisted" | "limited" | "acoustic";
+
+export interface LanguageSession {
+  id: string;
+  mode: string;
+  language: string;
+  status: "active" | "completed" | "abandoned";
+  cefr_target: string | null;
+  cefr_estimate: string | null;
+  ielts_part: number | null;
+  started_at: string;
+  ended_at: string | null;
+  speaking_seconds: number;
+  user_words: number;
+  /** Estimated IELTS-style range from the simulator — never an official score. */
+  band_low: number | null;
+  band_high: number | null;
+  fluency_score: number | null;
+  lexical_score: number | null;
+  grammar_score: number | null;
+  pronunciation_score: number | null;
+  pronunciation_confidence: PronunciationConfidence;
+  feedback: string | null;
+  conversation_id: string | null;
+  report_artifact_id: string | null;
+}
+
+export interface LanguageMistake {
+  category: string;
+  original: string;
+  correction: string;
+  explanation: string;
+  severity: "minor" | "major";
+}
+
+export interface LanguageSessionDetail extends LanguageSession {
+  strengths: string[];
+  weaknesses: string[];
+  practice_target: string;
+  notes: string[];
+  turns: { position: number; role: "learner" | "coach"; text: string; channel: string; ielts_part: number | null; word_count: number; speech_seconds: number | null }[];
+  metrics: { name: string; value: number; scale: string; method: "computed" | "estimated"; confidence: string }[];
+  mistakes: LanguageMistake[];
+}
+
+export interface LanguageGoal {
+  id: string;
+  description: string;
+  target_band: number | null;
+  cefr_target: string | null;
+  deadline: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface LanguageProgress {
+  sessions: LanguageSession[];
+  speaking_minutes: number;
+  criteria_trend: Record<string, { older: number; newer: number }>;
+  recurring_mistakes: { category: string; count: number; sessions: number; example: string }[];
+  goals: LanguageGoal[];
+}
+
+export interface VocabularyItem {
+  term: string;
+  meaning: string;
+  example: string;
+  times_suggested: number;
+  status: string;
+  created_at: string;
 }

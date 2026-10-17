@@ -44,3 +44,9 @@ export function rmsOf(samples: Float32Array): number {
   for (const sample of samples) sum += sample * sample;
   return samples.length ? Math.sqrt(sum / samples.length) : 0;
 }
+
+/** Measured speaking time of an utterance (first speech to last loud moment), in seconds. */
+export function speakingSeconds(state: VadState): number | null {
+  if (state.speechAt === null || state.lastLoudAt === null) return null;
+  return Math.round((state.lastLoudAt - state.speechAt) / 100) / 10;
+}

@@ -65,7 +65,8 @@ export function speechSynthesisSupported(): boolean {
 
 export interface ListenHandlers {
   onInterim: (text: string) => void;
-  onFinal: (text: string) => void;
+  /** `speechSeconds` is the measured speaking time when the listener can measure it. */
+  onFinal: (text: string, info?: { speechSeconds?: number | null }) => void;
   /** Called once when listening stops for any reason (after onFinal, if any). */
   onEnd: (error: string | null) => void;
 }

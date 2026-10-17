@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rmsOf, vadStart, vadStep, type VadAction, type VadConfig } from "./vad";
+import { rmsOf, speakingSeconds, vadStart, vadStep, type VadAction, type VadConfig } from "./vad";
 
 const config: VadConfig = { threshold: 0.1, endSilenceMs: 1000, noSpeechMs: 3000, maxMs: 10_000 };
 
@@ -34,5 +34,14 @@ describe("voice activity detection", () => {
   it("computes RMS", () => {
     expect(rmsOf(new Float32Array([0.5, -0.5, 0.5, -0.5]))).toBeCloseTo(0.5);
     expect(rmsOf(new Float32Array())).toBe(0);
+  });
+
+  it("measures speaking time from the first speech to the last loud moment", () => {
+    expect(speakingSeconds(vadStart(0))).toBeNull();
+    let state = vadStart(0);
+    for (const [now, rms] of [[500, 0.01], [1000, 0.5], [3400, 0.5], [3500, 0.01], [4600, 0.01]] as const) {
+      state = vadStep(state, rms, now)[0];
+    }
+    expect(speakingSeconds(state)).toBe(2.4);
   });
 });

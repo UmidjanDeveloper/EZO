@@ -15,7 +15,7 @@ import type { LanguageCode, VoiceStatus } from "@ezo/shared";
 import { ApiError } from "@ezo/shared";
 import { api } from "../api";
 import { listenOnce, speak as browserSpeak, speechRecognitionSupported, stopSpeaking, type ListenHandlers } from "../speech";
-import { DEFAULT_VAD, rmsOf, vadStart, vadStep } from "./vad";
+import { DEFAULT_VAD, rmsOf, speakingSeconds, vadStart, vadStep } from "./vad";
 
 export type EngineKind = "server" | "browser";
 
@@ -123,7 +123,7 @@ export const listenWithServer: Listen = (language, handlers) => {
         const result = await api.transcribe(blob, `speech.${extensionFor(mime)}`, language);
         if (cancelled) return;
         const text = result.text.trim();
-        if (text) handlers.onFinal(text);
+        if (text) handlers.onFinal(text, { speechSeconds: speakingSeconds(vad) });
         end(text ? null : "no-speech");
       } catch (error) {
         if (cancelled) return;

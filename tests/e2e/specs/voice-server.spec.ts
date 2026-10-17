@@ -103,10 +103,16 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   await page.getByTestId("mode-voice").click();
   const stage = page.getByTestId("voice-stage");
   await expect(stage).toHaveAttribute("data-engine", "server");
+  const chatRequest = page.waitForRequest((request) => request.url().includes("/api/chat/stream"));
   await page.getByTestId("voice-toggle").click();
   await expect(page.getByTestId("voice-status")).toHaveText("Tinglayapman…");
 
   await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 10_000 });
+  // The measured speaking time travels with the voice message (the fake microphone speaks 0.7 s).
+  const sent = (await chatRequest).postDataJSON() as { channel: string; speech_seconds: number };
+  expect(sent.channel).toBe("voice");
+  expect(sent.speech_seconds).toBeGreaterThan(0.3);
+  expect(sent.speech_seconds).toBeLessThan(1.2);
   await expect(page.getByTestId("voice-caption")).toContainText("oflayn rejimda");
   await expect(stage.getByTestId("ezo-presence")).toHaveAttribute("data-state", "speaking");
   expect(speakRequests).toBe(1);

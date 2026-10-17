@@ -87,11 +87,11 @@ export function VoiceStage({ session }: { session: Session }) {
     const listenFn = useServer ? listenWithServer : listenWithBrowser;
     stopListeningRef.current = listenFn(language, {
       onInterim: (text) => turn === turnRef.current && setHeard(text),
-      onFinal: (text) => {
+      onFinal: (text, info) => {
         if (turn !== turnRef.current) return;
         gotText = true;
         setHeard(text);
-        void respond(text, turn);
+        void respond(text, turn, info?.speechSeconds ?? null);
       },
       onEnd: (error) => {
         stopListeningRef.current = null;
@@ -111,9 +111,9 @@ export function VoiceStage({ session }: { session: Session }) {
       },
     });
 
-    async function respond(text: string, currentTurn: number) {
+    async function respond(text: string, currentTurn: number, speechSeconds: number | null) {
       setPhase("thinking");
-      const reply = await send(text, "voice");
+      const reply = await send(text, "voice", { speechSeconds });
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
       if (!reply || !reply.content) {
         setPhase("idle");

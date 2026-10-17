@@ -16,6 +16,10 @@ import type {
   KnowledgeOverview,
   KnowledgeSearchResult,
   KnowledgeUploadResult,
+  LanguageGoal,
+  LanguageProgress,
+  LanguageSession,
+  LanguageSessionDetail,
   Memory,
   MemoryCategory,
   Message,
@@ -25,6 +29,7 @@ import type {
   StorySummary,
   SystemStatus,
   User,
+  VocabularyItem,
   VoiceStatus,
   VoiceTranscript,
 } from "./types";
@@ -239,6 +244,15 @@ export function createApiClient(options: ApiClientOptions) {
     getStory: (id: string) => request<Story>(`/api/stories/${id}`),
 
     getAgentRun: (id: string) => request<AgentRun>(`/api/agent-runs/${id}`),
+
+    languageProgress: () => request<LanguageProgress>("/api/language/progress"),
+    listLanguageSessions: () => request<LanguageSession[]>("/api/language/sessions"),
+    getLanguageSession: (id: string) => request<LanguageSessionDetail>(`/api/language/sessions/${id}`),
+    deleteLanguageSession: (id: string) =>
+      request<void>(`/api/language/sessions/${id}?confirm=true`, { method: "DELETE" }),
+    setLanguageGoal: (goal: { description: string; target_band?: number | null; cefr_target?: string | null }) =>
+      request<LanguageGoal>("/api/language/goals", { method: "POST", ...json(goal) }),
+    listVocabulary: () => request<VocabularyItem[]>("/api/language/vocabulary"),
 
     /**
      * Send a chat message and receive the reply as a stream of events.

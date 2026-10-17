@@ -109,7 +109,11 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
 
   /** Send a message; resolves with the final assistant message (or null if stopped). */
   const send = useCallback(
-    async (text: string, channel: ChatChannel = "text"): Promise<UiMessage | null> => {
+    async (
+      text: string,
+      channel: ChatChannel = "text",
+      options: { speechSeconds?: number | null } = {},
+    ): Promise<UiMessage | null> => {
       if (streaming) return null;
       const controller = new AbortController();
       abortRef.current = controller;
@@ -129,6 +133,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
             conversation_id: conversationId ?? null,
             project_id: conversationId ? null : projectId,
             channel,
+            speech_seconds: channel === "voice" ? (options.speechSeconds ?? null) : null,
           },
           controller.signal,
         );
