@@ -46,6 +46,21 @@ describe("createApiClient", () => {
     expect(((seenBody as FormData).get("file") as File).name).toBe("a.txt");
   });
 
+  it("downloads artifacts with their real (UTF-8) filename", async () => {
+    const client = createApiClient({
+      baseUrl: "http://api",
+      fetchImpl: async () =>
+        new Response("salom", {
+          headers: {
+            "Content-Disposition": `attachment; filename="Hisobot.md"; filename*=UTF-8''${encodeURIComponent("Hisobot o‘zbekcha.md")}`,
+          },
+        }),
+    });
+    const { blob, filename } = await client.downloadArtifact("a1", 2);
+    expect(filename).toBe("Hisobot o‘zbekcha.md");
+    expect(await blob.text()).toBe("salom");
+  });
+
   it("turns API errors into ApiError with code and message", async () => {
     const client = createApiClient({
       baseUrl: "http://api",

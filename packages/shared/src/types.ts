@@ -54,6 +54,8 @@ export interface MessageMetadata {
   /** Sources the answer actually cites, verified by the API (never invented). */
   citations?: SourceCitation[];
   sources_considered?: number;
+  /** Files EZO created (or the user saved) in this turn. */
+  artifacts?: ArtifactRef[];
 }
 
 /** One numbered source behind an answer: a file passage or a web page. */
@@ -323,4 +325,103 @@ export interface VoiceTranscript {
   language: string | null;
   provider: string;
   attempts: VoiceAttempt[];
+}
+
+export type ArtifactType =
+  | "document"
+  | "spreadsheet"
+  | "presentation"
+  | "image"
+  | "video"
+  | "audio"
+  | "code"
+  | "report"
+  | "research"
+  | "other";
+
+export interface ArtifactRef {
+  id: string;
+  title: string;
+  type: ArtifactType | string;
+  version: number;
+}
+
+/** One immutable version of an artifact. */
+export interface ArtifactVersion {
+  id: string;
+  version_number: number;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  content_hash: string;
+  provider: string | null;
+  model: string | null;
+  created_by: string;
+  change_summary: string | null;
+  parent_version_id: string | null;
+  generation_metadata: Record<string, unknown>;
+  source_references: SourceCitation[];
+  created_at: string;
+  current: boolean;
+  is_text: boolean;
+}
+
+export interface Artifact {
+  id: string;
+  title: string;
+  type: ArtifactType;
+  status: "draft" | "generating" | "ready" | "failed";
+  project_id: string | null;
+  conversation_id: string | null;
+  created_by_agent: string | null;
+  provider: string | null;
+  model: string | null;
+  metadata: Record<string, unknown>;
+  source_references: SourceCitation[];
+  current_version: ArtifactVersion | null;
+  version_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ArtifactDetail extends Artifact {
+  versions: ArtifactVersion[];
+}
+
+export interface StoryScene {
+  id: string;
+  index: number;
+  title: string;
+  purpose: string;
+  layout: string;
+  text: string;
+  visual_direction: string;
+  speaker_notes: string;
+  duration_seconds: number;
+  transition: string;
+  metadata: Record<string, unknown>;
+  narration: { text: string; voice: string; timing: Record<string, unknown> } | null;
+  assets: { id: string; scene_id: string | null; asset_type: string; artifact_id: string | null; source: string; metadata: Record<string, unknown> }[];
+}
+
+export interface StorySummary {
+  id: string;
+  title: string;
+  goal: string;
+  audience: string;
+  language: string;
+  format: "presentation" | "video" | "both";
+  visual_style: string;
+  aspect_ratio: string;
+  project_id: string | null;
+  scene_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Story extends StorySummary {
+  metadata: Record<string, unknown>;
+  scenes: StoryScene[];
+  timeline: { scene_id: string; start_seconds: number; end_seconds: number; animation: Record<string, unknown> }[];
+  total_seconds: number;
 }

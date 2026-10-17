@@ -5,6 +5,9 @@
 import { SseParser } from "./sse";
 import type {
   AgentRun,
+  Artifact,
+  ArtifactDetail,
+  ArtifactType,
   ChatRequestBody,
   ChatStreamEvent,
   Conversation,
@@ -18,6 +21,8 @@ import type {
   Message,
   Preferences,
   Project,
+  Story,
+  StorySummary,
   SystemStatus,
   User,
   VoiceStatus,
@@ -180,6 +185,51 @@ export function createApiClient(options: ApiClientOptions) {
       const response = await send("/api/voice/speak", { method: "POST", ...json({ text, language }), signal });
       return response.blob();
     },
+
+    listArtifacts: (filter: { projectId?: string; conversationId?: string; type?: ArtifactType } = {}) => {
+      const params = new URLSearchParams();
+      if (filter.projectId) params.set("project_id", filter.projectId);
+      if (filter.conversationId) params.set("conversation_id", filter.conversationId);
+      if (filter.type) params.set("type", filter.type);
+      const query = params.toString();
+      return request<Artifact[]>(`/api/artifacts${query ? `?${query}` : ""}`);
+    },
+    getArtifact: (id: string) => request<ArtifactDetail>(`/api/artifacts/${id}`),
+    /** Save text (e.g. one of EZO's answers) as a document artifact. */
+    createArtifact: (body: {
+      title: string;
+      content: string;
+      type?: ArtifactType;
+      format?: "markdown" | "text" | "csv" | "json" | "html";
+      project_id?: string | null;
+      conversation_id?: string | null;
+      message_id?: string | null;
+    }) => request<Artifact>("/api/artifacts", { method: "POST", ...json(body) }),
+    renameArtifact: (id: string, title: string) =>
+      request<Artifact>(`/api/artifacts/${id}`, { method: "PATCH", ...json({ title }) }),
+    /** Edit a text artifact; the previous version is kept. */
+    addArtifactVersion: (id: string, content: string, changeSummary = "") =>
+      request<ArtifactDetail>(`/api/artifacts/${id}/versions`, {
+        method: "POST",
+        ...json({ content, change_summary: changeSummary }),
+      }),
+    restoreArtifactVersion: (id: string, version: number) =>
+      request<ArtifactDetail>(`/api/artifacts/${id}/versions/${version}/restore`, { method: "POST" }),
+    artifactText: (id: string, version: number) =>
+      request<{ version_number: number; filename: string; text: string }>(`/api/artifacts/${id}/versions/${version}/text`),
+    downloadArtifact: async (id: string, version: number): Promise<{ blob: Blob; filename: string }> => {
+      const response = await send(`/api/artifacts/${id}/versions/${version}/download`);
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+      const plain = /filename="([^"]+)"/i.exec(disposition)?.[1];
+      const filename = encoded ? decodeURIComponent(encoded) : (plain ?? "artifact");
+      return { blob: await response.blob(), filename };
+    },
+    deleteArtifact: (id: string) => request<void>(`/api/artifacts/${id}?confirm=true`, { method: "DELETE" }),
+
+    listStories: (projectId?: string) =>
+      request<StorySummary[]>(`/api/stories${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`),
+    getStory: (id: string) => request<Story>(`/api/stories/${id}`),
 
     getAgentRun: (id: string) => request<AgentRun>(`/api/agent-runs/${id}`),
 

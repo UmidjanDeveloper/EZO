@@ -2,11 +2,14 @@
 
 import { Badge } from "@ezo/ui";
 import { motion } from "framer-motion";
-import { AlertTriangle, Brain, Check, Copy, Mic, ScrollText, Volume2 } from "lucide-react";
+import type { ArtifactRef } from "@ezo/shared";
+import { AlertTriangle, Bookmark, BookmarkCheck, Brain, Check, Copy, Mic, ScrollText, Volume2 } from "lucide-react";
 import { useState } from "react";
+import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { speak, speechSynthesisSupported, toSpeakableText } from "@/lib/speech";
+import { ArtifactCard } from "../artifacts/ArtifactCard";
 import { EzoRobot } from "../robot/EzoRobot";
 import { Markdown } from "./Markdown";
 import { Sources } from "./Sources";
@@ -21,6 +24,8 @@ export function MessageBubble({ message, onShowTrace }: Props) {
   const { m, language } = useI18n();
   const { showDebug } = useApp();
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState<ArtifactRef[]>([]);
+  const [saving, setSaving] = useState(false);
 
   if (message.role === "user") {
     return (
@@ -39,6 +44,25 @@ export function MessageBubble({ message, onShowTrace }: Props) {
   }
 
   const robotState = message.streaming ? (message.content ? "speaking" : "thinking") : "idle";
+  const artifacts = [...(message.metadata?.artifacts ?? []), ...saved].filter(
+    (artifact, index, all) => all.findIndex((other) => other.id === artifact.id) === index,
+  );
+  const persisted = !message.id.startsWith("local-");
+  const alreadySaved = saved.length > 0 || artifacts.some((artifact) => artifact.type === "document");
+
+  async function saveAsArtifact() {
+    setSaving(true);
+    try {
+      const artifact = await api.createArtifact({
+        title: titleFrom(message.content),
+        content: message.content,
+        message_id: message.id,
+      });
+      setSaved((current) => [...current, { id: artifact.id, title: artifact.title, type: artifact.type, version: 1 }]);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function copy() {
     try {
@@ -73,6 +97,10 @@ export function MessageBubble({ message, onShowTrace }: Props) {
           <p className="animate-pulse pt-1.5 text-sm text-ink-muted">{m.chat.thinking}</p>
         )}
 
+        {artifacts.map((artifact) => (
+          <ArtifactCard key={artifact.id} artifact={artifact} />
+        ))}
+
         {!message.streaming && message.metadata?.citations?.length ? (
           <Sources citations={message.metadata.citations} />
         ) : null}
@@ -88,6 +116,20 @@ export function MessageBubble({ message, onShowTrace }: Props) {
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
+            {persisted ? (
+              <button
+                type="button"
+                onClick={() => void saveAsArtifact()}
+                disabled={saving || alreadySaved}
+                className="flex items-center gap-1 rounded px-1 py-0.5 hover:text-ink disabled:opacity-60"
+                aria-label={alreadySaved ? m.artifacts.saved : m.artifacts.saveAnswer}
+                title={alreadySaved ? m.artifacts.saved : m.artifacts.saveAnswer}
+                data-testid="save-answer"
+              >
+                {alreadySaved ? <BookmarkCheck size={14} className="text-accent" /> : <Bookmark size={14} />}
+                <span className="hidden sm:inline">{alreadySaved ? m.artifacts.saved : m.artifacts.saveAnswer}</span>
+              </button>
+            ) : null}
             {speechSynthesisSupported() ? (
               <button
                 type="button"
@@ -119,4 +161,14 @@ export function MessageBubble({ message, onShowTrace }: Props) {
       </div>
     </motion.div>
   );
+}
+
+/** A short title for a saved answer: its first heading or line. */
+export function titleFrom(content: string): string {
+  const firstLine = content
+    .split("\n")
+    .map((line) => line.replace(/^[#>*\-\s\d.]+/, "").replace(/[*_`]/g, "").trim())
+    .find(Boolean);
+  const title = firstLine ?? "EZO";
+  return title.length > 80 ? `${title.slice(0, 77).trimEnd()}…` : title;
 }
