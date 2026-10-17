@@ -4,11 +4,13 @@
 *A personal AI operating system that grows with you.*
 
 EZO is not a chatbot clone. It is a modular personal AI system that understands what you
-need, picks the right specialist agent, remembers what matters, and (milestone by milestone)
+need, picks the right specialist agent, remembers what matters, and (phase by phase)
 learns to research, create documents and presentations, coach languages, write code and run
 longer workflows. The interface is Uzbek first, with English and Russian built in.
 
-> **Status: Milestones 1 (Foundation) and 2 (Knowledge, files and research) are complete.**
+> **Status: alpha.** Working today: chat with memory, files and research with sources,
+> turn-by-turn voice, documents (DOCX/PDF/XLSX), presentations (PPTX/PDF/web) and versioned
+> “Created” files. Next: the Language Coach (IELTS-style speaking practice).
 > The screen shows only the EZO robot and your conversation history. You can type, talk to EZO
 > out loud, give it your files, or ask it to research the web — answers come with sources.
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
@@ -108,7 +110,7 @@ are in [`apps/api/config/models.toml`](apps/api/config/models.toml). Set
 `EZO_PREFERRED_PROVIDER` to put one provider first. **Settings → System status** in the app
 shows which providers are connected and which model each route uses.
 
-## What works today (Milestones 1–2)
+## What works today
 
 - **Minimal interface:** the EZO robot inside a calm orb in the centre, the conversation
   history on the left (Files, Memory, Projects and Settings are small icons at the bottom).
@@ -143,14 +145,14 @@ shows which providers are connected and which model each route uses.
   see routing, steps, provider attempts, latency and tokens. Hidden model reasoning is never
   stored.
 - **UI:** dark and light themes, mobile layout, Uzbek / English / Russian interface.
-- **Files and knowledge (Milestone 2):** see the next section.
+- **Files and knowledge:** see the next section.
 
-## Files, knowledge and research (Milestone 2)
+## Files, knowledge and research
 
 - **Give EZO your files:** click the paperclip next to the message box, or open **Files**
   (bottom-left icon) and drop files there. Supported: PDF, Word (DOCX), Excel (XLSX), CSV,
   TXT, Markdown, and web pages by link. Images are accepted and stored, but reading text in
-  images (OCR) arrives with Milestone 4 — EZO says so instead of pretending.
+  images (OCR) arrives in a later phase (ROADMAP Phase 6.5) — EZO says so instead of pretending.
 - **Answers with sources:** when your question is about your files, EZO searches them and
   answers with numbered citations like `[1]`. Under the answer you see the sources (file,
   page, version). Citation numbers that do not match a real source are removed automatically,
@@ -192,7 +194,7 @@ EZO never stores your voice recordings. If the server voice fails, EZO tells you
 with the browser’s voice; if reading a reply aloud fails, the browser reads it instead. Tap the
 robot while EZO speaks to interrupt it and talk. Choose the speech language (UZ / EN / RU) above
 the robot; **Settings → System status → Voice** shows which engine is active. Fully realtime,
-streaming voice (talk over each other, word-by-word) is planned for Milestone 7.
+streaming voice (talk over each other, word-by-word) is planned for ROADMAP Phase 7.
 
 ## Created files and versions (Yaratilganlar)
 

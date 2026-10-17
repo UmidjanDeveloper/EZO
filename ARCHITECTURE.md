@@ -1,7 +1,8 @@
 # EZO architecture
 
 This document explains how EZO is built, why, and where to extend it. It describes the code
-as it exists after **Milestone 1**; later milestones add to it (see [ROADMAP.md](ROADMAP.md)).
+as it exists today (Foundation through Presentations, plus the orchestration foundation); the
+order of future work is in [ROADMAP.md](ROADMAP.md).
 
 ## Overview
 
@@ -21,7 +22,7 @@ as it exists after **Milestone 1**; later milestones add to it (see [ROADMAP.md]
 
 - **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS v4, Framer Motion.
 - **Backend:** Python, FastAPI, Pydantic, SQLAlchemy 2 (async), Alembic migrations.
-- **Database:** PostgreSQL (pgvector image, ready for Milestone 2). The schema is portable,
+- **Database:** PostgreSQL with pgvector. The schema is portable,
   so tests and the no-Docker quick mode run on SQLite.
 - **Monorepo:** pnpm workspace for TypeScript (`apps/web`, `packages/*`, `tests/e2e`);
   `uv` project for Python (`apps/api`).
@@ -38,11 +39,11 @@ project is much easier to install, test and debug):
 | `packages/agents` | `apps/api/src/ezo_api/agents/` |
 | `packages/providers` | `apps/api/src/ezo_api/providers/` |
 | `packages/memory` | `apps/api/src/ezo_api/memory/` |
-| `packages/tools`, `packages/rag` | Milestone 2 (`ezo_api/tools/`, `ezo_api/rag/`) |
+| `packages/tools`, `packages/rag` | `ezo_api/tools/`, `ezo_api/knowledge/` |
 | `packages/ui` | `packages/ui/` (React components) |
 | `packages/shared` | `packages/shared/` (API types + client) |
-| `services/worker` | Milestone 5/8 (background sync and jobs, with Redis) |
-| `knowledge/`, `infra/` | Added with the knowledge pipeline (Milestone 2) and deployment work |
+| `services/worker` | Not yet (ROADMAP *Infrastructure*: durable jobs, Redis) |
+| `knowledge/`, `infra/` | `ezo_api/knowledge/`; `infra/` not yet |
 | `tests/` | `tests/e2e/` (browser); unit/integration tests sit next to the API in `apps/api/tests/` |
 
 If the Python side grows large enough, any sub-package can be extracted into its own `uv`
@@ -104,8 +105,11 @@ and `error` (code, message, hint).
 
 ### Agents
 
-`agents/catalog.py` lists every planned agent with its milestone, preferred route, context
-mode and a **limitation note**. Implemented: `GeneralAgent` (searches the user's files when
+`agents/catalog.py` lists every agent with its roadmap **phase**, **maturity** (`planned`,
+`experimental`, `alpha`, `beta`, `stable`; availability is derived from it, so a planned agent
+can never be selected), preferred route, context mode and a **limitation note**.
+`maturity.py` does the same for non-agent capabilities; both are returned by `/api/status`
+and checked against ROADMAP.md by a test. Implemented: `GeneralAgent` (searches the user's files when
 they exist, strict relevance gate), `ResearchAgent` (plans queries with a fast model,
 searches files and the web, ranks by primary source / reliability / recency, reads the top
 pages, answers with dated citations; honest note when web search is not configured),
@@ -160,10 +164,10 @@ Retrieval (`memory/service.py`, `memory/scoring.py`): when an embedding model is
 memories are embedded on create/update and ranked by a hybrid score —
 `0.45 × semantic + 0.15 × lexical + 0.2 × importance + 0.1 × recency + 0.1 × project` — with a
 minimum semantic similarity so unrelated memories are not injected. Without embeddings, the
-Milestone 1 lexical score is used (`0.6 × relevance + 0.25 × importance + 0.15 × recency`,
+original lexical score is used (`0.6 × relevance + 0.25 × importance + 0.15 × recency`,
 prefix stemming for Uzbek/Russian suffixes). Very important profile memories are always included.
 
-### Knowledge, retrieval and citations (Milestone 2)
+### Knowledge, retrieval and citations
 
 ```
 upload / URL ─► validate (extension + content sniffing, size, zip-bomb limits, safe name, SHA-256)
@@ -180,7 +184,7 @@ answer   ─► verify_citations removes numbers that match no source; cited sou
 ```
 
 Statuses: `queued → processing → indexed | partial (no embeddings: keyword only) | needs_ocr
-(images/scans, OCR in Milestone 4) | failed (with a readable reason)`. Only the current
+(images/scans, OCR in ROADMAP Phase 6.5) | failed (with a readable reason)`. Only the current
 revision of `indexed`/`partial` documents is searchable. Source text is wrapped in `<source>`
 tags and the prompt tells the model to treat it as data, not instructions.
 
@@ -191,7 +195,7 @@ content type and time. `tools/reliability.py` scores domains (official `gov.uz`/
 academic 0.85, established news 0.7 … social 0.35).
 
 Every tool call goes through `ToolRegistry.execute`: Pydantic argument validation, unknown and
-dangerous tools denied (dangerous ones need explicit confirmation, Milestone 6), timeout, and
+dangerous tools denied (dangerous ones need explicit confirmation), timeout, and
 a `tool_calls` row with redacted arguments.
 
 Users see, add and delete memories on the **Memory** page (and per project). Automatic memory
@@ -278,7 +282,7 @@ deny-list, secret redaction, hardened minimal environment). See
 ### Voice providers
 
 `voice/base.py` defines `SpeechToTextProvider`, `TextToSpeechProvider` and
-`RealtimeVoiceProvider` (interface only, Milestone 7). `voice/openai_audio.py` implements
+`RealtimeVoiceProvider` (interface only, ROADMAP Phase 7). `voice/openai_audio.py` implements
 the first two over the OpenAI audio protocol and serves two providers: **OpenAI** and the
 optional **VoiceStudio** service. VoiceStudio is a separate AGPL-3.0 process reached over
 HTTP; its code is never imported. `VoiceService` tries the providers in
@@ -348,7 +352,7 @@ them, each with its own migration.
   Office files, sanitised display names, storage keys validated against traversal.
 - Web fetching: SSRF protection on every redirect, robots.txt, size/type/time limits.
 - Tools: validated arguments, timeouts, dangerous-tool denial, audit rows with redacted secrets.
-- No shell or filesystem tools exist yet; when they arrive (Milestone 6) they will require
+- No shell or filesystem tools exist yet; when they arrive (ROADMAP Phase 9) they will require
   explicit permission and run sandboxed.
 
 ### Observability
@@ -412,8 +416,8 @@ lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), them
 
 - **Explicit pipeline instead of an agent framework.** EzoCore is a small, readable state
   machine with traced steps. LangGraph can be introduced for multi-agent workflows
-  (Milestone 8) if the explicit approach stops being enough.
-- **Rule-based intent and language detection in Milestone 1.** Deterministic, free, fast,
+  (ROADMAP *Missions*) if the explicit approach stops being enough.
+- **Rule-based intent and language detection.** Deterministic, free, fast,
   testable and debuggable (matched signals are recorded). The interfaces allow model-based
   classifiers later.
 - **Official SDKs for providers.** Less custom HTTP code to maintain; adapters stay thin.

@@ -1,9 +1,98 @@
 # EZO implementation status
 
-This file records what has been **verified** to work, milestone by milestone, and the exact
-next step. Nothing is listed as working unless it was tested.
+What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
+working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
 
-## Baseline before Milestone 2 (2026-10-17, commit `b5d16c6`)
+## Verification convention
+
+Two kinds of results are reported, **never mixed**:
+
+1. **CI verified** — what GitHub Actions ran on a specific commit (workflow *CI*: jobs *API*,
+   *Web* and *Docker*). This is the authoritative number. Every CI job ends with a
+   `scripts/test_report.py` table (collected / passed / failed / skipped and every skip
+   reason) in the job log and the run summary. Quote that table, with the run number and
+   commit.
+2. **Extended local verification** — checks CI cannot run, listed by name: LibreOffice
+   opening generated files (CI has no LibreOffice, so 3 tests skip there), Docker builds in
+   the development sandbox, live provider calls, manual UI checks. These are reported as
+   "local, not in CI".
+
+Why the numbers differ between environments (all expected):
+
+| Test | SQLite (CI) | PostgreSQL (CI) | Local with LibreOffice |
+|---|---|---|---|
+| pgvector store test | skipped (needs PostgreSQL + pgvector) | runs | runs on PostgreSQL |
+| LibreOffice open/convert tests (3) | skipped (no LibreOffice on the runner) | skipped | run |
+
+Produce the same table locally:
+
+```bash
+cd apps/api
+uv run pytest -q -rs --junitxml=reports/sqlite.xml
+EZO_TEST_DATABASE_URL=postgresql://ezo:ezo@localhost:5432/ezo_test \
+  uv run pytest -q -rs --junitxml=reports/postgres.xml
+cd ../.. && python3 scripts/test_report.py \
+  "API · SQLite=apps/api/reports/sqlite.xml" "API · PostgreSQL=apps/api/reports/postgres.xml"
+```
+
+Test counts are not a quality score: a phase is judged by which failure modes its tests cover
+(listed per phase below), not by how many tests exist.
+
+## Current capabilities
+
+Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also returned by
+`GET /api/status` as `agents` and `features`). A test keeps them consistent with ROADMAP.md.
+
+| Capability | Phase | Maturity |
+|---|---|---|
+| EzoCore chat, routing, personality, memory | Foundation | alpha |
+| Files, knowledge base, citations; ResearchAgent | Knowledge | alpha |
+| Turn-by-turn voice, orb presence states | Voice | alpha |
+| Artifacts with versions and exports | Artifacts | alpha |
+| Story projects (API only) | Artifacts | experimental |
+| DocumentAgent + document formats | Documents | alpha |
+| PresentationAgent + slide engine | Presentations | alpha |
+| Native missions (in memory, not in chat) | Orchestration foundation | experimental |
+| LanguageCoachAgent | Phase 5 | planned |
+| VisualAgent | Phase 6 | planned |
+| OCR | Phase 6.5 | planned |
+| Durable jobs / worker | Infrastructure | planned |
+| LegalResearchAgent | Phase 8 | planned |
+| Realtime voice | Phase 7 | planned |
+| DeveloperAgent | Phase 9 | planned |
+| BusinessAgent | Business | planned |
+| Ruflo provider | Last | planned (off by default) |
+
+Planned agents are never shown as working: the GeneralAgent answers and states the
+limitation.
+
+## Latest verified baseline (before Sprint 0)
+
+**CI verified** — run #11, commit `4c1fd00`, all jobs green:
+
+| Suite | Passed | Skipped | Skip reasons |
+|---|---:|---:|---|
+| API · SQLite | 333 | 4 | 1 pgvector (needs PostgreSQL), 3 LibreOffice not installed |
+| API · PostgreSQL | 334 | 3 | 3 LibreOffice not installed |
+| Playwright e2e | 19 | 0 | — |
+| Lint, types, web build, `alembic check` | pass | | |
+| Web/shared unit tests (Vitest) | pass | | count not printed in that run's summary; reported from Sprint 0 on |
+
+**Extended local verification** (not in CI): the 3 LibreOffice tests pass locally (SQLite
+336 passed + 1 skipped, PostgreSQL 337 passed). API and web Docker images were built
+in the sandbox, and the API container migrated and served `/api/health`.
+
+## Sprint 0 — Stabilization (2026-10-17)
+
+See the end of this file for the Sprint 0 report.
+
+## Phase history (records made at the time)
+
+Numbers in this history are the **local** results recorded when each phase finished. They
+come from different environments and are not comparable with each other or with CI. Use
+*Latest verified baseline* for current numbers.
+
+### Baseline before Milestone 2 (2026-10-17, commit `b5d16c6`)
 
 | Check | Result |
 |---|---|
@@ -24,7 +113,7 @@ browser voice conversation, uz/en/ru UI, auth (local/token), rate limiting, audi
 
 Not yet implemented at baseline: Milestones 2–8 (see ROADMAP.md).
 
-## Milestone 2 — Knowledge, files and research (verified 2026-10-17)
+### Knowledge (Milestone 2) — verified 2026-10-17
 
 | Check | Result |
 |---|---|
@@ -43,7 +132,7 @@ Docker note: this cloud sandbox reaches the internet through a proxy with its ow
 so verification builds used temporary copies of the Dockerfiles that add that certificate
 (`--build-context ca=…`). The Dockerfiles in the repository are unchanged in that respect.
 
-### What works
+#### What works
 
 Upload (paperclip or **Files** page) → validated, stored, read in the background → searchable
 by keywords (always) and meaning (with an OpenAI/Gemini key) → EZO answers with numbered,
@@ -52,7 +141,7 @@ Web research via Claude web search or Tavily with official-source preference and
 Memories are retrieved semantically when embeddings are available. The orb shows real activity
 (searching, reading…). Details: README “Files, knowledge and research”.
 
-### How to test
+#### How to test
 
 ```bash
 python scripts/ezo.py test --e2e                                   # everything
@@ -63,19 +152,19 @@ EZO_TEST_DATABASE_URL=postgresql://ezo:ezo@localhost:5432/ezo_test \
 Manually: open **Files**, drop a PDF, wait for **Tayyor/Qisman**, then ask a question about it
 in chat — the answer cites `[1]` and shows the source under it.
 
-### Configuration
+#### Configuration
 
 `TAVILY_API_KEY`, `EZO_WEB_SEARCH_PROVIDER`, `EZO_WEB_SEARCH_MODEL`, `EZO_STORAGE_DIR`,
 `EZO_MAX_UPLOAD_MB`, `EZO_VECTOR_STORE`, `EZO_INGESTION_MODE`, `EZO_FETCH_ALLOW_PRIVATE_NETWORKS`
 (see `.env.example`); embedding models in `apps/api/config/models.toml` → `[[embeddings.candidates]]`.
 
-### Known limitations
+#### Known limitations
 
 No OCR (images/scans → “needs OCR”), no Qdrant or S3 implementations yet (interfaces exist),
 ingestion runs inside the API process, some API messages are English-only, the reranker is a
 pass-through. See ROADMAP “Known limitations”.
 
-### Security considerations
+#### Security considerations
 
 Content-sniffed uploads with size and zip-bomb limits; storage keys cannot escape the storage
 folder; SSRF-safe fetching (private/loopback/link-local/CGNAT refused on every redirect,
@@ -83,7 +172,7 @@ robots.txt, size/type/time limits); source text treated as data (prompt-injectio
 tool calls validated, time-limited, dangerous tools denied, every call audited with secrets
 redacted; ownership checks on every document; uploads audited.
 
-### Quality gate
+#### Quality gate
 
 1. **Does it actually run?** Yes — API and web run locally and in Docker; upload → search → cited answer verified.
 2. **Are tests passing?** Yes — numbers above, SQLite and PostgreSQL.
@@ -94,13 +183,13 @@ redacted; ownership checks on every document; uploads audited.
 7. **Faked functionality?** No — OCR, Qdrant, S3 and model reranking are explicitly reported as not implemented; without embeddings or web search EZO says so.
 8. **Understandable to a beginner?** Yes — one Files icon, a paperclip, status badges in Uzbek, and README/TROUBLESHOOTING sections in plain language.
 
-## Open-source integration (started 2026-10-17)
+### Voice / presence (open-source integration) — 2026-10-17
 
 - ✅ Licence audit: [docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - ✅ Phase 1 — EZO presence states (original code; unit, render and e2e tests).
 - ✅ Phase 2 — voice providers (details below).
 
-### Phase 2 — voice providers (verified 2026-10-17)
+#### Voice providers — verified 2026-10-17
 
 **What was changed:** new `voice/` package in the API (interfaces, OpenAI-compatible adapter,
 fallback service), `/api/voice/status|transcribe|speak`, voice settings, an optional
@@ -136,7 +225,7 @@ voice model is non-commercial.
 a sentence and pause: EZO answers with OpenAI’s voice; tap while it speaks to interrupt. Without
 keys the browser voice is used as before. For VoiceStudio see README → *Optional integrations*.
 
-## Phase 3 — Artifact system + StoryProject foundation (verified 2026-10-17)
+### Artifacts (Phase 3) — verified 2026-10-17
 
 **What was changed:**
 - Migration 0003 adds artifacts, immutable artifact versions and the story project tables.
@@ -184,7 +273,7 @@ keys the browser voice is used as before. For VoiceStudio see README → *Option
 - Story projects have no UI of their own yet; they are used internally by Phase 4.
 - Artifacts are stored locally. S3 storage is still interface-only.
 
-## Phase 4 — DocumentAgent + PresentationAgent (verified 2026-10-17)
+### Documents + Presentations (Phase 4) — verified 2026-10-17
 
 **What was changed:**
 - `documents/`: format services (DOCX, PDF with bundled Liberation Sans, XLSX/CSV with a
@@ -235,7 +324,7 @@ openpyxl (existing). Liberation Sans fonts bundled under OFL 1.1 (see THIRD_PART
 - Long files: transformations process the first 40,000 characters and say so.
 - Story projects still have no dedicated UI.
 
-## Ruflo orchestration — audit and architecture (2026-10-17)
+### Orchestration foundation + Ruflo audit — 2026-10-17
 
 **What was changed:**
 - `docs/OPEN_SOURCE_AUDIT.md` § 6 records the Ruflo audit: licence, security findings and

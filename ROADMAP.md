@@ -1,173 +1,127 @@
 # EZO roadmap
 
-EZO is built in milestones. Each milestone ends with lint, type-check, tests and a production
-build passing (`python scripts/ezo.py test --e2e` and `python scripts/ezo.py build`).
+This is the **only** roadmap. Phase names here are the ones used in the code
+(`apps/api/src/ezo_api/agents/catalog.py`, `apps/api/src/ezo_api/maturity.py`; a test keeps
+them in sync) and in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
-Legend: ✅ done · 🔜 next · ⏳ planned
+Maturity labels: **planned** (not built) · **experimental** (works in tests, may change) ·
+**alpha** (usable end to end, young) · **beta** · **stable**. Nothing in EZO is beta or stable yet.
 
-## ✅ Milestone 1 — Foundation
+A phase is done only when the checks in [Verification](IMPLEMENTATION_STATUS.md#verification-convention)
+pass: CI (lint, types, SQLite and PostgreSQL tests, migrations, web build, Playwright, Docker
+images) plus the extended local checks listed for that phase.
 
-- [x] Monorepo (pnpm workspace + uv project), one-command Docker start, `scripts/ezo.py`
-- [x] FastAPI backend, PostgreSQL, Alembic migrations, UUID keys, portable schema (SQLite for tests)
-- [x] Authentication abstraction (local owner / token mode)
-- [x] `ModelProvider` interface + Anthropic, OpenAI, Gemini adapters + offline mode
-- [x] Configurable model routing (`models.toml`) with provider fallback
-- [x] EzoCore pipeline (language, intent, agent selection, context, memory, plan, prompt,
-      generation, verification, persistence) with safe execution traces
-- [x] Agent catalog with availability; GeneralAgent (also covers unavailable agents honestly)
-- [x] Personality engine (TOML profile, context modes, humor levels)
-- [x] Conversations, projects, streaming chat (SSE), stop generation
-- [x] Memory: importance scoring, sensitivity filter, profile/project memory, inspect/delete UI
-- [x] Security basics: rate limiting, input limits, audit log, security headers
-- [x] Web UI: only the EZO robot + conversation history; type or talk; projects, memory and
-      settings behind small icons; uz/en/ru, dark/light, mobile
-- [x] Voice conversation with the browser’s speech recognition and synthesis (hands-free loop,
-      tap to interrupt, spoken-style replies via `channel: "voice"`)
-- [x] Tests: unit, integration (SQLite + PostgreSQL), browser end-to-end; CI workflow
-- [x] Docs: README, SETUP_WINDOWS, ARCHITECTURE, TROUBLESHOOTING
+## Done
 
-## ✅ Milestone 2 — Knowledge, files and research
+### Foundation — alpha
+- Monorepo (pnpm + uv), Docker Compose, `scripts/ezo.py`, CI
+- FastAPI, PostgreSQL (SQLite for tests), Alembic, authentication (local owner / token)
+- `ModelProvider` (Anthropic, OpenAI, Gemini, offline notice), routing with fallback (`models.toml`)
+- EzoCore pipeline: language, intent, agent selection, context, memory, plan, prompt,
+  generation, verification, persistence, execution traces (no hidden reasoning stored)
+- Personality engine; conversations, projects, streaming chat; memory with sensitivity filter
+- Security basics: rate limiting, input limits, audit log, security headers
+- Web UI: the EZO orb + conversation history; uz/en/ru, dark/light, mobile
 
-- [x] `StorageProvider` interface + local filesystem implementation (validated keys, atomic writes)
-- [x] Upload validation: extension allow-list + content sniffing, size limit (413), zip-bomb
-      limits, filename sanitising, path-traversal safety, SHA-256 duplicate detection
-- [x] Parsers: PDF, DOCX, XLSX, CSV, TXT, Markdown, HTML (web pages); images marked “needs OCR”
-- [x] Ingestion pipeline: fetch → parse → normalise → metadata → chunk → embed → index → revisions
-      (background runner with persisted status, resumes after restart; never overwrites a revision)
-- [x] `VectorStore` interface with pgvector (PostgreSQL) and a built-in local store; vector,
-      keyword (PostgreSQL full-text / BM25), hybrid (RRF), metadata/project filters, reranker hook
-- [x] Embeddings through `ModelProvider.embed` (OpenAI / Gemini), one active model, model-keyed vectors
-- [x] Retrieval with relevance gates and numbered citations (file, page, revision, URL, date,
-      reliability); citation verification removes invented numbers
-- [x] Entities + migration 0002: KnowledgeSource, KnowledgeDocument, DocumentRevision,
-      KnowledgeChunk, VectorEntry, ToolCall
-- [x] Tool interface + registry (validation, permissions, timeouts) + logged tool calls
-- [x] ResearchAgent: query planning, file + web search (Claude web search or Tavily),
-      primary/official-source preference, page reading via SSRF-safe fetcher, dated citations
-- [x] Semantic memory retrieval (hybrid: semantic + lexical + importance + recency + project)
-- [x] UI: Files page (drop/upload, add link, status, errors, versions, previews, re-read,
-      delete), paperclip in the composer, sources under answers, live activity states
-- [ ] Deferred (not faked): Qdrant implementation (interface ready), S3 storage provider
-      (interface ready), OCR for images/scans (Milestone 4), model-based reranker
+### Knowledge — alpha
+- Storage provider (local), validated uploads, parsers (PDF, DOCX, XLSX, CSV, TXT, MD, HTML)
+- Ingestion with revisions, vector stores (pgvector / local), hybrid retrieval, citations
+- Tool registry with logged calls; ResearchAgent (files + web, ranked sources, dated citations)
+- Files page, paperclip upload, sources under answers
 
-## Open-source integration track (from the integration prompt)
+### Voice — alpha
+- Presence: the orb shows real activity states only
+- Turn-by-turn voice: STT/TTS provider interfaces, OpenAI voice, optional VoiceStudio service
+  (separate AGPL container, `voice` profile), browser fallback; raw audio is never stored
 
-Licences reviewed in [docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md). No external code is
-copied; AGPL projects are optional separate services.
+### Artifacts — alpha
+- Artifacts with immutable versions, restore as a new version, exports, safe downloads
+- “Yaratilganlar / Created” page and artifact cards in chat
+- Story projects (scenes, narration, timeline) — **experimental**, API only
 
-- [x] Phase 1 — EZO presence: original orb with idle, listening, thinking, speaking, searching,
-      reading, coding, creating, working, completed and error states (ideas from APEX-UI, MIT)
-- [x] Phase 2 — voice provider interfaces (STT / TTS; realtime interface only) + OpenAI voice
-      + optional VoiceStudio service over its HTTP API (`voice` Docker profile); browser voice
-      stays as fallback; audio never stored
+### Documents — alpha
+- Format services: DOCX, PDF, XLSX/CSV, Markdown/TXT, diff; `OCRProvider` interface only
+- DocumentAgent: create, summarize, translate, proofread, rewrite, formal style, compare,
+  spreadsheet analysis and creation, convert (offline)
 
-## Current development order (from the next-development prompt)
+### Presentations — alpha
+- Own slide engine: 24 layouts, 5 themes, font-metric text fitting, native PPTX charts and
+  tables, PDF, web version, PNG previews, layout QA with one repair round
+- PresentationAgent with sources slide, StoryProject link and edits as new versions
 
-- [x] **Phase 3 — Artifact system + StoryProject foundation**
-  - [x] `Artifact` + immutable `ArtifactVersion` (migration 0003); content-addressed storage
-        through the existing StorageProvider; MIME types decided by EZO; owner-only access
-  - [x] Edit → new version, restore → new version, identical content → no new version,
-        download (attachment, `nosniff`, sandbox CSP), rename, confirmed delete, audit log
-  - [x] “Yaratilganlar / Created” page (filter, versions, preview, edit, restore, download,
-        rename, delete) and artifact cards inside conversations; “Save” under any answer
-  - [x] `StoryProject` / `StoryScene` / `StoryAsset` / `StoryNarration` / `StoryTimeline` with
-        CRUD, scene ordering and narration-aware timeline planning (`/api/stories`)
-- [x] **Phase 4 — DocumentAgent + PresentationAgent**
-  - [x] Format services outside the agents: DOCX (python-docx), PDF (reportlab, bundled
-        Liberation Sans), XLSX/CSV (openpyxl, formula-injection guard), Markdown/TXT, diff
-  - [x] `OCRProvider` interface (no fake OCR: scans stay `needs_ocr`)
-  - [x] DocumentAgent: create, summarize, translate, proofread, rewrite, formal style, compare,
-        spreadsheet analysis (computed facts) and creation, convert (works offline)
-  - [x] Edits → new artifact version (EZO documents) or a derived artifact (uploads), with a
-        change summary and diff statistics; the original is never changed
-  - [x] Own slide engine: 24 layouts, 5 themes, text fitted with real font metrics, native
-        PPTX charts/tables/bullets/notes, PDF, web version, PNG previews
-  - [x] Layout QA (overflow, tiny text, bounds, chart data, missing tables, duplicate titles,
-        density) with one model repair round; PPTX re-opened before it is reported
-  - [x] PresentationAgent: sources → narrative → deck → QA → artifact + StoryProject; sources
-        slide; follow-up edits become new versions
-  - [x] Artifact exports (PDF, web, Word, previews…) with downloads and thumbnails in the UI
-- [ ] Optional orchestration (Ruflo / native missions) — architecture and audit prepared, see
-      [`docs/RUFLO_INTEGRATION_PLAN.md`](docs/RUFLO_INTEGRATION_PLAN.md); execution comes after
-      the creative and developer foundations
-- [ ] Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator (estimated bands)
-- [ ] Phase 6 — VisualAgent (ImageProvider / ImageEditProvider; open-higgsfield as idea source only)
-- [ ] Phase 7 — Video / motion studio (MediaProductionProvider; optional OpenMontage worker;
-      Remotion licence re-checked first)
-- [ ] Phase 8 — Uzbekistan government knowledge (LegalResearchAgent + lex.uz / president.uz /
-      e-qaror / gov.uz connectors)
-- [ ] Phase 9 — DeveloperAgent + website builder (sandboxed repository tools)
-- [ ] Later — advanced tasks, background worker, business workflows; optional REA binary
-      analysis (off by default)
+### Orchestration foundation — experimental
+- `OrchestrationProvider` interface, native mission runner (in memory), deterministic
+  complexity routing, approval gates, Ruflo security boundary and audit
+- Not started from chat yet (see *Missions* below)
 
-## ⏳ Milestone 3 — Language
+## Next (in this order)
 
-- [ ] LanguageCoachAgent: free conversation, teacher, grammar, vocabulary, debate,
-      job interview, travel and business roleplay
-- [ ] IELTS-style speaking simulator (three parts, four criteria; clearly *not* an official examiner)
-- [ ] Mistake tracking during sessions, feedback after sections
-- [ ] LanguageSession and LanguageMetric storage, progress reports and graphs
-- [ ] CEFR levels; reuse of past mistakes in exercises
-- [ ] Licensed language knowledge base (official IELTS descriptors and samples, OER)
-- [ ] Realtime voice interfaces (provider-agnostic) prepared
+### Sprint 0 — Stabilization ← current
+- One roadmap, accurate catalog phases and maturity labels, verification convention
+- Docker images built in CI, dependency audits, `docs/SECURITY.md`, Git workflow and licence notes
 
-## ⏳ Milestone 4 — Creative studio
+### Phase 5 — Language Coach + IELTS
+- LanguageCoachAgent with persistent sessions, turns, metrics, mistakes, goals, vocabulary
+- Modes: free conversation, IELTS-style speaking (Parts 1–3, *estimated* bands, never
+  "official"), teacher, grammar, vocabulary, debate, job interview, travel, business English
+- CEFR A1–C2 adaptation; recurring-mistake tracking reused in later sessions
+- Feedback after sections, not interruptions; session report artifacts; progress questions
+- Pronunciation labelled limited / transcript-assisted until acoustic analysis exists
+- Licensed knowledge only (official public IELTS material, descriptors, OER) via RAG
 
-- [ ] Artifact system (versions, files, metadata, edit later)
-- [ ] DocumentAgent: PDF / DOCX / XLSX / CSV read & create, OCR provider interface
-- [ ] PresentationAgent: audience → narrative → slide architecture → content → visuals → QA
-- [ ] PPTX export (PptxGenJS), PDF and web presentations; Remotion for motion
-- [ ] Presentation design knowledge base (own layouts, colour systems, rules)
-- [ ] VisualAgent interface (image generation providers, provenance metadata)
+### Phase 6 — Visual Agent
+- `ImageProvider` / `ImageEditProvider` (OpenAI, Gemini, later local), configurable models
+- Image generation and editing, diagrams, social graphics, logo concepts, product visuals
+- PresentationAgent requests visuals; honest placeholders when no provider is available
 
-## ⏳ Milestone 5 — Government knowledge
+### Phase 6.5 — OCR + document fidelity + long documents
+- Real `OCRProvider` implementations with page numbers, confidence and text blocks
+- DOCX editing that preserves formatting; chunk-aware map/reduce for long documents
+  (replaces the current 40,000-character limit)
 
-- [ ] Connectors: LexUzConnector, PresidentUzConnector, EqarorConnector, GovUzConnector
-- [ ] Legal metadata (number, authority, type, dates, status, versions, relations)
-- [ ] Revision tracking with content hashes; never overwrite history silently
-- [ ] Background synchronisation (worker + Redis), robots/terms/rate-limit compliance
-- [ ] Current-law retrieval with aggressive metadata filtering; live re-check when stale
-- [ ] Admin sync screen (last sync, documents indexed/changed, errors)
-- [ ] LegalResearchAgent
+### Infrastructure — durable jobs
+- Persistent Task / Job / JobEvent / JobArtifact / JobApproval, `services/worker` with a real
+  queue (Redis), recovery after restarts; chat never depends on the worker being up
+- `S3StorageProvider`, backups and restore procedure
 
-## ⏳ Milestone 6 — Developer
+### Missions — persistent native orchestration
+- Mission tables + migration, missions started from chat for complex requests, progress
+  (“3/5 steps”), approval cards for external-impact actions
 
-- [ ] DeveloperAgent with repository tools (read_file, write_file, search_code, git_status,
-      git_diff, run_tests, run_command)
-- [ ] Sandboxed command execution; explicit permission for dangerous actions
-- [ ] Test/lint/build workflow, commit and pull-request preparation
-- [ ] Website/app builder workflow
+### Phase 8 — Uzbekistan government knowledge
+- LegalResearchAgent; LexUz, President.uz, E-qaror, Gov.uz connectors
+- Versioned legal documents (never overwritten), currentness checks, admin sync status
 
-## ⏳ Milestone 7 — Realtime voice
+### Phase 7 — Realtime voice
+- Streaming STT → streaming response → streaming TTS, barge-in, turn detection, low latency;
+  stronger pronunciation analysis for the Language Coach
 
-- [ ] Server-side realtime voice providers (replacing the browser Web Speech API used since M1):
-      microphone → VAD → speech recognition → streaming response → TTS
-- [ ] Interruption, low latency, transcript stored separately from audio
-- [ ] Full-screen speaking UI (timer, waveform, goal, transcript) and session reports
-- [ ] Pronunciation feedback
+### Phase 9 — Developer Agent + website builder
+- Sandboxed repository tools (no unrestricted shell), approvals for push/deploy/destructive
+  changes, inspect → reproduce → patch → test → lint → typecheck → build → diff → report
 
-## ⏳ Milestone 8 — Advanced agent workflows
+### Video / Motion
+- StoryProject → scenes → visuals → narration → timeline → render → video artifact
+  (OpenMontage only as an optional external AGPL service; licences re-checked first)
 
-- [ ] Task and Job entities (queued → planning → running → waiting_for_user → completed/failed/cancelled)
-- [ ] Background worker (`services/worker`) with persisted progress and UI status
-- [ ] Multi-agent orchestration (LangGraph if the explicit pipeline is no longer enough)
-- [ ] BusinessAgent (market research with retrieved data, labelled estimates)
-- [ ] Complex research workflows
+### Business
+- BusinessAgent: idea, competitor and market analysis, pricing, unit economics, SWOT, pitch;
+  every number marked as source-backed fact, estimate or assumption
 
-## Known limitations after Milestone 2
+### Last — optional Ruflo provider
+- Only after native missions are proven stable; see
+  [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
-- Intent and language detection are rule-based (transparent, but can misread unusual phrasing;
-  you can still talk normally — the GeneralAgent answers everything).
-- Semantic search and semantic memory need an OpenAI or Gemini key (embeddings); without one,
-  EZO falls back to keyword search and says so.
-- Images and scanned PDFs are stored but not read (OCR is Milestone 4).
-- Ingestion runs in the API process (asyncio tasks, resumed at startup); a separate worker
-  with Redis arrives in Milestone 8.
-- Some status/error texts from the API are in English while the interface is uz/en/ru.
-- Voice is turn-by-turn (record until a pause → transcribe → answer → speak, tap to
-  interrupt). Server voice needs `OPENAI_API_KEY` or the optional VoiceStudio service;
-  otherwise the browser’s speech services are used (not Firefox; Uzbek voices depend on the
-  device). Realtime streaming voice is Milestone 7.
-- The rate limiter is in-memory (one API process). Redis arrives with the worker.
-- Single-owner authentication; multi-user accounts are not implemented.
-- Default model names in `models.toml` must be kept current with the providers’ model lists.
+## Known limitations (current)
+
+- Intent and language detection are rule-based (transparent, can misread unusual phrasing).
+- Semantic search and semantic memory need an OpenAI or Gemini key for embeddings; without one
+  EZO uses keyword search and says so.
+- Images and scanned PDFs are stored but not read (no OCR yet).
+- Ingestion runs in the API process (resumed at startup); no separate worker yet.
+- Voice is turn-by-turn; realtime voice is Phase 7.
+- The rate limiter is in memory (one API process).
+- Single-owner authentication; no multi-user accounts.
+- Some API status/error texts are English-only (new texts are added in uz/en/ru).
+- Default model names in `apps/api/config/models.toml` must be kept current.
+- Not yet: Qdrant vector store, S3 storage, model-based reranker (interfaces exist).
