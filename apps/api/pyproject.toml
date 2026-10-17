@@ -15,12 +15,15 @@ dependencies = [
     "openai>=3.33.0",
     "openpyxl>=3.1.5",
     "pgvector>=0.5.1",
+    "pillow>=11",
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
     "pypdf>=6.21.1",
     "python-docx>=1.2.0",
     "python-multipart>=0.0.32",
+    "python-pptx>=1.0.2",
+    "reportlab>=4.2",
     "sqlalchemy[asyncio]>=2.1.5",
     "trafilatura>=2.3.1",
     "tzdata>=2026.5",
@@ -37,7 +40,6 @@ dev = [
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
-    "reportlab>=5.0.1",
     "ruff>=0.17.1",
 ]
 
@@ -67,7 +69,7 @@ packages = ["ezo_api"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*"]
+module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*", "reportlab.*", "pptx.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
