@@ -64,6 +64,8 @@ class ToolRegistry:
         else:
             try:
                 args = tool.args_model.model_validate(arguments)
+                if ctx.on_activity is not None:
+                    ctx.on_activity(tool.activity)
                 result = await asyncio.wait_for(tool.run(args, ctx), tool.timeout_seconds)
                 status = "ok" if result.ok else "error"
             except ValidationError as exc:

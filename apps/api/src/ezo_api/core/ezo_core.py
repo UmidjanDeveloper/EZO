@@ -12,9 +12,10 @@ never hidden model reasoning).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
@@ -113,7 +114,7 @@ class CoreMeta:
 
 @dataclass(frozen=True, slots=True)
 class CoreActivity:
-    """What EZO is doing before it starts answering (e.g. researching)."""
+    """What EZO is visibly doing before it answers: searching, reading, working…"""
 
     stage: str
     type: Literal["activity"] = "activity"
@@ -295,9 +296,12 @@ class EzoCore:
             history = await self._load_history(session, prepared)
             memories = await self._retrieve_memories(session, prepared)
             plan = self._plan(prepared)
-            if selection.agent.spec.key == "research":
-                yield CoreActivity("researching")
-            gathered = await self._gather(session, prepared, history)
+            gathered = Gathered()
+            async for item in self._gather_with_activity(session, prepared, history):
+                if isinstance(item, CoreActivity):
+                    yield item
+                else:
+                    gathered = item
             system_prompt = self._compose_prompt(prepared, plan, memories, gathered)
 
             with tracer.step("route_model") as step:
@@ -396,8 +400,37 @@ class EzoCore:
             step.summary = f"{len(retrieved)} memories"
             return retrieved
 
-    async def _gather(
+    async def _gather_with_activity(
         self, session: AsyncSession, prepared: PreparedTurn, history: list[ChatMessage]
+    ) -> AsyncIterator[CoreActivity | Gathered]:
+        """Run the gather step and stream the visible stage of each tool as it starts."""
+        stages: asyncio.Queue[str] = asyncio.Queue()
+        task = asyncio.create_task(self._gather(session, prepared, history, stages.put_nowait))
+        last = ""
+        try:
+            while True:
+                getter = asyncio.ensure_future(stages.get())
+                done, _ = await asyncio.wait({task, getter}, return_when=asyncio.FIRST_COMPLETED)
+                if getter not in done:
+                    getter.cancel()
+                    break
+                stage = getter.result()
+                if stage != last:
+                    last = stage
+                    yield CoreActivity(stage)
+            yield task.result()
+        finally:
+            if not task.done():  # the client went away mid-gather
+                task.cancel()
+                with anyio.CancelScope(shield=True):
+                    await asyncio.gather(task, return_exceptions=True)
+
+    async def _gather(
+        self,
+        session: AsyncSession,
+        prepared: PreparedTurn,
+        history: list[ChatMessage],
+        on_activity: Callable[[str], None] | None = None,
     ) -> Gathered:
         """Let the agent collect sources with tools (knowledge base, web)."""
         with prepared.tracer.step("gather") as step:
@@ -420,6 +453,7 @@ class EzoCore:
                         user_id=prepared.user.id,
                         run_id=prepared.run.id,
                         project_scope=prepared.conversation.project_id,
+                        on_activity=on_activity,
                     ),
                     history_hint=earlier_user[-1][:500] if earlier_user else "",
                 )

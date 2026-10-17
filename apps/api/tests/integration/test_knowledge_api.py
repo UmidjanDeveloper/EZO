@@ -171,6 +171,7 @@ async def test_chat_uses_files_and_verifies_citations(
     assert "[1] loyiha" in system and "Samarqand-7" in system
     assert '<source n="1">' in system and "never invent a source" in system
 
+    assert [d["stage"] for n, d in events if n == "activity"] == ["searching"]
     done = events[-1][1]["message"]
     assert done["content"] == "Kod nomi Samarqand-7 [1]. Boshqa da'vo."
     citations = done["metadata"]["citations"]
@@ -191,5 +192,6 @@ async def test_unrelated_chat_does_not_inject_files(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
     await upload(client, "loyiha.txt", FACT.encode())
-    await stream_chat(client, message="Salom, kayfiyating qalay?")
+    events = await stream_chat(client, message="Salom, kayfiyating qalay?")
+    assert [d["stage"] for n, d in events if n == "activity"] == ["searching"]  # files checked
     assert "<source" not in (fake_anthropic.requests[-1].system or "")

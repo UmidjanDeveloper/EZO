@@ -26,6 +26,7 @@ class KnowledgeSearchArgs(BaseModel):
 
 class KnowledgeSearchTool(Tool[KnowledgeSearchArgs]):
     name: ClassVar[str] = "knowledge_search"
+    activity: ClassVar[str] = "searching"
     description: ClassVar[str] = "Search the user's uploaded files and saved web pages."
     args_model: ClassVar[type[BaseModel]] = KnowledgeSearchArgs
 
@@ -54,6 +55,7 @@ class WebSearchArgs(BaseModel):
 
 class WebSearchTool(Tool[WebSearchArgs]):
     name: ClassVar[str] = "web_search"
+    activity: ClassVar[str] = "searching"
     description: ClassVar[str] = "Search the web for current information."
     args_model: ClassVar[type[BaseModel]] = WebSearchArgs
     timeout_seconds: ClassVar[float] = 60.0
@@ -93,6 +95,7 @@ class WebFetchArgs(BaseModel):
 
 class WebFetchTool(Tool[WebFetchArgs]):
     name: ClassVar[str] = "web_fetch"
+    activity: ClassVar[str] = "reading"
     description: ClassVar[str] = "Open a public web page (http/https) and read its main text."
     args_model: ClassVar[type[BaseModel]] = WebFetchArgs
 

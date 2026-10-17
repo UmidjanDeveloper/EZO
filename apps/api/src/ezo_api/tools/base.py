@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -28,6 +29,8 @@ class ToolContext:
     project_scope: uuid.UUID | None = None
     allow_dangerous: bool = False
     """Only set after an explicit user confirmation (used from Milestone 6)."""
+    on_activity: Callable[[str], None] | None = None
+    """Told what EZO is visibly doing (e.g. "searching") when a tool starts."""
 
 
 @dataclass(slots=True)
@@ -45,6 +48,8 @@ class Tool[ArgsT: BaseModel](ABC):
     args_model: ClassVar[type[BaseModel]]
     dangerous: ClassVar[bool] = False
     timeout_seconds: ClassVar[float] = 30.0
+    activity: ClassVar[str] = "working"
+    """Visible state while the tool runs: searching, reading, coding, creating, working."""
 
     @abstractmethod
     async def run(self, args: ArgsT, ctx: ToolContext) -> ToolResult: ...

@@ -72,7 +72,8 @@ async def test_research_agent_searches_ranks_reads_and_cites(database_url: str) 
         )
         meta = events[0][1]
         assert meta["agent"] == "research"
-        assert any(name == "activity" for name, _ in events)
+        stages = [data["stage"] for name, data in events if name == "activity"]
+        assert stages == ["searching", "reading"]  # web_search..., then web_fetch
 
         assert search.queries == ["Uzbekistan inflation September 2026", "inflyatsiya 2026"]
         system = planner_and_answer.requests[-1].system or ""
