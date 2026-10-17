@@ -191,3 +191,17 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* EZO robot shell colours. */
+:root {
+  --robot-shell-1: #ffffff;
+  --robot-shell-2: #c9d1dc;
+  --robot-shell-edge: #9aa5b5;
+  --robot-visor: #0b111b;
+}
+.dark {
+  --robot-shell-1: #3a4252;
+  --robot-shell-2: #141922;
+  --robot-shell-edge: #4b5568;
+  --robot-visor: #03060b;
+}

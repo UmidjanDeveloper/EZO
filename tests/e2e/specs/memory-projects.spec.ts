@@ -5,7 +5,7 @@ test("memory: EZO remembers explicit facts and the user can delete them", async 
   await page.getByTestId("composer-input").fill("Eslab qol: men yashil choyni yaxshi ko‘raman.");
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("message-assistant")).toContainText("oflayn");
-  await expect(page.getByText("Xotiraga saqlandi")).toBeVisible();
+  await expect(page.getByText("Eslab qoldim")).toBeVisible();
 
   await page.goto("/memory");
   const list = page.getByTestId("memory-list");

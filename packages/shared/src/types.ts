@@ -38,7 +38,10 @@ export interface Conversation {
   updated_at: string;
 }
 
+export type ChatChannel = "text" | "voice";
+
 export interface MessageMetadata {
+  channel?: ChatChannel;
   provider?: string | null;
   model?: string | null;
   route?: string | null;
@@ -212,4 +215,6 @@ export interface ChatRequestBody {
   conversation_id?: string | null;
   project_id?: string | null;
   agent?: string | null;
+  /** "voice" asks EZO for short, spoken-style replies. */
+  channel?: ChatChannel;
 }

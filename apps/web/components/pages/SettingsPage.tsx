@@ -11,7 +11,7 @@ import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "./PageFrame";
 
 export function SettingsPage() {
-  const { m, f, language, setLanguage } = useI18n();
+  const { m, language, setLanguage } = useI18n();
   const { choice, setChoice } = useTheme();
   const { status, statusError, refreshStatus, showDebug, setShowDebug } = useApp();
   const { data: loadedUser, error: loadError } = useApiData(useCallback(() => api.me(), []));
@@ -183,20 +183,6 @@ export function SettingsPage() {
                       <span className="font-mono text-xs text-ink-muted">
                         {route.active_candidates.map((c) => `${c.provider}/${c.model}`).join(" → ") || "–"}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section>
-                <h3 className="mb-2 font-medium">{m.settings.agents}</h3>
-                <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {status.agents.map((agent) => (
-                    <li key={agent.key} className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2">
-                      <span>{agent.names[language]}</span>
-                      <Badge tone={agent.available ? "success" : "neutral"}>
-                        {agent.available ? m.settings.available : f(m.settings.milestone, { n: agent.milestone })}
-                      </Badge>
                     </li>
                   ))}
                 </ul>

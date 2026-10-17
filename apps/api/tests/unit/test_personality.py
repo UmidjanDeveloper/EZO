@@ -73,3 +73,8 @@ def test_general_agent_routes_deep_requests_to_reasoning() -> None:
     text = "Biznes rejamni batafsil tahlil qil"
     plan = GeneralAgent().plan(AgentTurn(text, "uz", classify_intent(text), AGENTS[Intent.GENERAL]))
     assert plan.route == "reasoning"
+
+
+def test_voice_prompt_asks_for_short_spoken_answers() -> None:
+    assert "Voice conversation" in build_system_prompt(PROFILE, _ctx(voice=True))
+    assert "Voice conversation" not in build_system_prompt(PROFILE, _ctx())

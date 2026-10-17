@@ -43,6 +43,7 @@ def _validate(body: ChatIn, services: Services) -> TurnInput:
         conversation_id=body.conversation_id,
         project_id=body.project_id,
         forced_agent=body.agent,
+        channel=body.channel,
     )
 
 

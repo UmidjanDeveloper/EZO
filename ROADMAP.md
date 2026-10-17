@@ -19,7 +19,10 @@ Legend: ✅ done · 🔜 next · ⏳ planned
 - [x] Conversations, projects, streaming chat (SSE), stop generation
 - [x] Memory: importance scoring, sensitivity filter, profile/project memory, inspect/delete UI
 - [x] Security basics: rate limiting, input limits, audit log, security headers
-- [x] Web UI: chat, projects, memory, settings, coming-soon modules, uz/en/ru, dark/light, mobile
+- [x] Web UI: only the EZO robot + conversation history; type or talk; projects, memory and
+      settings behind small icons; uz/en/ru, dark/light, mobile
+- [x] Voice conversation with the browser’s speech recognition and synthesis (hands-free loop,
+      tap to interrupt, spoken-style replies via `channel: "voice"`)
 - [x] Tests: unit, integration (SQLite + PostgreSQL), browser end-to-end; CI workflow
 - [x] Docs: README, SETUP_WINDOWS, ARCHITECTURE, TROUBLESHOOTING
 
@@ -77,7 +80,8 @@ Legend: ✅ done · 🔜 next · ⏳ planned
 
 ## ⏳ Milestone 7 — Realtime voice
 
-- [ ] Microphone → VAD → speech recognition → streaming response → TTS
+- [ ] Server-side realtime voice providers (replacing the browser Web Speech API used since M1):
+      microphone → VAD → speech recognition → streaming response → TTS
 - [ ] Interruption, low latency, transcript stored separately from audio
 - [ ] Full-screen speaking UI (timer, waveform, goal, transcript) and session reports
 - [ ] Pronunciation feedback
@@ -95,7 +99,8 @@ Legend: ✅ done · 🔜 next · ⏳ planned
 - Intent and language detection are rule-based (transparent, but can misread unusual phrasing;
   you can still talk normally — the GeneralAgent answers everything).
 - Memory relevance is lexical until embeddings arrive in Milestone 2.
-- No tool calling, web access, file upload or voice yet.
+- No tool calling, web access or file upload yet. Voice uses the browser’s speech services
+  (not Firefox; Uzbek voices depend on the device).
 - The rate limiter is in-memory (one API process). Redis arrives with the worker.
 - Single-owner authentication; multi-user accounts are not implemented.
 - Default model names in `models.toml` must be kept current with the providers’ model lists.

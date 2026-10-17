@@ -1,8 +1,8 @@
 """Offline provider: used only when no real AI provider is configured.
 
-It is NOT an AI model. It answers with a clear, localized notice explaining how
-to connect a provider, plus what EzoCore understood (agent, language), so the
-full stack can be run and tested without API keys.
+It is NOT an AI model. It answers with a clear notice, in the user's language,
+explaining how to connect a provider, so the full stack can be run and tested
+without API keys.
 """
 
 from __future__ import annotations
@@ -27,22 +27,19 @@ _NOTICE = {
         "⚠️ EZO hozir **oflayn rejimda**: hech qanday AI provayder ulanmagan, shuning uchun "
         "bu javob sun'iy intellektdan emas.\n\n"
         "Ulash uchun loyiha ildizidagi `.env` fayliga `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` "
-        "yoki `GEMINI_API_KEY` dan birini yozing va EZO'ni qayta ishga tushiring.\n\n"
-        "EZO tushungan narsa: agent — **{agent}**, til — **{language}**."
+        "yoki `GEMINI_API_KEY` dan birini yozing va EZO'ni qayta ishga tushiring."
     ),
     "en": (
         "⚠️ EZO is running in **offline mode**: no AI provider is connected, so this reply "
         "does not come from an AI model.\n\n"
         "To connect one, put `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY` in the "
-        "`.env` file in the project root and restart EZO.\n\n"
-        "What EZO understood: agent — **{agent}**, language — **{language}**."
+        "`.env` file in the project root and restart EZO."
     ),
     "ru": (
         "⚠️ EZO работает в **офлайн-режиме**: ни один AI-провайдер не подключён, поэтому "
         "этот ответ не от модели ИИ.\n\n"
         "Чтобы подключить, укажите `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` или `GEMINI_API_KEY` "
-        "в файле `.env` в корне проекта и перезапустите EZO.\n\n"
-        "Что понял EZO: агент — **{agent}**, язык — **{language}**."
+        "в файле `.env` в корне проекта и перезапустите EZO."
     ),
 }
 
@@ -58,8 +55,7 @@ class OfflineProvider(ModelProvider):
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
         language = request.hints.get("language", "uz")
         template = _NOTICE.get(language, _NOTICE["uz"])
-        text = template.format(agent=request.hints.get("agent", "general"), language=language)
-        for word in text.split(" "):
+        for word in template.split(" "):
             if self._delay:
                 await asyncio.sleep(self._delay)
             yield TextDelta(word + " ")

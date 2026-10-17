@@ -101,6 +101,9 @@ class ChatIn(BaseModel):
     conversation_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
     agent: str | None = Field(default=None, max_length=50, description="Manual agent override")
+    channel: Literal["text", "voice"] = Field(
+        default="text", description="'voice' when the user speaks and hears the reply"
+    )
 
 
 class ChatOut(BaseModel):

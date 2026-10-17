@@ -32,6 +32,8 @@ class PromptContext:
     project_description: str | None = None
     memories: Sequence[PromptMemory] = ()
     agent_instructions: str = ""
+    voice: bool = False
+    """The user is speaking and will hear the reply through text-to-speech."""
 
 
 def build_system_prompt(profile: PersonalityProfile, ctx: PromptContext) -> str:
@@ -57,6 +59,15 @@ def build_system_prompt(profile: PersonalityProfile, ctx: PromptContext) -> str:
         sections.append(
             f"The user's last message appears to be in {language_name}. Answer in the language "
             "the user is writing in (Uzbek, English or Russian). If unsure, use Uzbek."
+        )
+
+    if ctx.voice:
+        sections.append(
+            "Voice conversation: the user is talking to you out loud and will HEAR your reply "
+            "spoken by a speech synthesizer. Talk like a person in a natural conversation: "
+            "short spoken sentences (usually 1-4), no Markdown, no lists, tables, code blocks, "
+            "emojis or URLs. If a topic needs detail, give the essence and offer to continue "
+            "or to show it in text."
         )
 
     if ctx.agent_instructions:

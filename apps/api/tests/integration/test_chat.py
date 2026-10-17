@@ -135,3 +135,22 @@ async def test_status_reports_providers_agents_and_routes(client: AsyncClient) -
     agents = {a["key"]: a["available"] for a in status["agents"]}
     assert agents["general"] is True and agents["presentation"] is False
     assert status["routing"]["routes"]["chat"]["active_candidates"][0]["provider"] == "anthropic"
+
+
+async def test_voice_channel_asks_for_spoken_replies(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    events = await stream_chat(client, message="Salom EZO", channel="voice")
+    assert "Voice conversation" in (fake_anthropic.requests[-1].system or "")
+    conversation_id = events[0][1]["conversation_id"]
+    messages = (await client.get(f"/api/conversations/{conversation_id}/messages")).json()
+    assert messages[0]["metadata"]["channel"] == "voice"
+
+    # Typed messages in the same conversation get the normal (text) style.
+    await stream_chat(client, message="Endi yozaman", conversation_id=conversation_id)
+    assert "Voice conversation" not in (fake_anthropic.requests[-1].system or "")
+
+
+async def test_unknown_channel_is_rejected(client: AsyncClient) -> None:
+    response = await client.post("/api/chat/stream", json={"message": "hi", "channel": "fax"})
+    assert response.status_code == 422

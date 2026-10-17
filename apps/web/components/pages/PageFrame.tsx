@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { HistoryButton } from "../layout/shell-context";
 
 export function PageFrame({ title, subtitle, actions, children }: {
   title: string;
@@ -11,7 +12,10 @@ export function PageFrame({ title, subtitle, actions, children }: {
       <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
         <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            <div className="flex items-center gap-2">
+              <HistoryButton className="-ml-1.5" />
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            </div>
             {subtitle ? <p className="mt-1 max-w-2xl text-sm text-ink-muted">{subtitle}</p> : null}
           </div>
           {actions}

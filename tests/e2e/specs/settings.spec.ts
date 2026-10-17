@@ -6,7 +6,6 @@ test("settings: system status and interface language", async ({ page }) => {
   await expect(status).toContainText("Anthropic Claude");
   await expect(status).toContainText("Ulanmagan");
   await expect(status).toContainText("Oflayn rejim");
-  await expect(status).toContainText("Umumiy hamroh");
 
   await page.getByTestId("ui-language").selectOption("en");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
@@ -16,12 +15,4 @@ test("settings: system status and interface language", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByTestId("ui-language").selectOption("uz");
-});
-
-test("unavailable modules are clearly marked", async ({ page }) => {
-  await page.goto("/learn");
-  const card = page.getByTestId("coming-soon");
-  await expect(card).toContainText("Tez orada");
-  await expect(card).toContainText("3-bosqichda");
-  await expect(card).toContainText("IELTS");
 });

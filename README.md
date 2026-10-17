@@ -8,10 +8,10 @@ need, picks the right specialist agent, remembers what matters, and (milestone b
 learns to research, create documents and presentations, coach languages, write code and run
 longer workflows. The interface is Uzbek first, with English and Russian built in.
 
-> **Status: Milestone 1 (Foundation) is complete.** Chat, conversations, projects, memory,
-> provider routing with fallback, and the EzoCore pipeline work end to end. Specialist agents
-> (language coach, presentations, research…) are shown in the app as *coming soon* with the
-> milestone that delivers them. See [ROADMAP.md](ROADMAP.md).
+> **Status: Milestone 1 (Foundation) is complete.** The screen shows only the EZO robot and
+> your conversation history. You can type, or talk to EZO out loud like to a person. EZO
+> decides by itself which specialist agent a request needs — there are no agent menus.
+> See [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -107,14 +107,22 @@ shows which providers are connected and which model each route uses.
 
 ## What works today (Milestone 1)
 
-- **Chat** with streaming replies, Markdown, stop button, conversation history.
+- **Minimal interface:** the EZO robot in the centre, the conversation history on the left
+  (Memory, Projects and Settings are small icons at the bottom). The robot reacts to what EZO
+  does: idle, listening, thinking, speaking.
+- **Two ways to talk, one conversation:** **Yozish** (type) with streaming replies, Markdown
+  and a stop button, or **Gaplashish** (talk): tap the robot, speak, and EZO answers out loud,
+  then listens again — hands-free, like talking to a person. Tap while it speaks to interrupt.
+  Voice replies are short and conversational (EZO is told it is being heard, not read).
+  Any reply can also be read aloud with the speaker button.
 - **EzoCore pipeline:** language detection (uz/en/ru) → intent classification → agent
   selection → context → memory retrieval → plan → prompt → model routing with fallback →
   quality checks → saving → memory capture. Every step is traced.
-- **Agent routing:** “English speaking qilamiz”, “15 slide presentation tayyorla”,
-  “GitHub bugini top”, “prezident qarorini tushuntir” are recognised. Agents that are not
-  built yet are clearly marked; the General Companion helps meanwhile and is told exactly what
-  it cannot do (e.g. it will not invent law numbers or claim it created a file).
+- **Automatic agent routing (behind the scenes):** “English speaking qilamiz”, “15 slide
+  presentation tayyorla”, “GitHub bugini top”, “prezident qarorini tushuntir” are recognised
+  and routed without any menus. Agents that are not built yet are covered by the General
+  Companion, which is told exactly what it cannot do (it will not invent law numbers or claim
+  it created a file).
 - **Memory:** EZO stores only meaningful statements (explicit “eslab qol…”, preferences,
   goals, personal facts, learning difficulties, decisions) with importance scoring, never
   stores passwords/cards/passports automatically, and lets you view, add and delete memories.
@@ -126,9 +134,21 @@ shows which providers are connected and which model each route uses.
 - **Security basics:** auth abstraction (local owner or token mode), rate limiting, input
   limits, parameterized queries (SQLAlchemy), audit log for deletions and memory changes,
   security headers, no secrets in code.
-- **Debug traces:** click **Iz (debug)** in a chat to see routing, steps, provider attempts,
-  latency and tokens. Hidden model reasoning is never stored.
+- **Debug traces:** turn on *Debug* in Settings, then click **Iz (debug)** under a reply to
+  see routing, steps, provider attempts, latency and tokens. Hidden model reasoning is never
+  stored.
 - **UI:** dark and light themes, mobile layout, Uzbek / English / Russian interface.
+
+### Voice mode notes
+
+Voice uses the speech features built into the browser (Web Speech API): **Chrome, Edge and
+Safari** work; Firefox cannot recognise speech (type instead). Allow microphone access when
+the browser asks. Choose the speech language (UZ / EN / RU) above the robot. Uzbek speech
+recognition depends on the browser’s speech service; many computers have no Uzbek *voice*
+for reading replies aloud — EZO then reads with another installed voice and tells you so.
+Privacy: in Chrome and Edge, speech recognition is done by the browser maker’s online
+service, so your voice audio is sent to it (EZO itself stores only the text transcript).
+Server-side realtime voice (faster, interruptible mid-word, better Uzbek) is Milestone 7.
 
 ## Repository layout
 

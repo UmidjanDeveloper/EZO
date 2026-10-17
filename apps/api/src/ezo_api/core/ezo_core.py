@@ -66,6 +66,7 @@ class TurnInput:
     conversation_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
     forced_agent: str | None = None
+    channel: Literal["text", "voice"] = "text"
 
 
 @dataclass(slots=True)
@@ -81,6 +82,7 @@ class PreparedTurn:
     selection: AgentSelection
     tracer: Tracer
     created_conversation: bool
+    channel: Literal["text", "voice"] = "text"
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,7 +187,7 @@ class EzoCore:
             role="user",
             content=turn.text,
             language=language,
-            meta={},
+            meta={"channel": turn.channel},
         )
         run = AgentRun(
             user_id=user.id,
@@ -215,6 +217,7 @@ class EzoCore:
             selection=selection,
             tracer=tracer,
             created_conversation=created,
+            channel=turn.channel,
         )
 
     async def _load_conversation(
@@ -395,9 +398,13 @@ class EzoCore:
                         for m in memories
                     ],
                     agent_instructions=plan.instructions,
+                    voice=prepared.channel == "voice",
                 ),
             )
-            step.summary = f"mode={plan.context_mode} humor={humor} chars={len(prompt)}"
+            step.summary = (
+                f"mode={plan.context_mode} channel={prepared.channel} humor={humor} "
+                f"chars={len(prompt)}"
+            )
             return prompt
 
     def _verify(

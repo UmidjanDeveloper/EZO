@@ -96,7 +96,8 @@ Streaming uses Server-Sent Events with four event types: `meta` (conversation, r
 mode and a **limitation note**. In Milestone 1 only `GeneralAgent` is implemented. When the
 intent asks for an unavailable agent (e.g. presentations), `GeneralAgent` handles the turn and
 its prompt contains that agent’s limitation note, so it does not pretend to export files,
-browse the web or cite laws it cannot verify. The UI shows the same information.
+browse the web or cite laws it cannot verify. Agent selection is invisible in the UI (visible
+only in the debug trace).
 
 Adding an agent: subclass `Agent` (`agents/base.py`), implement `plan()`, mark it
 `available=True` in the catalog and register it in `AgentRegistry`.
@@ -114,7 +115,7 @@ Adding an agent: subclass `Agent` (`agents/base.py`), implement `plan()`, mark i
   candidate when a provider fails **before** producing text; a failure mid-answer is reported,
   not silently retried (the user would see two different answers glued together).
 - `providers/offline.py` — used only when no key is configured. It is not an AI model; it
-  explains how to connect one and reports what EzoCore understood.
+  explains, in the user's language, how to connect one.
 
 For Claude Opus/Sonnet-class models the Anthropic adapter enables the API’s server-side
 refusal fallback. No `temperature` is sent (several current models reject it).
@@ -197,13 +198,22 @@ app’s **Iz (debug)** panel shows it. Hidden model reasoning is never stored.
 
 ```
 app/                  routes: / (chat), /chat/[id], /projects, /projects/[id], /memory,
-                      /settings, /[module] (coming-soon modules), /ezo-config (runtime config)
-components/chat/      ChatView (streaming state), Composer, MessageBubble, TracePanel…
-components/layout/    AppShell (responsive drawer), Sidebar (modules + recent chats)
-components/pages/     Projects, Memory, Settings, ComingSoon
-lib/                  API client instance, i18n (uz/en/ru), theme, app state, data hook
+                      /settings, /ezo-config (runtime config)
+components/robot/     EzoRobot — animated SVG robot (idle, listening, thinking, speaking)
+components/chat/      ChatView (type/talk switch), useChatSession (conversation + streaming),
+                      VoiceStage (hands-free voice loop), Composer, MessageBubble, TracePanel
+components/layout/    AppShell + HistoryPanel (conversation history is the only navigation)
+components/pages/     Projects, Memory, Settings
+lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), theme, app state
 ```
 
+- **Design principle:** the user only sees EZO (the robot) and the conversation history.
+  Agents are chosen by EzoCore behind the scenes; nothing in the UI asks the user to pick one.
+- **Voice loop** (`VoiceStage`): listen (browser speech recognition, uz-UZ / en-US / ru-RU) →
+  send with `channel: "voice"` → stream the reply → read it aloud (speech synthesis, Markdown
+  stripped) → listen again. Tapping the robot interrupts. With `channel: "voice"` EzoCore adds
+  a prompt section asking for short, spoken-style answers; the channel is stored on the
+  message. Typed and spoken turns share one conversation.
 - The API client (`packages/shared`) parses the SSE stream incrementally and supports
   cancelling generation.
 - `/ezo-config` serves the API URL from the `EZO_API_URL` environment variable at runtime, so

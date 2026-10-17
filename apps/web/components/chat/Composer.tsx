@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@ezo/ui";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, AudioLines, Square } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useI18n } from "@/lib/i18n/context";
 
@@ -9,12 +9,14 @@ interface ComposerProps {
   streaming: boolean;
   onSend: (text: string) => void;
   onStop: () => void;
+  /** Switch to voice conversation (hidden when not provided). */
+  onVoice?: () => void;
   autoFocus?: boolean;
 }
 
 const MAX_HEIGHT = 220;
 
-export function Composer({ streaming, onSend, onStop, autoFocus }: ComposerProps) {
+export function Composer({ streaming, onSend, onStop, onVoice, autoFocus }: ComposerProps) {
   const { m } = useI18n();
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -58,6 +60,18 @@ export function Composer({ streaming, onSend, onStop, autoFocus }: ComposerProps
           className="max-h-[220px] min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-6 text-ink placeholder:text-ink-faint focus:outline-none"
           data-testid="composer-input"
         />
+        {onVoice && !text.trim() && !streaming ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onVoice}
+            aria-label={m.voice.modeVoice}
+            title={m.voice.modeVoice}
+            data-testid="composer-voice"
+          >
+            <AudioLines size={18} />
+          </Button>
+        ) : null}
         {streaming ? (
           <Button variant="secondary" size="icon" onClick={onStop} aria-label={m.chat.stop} title={m.chat.stop}>
             <Square size={14} className="fill-current" />

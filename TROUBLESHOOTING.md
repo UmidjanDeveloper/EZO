@@ -57,6 +57,17 @@ Docker Desktop is not running. Start it and wait for *Engine running*.
 Close and reopen PowerShell after installing a tool. Use `py` instead of `python`. Install
 pnpm with `npm install -g pnpm`.
 
+## Voice mode (Gaplashish) does not work
+
+| Symptom | Fix |
+|---|---|
+| “Bu brauzer ovozni tanimaydi” | Use Chrome, Edge or Safari. Firefox has no speech recognition. |
+| “Mikrofonga ruxsat berilmagan” | Click the lock icon in the address bar → allow **Microphone** → reload. |
+| “Ovoz eshitilmadi” | Speak right after tapping the robot; check the right microphone is selected in Windows sound settings. |
+| “Nutqni tanish xizmatiga ulanib bo‘lmadi” | Browser speech recognition needs internet (Chrome sends audio to its speech service). |
+| Replies are read in a strange accent | The device has no voice for that language (common for Uzbek). Windows: Settings → Time & language → Speech → add a voice. |
+| EZO hears the wrong language | Pick UZ / EN / RU above the robot. |
+
 ## “429 Too many requests”
 
 The built-in rate limiter stopped a burst of requests. Wait a minute, or raise
