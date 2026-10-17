@@ -137,7 +137,7 @@ def test_spreadsheet_analysis() -> None:
     text = describe([summary])
     assert "Aholi: number" in text and "sum 7000" in text
 
-    csv_sheet = read_sheets("a;b\n1;2\n".encode(), "x.csv")[0]
+    csv_sheet = read_sheets(b"a;b\n1;2\n", "x.csv")[0]
     assert csv_sheet.columns == ["a;b"]  # comma CSV reader; semicolons stay text
 
 

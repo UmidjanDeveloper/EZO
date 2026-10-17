@@ -69,8 +69,14 @@ packages = ["ezo_api"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*", "reportlab.*", "pptx.*"]
+module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*", "reportlab.*", "pptx.*", "lxml.*"]
 ignore_missing_imports = true
+
+# python-pptx is only partly typed; keep the relaxation to this one adapter module.
+[[tool.mypy.overrides]]
+module = ["ezo_api.documents.render.pptx_renderer"]
+disallow_untyped_calls = false
+warn_return_any = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
