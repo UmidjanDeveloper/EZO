@@ -15,10 +15,13 @@ from ezo_api.orchestration.models import AgentOutput, MissionPlan, StepSpec
 from ezo_api.orchestration.native import NativeOrchestrationProvider
 from ezo_api.orchestration.registry import FALLBACK_NOTICE, select_orchestration
 from ezo_api.orchestration.security import (
+    RUFLO_TOOL_ALLOWLIST,
+    RUFLO_TOOL_DENYLIST,
     child_env,
     is_allowed_tool,
     normalize_tool_name,
     redact_secrets,
+    ruflo_env,
 )
 from ezo_api.settings import Settings
 
@@ -358,3 +361,18 @@ def test_ruflo_is_optional_and_falls_back_to_native() -> None:
         executor,
     )
     assert enabled.provider.name == "native" and enabled.notice == FALLBACK_NOTICE
+
+
+def test_allow_and_deny_lists_never_overlap() -> None:
+    assert not RUFLO_TOOL_ALLOWLIST & RUFLO_TOOL_DENYLIST
+    assert not is_allowed_tool("mcp__claude-flow__terminal_execute")
+
+
+def test_ruflo_env_is_hardened_isolated_and_secret_free(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-real")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://ezo:pw@db/ezo")
+    env = ruflo_env("/srv/ezo/missions/m1/home")
+    assert env["HOME"] == "/srv/ezo/missions/m1/home"
+    assert env["CLAUDE_FLOW_AUTO_UPDATE"] == "false" and env["RUFLO_DAEMON_AUTOSTART"] == "0"
+    assert env["RUFLO_MCP_ENFORCE_POLICY"] == "1"
+    assert "ANTHROPIC_API_KEY" not in env and "DATABASE_URL" not in env

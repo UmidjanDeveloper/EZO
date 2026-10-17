@@ -31,6 +31,44 @@ RUFLO_TOOL_ALLOWLIST: frozenset[str] = frozenset(
 )
 _MCP_PREFIX = re.compile(r"^mcp__[a-z0-9_-]+__")
 
+# Ruflo's own opt-outs, always set for the Ruflo process (audit: docs/OPEN_SOURCE_AUDIT.md § 6):
+# no self-update/auto-install, no background daemon, no promo/telemetry fetches, no rewriting
+# of ~/.claude/helpers, and its MCP policy gate + audit log switched on as a second fence.
+RUFLO_HARDENING_ENV: dict[str, str] = {
+    "CLAUDE_FLOW_AUTO_UPDATE": "false",
+    "RUFLO_DAEMON_AUTOSTART": "0",
+    "RUFLO_DAEMON_AI_WORKERS": "0",
+    "RUFLO_FUNNEL": "0",
+    "RUFLO_FUNNEL_MESSAGES": "0",
+    "RUFLO_HELPERS_LOCKED": "1",
+    "RUFLO_MCP_ENFORCE_POLICY": "1",
+    "CLAUDE_FLOW_STRICT_GUARDRAIL": "true",
+}
+# Tools that are dangerous in Ruflo and must never be reachable, even if a future allow-list
+# edit is careless (checked in addition to the allow-list).
+RUFLO_TOOL_DENYLIST: frozenset[str] = frozenset(
+    {
+        "terminal_execute",
+        "terminal_create",
+        "github_pr_manage",
+        "github_issue_track",
+        "github_workflow",
+        "http_fetch",
+        "browser_eval",
+        "hooks_codemod",
+        "memory_import_claude",
+        "managed_agent_create",
+        "config_set",
+        "config_import",
+        "system_reset",
+        "mcp_start",
+        "mcp_stop",
+        "autopilot_enable",
+        "transfer_store-download",
+        "transfer_ipfs-resolve",
+    }
+)
+
 # Environment a child process may inherit. Secrets are passed one by one, never by copying
 # the whole environment.
 SAFE_ENV_KEYS: frozenset[str] = frozenset(
@@ -59,7 +97,8 @@ def normalize_tool_name(name: str) -> str:
 
 
 def is_allowed_tool(name: str) -> bool:
-    return normalize_tool_name(name) in RUFLO_TOOL_ALLOWLIST
+    tool = normalize_tool_name(name)
+    return tool in RUFLO_TOOL_ALLOWLIST and tool not in RUFLO_TOOL_DENYLIST
 
 
 def redact_secrets(text: str) -> str:
@@ -71,6 +110,15 @@ def redact_secrets(text: str) -> str:
     for pattern in _SECRET_PATTERNS:
         text = pattern.sub(MASK, text)
     return text
+
+
+def ruflo_env(home: str, extra: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environment for the Ruflo MCP process: minimal, hardened, with an isolated HOME.
+
+    Ruflo writes to ``~/.claude``, ``~/.claude-flow`` and ``~/.ruflo``; a per-mission HOME keeps
+    that away from the real user profile. No EZO secret is included.
+    """
+    return child_env({**RUFLO_HARDENING_ENV, "HOME": home, **(extra or {})})
 
 
 def child_env(
