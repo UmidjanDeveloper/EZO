@@ -22,7 +22,10 @@ COPY migrations ./migrations
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
-RUN useradd --create-home --uid 10001 ezo
+# Uploaded files live in /app/storage (a Docker volume, see docker-compose.yml).
+ENV EZO_STORAGE_DIR=/app/storage
+RUN useradd --create-home --uid 10001 ezo \
+    && mkdir -p /app/storage && chown ezo:ezo /app/storage
 USER ezo
 
 EXPOSE 8000

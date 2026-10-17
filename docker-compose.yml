@@ -2,13 +2,13 @@
 #
 #   docker compose up --build      start everything (first run builds images)
 #   docker compose up -d db        start only the database (for `python scripts/ezo.py dev`)
-#   docker compose down            stop (data is kept in the "ezo-db" volume)
+#   docker compose down            stop (data is kept in the "ezo-db" and "ezo-storage" volumes)
 #
 # Secrets (API keys) come from the .env file in this folder.
 
 services:
   db:
-    # PostgreSQL 16 with the pgvector extension, ready for Milestone 2 (vector search).
+    # PostgreSQL 16 with the pgvector extension (vector search for files and memories).
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ezo
@@ -35,6 +35,8 @@ services:
       EZO_CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ezo-storage:/app/storage
     depends_on:
       db:
         condition: service_healthy
@@ -55,3 +57,4 @@ services:
 
 volumes:
   ezo-db:
+  ezo-storage:

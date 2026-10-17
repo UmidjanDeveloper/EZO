@@ -119,6 +119,14 @@ class Settings(BaseSettings):
             return None
         return value
 
+    @field_validator("storage_dir", mode="before")
+    @classmethod
+    def _blank_storage_is_default(cls, value: object) -> object:
+        # `EZO_STORAGE_DIR=` (empty, as in .env.example) must not mean "current folder".
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return API_DIR / "storage"
+        return value
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
