@@ -8,6 +8,7 @@ EZO's own source code does not contain copied code from the projects reviewed in
 - OpenMontage
 - REA
 - open-higgsfield
+- Ruflo (audited; optional external MCP orchestrator, not installed, no code copied)
 
 Projects that EZO only studied for ideas are not listed here. Optional external
 services such as VoiceStudio and OpenMontage are installed and run separately, under

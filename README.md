@@ -260,6 +260,21 @@ keeps working if it is missing or broken. Licence details:
 - **Test:** open **Settings** and check that *Voice* says “Server voice: voicestudio”. Then
   open **Gaplashish**, tap the robot and speak.
 - **Disable:** clear `VOICESTUDIO_URL` in `.env` and start without `--profile voice`.
+
+### Ruflo — multi-agent orchestration (prepared, not active)
+
+- **What it is:** an MIT-licensed tool that coordinates many AI agents. EZO may later use it,
+  as an *optional* helper, for very large jobs such as “repo’ni audit qil va fix qil”.
+- **Required?** No. EZO has its own native mission runner, and nothing needs Ruflo. It is
+  **off by default** (`EZO_ORCHESTRATION_PROVIDER=native`, `EZO_RUFLO_ENABLED=false`).
+- **Status:** audited and planned, not active. Even with it enabled, EZO currently uses its
+  native workflow and says so: *“Advanced orchestration provider unavailable; continuing with
+  EZO's native workflow.”*
+- **Security warning:** Ruflo can run shell commands, merge on GitHub, and update itself. EZO
+  will only talk to it through a strict allow-list, with no API keys and in an isolated
+  directory. **Do not run `ruflo init` inside the EZO folder.** See
+  [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md) and the audit in
+  [docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md).
 - **Developer mode (without Docker):** run VoiceStudio yourself (it listens on
   `http://localhost:3900`) and set `VOICESTUDIO_URL=http://localhost:3900`.
 

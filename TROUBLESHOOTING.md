@@ -154,3 +154,13 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
 - **A scanned PDF cannot be read** — OCR is not built in yet; the file shows `needs_ocr`.
 - **Fonts look different in PowerPoint** — slides use Arial, which is metric-compatible with
   the Liberation Sans used for fitting. If Arial is missing, the app substitutes a similar font.
+
+## Orchestration / Ruflo
+
+- **“Advanced orchestration provider unavailable; continuing with EZO's native workflow.”**
+  This is expected. Ruflo is optional and not active in this version. Nothing is broken, and
+  EZO's native workflow is used.
+- **I ran `ruflo init` in the EZO folder by mistake.** It writes `.claude/`, `.claude-flow/`,
+  `.swarm/`, `CLAUDE.md` and `.mcp.json`, and pre-approves all of its tools. Remove those files
+  (check with `git status`) and the “Ruflo Integration” block it appended to
+  `~/.claude/CLAUDE.md`.

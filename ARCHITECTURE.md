@@ -261,6 +261,20 @@ version's `generation_metadata.exports` (keys are internal; the API returns `exp
 name, filename, type and size). `GET /api/artifacts/{id}/versions/{n}/exports/{name}`
 serves them (PNG previews inline, everything else as attachments).
 
+### Orchestration (prepared, not wired into chat)
+
+`orchestration/` holds optional multi-agent **missions** behind one interface,
+`OrchestrationProvider` (`plan_mission`, `start_mission`, `get_status`, `pause`, `resume`,
+`cancel`, `submit_approval`, `list_agent_runs`, `get_result`). EzoCore stays the decision
+maker: `complexity.assess()` decides deterministically whether a request is one agent's job
+or a mission, and `draft_plan()` builds a small, validated dependency graph. The
+`NativeOrchestrationProvider` runs it: parallel steps with scoped inputs, retries, timeouts,
+approval gates, pause/resume/cancel and artifact linking. Every step returns a validated
+`AgentOutput`, and a mission is never "completed" after a failed step.
+`security.py` defines the boundary for a future, optional `RufloProvider` (MCP allow-list and
+deny-list, secret redaction, hardened minimal environment). See
+[docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md).
+
 ### Voice providers
 
 `voice/base.py` defines `SpeechToTextProvider`, `TextToSpeechProvider` and

@@ -235,6 +235,46 @@ openpyxl (existing). Liberation Sans fonts bundled under OFL 1.1 (see THIRD_PART
 - Long files: transformations process the first 40,000 characters and say so.
 - Story projects still have no dedicated UI.
 
+## Ruflo orchestration — audit and architecture (2026-10-17)
+
+**What was changed:**
+- `docs/OPEN_SOURCE_AUDIT.md` § 6 records the Ruflo audit: licence, security findings and
+  decision.
+- `docs/RUFLO_INTEGRATION_PLAN.md` covers architecture, security boundary, MCP strategy,
+  allow-list, mission schema, lifecycle, approvals, fallback, UI, testing and deployment.
+- `orchestration/`:
+  - the `OrchestrationProvider` interface;
+  - a working `NativeOrchestrationProvider`;
+  - deterministic complexity routing and plan drafts;
+  - the `AgentOutput` contract;
+  - the security boundary: allow-list, deny-list, redaction, hardened environment.
+- Settings: `EZO_ORCHESTRATION_PROVIDER`, `EZO_RUFLO_ENABLED`, `EZO_RUFLO_COMMAND`,
+  `EZO_RUFLO_TIMEOUT_SECONDS`. Ruflo is off by default and falls back to native with a notice.
+
+**Deliberately not done yet (per the roadmap):** missions are not started from chat. There are
+no mission tables, no `RufloProvider` and no MCP client yet. Ruflo was not installed or
+initialised anywhere, and no plugins or mods were enabled. No Ruflo code was copied.
+
+| Check | Result |
+|---|---|
+| Backend lint/format/mypy | ✅ pass (158 files) |
+| Unit tests (orchestration) | ✅ 25 tests: interface, routing on the spec examples, plan validation, lifecycle, parallelism, scoped inputs, retries, failure propagation, invalid output, timeouts, approve/reject, pause/resume, cancel, ownership, artifact linking, presence events, allow-list/deny-list, redaction, hardened environment, Ruflo fallback |
+| Integration (realistic mission) | ✅ research → DOCX report via real tools → PPTX from both structured outputs → QA; mission completed, both artifacts linked and listed |
+
+**Quality gate:**
+1. Runs? Yes. Nothing user-visible changed, so chat is unchanged.
+2. Tests pass? Yes (see the full suite numbers in the commit log).
+3. Docker? Yes. No new dependency; the API image is unchanged.
+4. Migrations? None needed yet; the mission tables are specified in the plan.
+5. Existing features intact? Yes, all earlier tests pass.
+6–7. Versions and provenance? Mission artifacts are ordinary versioned artifacts.
+8. Honest failures? Yes. A mission fails when any step or the QA fails. Ruflo being
+   unavailable falls back to native with a plain notice.
+9. Security? Yes: allow-list plus hard deny-list, no secrets passed, isolated HOME, opt-outs
+   for self-update, daemon and promo feeds, stdio only, and approval gates for actions with
+   outside effects.
+10. Beginner? Nothing to configure; see README → *Ruflo*.
+
 ## Next step
 
 **Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator** (estimated bands, never

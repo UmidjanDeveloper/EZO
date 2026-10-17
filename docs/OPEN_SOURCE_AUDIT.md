@@ -14,8 +14,9 @@
 | [OpenMontage](https://github.com/calesthio/OpenMontage) | AGPL-3.0 | **No** | Optional external worker (Phase 4). Pipeline ideas studied. |
 | [REA](https://github.com/morluto/rea) | MIT (+ many third-party engine licences) | **No** | Not integrated. Optional future DeveloperAgent tool, off by default. |
 | [open-higgsfield](https://github.com/wide-trace/open-higgsfield) | **None** (no LICENSE file) | **No** (not allowed) | Design/architecture reference only. |
+| [Ruflo](https://github.com/ruvnet/ruflo) | MIT (+ Apache-2.0 fork inside, some unlabelled packages) | **No** | Optional external MCP orchestrator, **off by default**, behind a strict allow-list. Not active yet. |
 
-**Result:** no third-party source code from these five projects is in the EZO
+**Result:** no third-party source code from these six projects is in the EZO
 repository. `THIRD_PARTY_NOTICES.md` therefore lists only EZO's own package
 dependencies.
 
@@ -166,6 +167,74 @@ dependencies.
   - generation settings
   - persistent job history
   - a media gallery
+
+## 6. Ruflo
+
+> Audited 2026-10-17 by reading files only: nothing was executed, installed or initialised.
+> The repository's `CLAUDE.md` / `AGENTS.md` / `SKILL.md` contain instructions aimed at AI
+> agents ("MUST initialize the swarm…"); they were treated as data and not followed.
+
+- **Repository:** https://github.com/ruvnet/ruflo (commit `961ab6c8795a…`, 2026-10-17,
+  *fix(cli): honor the no-update startup opt-out*). Packages `ruflo` / `@claude-flow/cli`
+  3.56.10 (formerly *claude-flow*).
+- **Licence:** MIT (`LICENSE`), **Copyright (c) 2024-2026 ruvnet**. Every first-party
+  package that declares a licence declares MIT. Two Rust crates are "MIT OR Apache-2.0".
+- **Unlabelled packages:** `@claude-flow/mcp`, `memory`, `security`, `shared`, `swarm`,
+  `testing`, `deployment`, `integration`, `performance`, the `guidance-kernel` crate and
+  `ruflo/src/mcp-bridge` have no licence field. The root MIT licence most likely covers them,
+  but that is **not confirmed per package**.
+- **Embedded third-party code:** `ruflo/src/ruvocal/` is a fork of Hugging Face chat-ui,
+  Apache-2.0 (© 2018- The Hugging Face team).
+- **Dependencies of note:** no AGPL/GPL/SSPL/BUSL in manifests or lockfiles. Optional
+  transitive dependencies include `@anthropic-ai/claude-agent-sdk` (Anthropic's own terms)
+  and LGPL-3.0 `sharp-libvips` binaries. MPL-2.0, BlueOak and Python-2.0 packages are also
+  present.
+- **Commercial use / modification / redistribution:** allowed (MIT). If code were copied, the
+  MIT notice must be kept (and Apache-2.0 notices for any `ruvocal` part).
+- **Copied into EZO:** **nothing.** EZO's `orchestration/` package is original code;
+  only tool *names* are referenced, for the allow-list.
+
+**What it is.** A CLI plus an MCP server (`npx ruflo mcp start`; stdio by default, optional
+HTTP/WebSocket) for Claude Code and other coding agents. It has about 380 registered MCP
+tools (the README says 314) and 46 Claude Code plugins.
+
+**Security findings** (each checked in source; the two most serious were re-verified):
+
+| Area | Finding | Risk for EZO |
+|---|---|---|
+| Shell | `terminal_execute` runs `execSync(command)` with the full `process.env`, with no gate in the main MCP server (`mcp-tools/terminal-tools.ts`). History is stored unredacted in `.claude-flow/terminals/store.json`. The codex loop uses `spawn(…, {shell:true})`. | **Critical** if reachable → hard deny-list |
+| Auto-approval | `init` writes `allow: ["mcp__claude-flow__*", "Bash(npx claude-flow*)", …]`. `plugin/hooks/hooks.json` has a `PermissionRequest` hook that auto-allows every `mcp__claude-flow__*` tool (verified). | **High** → never run `init`, never install its plugin |
+| Other powerful tools | `github_pr_manage` (merge), `github_workflow` (trigger), `http_fetch` (private-IP block can be lifted by env), `browser_eval`, `hooks_codemod`, `memory_import_claude` (reads `~/.claude/projects/*/memory`), `managed_agent_create` (unrestricted networking option), IPFS downloads, `config_*`, `system_reset` | **High** → deny-list |
+| Model calls | `swarm_*` / `agent_spawn` only record state. `agent_execute` calls `api.anthropic.com` (or `ANTHROPIC_BASE_URL`), OpenRouter or Ollama itself, with keys from its environment. | Bypasses EZO routing/cost → only via an EZO model proxy with a mission-scoped token |
+| Secrets | Reads ~180 environment variables, including all major provider keys. Passes the full environment to the child processes it starts. `providers configure --key` stores keys in plain text. Redaction only in the hooks command recorder. | **High** → minimal env, no real keys, isolated HOME |
+| Self-update | Every CLI command checks npm (24 h) and **auto-installs patch releases**. Opt-outs: `CLAUDE_FLOW_AUTO_UPDATE=false`, `--no-update`, `CI=true`. Hook fallback runs `npx --yes ruflo@latest`. | Supply chain → pinned version, opt-outs set |
+| Network | Promo feed `funnel.ruv.io/v1/messages` fetched without consent at session start (`RUFLO_FUNNEL=0` stops it). Telemetry is consent-gated and off by default. IPFS registries, federation relays, remote MCP servers in some plugins. | Medium → internal-only network, opt-outs |
+| Files written | `init`: `.claude/` (settings, hooks, helpers, skills), `.claude-flow/`, `.swarm/memory.db`, `CLAUDE.md`, `.mcp.json`. It also appends to `~/.claude/CLAUDE.md` and refreshes `~/.claude/helpers` on every command (`RUFLO_HELPERS_LOCKED=1` stops it). | Medium → per-mission HOME and work dir |
+| Background | A detached daemon is auto-started by CLI commands (`RUFLO_DAEMON_AUTOSTART=0`). Headless `claude --print` workers bypass the nested-session check; they are off by default. | Medium → opt-outs |
+| HTTP MCP | No token required on loopback binds. | Medium → stdio only |
+| Plugins / mods | Plugins come from an IPFS registry and are **not sandboxed** ("full process access"). Default mod trust is `observe` (blocks nothing). | High → no plugins |
+| Guardrails | MCP policy gate, audit log and prompt-injection guardrail exist but are **opt-in** (`RUFLO_MCP_ENFORCE_POLICY=1`, `RUFLO_MCP_AUDIT_LOG_PATH`, `CLAUDE_FLOW_STRICT_GUARDRAIL=true`). | Enabled as a second fence |
+| Useful parts | Workflows with pause/resume/cancel, missions with an authorization request, task tracking, worktree awareness, observability logs. | Value mainly for DeveloperAgent missions |
+
+**MCP integration strategy:**
+- Run as a separate process or container, launched by EZO with an argument list (no
+  shell), on stdio.
+- Pinned version, environment from `ruflo_env()` (minimal, hardened, isolated HOME, no
+  secrets).
+- EZO's allow-list plus deny-list (`orchestration/security.py`), with Ruflo's own policy gate
+  on as well.
+- Model calls only through an EZO proxy.
+- Falls back to the native provider on any failure.
+
+Details: [`docs/RUFLO_INTEGRATION_PLAN.md`](RUFLO_INTEGRATION_PLAN.md).
+
+**Decision:** **approved as an optional, isolated MCP integration, not now.** No code is
+copied and nothing is installed in the EZO repository or the development environment. EZO
+ships the `OrchestrationProvider` interface and its own native runner, which cover mission
+coordination without Ruflo. A `RufloProvider` is built after the DeveloperAgent phase, where
+Ruflo's parallel coding workers and worktree support add real value. The security rules above
+are preconditions. **Development-time use:** not enabled. Ruflo was not initialised or
+installed in this repository, and no mods or plugins were enabled.
 
 ---
 
