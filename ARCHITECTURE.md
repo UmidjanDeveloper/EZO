@@ -106,10 +106,11 @@ and `error` (code, message, hint).
 
 `agents/catalog.py` lists every planned agent with its milestone, preferred route, context
 mode and a **limitation note**. Implemented: `GeneralAgent` (searches the user's files when
-they exist, strict relevance gate) and `ResearchAgent` (plans queries with a fast model,
+they exist, strict relevance gate), `ResearchAgent` (plans queries with a fast model,
 searches files and the web, ranks by primary source / reliability / recency, reads the top
-pages, answers with dated citations; honest note when web search is not configured). When the
-intent asks for an unavailable agent (e.g. presentations), `GeneralAgent` handles the turn and
+pages, answers with dated citations; honest note when web search is not configured),
+`DocumentAgent` and `PresentationAgent` (see *Documents and presentations* below). When the
+intent asks for an unavailable agent (e.g. images), `GeneralAgent` handles the turn and
 its prompt contains that agent’s limitation note, so it does not pretend to export files,
 browse the web or cite laws it cannot verify. Agent selection is invisible in the UI (visible
 only in the debug trace).
@@ -219,6 +220,46 @@ Agents report what they created in `Gathered.artifacts`. EzoCore stores it in th
 `story/service.py` (`StoryService`) manages story projects. `story/timeline.py` plans a
 sequential timeline in which a scene lasts its planned duration, or longer if its narration
 needs more time (about 2.4 words per second), so narration is never cut off.
+
+### Documents and presentations (Phase 4)
+
+Format services live in `documents/` and know nothing about agents or models:
+
+- `model.py` + `markdown_io.py`: a format-neutral `DocumentSpec` parsed from Markdown.
+- `docx/`, `pdf/`, `spreadsheet/` writers; `spreadsheet/analysis.py` computes column facts
+  (types, missing values, sum/mean/median/min/max, top values) without pandas.
+- `compare.py`: paragraph-level diff; `ocr.py`: the `OCRProvider` interface.
+- `render/`: the slide engine. `spec.py` validates a `DeckSpec` (24 layouts), `layouts.py`
+  lays every slide out **once** into primitives on a 960×540 pt canvas, fitting text with the
+  bundled Liberation Sans metrics (Arial-compatible), and four renderers draw the same plan:
+  `pptx_renderer.py` (native text, bullets, charts, tables, notes), `pdf.py`, `png.py`
+  (previews) and `html.py` (self-contained web version). `qa.py` checks the plan; `build.py`
+  moves surplus bullets to the notes, renders, and re-opens the PPTX before it is reported.
+
+Why python-pptx and not PptxGenJS: the API is Python, the layout is computed in Python once
+for all four outputs, and python-pptx writes native, editable charts and tables without a
+Node worker.
+
+Agents use them only through logged tools (`tools/document_tools.py`): `read_document`,
+`create_document`, `create_spreadsheet`, `create_presentation`. Helpers: `agents/llm.py`
+(`complete()` through the router, `extract_json()`, `sources_block()` which wraps source
+text as data) and `agents/references.py` (which uploaded file or EZO document a request
+means, scoped to the project).
+
+- **PresentationAgent**: sources (the referenced file, else knowledge search; web search when
+  the topic needs current data) → one `reasoning`-route call returns a `DeckSpec` →
+  `check_deck` QA → one repair call if there are errors → `create_presentation` (PPTX + PDF +
+  web + previews + JSON spec as exports, a linked `StoryProject`) → a short report on the cheap
+  `chat` route. “3-slaydni qisqartir” edits the conversation's latest deck into a new version.
+- **DocumentAgent** picks an action without a model call (convert, compare, analyze,
+  spreadsheet, transform, create, answer). Conversion and comparison need no model and work
+  offline. Transformations of an upload create a derived artifact; of an EZO document, a new
+  version. Both record `derived_from`, a change summary and diff statistics.
+
+Version exports are stored under `artifacts/<user>/exports/<artifact>/` and listed in the
+version's `generation_metadata.exports` (keys are internal; the API returns `exports` with
+name, filename, type and size). `GET /api/artifacts/{id}/versions/{n}/exports/{name}`
+serves them (PNG previews inline, everything else as attachments).
 
 ### Voice providers
 

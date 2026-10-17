@@ -210,8 +210,29 @@ you can come back to later.
   only way to remove versions.
 - Files are stored in the same safe storage as uploads (Docker volume `ezo-storage`), are only
   visible to you, and are always downloaded as files (never opened as web pages).
-- Behind the scenes EZO also has **story projects** (scenes, narration, timing): the shared
-  model the upcoming presentation and video features will build on.
+- Behind the scenes EZO also has **story projects** (scenes, narration, timing): every
+  presentation keeps one, so it can later become a video.
+
+## Documents and presentations (Hujjat va taqdimotlar)
+
+Just ask in chat — EZO picks the right specialist itself:
+
+| Try | What happens |
+|---|---|
+| “AI haqida 10 slaydli taqdimot tayyorla” | A real **PPTX** (editable text, native charts and tables, speaker notes) plus **PDF**, a **web version** and slide previews |
+| “Shu PDF asosida taqdimot tayyorla” (after uploading) | The deck is built from your file and ends with a *Manbalar / Sources* slide |
+| “3-slaydni qisqartir” | The same presentation gets **version 2**; version 1 is kept |
+| “Hokimga rasmiy ariza yozib ber” | A **DOCX** (+ PDF, Markdown) with placeholders like `[F.I.Sh.]` for details you did not give |
+| “Shu faylni ingliz tiliga tarjima qil” | A new translated document with a change summary; your upload is never changed |
+| “Bu ikki hujjatni solishtir” | A paragraph-level comparison (works offline) |
+| “Shu excel jadvalni tahlil qil” | Exact column statistics computed by EZO, explained in plain words |
+| “Oylik xarajatlar uchun excel jadval yarat” | An **XLSX** (+ CSV); unknown values stay empty, never invented |
+| “Shu faylni PDF ga aylantir” | Format conversion — works even without an AI key |
+
+Every presentation goes through a layout check (text that does not fit, tiny fonts, elements
+outside the slide, broken chart data…). EZO repairs problems once automatically and tells you
+honestly if anything remains. Images are abstract visuals for now (image generation arrives
+with the Visual Agent). Scanned PDFs need OCR, which is not built in yet.
 
 ## Optional integrations
 

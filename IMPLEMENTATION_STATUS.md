@@ -184,12 +184,59 @@ keys the browser voice is used as before. For VoiceStudio see README → *Option
 - Story projects have no UI of their own yet; they are used internally by Phase 4.
 - Artifacts are stored locally. S3 storage is still interface-only.
 
+## Phase 4 — DocumentAgent + PresentationAgent (verified 2026-10-17)
+
+**What was changed:**
+- `documents/`: format services (DOCX, PDF with bundled Liberation Sans, XLSX/CSV with a
+  formula-injection guard, Markdown/TXT, spreadsheet analysis, diff, `OCRProvider` interface).
+- `documents/render/`: own slide engine. 24 layouts, 5 themes, real font-metric text fitting,
+  PPTX/PDF/HTML/PNG renderers from one layout plan, layout QA.
+- Artifact **exports** per version (PDF, web, Word, Markdown, CSV, previews, deck spec), with
+  a download endpoint and cleanup on delete.
+- Tools: `read_document`, `create_document`, `create_spreadsheet`, `create_presentation`.
+- `DocumentAgent` and `PresentationAgent` (catalog: available). Intent signals updated
+  (presentation wins ties; translation/report/official-letter signals for documents).
+- Web: “Other formats” downloads, slide thumbnails and QA result on the Created page.
+
+**Code reused:** none copied. Libraries: python-pptx, reportlab, Pillow (new); python-docx,
+openpyxl (existing). Liberation Sans fonts bundled under OFL 1.1 (see THIRD_PARTY_NOTICES).
+
+| Check | Result |
+|---|---|
+| Backend lint/format/mypy | ✅ pass (151 files) |
+| Backend tests SQLite / PostgreSQL | ✅ 310 passed + 1 skipped / 311 passed |
+| — engine | every layout rendered; PPTX re-opened (python-pptx) and opened by LibreOffice; native charts with exact values; bullets via `buChar`; QA detects empty/overflow/duplicate/chart/table problems with slide numbers |
+| — agents | file-based deck with sources slide and citations; reasoning route for the deck, chat route for the report; follow-up edit → v2 with story updated and v1 exports intact; QA repair round; invalid model output → nothing created, honest note; offline → nothing created; DOCX creation with placeholders; translation → derived artifact, original unchanged; follow-up rewrite → v2; comparison; spreadsheet facts; XLSX creation with empty unknowns and neutralised formulas; project scope; offline conversion |
+| Frontend lint/typecheck/unit | ✅ pass; 46 unit tests |
+| Web production build | ✅ pass |
+| Playwright | ✅ 19 passed, new: attach file → “PDF ga aylantir” → PDF download → Word export download |
+| Docker | ✅ API image rebuilt; inside the container: deck → PPTX + PDF + 2 previews, QA passed; DOCX/PDF/MD rendered; catalog lists document + presentation |
+| Migrations | no schema change in this phase (exports live in version metadata) |
+
+**Quality gate:**
+1. Runs? Yes, locally and in Docker.
+2. Tests pass? Yes (numbers above).
+3. Docker? Yes.
+4. Migrations valid? No new migration; 0003 unchanged and still verified by the suite.
+5. Chat, RAG, research and voice still work? Yes, all earlier tests and e2e pass.
+6. Old versions preserved? Yes. Edits and regenerations add versions, exports are per version,
+   and tests read v1's spec after v2 exists.
+7. Provenance? Yes: provider, model, `derived_from`, change summary, diff statistics, QA report
+   and sources on every generated version.
+8. Failures honest? Yes: no file → asks for upload; invalid model output, provider failure or
+   offline → “nothing was created”; remaining QA issues are reported with slide numbers.
+9. Security? Yes: owner + project scoping, source text wrapped as data in prompts, formula
+   injection neutralised, server-decided MIME types, exports never rendered in the API origin.
+10. Beginner can test? Yes: try the examples in README → *Documents and presentations*.
+
+**Known limitations:**
+- No image generation yet (abstract visuals on image slides); no OCR for scans.
+- Conversion of uploaded PDFs/DOCX carries the text, not the original page layout.
+- Long files: transformations process the first 40,000 characters and say so.
+- Story projects still have no dedicated UI.
+
 ## Next step
 
-**Phase 4 — DocumentAgent + PresentationAgent.**
-- Format services: DOCX, PDF, XLSX, CSV, Markdown and TXT.
-- An OCRProvider interface.
-- DocumentAgent: summarize, rewrite, translate, compare, report and spreadsheet work. Every
-  output becomes an artifact version with provenance.
-- PresentationAgent: goal → research if needed → narrative → StoryProject → layouts → real PPTX
-  → QA → artifact.
+**Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator** (estimated bands, never
+“official” scores), then VisualAgent. Ruflo orchestration is audited and its architecture is
+prepared (`docs/RUFLO_INTEGRATION_PLAN.md`); execution is scheduled after the foundations.

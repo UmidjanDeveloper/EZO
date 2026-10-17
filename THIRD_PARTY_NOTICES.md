@@ -13,6 +13,15 @@ Projects that EZO only studied for ideas are not listed here. Optional external
 services such as VoiceStudio and OpenMontage are installed and run separately, under
 their own licences, and are not distributed with EZO.
 
+## Bundled fonts
+
+`apps/api/src/ezo_api/documents/fonts/` contains **Liberation Sans** Regular and Bold
+(copyright © 2012 Red Hat, Inc., with Reserved Font Name *Liberation*), distributed under the
+**SIL Open Font License 1.1**. The full licence text is in
+[`apps/api/src/ezo_api/documents/fonts/OFL.txt`](apps/api/src/ezo_api/documents/fonts/OFL.txt).
+The fonts are used unmodified to measure text and to draw PDFs and slide previews. They are
+not sold on their own.
+
 ## Package dependencies
 
 EZO installs the following direct dependencies through `uv` and `pnpm`. They are not
@@ -42,6 +51,11 @@ installed package's metadata (2026-10-17).
 | python-docx | 1.2.0 | MIT |
 | openpyxl | 3.1.5 | MIT |
 | trafilatura | 2.3.1 | Apache-2.0 |
+| python-pptx | 1.0.2 | MIT |
+| pillow | 13.0.0 | MIT-CMU (HPND) |
+| reportlab | 5.0.1 | BSD-3-Clause |
+| lxml (via python-docx / python-pptx) | 6.1.3 | BSD-3-Clause |
+| XlsxWriter (installed by python-pptx; EZO itself writes XLSX with openpyxl) | 3.2.9 | BSD-2-Clause |
 | python-multipart | 0.0.32 | Apache-2.0 |
 | tzdata | 2026.5 | Apache-2.0 |
 

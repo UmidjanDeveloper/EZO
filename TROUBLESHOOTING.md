@@ -142,3 +142,15 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
 - Set `EZO_LOG_LEVEL=DEBUG` in `.env` for verbose API logs.
 - Every chat turn is recorded as an *agent run* (routing decisions, steps, provider attempts,
   errors) — visible in the **Iz (debug)** panel and at `GET /api/agent-runs`.
+
+## Documents and presentations
+
+- **“EZO cannot write the presentation content”** — no AI provider is connected. Writing
+  documents and slides needs a model. Converting files and comparing them still work offline.
+- **“no matching uploaded file was found”** — upload the file first (paperclip), or name it
+  (“report.pdf ni …”). Files in another project are not visible from this conversation.
+- **The quality check reports problems** — EZO already tried one automatic repair. Ask for a
+  concrete change (“5-slaydni qisqartir”); it becomes a new version and the old one is kept.
+- **A scanned PDF cannot be read** — OCR is not built in yet; the file shows `needs_ocr`.
+- **Fonts look different in PowerPoint** — slides use Arial, which is metric-compatible with
+  the Liberation Sans used for fitting. If Arial is missing, the app substitutes a similar font.

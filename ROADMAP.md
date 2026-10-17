@@ -72,8 +72,24 @@ copied; AGPL projects are optional separate services.
         rename, delete) and artifact cards inside conversations; “Save” under any answer
   - [x] `StoryProject` / `StoryScene` / `StoryAsset` / `StoryNarration` / `StoryTimeline` with
         CRUD, scene ordering and narration-aware timeline planning (`/api/stories`)
-- [ ] Phase 4 — DocumentAgent (DOCX/PDF/XLSX/CSV/MD/TXT creation and transformation, OCR
-      interface) + PresentationAgent (narrative → StoryProject → layouts → PPTX → QA → Artifact)
+- [x] **Phase 4 — DocumentAgent + PresentationAgent**
+  - [x] Format services outside the agents: DOCX (python-docx), PDF (reportlab, bundled
+        Liberation Sans), XLSX/CSV (openpyxl, formula-injection guard), Markdown/TXT, diff
+  - [x] `OCRProvider` interface (no fake OCR: scans stay `needs_ocr`)
+  - [x] DocumentAgent: create, summarize, translate, proofread, rewrite, formal style, compare,
+        spreadsheet analysis (computed facts) and creation, convert (works offline)
+  - [x] Edits → new artifact version (EZO documents) or a derived artifact (uploads), with a
+        change summary and diff statistics; the original is never changed
+  - [x] Own slide engine: 24 layouts, 5 themes, text fitted with real font metrics, native
+        PPTX charts/tables/bullets/notes, PDF, web version, PNG previews
+  - [x] Layout QA (overflow, tiny text, bounds, chart data, missing tables, duplicate titles,
+        density) with one model repair round; PPTX re-opened before it is reported
+  - [x] PresentationAgent: sources → narrative → deck → QA → artifact + StoryProject; sources
+        slide; follow-up edits become new versions
+  - [x] Artifact exports (PDF, web, Word, previews…) with downloads and thumbnails in the UI
+- [ ] Optional orchestration (Ruflo / native missions) — architecture and audit prepared, see
+      [`docs/RUFLO_INTEGRATION_PLAN.md`](docs/RUFLO_INTEGRATION_PLAN.md); execution comes after
+      the creative and developer foundations
 - [ ] Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator (estimated bands)
 - [ ] Phase 6 — VisualAgent (ImageProvider / ImageEditProvider; open-higgsfield as idea source only)
 - [ ] Phase 7 — Video / motion studio (MediaProductionProvider; optional OpenMontage worker;
