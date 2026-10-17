@@ -17,6 +17,14 @@ from ezo_api.db.models.knowledge import (
     KnowledgeSource,
     VectorEntry,
 )
+from ezo_api.db.models.language import (
+    LanguageGoal,
+    LanguageMetric,
+    LanguageMistake,
+    LanguageSession,
+    LanguageTurn,
+    LanguageVocabularyItem,
+)
 from ezo_api.db.models.memory import Memory
 from ezo_api.db.models.observability import AgentRun, AuditLog, ToolCall
 from ezo_api.db.models.project import Project
@@ -32,6 +40,12 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeDocument",
     "KnowledgeSource",
+    "LanguageGoal",
+    "LanguageMetric",
+    "LanguageMistake",
+    "LanguageSession",
+    "LanguageTurn",
+    "LanguageVocabularyItem",
     "Memory",
     "Message",
     "Project",
