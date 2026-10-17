@@ -29,7 +29,8 @@ tests/e2e/playwright-report/
 coverage/
 
 # Local storage for development uploads (from Milestone 2)
-storage/
+/apps/api/storage/
+/storage/
 
 # OS / editors
 .DS_Store

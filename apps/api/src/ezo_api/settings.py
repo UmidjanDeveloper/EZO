@@ -78,8 +78,33 @@ class Settings(BaseSettings):
     timezone: str = Field(default="Asia/Tashkent", alias="EZO_TIMEZONE")
     expose_debug_traces: bool = Field(default=True, alias="EZO_DEBUG_TRACES")
 
+    # Files and knowledge (Milestone 2).
+    storage_dir: Path = Field(default=API_DIR / "storage", alias="EZO_STORAGE_DIR")
+    max_upload_mb: int = Field(default=25, alias="EZO_MAX_UPLOAD_MB")
+    vector_store: Literal["auto", "pgvector", "local"] = Field(
+        default="auto", alias="EZO_VECTOR_STORE"
+    )
+    ingestion_mode: Literal["background", "inline"] = Field(
+        default="background", alias="EZO_INGESTION_MODE"
+    )
+
+    # Research tools.
+    web_search_provider: Literal["auto", "anthropic", "tavily", "none"] = Field(
+        default="auto", alias="EZO_WEB_SEARCH_PROVIDER"
+    )
+    web_search_model: str = Field(default="claude-sonnet-5-5", alias="EZO_WEB_SEARCH_MODEL")
+    tavily_api_key: SecretStr | None = Field(default=None, alias="TAVILY_API_KEY")
+    fetch_allow_private_networks: bool = Field(
+        default=False, alias="EZO_FETCH_ALLOW_PRIVATE_NETWORKS"
+    )
+
     @field_validator(
-        "openai_api_key", "anthropic_api_key", "gemini_api_key", "api_token", mode="before"
+        "openai_api_key",
+        "anthropic_api_key",
+        "gemini_api_key",
+        "api_token",
+        "tavily_api_key",
+        mode="before",
     )
     @classmethod
     def _blank_is_none(cls, value: object) -> object:
@@ -100,6 +125,10 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
     @property
     def is_sqlite(self) -> bool:
