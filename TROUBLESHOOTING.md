@@ -67,6 +67,9 @@ pnpm with `npm install -g pnpm`.
 | “Nutqni tanish xizmatiga ulanib bo‘lmadi” | Browser speech recognition needs internet (Chrome sends audio to its speech service). |
 | Replies are read in a strange accent | The device has no voice for that language (common for Uzbek). Windows: Settings → Time & language → Speech → add a voice. |
 | EZO hears the wrong language | Pick UZ / EN / RU above the robot. |
+| “Server ovozi hozir ishlamayapti…” | The server voice (OpenAI or VoiceStudio) failed. EZO switched to the browser’s voice for this session. Check the key or that VoiceStudio is running (`docker compose --profile voice ps`, `docker compose logs voicestudio`), then reload the page. |
+| Settings shows “Using the browser’s voice” although VoiceStudio runs | Set `VOICESTUDIO_URL` in `.env` (Docker: `http://voicestudio:3900`) and restart the API. |
+| VoiceStudio is slow the first time | It downloads several GB of models on first start. Wait until `docker compose logs voicestudio` shows it is ready. |
 
 ## Files (Fayllar) and sources
 

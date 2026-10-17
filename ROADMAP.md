@@ -57,8 +57,9 @@ copied; AGPL projects are optional separate services.
 
 - [x] Phase 1 — EZO presence: original orb with idle, listening, thinking, speaking, searching,
       reading, coding, creating, working, completed and error states (ideas from APEX-UI, MIT)
-- [ ] Phase 2 — voice provider interfaces (STT / TTS / realtime) + optional VoiceStudio service
-      over its HTTP API; browser voice stays as fallback
+- [x] Phase 2 — voice provider interfaces (STT / TTS; realtime interface only) + OpenAI voice
+      + optional VoiceStudio service over its HTTP API (`voice` Docker profile); browser voice
+      stays as fallback; audio never stored
 - [ ] Phase 3 — Artifact foundation + shared StoryProject model (presentation ⇄ video)
 - [ ] Phase 4 — MediaProductionProvider; Remotion and/or OpenMontage as optional workers
 - [ ] Phase 5 — VisualAgent with ImageProvider / VideoGenerationProvider (open-higgsfield as design reference only)
@@ -128,7 +129,10 @@ copied; AGPL projects are optional separate services.
 - Ingestion runs in the API process (asyncio tasks, resumed at startup); a separate worker
   with Redis arrives in Milestone 8.
 - Some status/error texts from the API are in English while the interface is uz/en/ru.
-- Voice uses the browser’s speech services (not Firefox; Uzbek voices depend on the device).
+- Voice is turn-by-turn (record until a pause → transcribe → answer → speak, tap to
+  interrupt). Server voice needs `OPENAI_API_KEY` or the optional VoiceStudio service;
+  otherwise the browser’s speech services are used (not Firefox; Uzbek voices depend on the
+  device). Realtime streaming voice is Milestone 7.
 - The rate limiter is in-memory (one API process). Redis arrives with the worker.
 - Single-owner authentication; multi-user accounts are not implemented.
 - Default model names in `models.toml` must be kept current with the providers’ model lists.

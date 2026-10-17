@@ -81,6 +81,8 @@ Your conversations, memories and uploaded files are kept between restarts (Docke
   *meaning*, not only by matching words.
 - `TAVILY_API_KEY` — web search through Tavily. With an Anthropic key EZO can already search
   the web with Claude; Tavily is an alternative.
+- Local voice with VoiceStudio (optional, large download): see “Optional integrations” in
+  README.md, then start with `docker compose --profile voice up`.
 
 ---
 

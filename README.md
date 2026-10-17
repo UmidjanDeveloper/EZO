@@ -178,14 +178,60 @@ shows which providers are connected and which model each route uses.
 
 ### Voice mode notes
 
-Voice uses the speech features built into the browser (Web Speech API): **Chrome, Edge and
-Safari** work; Firefox cannot recognise speech (type instead). Allow microphone access when
-the browser asks. Choose the speech language (UZ / EN / RU) above the robot. Uzbek speech
-recognition depends on the browser’s speech service; many computers have no Uzbek *voice*
-for reading replies aloud — EZO then reads with another installed voice and tells you so.
-Privacy: in Chrome and Edge, speech recognition is done by the browser maker’s online
-service, so your voice audio is sent to it (EZO itself stores only the text transcript).
-Server-side realtime voice (faster, interruptible mid-word, better Uzbek) is Milestone 7.
+Voice works in three ways, and EZO picks the best one automatically:
+
+| Engine | Needs | Notes |
+|---|---|---|
+| **Browser voice** (default) | Chrome, Edge or Safari | Built into the browser. Firefox cannot recognise speech. Uzbek voices depend on the device. In Chrome/Edge the browser maker’s online service hears your audio. |
+| **OpenAI voice** | `OPENAI_API_KEY` | EZO records your sentence, OpenAI transcribes it and reads replies aloud (natural voice, good Uzbek/English/Russian). |
+| **VoiceStudio** (optional, local) | the `voice` Docker profile | Runs on your own computer. See *Optional integrations* below. |
+
+When a server voice is configured, EZO records until you pause, sends the recording to the
+API, and the API transcribes it and forgets the audio. Only the text becomes part of the chat.
+EZO never stores your voice recordings. If the server voice fails, EZO tells you and continues
+with the browser’s voice; if reading a reply aloud fails, the browser reads it instead. Tap the
+robot while EZO speaks to interrupt it and talk. Choose the speech language (UZ / EN / RU) above
+the robot; **Settings → System status → Voice** shows which engine is active. Fully realtime,
+streaming voice (talk over each other, word-by-word) is planned for Milestone 7.
+
+## Optional integrations
+
+None of these is needed for normal EZO chat. Each one is off until you turn it on, and EZO
+keeps working if it is missing or broken. Licence details:
+[docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md).
+
+### VoiceStudio — local voice (speech-to-text and text-to-speech)
+
+- **What it does:** turns your speech into text and reads EZO’s replies aloud, on your own
+  computer, through VoiceStudio’s OpenAI-compatible API.
+- **Required?** No. Without it, EZO uses OpenAI voice (if `OPENAI_API_KEY` is set) or the
+  browser’s voice.
+- **Licence:** VoiceStudio is AGPL-3.0 and runs as a separate container; no VoiceStudio code is
+  inside EZO. **Its default voice model is licensed for non-commercial use only.**
+- **Install:**
+  1. In `.env`:
+     ```
+     VOICESTUDIO_URL=http://voicestudio:3900
+     VOICESTUDIO_API_KEY=any-long-random-text
+     ```
+  2. Run `docker compose --profile voice up --build`. The first start downloads several GB
+     of models, which can take a while. VoiceStudio is not published on your network; only
+     the EZO API can reach it.
+- **Test:** open **Settings** and check that *Voice* says “Server voice: voicestudio”. Then
+  open **Gaplashish**, tap the robot and speak.
+- **Disable:** clear `VOICESTUDIO_URL` in `.env` and start without `--profile voice`.
+- **Developer mode (without Docker):** run VoiceStudio yourself (it listens on
+  `http://localhost:3900`) and set `VOICESTUDIO_URL=http://localhost:3900`.
+
+### OpenMontage — video production (planned, Phase 4)
+
+Not integrated yet. It will be an optional `studio` Docker profile that renders videos from
+EZO’s presentation/story projects. It is AGPL-3.0 and will run as a separate service.
+
+### REA — binary analysis (planned, Phase 6)
+
+Not integrated. It will only be offered to the DeveloperAgent, off by default, and only for
+software you own or are allowed to analyse.
 
 ## Repository layout
 

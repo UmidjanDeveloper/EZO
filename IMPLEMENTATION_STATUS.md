@@ -97,12 +97,51 @@ redacted; ownership checks on every document; uploads audited.
 ## Open-source integration (started 2026-10-17)
 
 - ✅ Licence audit: [docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-- ✅ Phase 1 — EZO presence states (original code; verified by unit, render and e2e tests above).
+- ✅ Phase 1 — EZO presence states (original code; unit, render and e2e tests).
+- ✅ Phase 2 — voice providers (details below).
+
+### Phase 2 — voice providers (verified 2026-10-17)
+
+**What was changed:** new `voice/` package in the API (interfaces, OpenAI-compatible adapter,
+fallback service), `/api/voice/status|transcribe|speak`, voice settings, an optional
+`voicestudio` service in a `voice` Docker Compose profile, and a web voice engine (recording
+with pause detection, server speech, automatic browser fallback). Settings → System status
+shows the active voice.
+
+**Code reused:** none. VoiceStudio (AGPL-3.0) is called over its documented OpenAI-compatible
+HTTP API from a separate container; its source is not part of EZO. Everything else was written
+from scratch.
+
+**Tests:**
+
+| Check | Result |
+|---|---|
+| Backend lint/format/mypy | ✅ pass (108 files) |
+| Backend tests SQLite / PostgreSQL | ✅ 235 passed + 1 skipped / 236 passed |
+| — voice unit tests | audio sniffing, adapter, error mapping, fallback order, `bad_audio` stop, configuration, **wire-format contract with the real OpenAI SDK** (paths, Bearer key, multipart, `language` field) |
+| — voice API tests | no provider → 503 with hint; fallback with attempts; non-audio → 422; oversized → 413; speak MP3 + `no-store`; all failing → 502; audio never written to disk/DB; transcript → voice chat message |
+| Frontend lint/typecheck/unit | ✅ pass; 43 unit tests (incl. pause detection) |
+| Web production build | ✅ pass |
+| Playwright | ✅ 17 passed, incl. server voice round trip with a synthetic microphone, tap-to-interrupt while EZO speaks, and server failure → browser listening and speaking |
+| Docker | ✅ API image rebuilt and run: `/api/voice/status` lists VoiceStudio; with VoiceStudio unreachable, transcribe returns a clear 502 with the failed attempt. `docker compose config` valid with and without `--profile voice` |
+
+**Known limitations:** the VoiceStudio container itself could not be started in this sandbox
+(its registry is blocked by the sandbox proxy), so VoiceStudio was verified by the contract test
+against its documented API, not live. Voice is turn-by-turn, not realtime streaming (the
+`RealtimeVoiceProvider` interface exists without an implementation, Milestone 7). Pause
+detection is a simple energy threshold (noisy rooms may end a turn late). VoiceStudio’s default
+voice model is non-commercial.
+
+**How the owner can test:** with `OPENAI_API_KEY` set, open **Gaplashish**, tap the robot, speak
+a sentence and pause: EZO answers with OpenAI’s voice; tap while it speaks to interrupt. Without
+keys the browser voice is used as before. For VoiceStudio see README → *Optional integrations*.
 
 ## Next step
 
-**Phase 2 — voice providers.** Add `SpeechToTextProvider` / `TextToSpeechProvider` interfaces
-in the API, an OpenAI voice provider and an optional `VoiceStudioProvider` (its
-OpenAI-compatible `/v1/audio/*` HTTP API, separate container in a `voice` Docker profile),
-`/api/voice/*` endpoints with size limits and no stored audio, and keep the browser voice as
-the fallback. Then Milestone 3 (Language Coach) builds on that voice layer.
+**Phase 3 — Artifact foundation and the shared StoryProject model.** Add `Artifact` and
+`ArtifactVersion` tables (type, provider, model, generation metadata, project, source
+references, versions that are never overwritten) with an Alembic migration 0003, artifact API
+and storage, then `StoryProject`, `StoryScene`, `StoryAsset`, `StoryNarration` and
+`StoryTimeline` so one narrative can become PPTX, web slides or a video. After that: Phase 4
+(MediaProductionProvider, Remotion/OpenMontage workers), Phase 5 (VisualAgent providers),
+then Milestone 3 (Language Coach) on top of the new voice layer.

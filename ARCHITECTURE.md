@@ -63,6 +63,8 @@ knowledge/         uploads (validation), parsers, ingestion pipeline + runner, e
                    vector stores (pgvector / local), retrieval (keyword + vector + RRF),
                    citations, SSRF-safe fetcher
 storage/           StorageProvider interface + LocalStorageProvider (S3 later)
+voice/             SpeechToTextProvider / TextToSpeechProvider / RealtimeVoiceProvider
+                   interfaces, OpenAI-compatible adapter (OpenAI, VoiceStudio), fallback service
 providers/         ModelProvider interface, adapters, router with fallback, offline mode
 memory/            extraction + importance scoring, sensitivity filter, retrieval
 personality/       personality profile (TOML) and system-prompt composition
@@ -194,6 +196,27 @@ a `tool_calls` row with redacted arguments.
 Users see, add and delete memories on the **Memory** page (and per project). Automatic memory
 can be switched off in Settings.
 
+### Voice providers
+
+`voice/base.py` defines `SpeechToTextProvider`, `TextToSpeechProvider` and
+`RealtimeVoiceProvider` (interface only, Milestone 7). `voice/openai_audio.py` implements
+the first two over the OpenAI audio protocol and serves two providers: **OpenAI** and the
+optional **VoiceStudio** service. VoiceStudio is a separate AGPL-3.0 process reached over
+HTTP; its code is never imported. `VoiceService` tries the providers in
+`EZO_VOICE_PROVIDERS` order (`auto` = VoiceStudio, then OpenAI) and records every attempt.
+A `bad_audio` error stops the chain, because the recording itself is the problem.
+
+`/api/voice/status` lists the providers. `/api/voice/transcribe` takes one recording
+(size-limited and sniffed: WebM, Ogg, WAV, MP3, MP4) and returns the text.
+`/api/voice/speak` returns MP3 with `Cache-Control: no-store`. Audio stays in memory only.
+The transcript is sent as a normal chat message with `channel: "voice"`.
+
+```
+microphone ─► MediaRecorder + VAD (pause detection) ─► POST /api/voice/transcribe ─► provider chain
+          └─(no server provider / server failed)─► browser SpeechRecognition
+reply text ─► POST /api/voice/speak ─► <audio> (tap = interrupt) ─(fails)─► browser speechSynthesis
+```
+
 ### Personality
 
 `config/personality.toml` holds identity, traits, rules (no sycophancy, disagree politely,
@@ -263,6 +286,7 @@ components/chat/      ChatView (type/talk switch), useChatSession (conversation 
                       VoiceStage (hands-free voice loop), Composer, MessageBubble, TracePanel
 components/layout/    AppShell + HistoryPanel (conversation history is the only navigation)
 components/pages/     Projects, Memory, Settings
+lib/voice/            voice engines (server recording + VAD, server speech, browser fallback)
 lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), theme, app state,
                       ezo-state (pure visible-state machine), knowledge helpers
 ```
