@@ -8,10 +8,11 @@ need, picks the right specialist agent, remembers what matters, and (milestone b
 learns to research, create documents and presentations, coach languages, write code and run
 longer workflows. The interface is Uzbek first, with English and Russian built in.
 
-> **Status: Milestone 1 (Foundation) is complete.** The screen shows only the EZO robot and
-> your conversation history. You can type, or talk to EZO out loud like to a person. EZO
-> decides by itself which specialist agent a request needs — there are no agent menus.
-> See [ROADMAP.md](ROADMAP.md).
+> **Status: Milestones 1 (Foundation) and 2 (Knowledge, files and research) are complete.**
+> The screen shows only the EZO robot and your conversation history. You can type, talk to EZO
+> out loud, give it your files, or ask it to research the web — answers come with sources.
+> EZO decides by itself which specialist agent a request needs — there are no agent menus.
+> See [ROADMAP.md](ROADMAP.md) and [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
 ---
 
@@ -27,6 +28,8 @@ longer workflows. The interface is Uzbek first, with English and Russian built i
    ```
 
 4. Brauzerda oching: **http://localhost:3000**
+5. Fayl berish: xabar oynasi yonidagi 📎 tugmasi yoki pastdagi **Fayllar** belgisi.
+   Internetdan izlash uchun: “internetdan qidir: …” deb yozing (Anthropic yoki Tavily kaliti kerak).
 
 To‘xtatish: terminalda `Ctrl+C`, keyin `docker compose down`.
 Windows uchun batafsil qo‘llanma: [SETUP_WINDOWS.md](SETUP_WINDOWS.md).
@@ -105,11 +108,13 @@ are in [`apps/api/config/models.toml`](apps/api/config/models.toml). Set
 `EZO_PREFERRED_PROVIDER` to put one provider first. **Settings → System status** in the app
 shows which providers are connected and which model each route uses.
 
-## What works today (Milestone 1)
+## What works today (Milestones 1–2)
 
-- **Minimal interface:** the EZO robot in the centre, the conversation history on the left
-  (Memory, Projects and Settings are small icons at the bottom). The robot reacts to what EZO
-  does: idle, listening, thinking, speaking.
+- **Minimal interface:** the EZO robot inside a calm orb in the centre, the conversation
+  history on the left (Files, Memory, Projects and Settings are small icons at the bottom).
+  The orb shows what EZO is really doing — idle, listening, thinking, speaking, searching,
+  reading sources, working, done or error — and a small status appears in the header while
+  EZO is busy. Stages come from the server (a tool really started), never invented.
 - **Two ways to talk, one conversation:** **Yozish** (type) with streaming replies, Markdown
   and a stop button, or **Gaplashish** (talk): tap the robot, speak, and EZO answers out loud,
   then listens again — hands-free, like talking to a person. Tap while it speaks to interrupt.
@@ -138,6 +143,38 @@ shows which providers are connected and which model each route uses.
   see routing, steps, provider attempts, latency and tokens. Hidden model reasoning is never
   stored.
 - **UI:** dark and light themes, mobile layout, Uzbek / English / Russian interface.
+- **Files and knowledge (Milestone 2):** see the next section.
+
+## Files, knowledge and research (Milestone 2)
+
+- **Give EZO your files:** click the paperclip next to the message box, or open **Files**
+  (bottom-left icon) and drop files there. Supported: PDF, Word (DOCX), Excel (XLSX), CSV,
+  TXT, Markdown, and web pages by link. Images are accepted and stored, but reading text in
+  images (OCR) arrives with Milestone 4 — EZO says so instead of pretending.
+- **Answers with sources:** when your question is about your files, EZO searches them and
+  answers with numbered citations like `[1]`. Under the answer you see the sources (file,
+  page, version). Citation numbers that do not match a real source are removed automatically,
+  so EZO cannot invent a source.
+- **Versions, not overwrites:** upload a changed file with the same name and EZO keeps the
+  old version and searches only the new one. Identical files are detected as duplicates.
+- **Web research:** say “internetdan qidir…”, “search the web…”, “найди в интернете…” or ask
+  for the latest news. EZO plans search queries, searches, prefers official/primary sources,
+  reads the best pages and answers with dated, cited facts. Needs an Anthropic key (Claude web
+  search) or a `TAVILY_API_KEY`; without either EZO tells you web search is not configured.
+- **Smarter memory:** with an OpenAI or Gemini key, memories are found by meaning (not just
+  matching words), mixed with importance, recency and project relevance.
+- **Search modes:** meaning-based (“semantic”) search needs an OpenAI or Gemini key for
+  embeddings; without one, files are still found by keywords. On PostgreSQL EZO uses the
+  pgvector extension automatically; otherwise a built-in vector store.
+
+| Setting (`.env`) | What it does | Default |
+|---|---|---|
+| `TAVILY_API_KEY` | Web search through Tavily | empty |
+| `EZO_WEB_SEARCH_PROVIDER` | `auto`, `anthropic`, `tavily` or `none` | `auto` |
+| `EZO_MAX_UPLOAD_MB` | Largest upload | `25` |
+| `EZO_STORAGE_DIR` | Where uploaded files are kept | `apps/api/storage` (Docker: volume `ezo-storage`) |
+| `EZO_VECTOR_STORE` | `auto`, `pgvector` or `local` | `auto` |
+| `EZO_INGESTION_MODE` | `background` (don’t wait) or `inline` | `background` |
 
 ### Voice mode notes
 
@@ -161,7 +198,7 @@ apps/
     tests/        unit + integration tests
   web/            Next.js web app (React, Tailwind CSS, Framer Motion)
 packages/
-  shared/         TypeScript API types + client (streaming SSE parser)
+  shared/         TypeScript API types + client (streaming SSE parser, uploads)
   ui/             shared React components
 tests/e2e/        Playwright browser tests
 scripts/ezo.py    setup / dev / test / build helper
@@ -169,7 +206,9 @@ docker-compose.yml
 ```
 
 More: [ARCHITECTURE.md](ARCHITECTURE.md) · [ROADMAP.md](ROADMAP.md) ·
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [SETUP_WINDOWS.md](SETUP_WINDOWS.md)
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [SETUP_WINDOWS.md](SETUP_WINDOWS.md) ·
+[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) · [Open-source audit](docs/OPEN_SOURCE_AUDIT.md) ·
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## Testing
 
@@ -188,3 +227,10 @@ run the same tests on PostgreSQL. CI (`.github/workflows/ci.yml`) runs both.
   reached by other people (a server, your home network), set `EZO_AUTH_MODE=token` and a long
   random `EZO_API_TOKEN`, and enter that token in **Settings**.
 - Docker publishes ports only on `127.0.0.1` (your computer), not on the network.
+- Uploads are checked by content, not only by name (a renamed `.exe` is rejected), limited in
+  size, stored under random-safe names, and never served back as web pages.
+- “Add link” and EZO’s web reading refuse private/internal addresses (SSRF protection) and
+  respect `robots.txt`. Text from files and web pages is treated as data: instructions inside
+  them are ignored.
+- Every tool EZO uses (file search, web search, page reading) is logged with redacted
+  arguments; see the debug trace of an answer.

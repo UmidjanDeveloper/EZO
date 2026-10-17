@@ -68,6 +68,32 @@ pnpm with `npm install -g pnpm`.
 | Replies are read in a strange accent | The device has no voice for that language (common for Uzbek). Windows: Settings → Time & language → Speech → add a voice. |
 | EZO hears the wrong language | Pick UZ / EN / RU above the robot. |
 
+## Files (Fayllar) and sources
+
+| Symptom | Fix |
+|---|---|
+| “This file type is not supported” | Allowed: PDF, DOCX, XLSX, CSV, TXT, MD, PNG/JPG/GIF/WEBP. Old `.doc`/`.xls`: open in Word/Excel and *Save as* `.docx`/`.xlsx`. |
+| “The file is not a real PDF/…” | The file was renamed (e.g. `.exe` → `.pdf`) or is damaged. Export it again from the original program. |
+| “The file is too large” (413) | Raise `EZO_MAX_UPLOAD_MB` in `.env` (default 25) and restart, or split the file. |
+| Status **Qisman / Partial** | Files are found by keywords only. Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to `.env`, restart, then press **Qayta o‘qish / Re-read** on the file. |
+| Status **OCR kerak / Needs OCR** | The file is an image or a scanned PDF without a text layer. Reading text from images arrives in Milestone 4; for now use a PDF with selectable text. |
+| Status **Xato / Failed** | The message under the file says why (password-protected, damaged, empty). Fix the file and upload again. |
+| A file stays **O‘qilmoqda / Reading** | Large PDFs take a while. If the API restarted, reading resumes automatically. Check `docker compose logs api`. |
+| EZO answers without using my file | Ask about the file’s content directly (“shartnomada muddat qancha?”). In casual chat EZO only uses files that clearly match. Files in a project are used only inside that project. |
+| “Add link” says the address is not allowed | EZO never fetches private or local addresses (security). Use a public `https://` page. Some sites forbid automated reading in `robots.txt`; EZO respects that. |
+
+## Web research says “web search is not configured”
+
+Add `ANTHROPIC_API_KEY` (EZO uses Claude’s web search) or a `TAVILY_API_KEY`
+(https://tavily.com) to `.env` and restart. `EZO_WEB_SEARCH_PROVIDER=none` turns web search off.
+If searches fail with quota errors, the provider’s plan limit was reached.
+
+## Semantic search was enabled later / embedding model changed
+
+Vectors are stored per embedding model. After adding an OpenAI/Gemini key or changing
+`[[embeddings.candidates]]` in `models.toml`, press **Re-read** on your files so they get
+vectors for the new model (keyword search keeps working meanwhile).
+
 ## “429 Too many requests”
 
 The built-in rate limiter stopped a burst of requests. Wait a minute, or raise
@@ -94,6 +120,9 @@ With Docker: `docker compose up --build` (migrations run automatically).
 ```bash
 docker compose down -v
 ```
+
+This deletes the database **and** the uploaded files (`ezo-db` and `ezo-storage` volumes).
+In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR`).
 
 ## Getting more detail
 

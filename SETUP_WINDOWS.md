@@ -72,7 +72,15 @@ lines like `web-1 | ✓ Ready`, open **http://localhost:3000** in your browser.
 | Get the newest version | `git pull` then `docker compose up --build` |
 | Look at error messages | `docker compose logs api` |
 
-Your conversations and memories are kept between restarts.
+Your conversations, memories and uploaded files are kept between restarts (Docker volumes
+`ezo-db` and `ezo-storage`).
+
+**Optional keys** (add to `.env`, then restart):
+
+- `OPENAI_API_KEY` or `GEMINI_API_KEY` — lets EZO find things in your files and memories by
+  *meaning*, not only by matching words.
+- `TAVILY_API_KEY` — web search through Tavily. With an Anthropic key EZO can already search
+  the web with Claude; Tavily is an alternative.
 
 ---
 

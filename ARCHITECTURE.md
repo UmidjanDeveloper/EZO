@@ -54,9 +54,15 @@ workspace member without changing its imports.
 main.py            app factory: middleware, error handlers, routers
 settings.py        all configuration from environment variables / .env
 services.py        builds the service container (DB, auth, router, core…)
-api/routes/        HTTP endpoints: chat, conversations, memory, projects, system
+api/routes/        HTTP endpoints: chat, conversations, memory, projects, knowledge, system
 core/              EzoCore pipeline, language detection, intent classification, tracing
-agents/            Agent interface, catalog (availability per milestone), GeneralAgent
+agents/            Agent interface, catalog (availability per milestone), GeneralAgent, ResearchAgent
+tools/             Tool interface, ToolRegistry (validation, permissions, timeouts, audit),
+                   knowledge_search, web_search (Tavily / Claude), web_fetch, source reliability
+knowledge/         uploads (validation), parsers, ingestion pipeline + runner, embeddings,
+                   vector stores (pgvector / local), retrieval (keyword + vector + RRF),
+                   citations, SSRF-safe fetcher
+storage/           StorageProvider interface + LocalStorageProvider (S3 later)
 providers/         ModelProvider interface, adapters, router with fallback, offline mode
 memory/            extraction + importance scoring, sensitivity filter, retrieval
 personality/       personality profile (TOML) and system-prompt composition
@@ -80,26 +86,34 @@ HTTP response starts, so bad input becomes a normal 4xx error; `execute` streams
 | load_context | recent messages within a character budget | |
 | retrieve_memory | profile (+ current project) memories ranked by relevance, importance, recency | `memory/service.py` |
 | plan | agent chooses route (chat/reasoning/coding…), context mode and instructions | `agents/general.py` |
-| compose_prompt | personality + rules + mode + language + memories + date | `personality/prompt.py` |
+| gather | the agent uses tools before answering (file search, web search, page reading); each tool start is streamed as an `activity` stage | `agents/*.py`, `tools/` |
+| compose_prompt | personality + rules + mode + language + memories + numbered sources + notes + date | `personality/prompt.py` |
 | route_model / generate | stream from the first working candidate; fall back before the first token | `providers/router.py` |
 | verify | empty reply, refusal and truncation handling | |
+| verify_citations | keep only `[n]` markers that match a retrieved source; store cited sources on the message | `knowledge/retrieval/citations.py` |
 | save_memory | capture meaningful, non-sensitive statements from the user message | `memory/extraction.py` |
 | *(persist)* | assistant message, run status, provider, model, tokens, latency, steps | |
 
-Streaming uses Server-Sent Events with four event types: `meta` (conversation, routing),
-`delta` (text), `done` (saved message + run summary) and `error` (code, message, hint).
+Streaming uses Server-Sent Events with five event types: `meta` (conversation, routing),
+`activity` (what EZO is visibly doing: `searching`, `reading`, `coding`, `creating`,
+`working`), `delta` (text), `done` (saved message + run summary, with `metadata.citations`)
+and `error` (code, message, hint).
 `POST /api/chat` offers the same pipeline without streaming.
 
 ### Agents
 
 `agents/catalog.py` lists every planned agent with its milestone, preferred route, context
-mode and a **limitation note**. In Milestone 1 only `GeneralAgent` is implemented. When the
+mode and a **limitation note**. Implemented: `GeneralAgent` (searches the user's files when
+they exist, strict relevance gate) and `ResearchAgent` (plans queries with a fast model,
+searches files and the web, ranks by primary source / reliability / recency, reads the top
+pages, answers with dated citations; honest note when web search is not configured). When the
 intent asks for an unavailable agent (e.g. presentations), `GeneralAgent` handles the turn and
 its prompt contains that agent’s limitation note, so it does not pretend to export files,
 browse the web or cite laws it cannot verify. Agent selection is invisible in the UI (visible
 only in the debug trace).
 
-Adding an agent: subclass `Agent` (`agents/base.py`), implement `plan()`, mark it
+Adding an agent: subclass `Agent` (`agents/base.py`), implement `plan()` (and optionally
+`gather()` to use tools), mark it
 `available=True` in the catalog and register it in `AgentRegistry`.
 
 ### Model providers and routing
@@ -139,10 +153,43 @@ score. Questions are ignored. `memory/sensitive.py` blocks passwords, API keys, 
 (Luhn-checked), passport numbers and bank accounts from automatic storage. Repeating a
 statement reinforces the existing memory instead of duplicating it.
 
-Retrieval (`memory/scoring.py`): `0.6 × relevance + 0.25 × importance + 0.15 × recency`
-(30-day half-life). Relevance is lexical with prefix stemming (works reasonably for Uzbek and
-Russian suffixes); Milestone 2 replaces it with embeddings through a `VectorStore` interface.
-Very important profile memories are always included.
+Retrieval (`memory/service.py`, `memory/scoring.py`): when an embedding model is available,
+memories are embedded on create/update and ranked by a hybrid score —
+`0.45 × semantic + 0.15 × lexical + 0.2 × importance + 0.1 × recency + 0.1 × project` — with a
+minimum semantic similarity so unrelated memories are not injected. Without embeddings, the
+Milestone 1 lexical score is used (`0.6 × relevance + 0.25 × importance + 0.15 × recency`,
+prefix stemming for Uzbek/Russian suffixes). Very important profile memories are always included.
+
+### Knowledge, retrieval and citations (Milestone 2)
+
+```
+upload / URL ─► validate (extension + content sniffing, size, zip-bomb limits, safe name, SHA-256)
+            ─► StorageProvider (content-addressed keys; no path traversal)
+            ─► IngestionRunner (background task, persisted status, resumes after restart)
+                 parse ─► normalise ─► metadata ─► chunk (~1200 chars, overlap 150, pages/headings kept)
+                 ─► DocumentRevision (new content = new revision; old ones kept, never overwritten)
+                 ─► embed (one active model, "provider:model" stored with every vector)
+                 ─► index (VectorStore: pgvector on PostgreSQL, numpy store otherwise)
+question ─► Retriever: keyword (PostgreSQL full-text / BM25 on SQLite) + vector search
+            ─► Reciprocal Rank Fusion ─► relevance gate (strict for casual chat) ─► max 3 per document
+            ─► numbered SourceRefs (title, file/URL, page, revision, date, reliability)
+answer   ─► verify_citations removes numbers that match no source; cited sources stored on the message
+```
+
+Statuses: `queued → processing → indexed | partial (no embeddings: keyword only) | needs_ocr
+(images/scans, OCR in Milestone 4) | failed (with a readable reason)`. Only the current
+revision of `indexed`/`partial` documents is searchable. Source text is wrapped in `<source>`
+tags and the prompt tells the model to treat it as data, not instructions.
+
+Web: `tools/web_search.py` uses Tavily (`TAVILY_API_KEY`) or Claude's server-side web search
+tool; `knowledge/fetch.py` (`SafeFetcher`) resolves DNS and refuses private, loopback,
+link-local and CGNAT addresses on every redirect hop, checks `robots.txt`, limits size,
+content type and time. `tools/reliability.py` scores domains (official `gov.uz`/`.gov` 0.95,
+academic 0.85, established news 0.7 … social 0.35).
+
+Every tool call goes through `ToolRegistry.execute`: Pydantic argument validation, unknown and
+dangerous tools denied (dangerous ones need explicit confirmation, Milestone 6), timeout, and
+a `tool_calls` row with redacted arguments.
 
 Users see, add and delete memories on the **Memory** page (and per project). Automatic memory
 can be switched off in Settings.
@@ -165,12 +212,18 @@ All primary keys are UUIDs. Migrations live in `apps/api/migrations` (Alembic).
 | `projects` | user projects |
 | `conversations` | chat threads (optionally in a project) |
 | `messages` | user and assistant messages with metadata (provider, model, route…) |
-| `memories` | profile/project memories with importance, confidence, source, sensitivity, last access; `embedding` column reserved for Milestone 2 |
+| `memories` | profile/project memories with importance, confidence, source, sensitivity, last access (vectors live in the vector store) |
 | `agent_runs` | one trace per turn: intent, agent, route, provider, model, latency, tokens, steps, provider attempts, errors |
-| `audit_logs` | deletions, memory changes, project creation, preference changes |
+| `audit_logs` | deletions, memory changes, project creation, preference changes, uploads |
+| `knowledge_sources` | where documents come from: uploads, a URL, later connectors (lex.uz…) |
+| `knowledge_documents` | one file or page: title, type, size, content hash, status, error, current revision |
+| `document_revisions` | every version of a document (content hash, storage key, extracted text) |
+| `knowledge_chunks` | searchable passages of a revision with page/heading metadata (PostgreSQL GIN full-text index) |
+| `vector_entries` | portable vector store (JSON vectors) used when pgvector is unavailable |
+| `pgvector_entries` | PostgreSQL only, created by migration 0002 when the `vector` extension can be enabled |
+| `tool_calls` | every tool execution: tool, redacted arguments, status, summary, error, duration |
 
-`Artifact`, `Task`, `ToolCall`, `KnowledgeSource`, `KnowledgeDocument`, `KnowledgeChunk`,
-`DocumentRevision`, `LanguageSession` and `LanguageMetric` arrive with the milestones that use
+`Artifact`, `Task`, `LanguageSession` and `LanguageMetric` arrive with the milestones that use
 them, each with its own migration.
 
 ### Security
@@ -184,6 +237,10 @@ them, each with its own migration.
 - Security headers on every response (pure ASGI middleware, safe for streaming).
 - Audit log for important operations.
 - Markdown from models is rendered without raw HTML; links open with `noopener`.
+- Uploads: extension allow-list plus content sniffing, size limit, zip-bomb limits for
+  Office files, sanitised display names, storage keys validated against traversal.
+- Web fetching: SSRF protection on every redirect, robots.txt, size/type/time limits.
+- Tools: validated arguments, timeouts, dangerous-tool denial, audit rows with redacted secrets.
 - No shell or filesystem tools exist yet; when they arrive (Milestone 6) they will require
   explicit permission and run sandboxed.
 
@@ -199,12 +256,15 @@ app’s **Iz (debug)** panel shows it. Hidden model reasoning is never stored.
 ```
 app/                  routes: / (chat), /chat/[id], /projects, /projects/[id], /memory,
                       /settings, /ezo-config (runtime config)
-components/robot/     EzoRobot — animated SVG robot (idle, listening, thinking, speaking)
+components/robot/     EzoRobot — animated SVG robot face; EzoPresence — orb around it with 11
+                      visible states; EzoStatus — header status pill
+components/knowledge/ Files page (upload, link, status, versions, previews, delete/re-read)
 components/chat/      ChatView (type/talk switch), useChatSession (conversation + streaming),
                       VoiceStage (hands-free voice loop), Composer, MessageBubble, TracePanel
 components/layout/    AppShell + HistoryPanel (conversation history is the only navigation)
 components/pages/     Projects, Memory, Settings
-lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), theme, app state
+lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), theme, app state,
+                      ezo-state (pure visible-state machine), knowledge helpers
 ```
 
 - **Design principle:** the user only sees EZO (the robot) and the conversation history.
@@ -214,8 +274,15 @@ lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), them
   stripped) → listen again. Tapping the robot interrupts. With `channel: "voice"` EzoCore adds
   a prompt section asking for short, spoken-style answers; the channel is stored on the
   message. Typed and spoken turns share one conversation.
-- The API client (`packages/shared`) parses the SSE stream incrementally and supports
-  cancelling generation.
+- **Visible state** (`lib/ezo-state.ts`): a pure reducer turns chat events (send, activity,
+  delta, done, error) into one of `idle, listening, thinking, speaking, searching, reading,
+  coding, creating, working, completed, error`. Unknown server stages show as `working`;
+  `completed`/`error` settle back to `idle`. `EzoPresence` renders each state with its own
+  subtle motion (original SVG/framer-motion; respects reduced motion).
+- **Files in chat:** the paperclip uploads to the knowledge base (scoped to the current
+  project) and shows a status chip; answers list their cited sources under the text.
+- The API client (`packages/shared`) parses the SSE stream incrementally, supports
+  cancelling generation and multipart uploads.
 - `/ezo-config` serves the API URL from the `EZO_API_URL` environment variable at runtime, so
   the same build works in Docker, tests and development.
 - Design tokens are CSS variables (`app/globals.css`) for light and dark themes; the palette
@@ -229,7 +296,7 @@ lib/                  API client, speech (Web Speech API), i18n (uz/en/ru), them
 |---|---|---|
 | Unit (Python) | pytest | `apps/api/tests/unit` — language, intent, memory, router, adapters (fake SDK clients), personality, rate limit |
 | Integration (Python) | pytest + httpx ASGI | `apps/api/tests/integration` — full API with fake providers, real migrations, SQLite or PostgreSQL |
-| Unit (TypeScript) | Vitest | `packages/shared` (SSE parser, client), `apps/web` (i18n) |
+| Unit (TypeScript) | Vitest | `packages/shared` (SSE parser, client, uploads), `apps/web` (i18n, visible-state machine, EzoPresence/Sources rendering) |
 | End-to-end | Playwright | `tests/e2e` — real browser, real API (offline mode, fresh SQLite) |
 
 ## Key decisions

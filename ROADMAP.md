@@ -26,19 +26,43 @@ Legend: ✅ done · 🔜 next · ⏳ planned
 - [x] Tests: unit, integration (SQLite + PostgreSQL), browser end-to-end; CI workflow
 - [x] Docs: README, SETUP_WINDOWS, ARCHITECTURE, TROUBLESHOOTING
 
-## 🔜 Milestone 2 — Knowledge
+## ✅ Milestone 2 — Knowledge, files and research
 
-- [ ] File storage abstraction (local filesystem; S3-compatible for production)
-- [ ] Document upload with validation (type, size, filename sanitising, path-traversal safety)
-- [ ] Ingestion pipeline: fetch → parse → normalise → metadata → chunk → embed → index → revisions
-- [ ] `VectorStore` interface with pgvector and Qdrant implementations
-- [ ] Embeddings through `ModelProvider.embed` (OpenAI / Gemini)
-- [ ] Hybrid retrieval (vector + keyword), metadata filters, optional reranking
-- [ ] Citations with source metadata; citation verification
-- [ ] Entities: KnowledgeSource, KnowledgeDocument, KnowledgeChunk, DocumentRevision, ToolCall
-- [ ] Tool interface + registry + logged tool calls
-- [ ] ResearchAgent (basic): web search tool, official-source preference, citations
-- [ ] Semantic memory retrieval (embeddings replace lexical relevance)
+- [x] `StorageProvider` interface + local filesystem implementation (validated keys, atomic writes)
+- [x] Upload validation: extension allow-list + content sniffing, size limit (413), zip-bomb
+      limits, filename sanitising, path-traversal safety, SHA-256 duplicate detection
+- [x] Parsers: PDF, DOCX, XLSX, CSV, TXT, Markdown, HTML (web pages); images marked “needs OCR”
+- [x] Ingestion pipeline: fetch → parse → normalise → metadata → chunk → embed → index → revisions
+      (background runner with persisted status, resumes after restart; never overwrites a revision)
+- [x] `VectorStore` interface with pgvector (PostgreSQL) and a built-in local store; vector,
+      keyword (PostgreSQL full-text / BM25), hybrid (RRF), metadata/project filters, reranker hook
+- [x] Embeddings through `ModelProvider.embed` (OpenAI / Gemini), one active model, model-keyed vectors
+- [x] Retrieval with relevance gates and numbered citations (file, page, revision, URL, date,
+      reliability); citation verification removes invented numbers
+- [x] Entities + migration 0002: KnowledgeSource, KnowledgeDocument, DocumentRevision,
+      KnowledgeChunk, VectorEntry, ToolCall
+- [x] Tool interface + registry (validation, permissions, timeouts) + logged tool calls
+- [x] ResearchAgent: query planning, file + web search (Claude web search or Tavily),
+      primary/official-source preference, page reading via SSRF-safe fetcher, dated citations
+- [x] Semantic memory retrieval (hybrid: semantic + lexical + importance + recency + project)
+- [x] UI: Files page (drop/upload, add link, status, errors, versions, previews, re-read,
+      delete), paperclip in the composer, sources under answers, live activity states
+- [ ] Deferred (not faked): Qdrant implementation (interface ready), S3 storage provider
+      (interface ready), OCR for images/scans (Milestone 4), model-based reranker
+
+## Open-source integration track (from the integration prompt)
+
+Licences reviewed in [docs/OPEN_SOURCE_AUDIT.md](docs/OPEN_SOURCE_AUDIT.md). No external code is
+copied; AGPL projects are optional separate services.
+
+- [x] Phase 1 — EZO presence: original orb with idle, listening, thinking, speaking, searching,
+      reading, coding, creating, working, completed and error states (ideas from APEX-UI, MIT)
+- [ ] Phase 2 — voice provider interfaces (STT / TTS / realtime) + optional VoiceStudio service
+      over its HTTP API; browser voice stays as fallback
+- [ ] Phase 3 — Artifact foundation + shared StoryProject model (presentation ⇄ video)
+- [ ] Phase 4 — MediaProductionProvider; Remotion and/or OpenMontage as optional workers
+- [ ] Phase 5 — VisualAgent with ImageProvider / VideoGenerationProvider (open-higgsfield as design reference only)
+- [ ] Phase 6 — optional REA BinaryAnalysisProvider for authorised analysis, off by default
 
 ## ⏳ Milestone 3 — Language
 
@@ -94,13 +118,17 @@ Legend: ✅ done · 🔜 next · ⏳ planned
 - [ ] BusinessAgent (market research with retrieved data, labelled estimates)
 - [ ] Complex research workflows
 
-## Known limitations after Milestone 1
+## Known limitations after Milestone 2
 
 - Intent and language detection are rule-based (transparent, but can misread unusual phrasing;
   you can still talk normally — the GeneralAgent answers everything).
-- Memory relevance is lexical until embeddings arrive in Milestone 2.
-- No tool calling, web access or file upload yet. Voice uses the browser’s speech services
-  (not Firefox; Uzbek voices depend on the device).
+- Semantic search and semantic memory need an OpenAI or Gemini key (embeddings); without one,
+  EZO falls back to keyword search and says so.
+- Images and scanned PDFs are stored but not read (OCR is Milestone 4).
+- Ingestion runs in the API process (asyncio tasks, resumed at startup); a separate worker
+  with Redis arrives in Milestone 8.
+- Some status/error texts from the API are in English while the interface is uz/en/ru.
+- Voice uses the browser’s speech services (not Firefox; Uzbek voices depend on the device).
 - The rate limiter is in-memory (one API process). Redis arrives with the worker.
 - Single-owner authentication; multi-user accounts are not implemented.
 - Default model names in `models.toml` must be kept current with the providers’ model lists.
