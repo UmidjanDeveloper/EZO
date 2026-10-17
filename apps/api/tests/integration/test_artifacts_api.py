@@ -237,3 +237,20 @@ async def test_service_rejects_unsafe_types(app: FastAPI) -> None:
             is not None
         )
         assert await session.scalar(select(Message)) is None
+
+
+async def test_cors_exposes_download_filename(client: AsyncClient) -> None:
+    artifact = await create_text(client)
+    origin = {"Origin": "http://localhost:3000"}
+    download = await client.get(
+        f"/api/artifacts/{artifact['id']}/versions/1/download", headers=origin
+    )
+    exposed = download.headers["access-control-expose-headers"]
+    assert "Content-Disposition" in exposed
+    preflight = await client.options(
+        f"/api/stories/{artifact['id']}/scenes",
+        headers={**origin, "Access-Control-Request-Method": "PUT"},
+    )
+    assert (
+        preflight.status_code == 200 and "PUT" in preflight.headers["access-control-allow-methods"]
+    )

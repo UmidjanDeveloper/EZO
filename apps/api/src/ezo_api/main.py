@@ -117,8 +117,10 @@ def create_app(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
+        # Lets the web app read download filenames and which voice answered.
+        expose_headers=["Content-Disposition", "X-EZO-Voice-Provider"],
     )
 
     @app.exception_handler(AuthError)
