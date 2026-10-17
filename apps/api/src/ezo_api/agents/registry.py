@@ -6,7 +6,9 @@ from dataclasses import dataclass
 
 from ezo_api.agents.base import Agent
 from ezo_api.agents.catalog import AGENTS, AgentSpec
+from ezo_api.agents.document import DocumentAgent
 from ezo_api.agents.general import GeneralAgent
+from ezo_api.agents.presentation import PresentationAgent
 from ezo_api.agents.research import ResearchAgent
 from ezo_api.core.intent import Intent
 
@@ -26,7 +28,12 @@ class AgentRegistry:
     def __init__(self, agents: list[Agent] | None = None) -> None:
         self._agents: dict[Intent, Agent] = {}
         self._general = GeneralAgent()
-        for agent in agents or [self._general, ResearchAgent()]:
+        for agent in agents or [
+            self._general,
+            ResearchAgent(),
+            DocumentAgent(),
+            PresentationAgent(),
+        ]:
             self._agents[agent.spec.intent] = agent
 
     def select(self, intent: Intent, forced_agent: str | None = None) -> AgentSelection:

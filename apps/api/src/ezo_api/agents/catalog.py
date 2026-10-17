@@ -60,16 +60,11 @@ AGENTS: dict[Intent, AgentSpec] = {
             "presentation",
             Intent.PRESENTATION,
             {"uz": "Taqdimot agenti", "en": "Presentation Agent", "ru": "Агент презентаций"},
-            "Narrative, slide architecture, visuals and PPTX/PDF export.",
-            available=False,
+            "Narrative, slide architecture, layout QA and PPTX/PDF/web export.",
+            available=True,
             milestone=4,
             context_mode="professional",
             route="reasoning",
-            limitation_note=(
-                "The Presentation Agent (PPTX/PDF export, visual design) is not available yet. "
-                "You may help plan the presentation in text (audience, goal, narrative, slide "
-                "outline), but state clearly that EZO cannot create the presentation file yet."
-            ),
         ),
         AgentSpec(
             "developer",
@@ -122,18 +117,11 @@ AGENTS: dict[Intent, AgentSpec] = {
             "document",
             Intent.DOCUMENT,
             {"uz": "Hujjat agenti", "en": "Document Agent", "ru": "Агент документов"},
-            "Reading, creating and analyzing PDF, DOCX, XLSX and scans.",
-            available=False,
+            "Reading, creating, editing, comparing and converting DOCX, PDF, XLSX and CSV.",
+            available=True,
             milestone=4,
             context_mode="professional",
             route="chat",
-            limitation_note=(
-                "EZO can already search the user's uploaded files (knowledge base) and cite "
-                "them: if relevant passages are provided below as sources, use and cite them. "
-                "Creating, converting or editing files (PDF/DOCX/XLSX export, OCR for scans) "
-                "is not available yet — say so if the user asks for it. If no source passages "
-                "are provided, ask the user to upload the file (paperclip button) first."
-            ),
         ),
         AgentSpec(
             "business",

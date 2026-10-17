@@ -48,10 +48,17 @@ def test_fixed_language_rule() -> None:
 
 
 def test_registry_falls_back_to_general_for_unavailable_agents() -> None:
-    selection = AgentRegistry().select(Intent.PRESENTATION)
+    selection = AgentRegistry().select(Intent.VISUAL)
     assert selection.agent.spec.key == "general"
-    assert selection.requested.key == "presentation"
+    assert selection.requested.key == "visual"
     assert selection.is_fallback
+
+
+def test_registry_selects_document_and_presentation_agents() -> None:
+    registry = AgentRegistry()
+    assert registry.select(Intent.PRESENTATION).agent.spec.key == "presentation"
+    assert registry.select(Intent.DOCUMENT).agent.spec.key == "document"
+    assert not registry.select(Intent.DOCUMENT).is_fallback
 
 
 def test_manual_agent_override() -> None:

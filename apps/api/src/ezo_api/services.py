@@ -27,6 +27,12 @@ from ezo_api.settings import Settings
 from ezo_api.storage.base import StorageProvider
 from ezo_api.storage.local import LocalStorageProvider
 from ezo_api.story.service import StoryService
+from ezo_api.tools.document_tools import (
+    CreateDocumentTool,
+    CreatePresentationTool,
+    CreateSpreadsheetTool,
+    ReadDocumentTool,
+)
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
 from ezo_api.tools.web_search import WebSearchProvider, build_web_search
@@ -128,7 +134,17 @@ def build_services(
         ingestion=IngestionRunner(knowledge, db.sessionmaker, settings.ingestion_mode),
         retriever=Retriever(embeddings, vectors),
         web_search=web_search,
-        tools=ToolRegistry([KnowledgeSearchTool(), WebSearchTool(), WebFetchTool()]),
+        tools=ToolRegistry(
+            [
+                KnowledgeSearchTool(),
+                WebSearchTool(),
+                WebFetchTool(),
+                ReadDocumentTool(),
+                CreateDocumentTool(),
+                CreateSpreadsheetTool(),
+                CreatePresentationTool(),
+            ]
+        ),
         memory_index=memory_index,
         voice=voice or build_voice_service(settings),
         artifacts=ArtifactService(storage),

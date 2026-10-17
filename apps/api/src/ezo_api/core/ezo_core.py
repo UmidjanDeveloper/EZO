@@ -453,6 +453,7 @@ class EzoCore:
                         user_id=prepared.user.id,
                         run_id=prepared.run.id,
                         project_scope=prepared.conversation.project_id,
+                        conversation_id=prepared.conversation.id,
                         on_activity=on_activity,
                     ),
                     history_hint=earlier_user[-1][:500] if earlier_user else "",

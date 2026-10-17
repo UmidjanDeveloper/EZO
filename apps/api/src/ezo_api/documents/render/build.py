@@ -69,6 +69,14 @@ def verify_pptx(data: bytes, expected_slides: int) -> None:
             raise DeckBuildError(f"Slide {number} of the PPTX is empty.")
 
 
+def check_deck(deck: DeckSpec, theme: Theme | None = None) -> QAReport:
+    """Lay out a copy of the deck and run QA without rendering any file (fast)."""
+    trial = deck.model_copy(deep=True)
+    _move_extra_bullets(trial, [])
+    theme = theme or choose_theme(trial.theme, trial.audience, trial.goal)
+    return run_qa(trial, layout_deck(trial, theme))
+
+
 def build_deck(deck: DeckSpec, theme: Theme | None = None, *, previews: bool = True) -> DeckBuild:
     theme = theme or choose_theme(deck.theme, deck.audience, deck.goal)
     fixes: list[str] = []

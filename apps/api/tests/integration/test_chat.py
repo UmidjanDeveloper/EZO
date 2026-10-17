@@ -51,14 +51,14 @@ async def test_history_and_system_prompt_reach_the_provider(
 async def test_agent_routing_for_unavailable_agent(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
-    events = await stream_chat(client, message="Ezo, 15 slide presentation tayyorla.")
+    events = await stream_chat(client, message="Ezo, menga logo rasm chizib ber.")
     meta = events[0][1]
-    assert meta["intent"] == "presentation"
-    assert meta["requested_agent"] == "presentation"
+    assert meta["intent"] == "visual"
+    assert meta["requested_agent"] == "visual"
     assert meta["requested_agent_available"] is False
     assert meta["agent"] == "general"
     # The covering agent is told about the limitation, so it cannot pretend.
-    assert "cannot create the presentation file" in (fake_anthropic.requests[-1].system or "")
+    assert "You cannot create images" in (fake_anthropic.requests[-1].system or "")
 
 
 async def test_routing_uses_route_specific_model(
@@ -133,7 +133,8 @@ async def test_status_reports_providers_agents_and_routes(client: AsyncClient) -
     assert configured == {"anthropic": True, "openai": True, "gemini": False}
     assert status["offline_mode"] is False
     agents = {a["key"]: a["available"] for a in status["agents"]}
-    assert agents["general"] is True and agents["presentation"] is False
+    assert agents["general"] is True and agents["presentation"] is True
+    assert agents["document"] is True and agents["visual"] is False
     assert status["routing"]["routes"]["chat"]["active_candidates"][0]["provider"] == "anthropic"
 
 

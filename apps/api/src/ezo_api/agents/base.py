@@ -17,7 +17,7 @@ from ezo_api.knowledge.retrieval.sources import SourceRef
 from ezo_api.personality.profile import ContextMode
 
 if TYPE_CHECKING:
-    from ezo_api.tools.base import ToolContext
+    from ezo_api.tools.base import ToolContext, ToolResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,12 +71,20 @@ class Gathered:
     """Artifacts created during this turn ({id, title, type, version}); shown under the answer."""
 
 
-async def run_tool(
+async def call_tool(
     gathered: Gathered, ctx: ToolContext, name: str, arguments: dict[str, Any]
-) -> list[SourceRef]:
-    """Execute a registered tool, record a trace entry, return its sources."""
+) -> ToolResult:
+    """Execute a registered tool and record a trace entry."""
     result = await ctx.services.tools.execute(name, arguments, ctx)
     gathered.tool_calls.append(
         {"tool": name, "ok": result.ok, "summary": result.summary, "error": result.error}
     )
+    return result
+
+
+async def run_tool(
+    gathered: Gathered, ctx: ToolContext, name: str, arguments: dict[str, Any]
+) -> list[SourceRef]:
+    """Execute a registered tool, record a trace entry, return its sources."""
+    result = await call_tool(gathered, ctx, name, arguments)
     return list(result.sources) if result.ok else []

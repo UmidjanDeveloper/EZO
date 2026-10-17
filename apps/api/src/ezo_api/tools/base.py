@@ -27,6 +27,8 @@ class ToolContext:
     user_id: uuid.UUID
     run_id: uuid.UUID | None = None
     project_scope: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    """Conversation of the turn (artifacts created by tools are linked to it)."""
     allow_dangerous: bool = False
     """Only set after an explicit user confirmation (used from Milestone 6)."""
     on_activity: Callable[[str], None] | None = None
