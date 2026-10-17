@@ -194,6 +194,25 @@ robot while EZO speaks to interrupt it and talk. Choose the speech language (UZ 
 the robot; **Settings → System status → Voice** shows which engine is active. Fully realtime,
 streaming voice (talk over each other, word-by-word) is planned for Milestone 7.
 
+## Created files and versions (Yaratilganlar)
+
+Everything EZO makes — and every answer you choose to keep — becomes an **artifact**: a file
+you can come back to later.
+
+- **Save an answer:** press **Saqlash / Save** under any EZO answer. It is stored as a
+  Markdown document, keeps the answer’s sources, and appears as a card under the answer.
+- **Yaratilganlar / Created** (layers icon, bottom-left) lists everything with type, project,
+  date and version. Open an item to preview, **edit** (text files), **download**, **rename** or
+  **delete** it.
+- **Versions are never overwritten.** Each edit becomes a new version (v2, v3…); older versions
+  stay downloadable. “Restore this version” makes an old version current by adding it again as
+  a new version — history is never rewritten. Deleting an artifact (with confirmation) is the
+  only way to remove versions.
+- Files are stored in the same safe storage as uploads (Docker volume `ezo-storage`), are only
+  visible to you, and are always downloaded as files (never opened as web pages).
+- Behind the scenes EZO also has **story projects** (scenes, narration, timing): the shared
+  model the upcoming presentation and video features will build on.
+
 ## Optional integrations
 
 None of these is needed for normal EZO chat. Each one is off until you turn it on, and EZO

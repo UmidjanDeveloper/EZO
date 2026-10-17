@@ -85,6 +85,16 @@ pnpm with `npm install -g pnpm`.
 | EZO answers without using my file | Ask about the file’s content directly (“shartnomada muddat qancha?”). In casual chat EZO only uses files that clearly match. Files in a project are used only inside that project. |
 | “Add link” says the address is not allowed | EZO never fetches private or local addresses (security). Use a public `https://` page. Some sites forbid automated reading in `robots.txt`; EZO respects that. |
 
+## Created (Yaratilganlar) and versions
+
+| Symptom | Fix |
+|---|---|
+| “Saqlash / Save” is greyed out | That answer is already saved (see the card under it), or it is still being written. |
+| An edit did not create a new version | The text was identical to the current version; nothing new is stored. |
+| I restored an old version and now have one more version | That is intended: restoring never deletes or rewrites history, it adds the old content again as the newest version. |
+| Download says the stored file is missing | The storage folder/volume was deleted or moved (`ezo-storage` in Docker, `apps/api/storage` in developer mode). Restore it from a backup. |
+| Deleting a project removed my files? | No — artifacts stay in *Created*; they just no longer belong to a project. |
+
 ## Web research says “web search is not configured”
 
 Add `ANTHROPIC_API_KEY` (EZO uses Claude’s web search) or a `TAVILY_API_KEY`

@@ -136,12 +136,60 @@ voice model is non-commercial.
 a sentence and pause: EZO answers with OpenAI’s voice; tap while it speaks to interrupt. Without
 keys the browser voice is used as before. For VoiceStudio see README → *Optional integrations*.
 
+## Phase 3 — Artifact system + StoryProject foundation (verified 2026-10-17)
+
+**What was changed:**
+- Migration 0003 adds artifacts, immutable artifact versions and the story project tables.
+- `ArtifactService`, `StoryService` and the timeline planner.
+- `/api/artifacts`: list with filters, details, create from text or a message, rename, edit
+  as a new version, restore, download, text preview and confirmed delete.
+- `/api/stories`: CRUD, replacing scenes, reordering, timeline.
+- Chat answers can be saved, and artifacts appear as cards under answers.
+- New “Yaratilganlar / Created” page and history-panel icon, with uz/en/ru texts.
+- CORS fix: the browser can now read download filenames, and PUT is allowed.
+
+**Code reused:** none. Built on EZO’s existing StorageProvider and audit log.
+
+| Check | Result |
+|---|---|
+| Backend lint/format/mypy | ✅ pass (118 files) |
+| Backend tests SQLite / PostgreSQL | ✅ 252 passed + 1 skipped / 253 passed |
+| — artifact tests | creation, download headers, edit → v2 with v1 preserved, identical content = no version, restore → v3 with parent, rename, filters, confirmed delete + storage cleanup, project deletion keeps artifacts, other users’ artifacts → 404 on every route, save answer from message (sources + message card), unsafe types/empty/unknown type rejected, path tricks sanitised, CORS exposure |
+| — story tests | CRUD, ordering, invalid reorder, scene replacement, narration-aware timeline, assets limited to own artifacts, access control, project scope; timeline unit tests |
+| Migrations | ✅ SQLite + PostgreSQL: fresh install, upgrade 0002 → 0003 (also on a database with existing data), `alembic check`, downgrade + re-upgrade |
+| Frontend lint/typecheck/unit | ✅ pass; 46 unit tests |
+| Web production build | ✅ pass (new route `/artifacts`) |
+| Playwright | ✅ 18 passed, incl. save answer → card → Created → edit (v2) → restore (v3) → download → rename → delete |
+| Docker | ✅ API image rebuilt; container migrated a fresh PostgreSQL to 0003; created an artifact, added v2, downloaded v1 unchanged; both versions stored in the volume |
+
+**Quality gate:**
+1. Runs? Yes, locally and in Docker.
+2. Tests pass? Yes (numbers above).
+3. Docker? Yes.
+4. Migrations valid? Yes.
+5. Chat, RAG and voice still work? Yes, all earlier tests and e2e pass.
+6. Old versions preserved? Yes. Versions are never updated, restore appends, and tests check
+   old content byte for byte.
+7. Provenance? Yes. Each version records the parent version, creator, provider, model and
+   sources. Saved answers keep their citations.
+8. Failures reported honestly? Yes: missing file → 410, non-text edit → 409, unsupported type →
+   422, other users → 404.
+9. Security? Yes: owner scoping, sanitised names, content-addressed keys, server-decided MIME
+   types, download headers, confirmed and audited deletes.
+10. Beginner can test? Yes: press *Saqlash* under an answer, then open *Yaratilganlar*.
+
+**Known limitations:**
+- Only text artifacts can be edited in the UI. Binary files (PPTX, images) get new versions
+  from the agents in later phases.
+- Story projects have no UI of their own yet; they are used internally by Phase 4.
+- Artifacts are stored locally. S3 storage is still interface-only.
+
 ## Next step
 
-**Phase 3 — Artifact foundation and the shared StoryProject model.** Add `Artifact` and
-`ArtifactVersion` tables (type, provider, model, generation metadata, project, source
-references, versions that are never overwritten) with an Alembic migration 0003, artifact API
-and storage, then `StoryProject`, `StoryScene`, `StoryAsset`, `StoryNarration` and
-`StoryTimeline` so one narrative can become PPTX, web slides or a video. After that: Phase 4
-(MediaProductionProvider, Remotion/OpenMontage workers), Phase 5 (VisualAgent providers),
-then Milestone 3 (Language Coach) on top of the new voice layer.
+**Phase 4 — DocumentAgent + PresentationAgent.**
+- Format services: DOCX, PDF, XLSX, CSV, Markdown and TXT.
+- An OCRProvider interface.
+- DocumentAgent: summarize, rewrite, translate, compare, report and spreadsheet work. Every
+  output becomes an artifact version with provenance.
+- PresentationAgent: goal → research if needed → narrative → StoryProject → layouts → real PPTX
+  → QA → artifact.

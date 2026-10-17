@@ -196,6 +196,30 @@ a `tool_calls` row with redacted arguments.
 Users see, add and delete memories on the **Memory** page (and per project). Automatic memory
 can be switched off in Settings.
 
+### Artifacts and story projects (Phase 3)
+
+`artifacts/service.py` (`ArtifactService`) is the only code that writes artifact content:
+
+- `create()` adds the artifact and version 1.
+- `add_version()` adds a new version, or nothing if the content is identical.
+- `restore()` copies an old version forward as a new version, with `parent_version_id`
+  pointing to the original.
+- `delete()` removes everything after an explicit confirmation, and only deletes stored files
+  no other version still uses.
+
+Content is stored through the existing `StorageProvider` under
+`artifacts/<user>/<hash[:2]>/<hash>.<ext>`. The MIME type comes from an extension allow-list,
+never from the caller. Downloads are sent as `attachment` with `X-Content-Type-Options:
+nosniff` and `Content-Security-Policy: sandbox`, so HTML or SVG artifacts never run in the
+API's origin.
+
+Agents report what they created in `Gathered.artifacts`. EzoCore stores it in the message's
+`metadata.artifacts`, and the web app shows a card under the answer.
+
+`story/service.py` (`StoryService`) manages story projects. `story/timeline.py` plans a
+sequential timeline in which a scene lasts its planned duration, or longer if its narration
+needs more time (about 2.4 words per second), so narration is never cut off.
+
 ### Voice providers
 
 `voice/base.py` defines `SpeechToTextProvider`, `TextToSpeechProvider` and
@@ -245,6 +269,11 @@ All primary keys are UUIDs. Migrations live in `apps/api/migrations` (Alembic).
 | `vector_entries` | portable vector store (JSON vectors) used when pgvector is unavailable |
 | `pgvector_entries` | PostgreSQL only, created by migration 0002 when the `vector` extension can be enabled |
 | `tool_calls` | every tool execution: tool, redacted arguments, status, summary, error, duration |
+| `artifacts` | things EZO created or the user saved: title, type, status, agent, provider, model, project, conversation, source references, current version |
+| `artifact_versions` | immutable versions: number, storage key, filename, MIME type, size, content hash, provider, model, created by, change summary, parent version, generation metadata, sources |
+| `story_projects` | one narrative (goal, audience, language, format, style, aspect ratio) behind slides or video |
+| `story_scenes` | ordered scenes: title, purpose, layout, text, visual direction, speaker notes, duration, transition |
+| `story_assets`, `story_narrations`, `story_timeline` | scene media (optionally artifacts), narration text/voice/timing, start/end/animation per scene |
 
 `Artifact`, `Task`, `LanguageSession` and `LanguageMetric` arrive with the milestones that use
 them, each with its own migration.
@@ -281,6 +310,7 @@ app/                  routes: / (chat), /chat/[id], /projects, /projects/[id], /
                       /settings, /ezo-config (runtime config)
 components/robot/     EzoRobot — animated SVG robot face; EzoPresence — orb around it with 11
                       visible states; EzoStatus — header status pill
+components/artifacts/ Created page (versions, preview, edit, restore, download) and ArtifactCard
 components/knowledge/ Files page (upload, link, status, versions, previews, delete/re-read)
 components/chat/      ChatView (type/talk switch), useChatSession (conversation + streaming),
                       VoiceStage (hands-free voice loop), Composer, MessageBubble, TracePanel

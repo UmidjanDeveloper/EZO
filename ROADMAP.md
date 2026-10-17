@@ -60,10 +60,29 @@ copied; AGPL projects are optional separate services.
 - [x] Phase 2 — voice provider interfaces (STT / TTS; realtime interface only) + OpenAI voice
       + optional VoiceStudio service over its HTTP API (`voice` Docker profile); browser voice
       stays as fallback; audio never stored
-- [ ] Phase 3 — Artifact foundation + shared StoryProject model (presentation ⇄ video)
-- [ ] Phase 4 — MediaProductionProvider; Remotion and/or OpenMontage as optional workers
-- [ ] Phase 5 — VisualAgent with ImageProvider / VideoGenerationProvider (open-higgsfield as design reference only)
-- [ ] Phase 6 — optional REA BinaryAnalysisProvider for authorised analysis, off by default
+
+## Current development order (from the next-development prompt)
+
+- [x] **Phase 3 — Artifact system + StoryProject foundation**
+  - [x] `Artifact` + immutable `ArtifactVersion` (migration 0003); content-addressed storage
+        through the existing StorageProvider; MIME types decided by EZO; owner-only access
+  - [x] Edit → new version, restore → new version, identical content → no new version,
+        download (attachment, `nosniff`, sandbox CSP), rename, confirmed delete, audit log
+  - [x] “Yaratilganlar / Created” page (filter, versions, preview, edit, restore, download,
+        rename, delete) and artifact cards inside conversations; “Save” under any answer
+  - [x] `StoryProject` / `StoryScene` / `StoryAsset` / `StoryNarration` / `StoryTimeline` with
+        CRUD, scene ordering and narration-aware timeline planning (`/api/stories`)
+- [ ] Phase 4 — DocumentAgent (DOCX/PDF/XLSX/CSV/MD/TXT creation and transformation, OCR
+      interface) + PresentationAgent (narrative → StoryProject → layouts → PPTX → QA → Artifact)
+- [ ] Phase 5 — LanguageCoachAgent + IELTS-style speaking simulator (estimated bands)
+- [ ] Phase 6 — VisualAgent (ImageProvider / ImageEditProvider; open-higgsfield as idea source only)
+- [ ] Phase 7 — Video / motion studio (MediaProductionProvider; optional OpenMontage worker;
+      Remotion licence re-checked first)
+- [ ] Phase 8 — Uzbekistan government knowledge (LegalResearchAgent + lex.uz / president.uz /
+      e-qaror / gov.uz connectors)
+- [ ] Phase 9 — DeveloperAgent + website builder (sandboxed repository tools)
+- [ ] Later — advanced tasks, background worker, business workflows; optional REA binary
+      analysis (off by default)
 
 ## ⏳ Milestone 3 — Language
 
