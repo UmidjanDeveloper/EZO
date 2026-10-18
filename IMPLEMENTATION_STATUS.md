@@ -76,28 +76,34 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #28 (CI), commit `429a52b`, all jobs green:
+**CI verified** — run #37 (CI), commit `0ea8d6e`, all jobs green:
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 423 | 419 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
-| API · PostgreSQL | 423 | 420 | 0 | 3 | 3 LibreOffice not installed |
+| API · SQLite | 535 | 530 | 0 | 5 | 1 needs PostgreSQL + pgvector; 4 LibreOffice not installed |
+| API · PostgreSQL | 535 | 531 | 0 | 4 | 4 LibreOffice not installed |
 | Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 22 | 22 | 0 | 0 | — |
+| Playwright e2e | 23 | 23 | 0 | 0 | — |
 
 Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL, ESLint,
-TypeScript, the web production build and the Docker job (Compose config including the
-`voice` profile, API and web image builds, API container migrates and answers
-`/api/health`, web container serves `/`).
+TypeScript, the web production build, and the Docker job. The Docker job covers the
+Compose config, the API and web image builds, the check that the API image has Tesseract
+with `uzb`, `uzb_cyrl`, `rus`, `eng` and `osd`, the API container migrating and answering
+`/api/health`, and the web container serving `/`. CI installs Tesseract and sets
+`EZO_REQUIRE_TESSERACT=1`, so the real OCR tests **run** (they fail rather than skip if
+Tesseract is missing).
 
-**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 422 passed
-+ 1 skipped; PostgreSQL 423 passed at the legal-agent commit); migration 0005 verified up →
-check → down → up on SQLite and PostgreSQL; the full Playwright suite passed locally (22); the API
-Docker image was rebuilt in the sandbox and, inside the container, rendered a diagram and
-built a deck with a slide image (no QA issues). Live image generation was **not** run: there
-are no provider keys in this environment, so the OpenAI and Gemini adapters are verified with
-SDK-shaped fakes only.
+**Extended local verification** (not in CI):
+
+- Same commit, with LibreOffice and Tesseract 5.3.4: SQLite 534 passed + 1 skipped
+  (pgvector); PostgreSQL 535 passed.
+- Migrations 0006 and 0007 verified up → check → down → up on SQLite and PostgreSQL.
+- The full Playwright suite passed locally (23).
+- The API Docker image could **not** be rebuilt in the sandbox: the sandbox proxy blocks
+  deb.debian.org, so the Tesseract apt step cannot run there. The CI Docker job built and
+  checked it.
+- Live image provider test **not performed** (no provider keys here).
 
 ## Sprint 0 — Stabilization (2026-10-17)
 
@@ -143,6 +149,69 @@ repository's default branch.
 **How the owner can test:** open the Actions tab → latest *CI* run → each job's summary
 shows the test table. `curl localhost:8000/api/status` lists agents with
 `maturity`/`phase`.
+
+## Phase 3 — OCR + EZO Office (2026-10-18) — alpha, partially complete
+
+Commits `73bdd41` (PDF engine), `d795ba8` (OCR), `6169895` (Word in place), `0072bb2`
+(conversions, tables, sheets), `fdaeb28` (long documents), `f419560` (chat UX), `aa9d894`
+(official-knowledge plan), `0ea8d6e` (regression pass). Every commit's CI run was green (runs #30, #31 and #33–#37).
+
+### What works
+
+- **PDF engine, offline** (`documents/pdf/`): merge, delete / extract / move / rotate pages,
+  split, orientation, page numbers, watermark, header/footer, lossless compression,
+  metadata cleaning, images ↔ PDF, inspect, page-level compare. Requests are understood
+  in uz/ru/en; several steps in one sentence keep page identity. Every output is reopened
+  and its page count verified. Encrypted PDFs are refused, restricted ones are read-only,
+  signed ones get a warning.
+- **OCR, local Tesseract** (`documents/ocr/`): `uzb`, `uzb_cyrl`, `rus`, `eng`, with
+  orientation detection, deskew, line boxes and engine confidence (labelled as an engine
+  score). OCR runs during ingestion (pages without a text layer), and its chunks are
+  cited as "text read by OCR". In chat it produces a `.txt` file. Scans can also become
+  editable or layout Word, or a searchable PDF. Per-page results are stored (migration
+  0006) and exposed at `/api/knowledge/documents/{id}/ocr`.
+- **Word in place** (`documents/docx/fidelity.py`): translate / proofread / formal /
+  rewrite keep runs, styles, numbering, tables, images, headers/footers and hyperlinks.
+  A before/after inventory is stored. Real tracked changes are available on request, and
+  find-and-replace needs no model.
+- **Tables → Excel**: Word tables are exact; tables in PDFs (PDFium word boxes) and scans
+  (OCR word boxes) are detected. **Spreadsheet operations**: sort, filter, duplicates,
+  empty rows, totals, group-by, all computed by EZO. Formula cells without a saved result
+  are reported, not calculated.
+- **Long documents**: section-aware parts, map-reduce summaries, part-by-part
+  translations, whole-file search for questions. Parts are cached (migration 0007), so a
+  job continues after a provider failure. The 40,000-character limit is gone.
+- **Chat**: files are attached to the message (ordered, ownership-checked, up to 20).
+  Chips show on the user message, PDF results show a first-page preview, and a send waits
+  while uploads are in flight.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| A — 3 attached PDFs: "Birlashtir va 2-betni olib tashla" → right pages, order, download | `test_pdf_office.py::test_scenario_a_merge_three_attached_pdfs_and_delete_page_two` (+ e2e `pdf-office.spec.ts`) |
+| B — Scanned Uzbek document (Latin/Cyrillic, rotated/skewed) → text, Word, searchable PDF | `test_ocr.py`, `test_convert_office.py::test_scan_to_editable_and_layout_word`, `::test_searchable_pdf_keeps_text_pages` |
+| C — Word file translated with its formatting kept; tracked changes on request | `test_docx_office.py`, `tests/unit/test_docx_fidelity.py` (incl. LibreOffice opening the result) |
+| D — Long document: whole file summarised, job resumes after a failure, questions search everything | `test_long_documents.py` |
+| E — No API key: PDF operations, OCR, conversions, tables, sheets, find-and-replace still work | `test_pdf_office.py::test_scenario_e_…`, `test_convert_office.py` (no providers), `test_docx_office.py::test_find_and_replace_needs_no_model` |
+
+### Measured results
+
+- OCR on clean generated pages (40 px Liberation Sans): ≥ 90 % of words exact in all four
+  languages, engine confidence about 95. A page rotated 90° and one skewed 3° are
+  straightened. Real photos, stamps and handwriting will be worse. Handwriting is not
+  supported.
+- Word fidelity on the rich fixture (heading, bold amount mid-sentence, hyperlink, red
+  italic text, numbered list, table, image, header, footer with a PAGE field): every
+  inventory property unchanged after translation. The bold, italic and colour stayed on
+  the translated words, and LibreOffice opens the result.
+
+### Not done (why Phase 3 is "partially complete")
+
+XLSX → PDF; editing Word footnotes/endnotes/comments/charts; LibreOffice in the Docker
+image (DOCX/XLSX → PDF exports need it); handwriting OCR; an LLM planner for sheet
+operations; a multi-page document viewer in the UI. Pathological PDFs cannot be killed
+mid-parse (thread), only abandoned. A separate worker process is planned with Phase 5.
 
 ## Official knowledge sources + OpenCode evaluation (2026-10-18) — experimental
 
@@ -623,8 +692,7 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-**Phase 3 — OCR + EZO Office**: a real `OCRProvider` (scanned PDFs, photos, screenshots, with
-page numbers and confidence), PDF tools (merge, split, delete/reorder/rotate/extract pages,
-image ↔ PDF, page numbers, watermark, compress), formatting-preserving DOCX edits and
-chunk-aware long-document workflows. Then Phase 4 (education, academic research, career).
-Ruflo stays off (Phase 14).
+Close the Phase 3 gaps that matter most: LibreOffice in the Docker image (DOCX/XLSX → PDF
+exports in production), XLSX → PDF, and the owner decisions in
+[docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md).
+Then Phase 4 (education, academic research, career). Ruflo stays off (Phase 14).
