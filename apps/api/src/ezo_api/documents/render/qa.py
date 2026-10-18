@@ -9,6 +9,7 @@ from typing import Literal
 from ezo_api.documents.render.primitives import (
     ChartBox,
     Ellipse,
+    ImageBox,
     Rect,
     SlidePlan,
     TableBox,
@@ -128,7 +129,7 @@ def run_qa(deck: DeckSpec, plans: list[SlidePlan]) -> QAReport:
             role = getattr(item, "role", "")
             if role in DECORATIVE or (isinstance(item, Ellipse) and role == "decor"):
                 continue
-            if isinstance(item, Rect | TextBox | ChartBox | TableBox | Ellipse) and (
+            if isinstance(item, Rect | TextBox | ChartBox | TableBox | Ellipse | ImageBox) and (
                 item.x < -0.5
                 or item.y < -0.5
                 or item.x + item.w > plan.width + 0.5
@@ -178,14 +179,13 @@ def run_qa(deck: DeckSpec, plans: list[SlidePlan]) -> QAReport:
             if key in titles:
                 add(Issue(n, "warning", "duplicate_title", f"Same title as slide {titles[key]}."))
             titles.setdefault(key, n)
-        if slide.image_prompt:
+        if slide.image_prompt and not any(isinstance(i, ImageBox) for i in plan.items):
             add(
                 Issue(
                     n,
                     "info",
-                    "image_pending",
-                    "An image was planned; image generation is not available yet "
-                    "(an abstract visual is used).",
+                    "image_placeholder",
+                    "An image was planned but none was generated; an abstract visual is used.",
                 )
             )
     return report

@@ -122,6 +122,22 @@ class Settings(BaseSettings):
     voice_max_audio_mb: int = Field(default=10, alias="EZO_VOICE_MAX_AUDIO_MB")
     voice_timeout_seconds: float = Field(default=60.0, alias="EZO_VOICE_TIMEOUT_SECONDS")
 
+    # Images (Visual Agent). Exact model IDs are configuration: check your provider's
+    # current model list. "none" disables image generation entirely.
+    image_providers: Annotated[list[str], NoDecode] = Field(
+        default=["auto"], alias="EZO_IMAGE_PROVIDERS"
+    )
+    openai_image_model: str = Field(default="gpt-image-2", alias="EZO_OPENAI_IMAGE_MODEL")
+    gemini_image_model: str = Field(
+        default="gemini-2.5-flash-image", alias="EZO_GEMINI_IMAGE_MODEL"
+    )
+    image_quality: Literal["low", "medium", "high"] = Field(
+        default="medium", alias="EZO_IMAGE_QUALITY"
+    )
+    image_max_per_request: int = Field(default=4, ge=1, le=8, alias="EZO_IMAGE_MAX_PER_REQUEST")
+    image_max_per_deck: int = Field(default=4, ge=0, le=20, alias="EZO_IMAGE_MAX_PER_DECK")
+    image_timeout_seconds: float = Field(default=120.0, ge=10, le=600, alias="EZO_IMAGE_TIMEOUT")
+
     @field_validator(
         "openai_api_key",
         "anthropic_api_key",
@@ -162,6 +178,14 @@ class Settings(BaseSettings):
     @field_validator("voice_providers", mode="before")
     @classmethod
     def _split_voice_providers(cls, value: object) -> object:
+        if isinstance(value, str):
+            names = [name.strip().lower() for name in value.split(",") if name.strip()]
+            return names or ["auto"]
+        return value
+
+    @field_validator("image_providers", mode="before")
+    @classmethod
+    def _split_image_providers(cls, value: object) -> object:
         if isinstance(value, str):
             names = [name.strip().lower() for name in value.split(",") if name.strip()]
             return names or ["auto"]

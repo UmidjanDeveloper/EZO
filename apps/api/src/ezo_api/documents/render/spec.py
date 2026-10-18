@@ -65,6 +65,7 @@ Layout = Literal[
     "bullets",
 ]
 _NUMBER = re.compile(r"-?\d+(?:[.,]\d+)?")
+_UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def _clean(text: Any, limit: int) -> str:
@@ -176,6 +177,8 @@ class SlideSpec(BaseModel):
     nodes: list[Node] = Field(default_factory=list)
     edges: list[tuple[str, str]] = Field(default_factory=list)
     image_prompt: str = ""
+    image_artifact_id: str = ""
+    """Set by EZO (never by the model): the generated image artifact used on this slide."""
     visual_direction: str = ""
     speaker_notes: str = ""
     sources: list[int] = Field(default_factory=list)
@@ -196,6 +199,12 @@ class SlideSpec(BaseModel):
     @classmethod
     def _long(cls, value: Any) -> str:
         return _clean(value, 600)
+
+    @field_validator("image_artifact_id", mode="before")
+    @classmethod
+    def _artifact_id(cls, value: Any) -> str:
+        text = str(value or "").strip()
+        return text if _UUID.match(text) else ""
 
     @field_validator("speaker_notes", mode="before")
     @classmethod

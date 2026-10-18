@@ -9,7 +9,15 @@ from PIL import Image, ImageDraw, ImageFont
 
 from ezo_api.documents import fonts
 from ezo_api.documents.render.common import ASCENT, flat, text_lines
-from ezo_api.documents.render.primitives import Ellipse, Line, Rect, SlidePlan, TextBox, Wedge
+from ezo_api.documents.render.primitives import (
+    Ellipse,
+    ImageBox,
+    Line,
+    Rect,
+    SlidePlan,
+    TextBox,
+    Wedge,
+)
 from ezo_api.documents.render.text import BULLET_INDENT
 
 _cache: dict[tuple[int, bool], ImageFont.FreeTypeFont] = {}
@@ -83,6 +91,11 @@ def render_png(plan: SlidePlan, width_px: int = 1280) -> bytes:
                     [(item.cx - r) * k, (item.cy - r) * k, (item.cx + r) * k, (item.cy + r) * k],
                     fill=plan.background,
                 )
+        elif isinstance(item, ImageBox):
+            target = (max(1, round(item.w * k)), max(1, round(item.h * k)))
+            with Image.open(io.BytesIO(item.data)) as source:
+                picture = source.convert("RGB").resize(target, Image.Resampling.LANCZOS)
+            image.paste(picture, (round(item.x * k), round(item.y * k)))
         elif isinstance(item, TextBox):
             for x, y, line, size, bold, color, bullet in text_lines(item):
                 font = _font(round(size * k), bold)

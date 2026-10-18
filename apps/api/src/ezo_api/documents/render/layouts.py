@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from ezo_api.documents.render.primitives import (
     ChartBox,
     Ellipse,
+    ImageBox,
     Line,
     Primitive,
     Rect,
@@ -25,6 +26,7 @@ from ezo_api.documents.render.primitives import (
 from ezo_api.documents.render.spec import Column, DeckSpec, Node, SlideSpec, Step
 from ezo_api.documents.render.text import content_height, fit
 from ezo_api.documents.render.theme import TYPE, Theme, mix, readable_on
+from ezo_api.visual.images import cover_fit
 
 MARGIN = 56.0
 TOP = 44.0
@@ -39,6 +41,8 @@ class Canvas:
     deck_title: str
     index: int
     total: int
+    image: bytes | None = None
+    """A generated image for this slide (hero_image layout), if one exists."""
 
     @property
     def inner_w(self) -> float:
@@ -372,8 +376,11 @@ def l_hero_image(c: Canvas, s: SlideSpec, deck: DeckSpec) -> list[Primitive]:
     paras = body_or_bullets(s)
     if paras:
         items.append(text(MARGIN, y, split - MARGIN - 20, c.bottom - y, paras, 20, t.ink))
-    # Visual panel: an abstract composition until the VisualAgent generates images.
     px, py, pw, ph = split + 10, TOP, c.w - split - MARGIN - 10, c.h - TOP - FOOTER_H - 20
+    if c.image:
+        items.append(ImageBox(px, py, pw, ph, cover_fit(c.image, pw, ph), alt=s.title))
+        return items + footer(c)
+    # No generated image: an abstract composition (never presented as a real picture).
     items.append(
         Rect(px, py, pw, ph, fill=mix(t.accent2, t.background, 0.85), radius=14, role="visual")
     )
@@ -1302,12 +1309,16 @@ LAYOUTS = {
 }
 
 
-def layout_deck(deck: DeckSpec, theme: Theme) -> list[SlidePlan]:
+def layout_deck(
+    deck: DeckSpec, theme: Theme, images: dict[int, bytes] | None = None
+) -> list[SlidePlan]:
+    """Lay out every slide. `images` maps a slide number (1-based) to its generated image."""
     w, h = canvas_size(deck.aspect_ratio)
     plans = []
     total = len(deck.slides)
     for index, slide in enumerate(deck.slides, start=1):
-        c = Canvas(w, h, theme, deck.title, index, total)
+        image = (images or {}).get(index) if slide.layout == "hero_image" else None
+        c = Canvas(w, h, theme, deck.title, index, total, image)
         items = LAYOUTS[slide.layout](c, slide, deck)
         plans.append(
             SlidePlan(

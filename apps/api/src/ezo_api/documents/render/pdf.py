@@ -6,11 +6,20 @@ import io
 import math
 
 from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as pdf_canvas
 
 from ezo_api.documents.pdf.writer import FONT, FONT_BOLD, register_fonts
 from ezo_api.documents.render.common import ASCENT, flat, text_lines
-from ezo_api.documents.render.primitives import Ellipse, Line, Rect, SlidePlan, TextBox, Wedge
+from ezo_api.documents.render.primitives import (
+    Ellipse,
+    ImageBox,
+    Line,
+    Rect,
+    SlidePlan,
+    TextBox,
+    Wedge,
+)
 from ezo_api.documents.render.text import BULLET_INDENT
 
 
@@ -93,6 +102,10 @@ def render_deck_pdf(plans: list[SlidePlan], title: str) -> bytes:
                 if item.inner_r:
                     c.setFillColor(HexColor(plan.background))
                     c.circle(item.cx, h - item.cy, item.inner_r, stroke=0, fill=1)
+            elif isinstance(item, ImageBox):
+                c.drawImage(
+                    ImageReader(io.BytesIO(item.data)), item.x, h - item.y - item.h, item.w, item.h
+                )
             elif isinstance(item, TextBox):
                 for x, y, line, size, bold, color, bullet in text_lines(item):
                     c.setFillColor(HexColor(color))

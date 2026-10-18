@@ -25,6 +25,7 @@ from ezo_api.documents.fonts import OFFICE_FONT
 from ezo_api.documents.render.primitives import (
     ChartBox,
     Ellipse,
+    ImageBox,
     Line,
     Rect,
     SlidePlan,
@@ -237,6 +238,14 @@ def _table(slide, item: TableBox) -> None:  # type: ignore[no-untyped-def]
                     run.font.color.rgb = rgb(item.header_ink if r == 0 else item.ink)
 
 
+def _image(slide, item: ImageBox) -> None:  # type: ignore[no-untyped-def]
+    picture = slide.shapes.add_picture(
+        io.BytesIO(item.data), emu(item.x), emu(item.y), emu(item.w), emu(item.h)
+    )
+    if item.alt:
+        picture._element.nvPicPr.cNvPr.set("descr", item.alt[:500])
+
+
 def render_pptx(plans: list[SlidePlan], title: str, language: str) -> bytes:
     presentation = Presentation()
     first = plans[0]
@@ -264,6 +273,8 @@ def render_pptx(plans: list[SlidePlan], title: str, language: str) -> bytes:
                 _chart(slide, item)
             elif isinstance(item, TableBox):
                 _table(slide, item)
+            elif isinstance(item, ImageBox):
+                _image(slide, item)
             elif isinstance(item, Wedge):  # only produced by chart expansion, never on PPTX slides
                 continue
         if plan.notes:

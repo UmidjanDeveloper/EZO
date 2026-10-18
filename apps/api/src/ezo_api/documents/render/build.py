@@ -77,11 +77,18 @@ def check_deck(deck: DeckSpec, theme: Theme | None = None) -> QAReport:
     return run_qa(trial, layout_deck(trial, theme))
 
 
-def build_deck(deck: DeckSpec, theme: Theme | None = None, *, previews: bool = True) -> DeckBuild:
+def build_deck(
+    deck: DeckSpec,
+    theme: Theme | None = None,
+    *,
+    previews: bool = True,
+    images: dict[int, bytes] | None = None,
+) -> DeckBuild:
+    """`images` maps a slide number (1-based) to a generated image for that slide."""
     theme = theme or choose_theme(deck.theme, deck.audience, deck.goal)
     fixes: list[str] = []
     _move_extra_bullets(deck, fixes)
-    plans = layout_deck(deck, theme)
+    plans = layout_deck(deck, theme, images)
     report = run_qa(deck, plans)
     build = DeckBuild(deck=deck, theme=theme, plans=plans, qa=report, fixes=fixes)
     build.pptx = render_pptx(plans, deck.title, deck.language)

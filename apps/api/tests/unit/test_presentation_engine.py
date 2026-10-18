@@ -72,7 +72,7 @@ def test_sample_deck_builds_every_format() -> None:
     build = build_deck(sample_deck())
     n = len(SAMPLE_DECK["slides"])  # type: ignore[arg-type]
     assert len(build.plans) == n and build.qa.passed, build.qa.to_dict()
-    assert {i.code for i in build.qa.issues} == {"image_pending"}
+    assert {i.code for i in build.qa.issues} == {"image_placeholder"}
 
     presentation = Presentation(io.BytesIO(build.pptx))
     assert len(presentation.slides) == n

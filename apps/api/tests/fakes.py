@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import math
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
+
+from PIL import Image
 
 from ezo_api.memory.scoring import stem_tokens
 from ezo_api.providers.base import ModelProvider
@@ -20,6 +23,13 @@ from ezo_api.providers.types import (
     Usage,
 )
 from ezo_api.tools.web_search import WebResult, WebSearchError, WebSearchProvider
+from ezo_api.visual.base import (
+    GeneratedImage,
+    ImageEditProvider,
+    ImageError,
+    ImageProvider,
+    ImageRequest,
+)
 from ezo_api.voice.base import (
     SpeechAudio,
     SpeechToTextProvider,
@@ -134,3 +144,48 @@ class FakeVoice(SpeechToTextProvider, TextToSpeechProvider):
         if self.fail_kind:
             raise VoiceError(self.fail_kind, f"{self.name}: failed")  # type: ignore[arg-type]
         return SpeechAudio(data=b"ID3fake-mp3", mime_type="audio/mpeg", provider=self.name)
+
+
+def png_bytes(width: int, height: int, color: str = "#3366cc") -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (width, height), color).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@dataclass
+class FakeImages(ImageProvider, ImageEditProvider):
+    """Returns a solid-colour image of the requested proportions, or fails in a chosen way."""
+
+    name: str = "fake-images"
+    model: str = "fake-image-1"
+    fail_with: str | None = None
+    data: bytes | None = None
+    """Return these bytes instead of a real image (to test validation)."""
+    requests: list[ImageRequest] = field(default_factory=list)
+    edits: list[tuple[bytes, ImageRequest]] = field(default_factory=list)
+
+    def _image(self, request: ImageRequest) -> GeneratedImage:
+        if self.fail_with is not None:
+            raise ImageError(self.fail_with, f"scripted {self.fail_with}")  # type: ignore[arg-type]
+        width, height = (int(v) * 128 for v in request.aspect_ratio.split(":"))
+        return GeneratedImage(
+            data=self.data if self.data is not None else png_bytes(width, height),
+            mime_type="image/png",
+            provider=self.name,
+            model=self.model,
+            revised_prompt=f"revised: {request.prompt[:40]}",
+        )
+
+    async def generate(self, request: ImageRequest) -> GeneratedImage:
+        self.requests.append(request)
+        return self._image(request)
+
+    async def edit(self, image: bytes, mime_type: str, request: ImageRequest) -> GeneratedImage:
+        self.edits.append((image, request))
+        result = self._image(request)
+        return GeneratedImage(
+            png_bytes(*Image.open(io.BytesIO(image)).size, color="#112244"),
+            result.mime_type,
+            result.provider,
+            result.model,
+        )

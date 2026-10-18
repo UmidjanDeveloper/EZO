@@ -6,11 +6,20 @@ Keys: ←/→ or space to move, F for fullscreen, N to show speaker notes.
 
 from __future__ import annotations
 
+import base64
 import math
 from html import escape
 
 from ezo_api.documents.render.common import ASCENT, flat, text_lines
-from ezo_api.documents.render.primitives import Ellipse, Line, Rect, SlidePlan, TextBox, Wedge
+from ezo_api.documents.render.primitives import (
+    Ellipse,
+    ImageBox,
+    Line,
+    Rect,
+    SlidePlan,
+    TextBox,
+    Wedge,
+)
 from ezo_api.documents.render.text import BULLET_INDENT
 
 
@@ -58,6 +67,11 @@ def _svg(plan: SlidePlan) -> str:
             parts.append(
                 f'<path d="{_arc(item.cx, item.cy, item.r, item.start, item.end, item.inner_r)}" fill="{item.fill}" stroke="{plan.background}" stroke-width="1.5"/>'
             )
+        elif isinstance(item, ImageBox):
+            encoded = base64.b64encode(item.data).decode("ascii")
+            parts.append(
+                f'<image x="{item.x:.1f}" y="{item.y:.1f}" width="{item.w:.1f}" height="{item.h:.1f}" preserveAspectRatio="xMidYMid slice" href="data:{item.mime_type};base64,{encoded}"><title>{escape(item.alt)}</title></image>'
+            )
         elif isinstance(item, TextBox):
             for x, y, line, size, bold, color, bullet in text_lines(item):
                 weight = ' font-weight="700"' if bold else ""
@@ -71,6 +85,16 @@ def _svg(plan: SlidePlan) -> str:
                 )
     parts.append("</svg>")
     return "".join(parts)
+
+
+def slide_svg(plan: SlidePlan) -> bytes:
+    """One slide as a standalone SVG file (fonts named on the root element)."""
+    svg = _svg(plan).replace(
+        "<svg ",
+        '<svg font-family="Liberation Sans, Arial, Helvetica, sans-serif" ',
+        1,
+    )
+    return ('<?xml version="1.0" encoding="UTF-8"?>' + svg).encode("utf-8")
 
 
 _STYLE = """

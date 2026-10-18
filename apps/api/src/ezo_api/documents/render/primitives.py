@@ -125,7 +125,21 @@ class TableBox:
     role: str = "table"
 
 
-Primitive = Rect | Ellipse | Line | Wedge | TextBox | ChartBox | TableBox
+@dataclass(slots=True)
+class ImageBox:
+    """A raster image already cropped to the box's proportions (see visual.images.cover_fit)."""
+
+    x: float
+    y: float
+    w: float
+    h: float
+    data: bytes
+    mime_type: str = "image/jpeg"
+    alt: str = ""
+    role: str = "image"
+
+
+Primitive = Rect | Ellipse | Line | Wedge | TextBox | ChartBox | TableBox | ImageBox
 
 
 @dataclass(slots=True)
