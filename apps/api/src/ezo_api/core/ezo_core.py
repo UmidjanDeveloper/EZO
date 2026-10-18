@@ -33,8 +33,9 @@ from ezo_api.core.intent import Intent, IntentResult, classify_intent
 from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
-from ezo_api.db.models import AgentRun, Conversation, Message, Project, User
+from ezo_api.db.models import AgentRun, Conversation, KnowledgeDocument, Message, Project, User
 from ezo_api.db.models.artifacts import ARTIFACT_TYPES
+from ezo_api.documents.pdf.requests import parse_pdf_request
 from ezo_api.knowledge.retrieval.citations import (
     CITATION_RULES,
     format_sources_for_prompt,
@@ -83,6 +84,7 @@ class TurnInput:
     forced_agent: str | None = None
     channel: Literal["text", "voice"] = "text"
     speech_seconds: float | None = None
+    attachments: tuple[uuid.UUID, ...] = ()
 
 
 @dataclass(slots=True)
@@ -100,6 +102,7 @@ class PreparedTurn:
     created_conversation: bool
     channel: Literal["text", "voice"] = "text"
     speech_seconds: float | None = None
+    attachments: tuple[uuid.UUID, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +161,27 @@ def make_title(text: str) -> str:
         return title
     cut = title[:TITLE_MAX_CHARS].rsplit(" ", 1)[0]
     return (cut or title[:TITLE_MAX_CHARS]) + "…"
+
+
+async def _owned_attachments(
+    session: AsyncSession, user_id: uuid.UUID, ids: tuple[uuid.UUID, ...]
+) -> tuple[uuid.UUID, ...]:
+    """The attached files, in the given order; another user's (or unknown) file is an error."""
+    if not ids:
+        return ()
+    owned = set(
+        (
+            await session.scalars(
+                select(KnowledgeDocument.id).where(
+                    KnowledgeDocument.id.in_(ids), KnowledgeDocument.user_id == user_id
+                )
+            )
+        ).all()
+    )
+    missing = [i for i in ids if i not in owned]
+    if missing:
+        raise TurnError(404, "attachment_not_found", "An attached file was not found.")
+    return ids
 
 
 async def _latest_artifact_is_image(
@@ -225,6 +249,14 @@ class EzoCore:
             ):
                 # "Fonini ko'k qil" right after an image: a change to that image.
                 intent = IntentResult(Intent.VISUAL, 1.0, ("image_follow_up",), intent.scores)
+            elif (
+                intent.intent == Intent.GENERAL
+                and turn.forced_agent is None
+                and (turn.attachments or parse_pdf_request(turn.text))
+            ):
+                # Files attached to the message (or a recognised PDF operation such as
+                # "2-betni o'chir"): the request is about documents.
+                intent = IntentResult(Intent.DOCUMENT, 1.0, ("attached_files",), intent.scores)
             step.summary = f"{intent.intent.value} ({intent.confidence:.2f})" + (
                 f" signals={list(intent.signals)}" if intent.signals else ""
             )
@@ -235,12 +267,14 @@ class EzoCore:
                 f" covering unavailable {selection.requested.key}" if selection.is_fallback else ""
             )
 
+        attachments = await _owned_attachments(session, user.id, turn.attachments)
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
             content=turn.text,
             language=language,
-            meta={"channel": turn.channel},
+            meta={"channel": turn.channel}
+            | ({"attachments": [str(a) for a in attachments]} if attachments else {}),
         )
         run = AgentRun(
             user_id=user.id,
@@ -272,6 +306,7 @@ class EzoCore:
             created_conversation=created,
             channel=turn.channel,
             speech_seconds=turn.speech_seconds,
+            attachments=attachments,
         )
 
     async def _load_conversation(
@@ -480,6 +515,7 @@ class EzoCore:
                         requested=selection.requested,
                         channel=prepared.channel,
                         speech_seconds=prepared.speech_seconds,
+                        attachments=prepared.attachments,
                     ),
                     tools=ToolContext(
                         session=session,
@@ -510,6 +546,7 @@ class EzoCore:
                     requested=selection.requested,
                     channel=prepared.channel,
                     speech_seconds=prepared.speech_seconds,
+                    attachments=prepared.attachments,
                 )
             )
             step.summary = f"route={plan.route} mode={plan.context_mode} steps={len(plan.steps)}"

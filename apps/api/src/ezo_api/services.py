@@ -35,6 +35,7 @@ from ezo_api.tools.document_tools import (
     ReadDocumentTool,
 )
 from ezo_api.tools.official_tools import OfficialSearchTool, VerifyOfficialDocumentTool
+from ezo_api.tools.pdf_tools import PdfTool
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
 from ezo_api.tools.visual_tools import CreateGraphicTool, EditImageTool, GenerateImageTool
@@ -155,6 +156,7 @@ def build_services(
                 EditImageTool(),
                 CreateGraphicTool(),
                 OfficialSearchTool(),
+                PdfTool(),
                 VerifyOfficialDocumentTool(),
             ]
         ),

@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.14.1",
     "pydantic-settings>=2.16.0",
     "pypdf>=6.21.1",
+    "pypdfium2>=5.14",
     "python-docx>=1.2.0",
     "python-multipart>=0.0.32",
     "python-pptx>=1.0.2",
@@ -69,7 +70,7 @@ packages = ["ezo_api"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*", "reportlab.*", "pptx.*", "lxml.*"]
+module = ["google.*", "docx.*", "openpyxl.*", "trafilatura.*", "pgvector.*", "reportlab.*", "pptx.*", "lxml.*", "pypdfium2.*"]
 ignore_missing_imports = true
 
 # python-pptx is only partly typed; keep the relaxation to this one adapter module.

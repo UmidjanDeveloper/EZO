@@ -110,6 +110,11 @@ class ChatIn(BaseModel):
         le=600,
         description="Measured speaking time of a voice message (used by the Language Coach)",
     )
+    attachments: list[uuid.UUID] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Uploaded files (knowledge document IDs) this message is about, in order",
+    )
 
 
 class ChatOut(BaseModel):

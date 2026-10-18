@@ -148,7 +148,12 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\bпоследн", 1),
     ],
     Intent.DOCUMENT: [
-        (r"\bpdf\b", 3),
+        (r"\b(birlashtir|merge\b|combine\b|объедин|склей)", 2),
+        (r"\b\d{1,4}\s*[-–]?\s*(bet|sahifa)\w*\b", 1.5),
+        (r"\b(oxirgi|birinchi) (bet|sahifa)", 1.5),
+        (r"\b(page|pages|страниц\w*)\s*\d", 1.5),
+        (r"\b(suv belgi|watermark|водян|sahifa raqam|bet raqam|page numbers|нумерац)", 2),
+        (r"\bpdf", 3),
         (r"\bdocx?\b", 3),
         (r"\bxlsx\b", 3),
         (r"\bexcel\b", 2.5),

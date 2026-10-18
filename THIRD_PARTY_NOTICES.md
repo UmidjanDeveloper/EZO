@@ -49,6 +49,7 @@ installed package's metadata (2026-10-17).
 | anyio | 4.15.1 | MIT |
 | numpy | 2.5.4 | BSD-3-Clause (with bundled MIT/0BSD/Zlib parts) |
 | pypdf | 6.21.1 | BSD-3-Clause |
+| pypdfium2 | 5.14.0 | BSD-3-Clause OR Apache-2.0 (bundles PDFium: BSD-3-Clause / Apache-2.0) — page rendering; PyMuPDF was not used because it is AGPL-3.0 |
 | python-docx | 1.2.0 | MIT |
 | openpyxl | 3.1.5 | MIT |
 | trafilatura | 2.3.1 | Apache-2.0 |

@@ -7,6 +7,7 @@ the shared pipeline (context, memory, model call, persistence, tracing).
 
 from __future__ import annotations
 
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -33,6 +34,8 @@ class AgentTurn:
     """"voice" when the user spoke the message."""
     speech_seconds: float | None = None
     """Measured speaking time of a voice message (None when typed or not measured)."""
+    attachments: tuple[uuid.UUID, ...] = ()
+    """Files attached to this message (knowledge document IDs, in the user's order)."""
 
 
 @dataclass(frozen=True, slots=True)
