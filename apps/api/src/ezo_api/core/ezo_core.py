@@ -37,6 +37,7 @@ from ezo_api.db.base import utcnow
 from ezo_api.db.models import AgentRun, Conversation, KnowledgeDocument, Message, Project, User
 from ezo_api.db.models.artifacts import ARTIFACT_TYPES
 from ezo_api.documents.pdf.requests import parse_pdf_request
+from ezo_api.education.catalog import wants_education
 from ezo_api.knowledge.retrieval.citations import (
     CITATION_RULES,
     format_sources_for_prompt,
@@ -268,6 +269,19 @@ class EzoCore:
                 # translation work, whatever the text is about (not language practice;
                 # presentations and images keep their own agents).
                 intent = IntentResult(Intent.DOCUMENT, 1.0, ("translation",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and (education := wants_education(turn.text)) is not None
+                and (
+                    intent.intent
+                    in (Intent.GENERAL, Intent.LANGUAGE_COACH, Intent.RESEARCH, Intent.BUSINESS)
+                    or (intent.intent == Intent.PRESENTATION and education.key == "lesson")
+                )
+                and await active_language_session(session, user.id, conversation.id) is None
+            ):
+                # "Test tuz", "dars ishlanmasi (taqdimoti bilan)", "o'qish rejasi":
+                # teaching materials (Word + Excel, slides for lessons).
+                intent = IntentResult(Intent.DOCUMENT, 1.0, ("education",), intent.scores)
             elif (
                 intent.intent == Intent.GENERAL
                 and turn.forced_agent is None

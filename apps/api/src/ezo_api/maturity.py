@@ -98,8 +98,17 @@ FEATURES: tuple[Feature, ...] = (
         "offline; interpretation is turn-based, not simultaneous",
     ),
     Feature(
-        "education_academic_career",
-        "Education, academic research and career agents",
+        "education",
+        "Teaching and study materials: lesson packages (Word, Excel, slides), quizzes with "
+        "answer keys, syllabi, rubrics, study plans",
+        "Phase 4",
+        "alpha",
+        "content needs an AI key (templates work offline); EZO checks answer keys, timing, "
+        "weights and points but a teacher must review the content",
+    ),
+    Feature(
+        "academic_career",
+        "Academic research assistance and career documents",
         "Phase 4",
         "planned",
     ),

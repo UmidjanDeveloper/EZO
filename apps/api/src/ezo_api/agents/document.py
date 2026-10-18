@@ -40,6 +40,7 @@ from ezo_api.agents.convert_office import (
     run_tables_action,
 )
 from ezo_api.agents.docx_office import find_docx, run_replace_action, transform_docx
+from ezo_api.agents.education_office import make_material
 from ezo_api.agents.llm import complete, extract_json, sources_block
 from ezo_api.agents.longdoc_office import (
     answer_sources,
@@ -74,6 +75,7 @@ from ezo_api.documents.compare import compare_texts
 from ezo_api.documents.longdoc import TooLongError, outline
 from ezo_api.documents.pdf import engine as pdf_engine
 from ezo_api.documents.pdf.engine import PdfError
+from ezo_api.education.catalog import Kind, wants_education
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
@@ -422,6 +424,11 @@ class DocumentAgent(Agent):
         # Deterministic EZO Office operations first: they need no model and no API key.
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
+            return gathered
+        education = wants_education(ctx.turn.text)
+        if education is not None and request.action not in ("convert", "compare"):
+            # "Test tuz", "dars ishlanmasini tayyorla": teaching materials (also from a file).
+            await self._educate(ctx, gathered, education)
             return gathered
         writing = wants_writing(normalize(ctx.turn.text))
         if writing is not None and request.transform is None:
@@ -1015,8 +1022,8 @@ class DocumentAgent(Agent):
             + ("\n" + "\n".join(extra_lines) if extra_lines else "")
         )
 
-    async def _write(self, ctx: GatherContext, gathered: Gathered, doc: DocType) -> None:
-        """Professional writing: facts from attached files (or the knowledge base) only."""
+    async def _file_sources(self, ctx: GatherContext, gathered: Gathered) -> list[SourceRef]:
+        """Attached files (up to three) as numbered sources, else the knowledge base."""
         tools = ctx.tools
         sources: list[SourceRef] = []
         for document in (await attached_files(tools, ctx.turn.attachments))[:3]:
@@ -1028,7 +1035,15 @@ class DocumentAgent(Agent):
         if not sources and not tools.services.router.is_offline:
             sources = await self._knowledge(ctx, gathered)
         number_sources(sources)
-        await write_document(ctx, gathered, doc, sources)
+        return sources
+
+    async def _educate(self, ctx: GatherContext, gathered: Gathered, kind: Kind) -> None:
+        """Teaching and study materials, based on the user's files when attached."""
+        await make_material(ctx, gathered, kind, await self._file_sources(ctx, gathered))
+
+    async def _write(self, ctx: GatherContext, gathered: Gathered, doc: DocType) -> None:
+        """Professional writing: facts from attached files (or the knowledge base) only."""
+        await write_document(ctx, gathered, doc, await self._file_sources(ctx, gathered))
 
     async def _create(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest
