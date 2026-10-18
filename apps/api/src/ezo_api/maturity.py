@@ -89,6 +89,15 @@ FEATURES: tuple[Feature, ...] = (
         "until a person approves them",
     ),
     Feature(
+        "translation",
+        "Translation: text and documents (uz Latin/Cyrillic, ru, en), glossary, quality "
+        "checks, bilingual Word files, turn-based voice interpretation",
+        "Translation",
+        "alpha",
+        "translation needs an AI key; Latin/Cyrillic conversion and the glossary work "
+        "offline; interpretation is turn-based, not simultaneous",
+    ),
+    Feature(
         "education_academic_career",
         "Education, academic research and career agents",
         "Phase 4",

@@ -56,6 +56,7 @@ from ezo_api.providers.router import (
 )
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
 from ezo_api.tools.base import ToolContext
+from ezo_api.translation.requests import wants_translation
 from ezo_api.visual.kinds import wants_edit as wants_visual_edit
 from ezo_api.writing.catalog import wants_writing
 
@@ -250,6 +251,23 @@ class EzoCore:
             ):
                 # "Fonini ko'k qil" right after an image: a change to that image.
                 intent = IntentResult(Intent.VISUAL, 1.0, ("image_follow_up",), intent.scores)
+            elif (
+                intent.intent
+                in (
+                    Intent.GENERAL,
+                    Intent.LANGUAGE_COACH,
+                    Intent.LEGAL_RESEARCH,
+                    Intent.RESEARCH,
+                    Intent.BUSINESS,
+                )
+                and turn.forced_agent is None
+                and wants_translation(turn.text)
+                and await active_language_session(session, user.id, conversation.id) is None
+            ):
+                # "Inglizchaga tarjima qil: …", "Kirillga o'gir", "Glossariyga qo'sh: …":
+                # translation work, whatever the text is about (not language practice;
+                # presentations and images keep their own agents).
+                intent = IntentResult(Intent.DOCUMENT, 1.0, ("translation",), intent.scores)
             elif (
                 intent.intent == Intent.GENERAL
                 and turn.forced_agent is None

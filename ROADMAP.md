@@ -91,6 +91,17 @@ images) plus the extended local checks listed for that phase.
 - Official-layout DOCX (+ PDF via LibreOffice, Markdown, text); templates without a model;
   organization profiles (letterhead, contacts, house style, preferred terms) in Settings
 
+### Translation — alpha
+- `translation/`: text translation (uz Latin, uz Cyrillic, ru, en) with domain styles;
+  Uzbek Latin ↔ Cyrillic by fixed rules without a model (text, Word files in place)
+- Documents reuse the existing pipeline: Word in place (DOCX fidelity), other files through
+  Markdown, long files part by part; Cyrillic output converted by EZO, not the model
+- Terminology memory (glossary, also per organization; migration 0009), used in prompts and
+  checked afterwards; quality checks for numbers, dates, links, names, missing and
+  untranslated paragraphs, script; bilingual two-column Word files
+- Turn-based voice interpretation API (speech → text → translation → speech); simultaneous
+  interpretation is not built (interface only)
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
@@ -100,7 +111,7 @@ images) plus the extended local checks listed for that phase.
 
 The owner's master prompt orders work as stages; they map onto this roadmap:
 A Office completion → Phase 3 (done) · B Professional writing (done, alpha) ·
-C Translation · D Education & career → Phase 4 · E Government work mode (organization
+C Translation (done, alpha) · D Education & career → Phase 4 · E Government work mode (organization
 profiles started in B) · F Official knowledge → Phase 7 · G Press secretary / Telegram ·
 H Durable missions → Phases 5–6 · I Advanced (voice, browser, developer, data, video,
 business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the owner approves).

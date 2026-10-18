@@ -237,6 +237,11 @@ def _parts(document: Any) -> Iterator[tuple[str, Any]]:
                 yield kind, rel.target_part.element
 
 
+def document_parts(document: Any) -> Iterator[tuple[str, Any]]:
+    """("body" | "header" | "footer", root element) of every part with text."""
+    return _parts(document)
+
+
 def open_docx(data: bytes) -> Any:
     if len(data) > MAX_DOCX_BYTES:
         raise DocxEditError("The Word file is too large to edit.", "too_large")

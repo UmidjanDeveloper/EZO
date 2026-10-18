@@ -15,6 +15,7 @@ import asyncio
 import hashlib
 import re
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -240,9 +241,11 @@ async def transform_docx(
     task: str,
     label: str,
     target_language: str | None,
+    review: Callable[[bytes, bytes], Awaitable[Any]] | None = None,
 ) -> None:
     """Edit `source` in place with the model and store the result (new artifact for an
-    upload, new version for EZO's own document)."""
+    upload, new version for EZO's own document). `review(original, edited)` may post-process
+    the file and add metadata, warnings, exports and note lines (translation checks)."""
     started = time.monotonic()
     try:
         document = await asyncio.to_thread(fidelity.open_docx, source.data)
@@ -274,6 +277,9 @@ async def transform_docx(
     data, report = await asyncio.to_thread(
         fidelity.apply_edits, source.data, edited.edits, tracked=tracked
     )
+    reviewed = await review(source.data, data) if review is not None and report.changed else None
+    if reviewed is not None:
+        data = reviewed.data
     after = await asyncio.to_thread(fidelity.inventory, data)
     preserved, changed = fidelity.compare_inventory(before, after)
     warnings = list(report.warnings)
@@ -284,7 +290,7 @@ async def transform_docx(
         )
     if edited.truncated_batches:
         warnings.append(f"{edited.truncated_batches} batch(es) hit the model's output limit.")
-    if report.number_changes and transform != "rewrite":
+    if report.number_changes and transform != "rewrite" and reviewed is None:
         warnings.append(
             f"Numbers differ from the original in {len(report.number_changes)} paragraph(s); "
             "check them."
@@ -318,9 +324,12 @@ async def transform_docx(
         "warnings": warnings,
         "duration_ms": round((time.monotonic() - started) * 1000),
         **({"target_language": target_language} if target_language else {}),
+        **(reviewed.meta if reviewed is not None else {}),
     }
     text = await asyncio.to_thread(fidelity.docx_text, data)
     exports = {"markdown": (f"{stem}.md", text.encode("utf-8"))}
+    if reviewed is not None:
+        exports.update(reviewed.exports)
     artifacts = ctx.tools.services.artifacts
     tools = ctx.tools
     summary = label + (" (tracked changes)" if tracked else "")
@@ -372,6 +381,7 @@ async def transform_docx(
         + (", styles" if "styles_sha256" in preserved else "")
         + ".",
         *[f"- WARNING: {w}" for w in warnings],
+        *(reviewed.lines if reviewed is not None else []),
         "Describe this briefly; do not paste the document. Never invent links.",
     ]
     gathered.notes.append("\n".join(lines_out))

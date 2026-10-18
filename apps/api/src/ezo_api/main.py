@@ -28,6 +28,7 @@ from ezo_api.api.routes import (
     projects,
     stories,
     system,
+    translation,
     voice,
     writing,
 )
@@ -176,6 +177,7 @@ def create_app(
         language,
         official,
         writing,
+        translation,
     ):
         app.include_router(module.router)
 

@@ -55,6 +55,16 @@ from ezo_api.agents.references import (
     latest_artifact,
     refers_to_a_file,
 )
+from ezo_api.agents.translate_office import (
+    TranslationPlan,
+    docx_review,
+    finish_markdown_translation,
+    load_glossary,
+    run_glossary_action,
+    run_inline_translation,
+    run_translit_action,
+    translation_plan,
+)
 from ezo_api.agents.writing_office import write_document
 from ezo_api.artifacts.service import ArtifactError
 from ezo_api.core.intent import Intent
@@ -72,6 +82,8 @@ from ezo_api.storage.base import StorageError
 from ezo_api.tools.base import ToolContext
 from ezo_api.tools.convert_tools import DOCX_MIME, XLSX_MIME
 from ezo_api.tools.document_tools import MAX_READ_CHARS
+from ezo_api.translation import glossary
+from ezo_api.translation.languages import DOMAIN_RULES, NAMES, base
 from ezo_api.writing.catalog import DocType, wants_writing
 
 logger = logging.getLogger(__name__)
@@ -416,11 +428,14 @@ class DocumentAgent(Agent):
             await self._write(ctx, gathered, writing)
             return gathered
         for action in (
+            run_glossary_action,
             run_ocr_export_action,
             run_ocr_action,
             run_replace_action,
             run_tables_action,
             run_sheet_action,
+            run_translit_action,
+            run_inline_translation,
         ):
             if await action(ctx, gathered):
                 return gathered
@@ -738,36 +753,57 @@ class DocumentAgent(Agent):
                 return
             await self._summarize_long_in_chat(ctx, gathered, source, full)
             return
+        plan: TranslationPlan | None = None
+        terms: list[glossary.Term] = []
+        if transform == "translate":
+            plan = translation_plan(ctx.turn.text, full, ctx.turn.language)
+            if base(plan.source) == base(plan.target):
+                gathered.notes.append(
+                    f"“{source.title}” is already in {NAMES.get(plan.source, plan.source)}, the "
+                    "language asked for. Nothing was translated; say so and ask which language "
+                    "they want."
+                )
+                return
         if self._offline(ctx, gathered):
             return
+        if plan is not None:
+            terms = glossary.relevant(
+                await load_glossary(ctx.tools, plan.source, plan.target), full, plan.source
+            )
         if transform != "summarize" and request.target_format in (None, "docx"):
             docx = await find_docx(ctx, source.document.document if source.document else None)
             if docx is not None:
-                target = request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
+                target = (
+                    plan.target
+                    if plan
+                    else request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
+                )
                 label = {
-                    "translate": f"Translated to {LANGUAGE_NAMES.get(target, target)}",
+                    "translate": f"Translated to {NAMES.get(target, target)}",
                     "proofread": "Proofread",
                     "rewrite": "Rewritten",
                     "formalize": "Formal style",
                 }[transform]
-                task = TRANSFORM_TASKS[transform].replace(
-                    "{target}", LANGUAGE_NAMES.get(target, target)
-                )
                 await transform_docx(
                     ctx,
                     gathered,
                     docx,
                     transform=transform,
-                    task=task,
+                    task=self._task(transform, target, plan, terms),
                     label=label,
                     target_language=target if transform == "translate" else None,
+                    review=docx_review(plan, terms, docx.title) if plan else None,
                 )
                 return
-        target = request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
-        task = TRANSFORM_TASKS[transform].replace("{target}", LANGUAGE_NAMES.get(target, target))
+        target = (
+            plan.target
+            if plan
+            else request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
+        )
+        task = self._task(transform, target, plan, terms)
         if len(full) > SOURCE_CHARS:
             await self._transform_long(
-                ctx, gathered, request, source, full, transform, task, target
+                ctx, gathered, request, source, full, transform, task, target, plan, terms
             )
             return
         text = full
@@ -795,6 +831,12 @@ class DocumentAgent(Agent):
         if not markdown.strip():
             gathered.notes.append("The edited document came back empty. Nothing was saved; say so.")
             return
+        extra: dict[str, Any] = {}
+        extra_lines: list[str] = []
+        if plan is not None:
+            markdown, extra, extra_lines = await finish_markdown_translation(
+                ctx, gathered, plan, terms, text, markdown, title
+            )
         comparison = compare_texts(text, markdown)
         metadata = {
             "action": transform,
@@ -802,12 +844,13 @@ class DocumentAgent(Agent):
             "comparison": comparison.summary(),
             "partial": partial,
             **({"target_language": target} if transform == "translate" else {}),
+            **extra,
         }
         summary = (
             changes
             or {
                 "summarize": "Summarized",
-                "translate": f"Translated to {LANGUAGE_NAMES.get(target, target)}",
+                "translate": f"Translated to {NAMES.get(target, target)}",
                 "proofread": "Proofread",
                 "rewrite": "Rewritten",
                 "formalize": "Formal style",
@@ -845,6 +888,24 @@ class DocumentAgent(Agent):
                 if "[?]" in markdown
                 else ""
             )
+            + ("\n" + "\n".join(extra_lines) if extra_lines else "")
+        )
+
+    @staticmethod
+    def _task(
+        transform: str, target: str, plan: TranslationPlan | None, terms: list[glossary.Term]
+    ) -> str:
+        if plan is None:
+            return TRANSFORM_TASKS[transform].replace(
+                "{target}", LANGUAGE_NAMES.get(target, target)
+            )
+        model_target = "uz" if target == "uz-cyrl" else target
+        block = glossary.prompt_block(terms, model_target)
+        return (
+            TRANSFORM_TASKS["translate"].replace("{target}", NAMES[model_target])
+            + f" Source language: {NAMES.get(plan.source, plan.source)}. "
+            + DOMAIN_RULES.get(plan.domain, DOMAIN_RULES["general"])
+            + (f"\n{block}" if block else "")
         )
 
     async def _summarize_long_in_chat(
@@ -879,6 +940,8 @@ class DocumentAgent(Agent):
         transform: str,
         task: str,
         target: str,
+        plan: TranslationPlan | None = None,
+        terms: list[glossary.Term] | None = None,
     ) -> None:
         language = LANGUAGE_NAMES.get(request.target_language or ctx.turn.language, "Uzbek")
         try:
@@ -905,9 +968,15 @@ class DocumentAgent(Agent):
         except TooLongError as exc:
             gathered.notes.append(too_long_note(source.title, exc.chars))
             return
+        extra: dict[str, Any] = {}
+        extra_lines: list[str] = []
+        if plan is not None:
+            markdown, extra, extra_lines = await finish_markdown_translation(
+                ctx, gathered, plan, terms or [], full, markdown, title
+            )
         summary_text = {
             "summarize": "Summarized (whole document)",
-            "translate": f"Translated to {LANGUAGE_NAMES.get(target, target)} (whole document)",
+            "translate": f"Translated to {NAMES.get(target, target)} (whole document)",
             "proofread": "Proofread (whole document)",
             "rewrite": "Rewritten (whole document)",
             "formalize": "Formal style (whole document)",
@@ -931,6 +1000,7 @@ class DocumentAgent(Agent):
                 },
                 "partial": False,
                 **({"target_language": target} if transform == "translate" else {}),
+                **extra,
             },
             provider=provider,
             model=model,
@@ -942,6 +1012,7 @@ class DocumentAgent(Agent):
             f"follow its sections{f' ({reused} reused from earlier work)' if reused else ''}; "
             f"saved as “{title}” ({info['words']} words, formats {', '.join(info['formats'])}). "
             "The original file is unchanged. Say that the whole document was covered."
+            + ("\n" + "\n".join(extra_lines) if extra_lines else "")
         )
 
     async def _write(self, ctx: GatherContext, gathered: Gathered, doc: DocType) -> None:

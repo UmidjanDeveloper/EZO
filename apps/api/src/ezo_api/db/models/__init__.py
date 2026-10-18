@@ -32,6 +32,7 @@ from ezo_api.db.models.observability import AgentRun, AuditLog, ToolCall
 from ezo_api.db.models.official import LegalDocument, LegalRevision, OfficialSyncRun
 from ezo_api.db.models.organization import OrganizationProfile
 from ezo_api.db.models.project import Project
+from ezo_api.db.models.translation import GlossaryTerm
 from ezo_api.db.models.user import User
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "AuditLog",
     "Conversation",
     "DocumentRevision",
+    "GlossaryTerm",
     "KnowledgeChunk",
     "KnowledgeDocument",
     "KnowledgeSource",
