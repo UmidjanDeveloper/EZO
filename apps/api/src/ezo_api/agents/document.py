@@ -33,8 +33,9 @@ from ezo_api.agents.base import (
     run_tool,
 )
 from ezo_api.agents.catalog import AGENTS
+from ezo_api.agents.docx_office import find_docx, run_replace_action, transform_docx
 from ezo_api.agents.llm import complete, extract_json, sources_block
-from ezo_api.agents.office import run_ocr_action, run_pdf_action
+from ezo_api.agents.office import attached_files, run_ocr_action, run_pdf_action
 from ezo_api.agents.references import (
     DocumentRef,
     document_source,
@@ -306,8 +307,13 @@ class DocumentAgent(Agent):
     ) -> list[SourceText]:
         tools = ctx.tools
         found: list[SourceText] = []
-        refs = await find_documents(
-            tools.session, tools.user_id, tools.project_scope, ctx.turn.text, limit=count
+        attached = await attached_files(tools, ctx.turn.attachments)
+        refs = (
+            [DocumentRef(document, "attached") for document in attached][:count]
+            if attached
+            else await find_documents(
+                tools.session, tools.user_id, tools.project_scope, ctx.turn.text, limit=count
+            )
         )
         for ref in refs:
             read = await self._read(gathered, tools, ref, limit)
@@ -340,6 +346,8 @@ class DocumentAgent(Agent):
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
             return gathered
         if await run_ocr_action(ctx, gathered):
+            return gathered
+        if await run_replace_action(ctx, gathered):
             return gathered
         gathered.tool_calls.append(
             {
@@ -596,6 +604,29 @@ class DocumentAgent(Agent):
             return
         if self._offline(ctx, gathered):
             return
+        if transform != "summarize" and request.target_format in (None, "docx"):
+            docx = await find_docx(ctx, source.document.document if source.document else None)
+            if docx is not None:
+                target = request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
+                label = {
+                    "translate": f"Translated to {LANGUAGE_NAMES.get(target, target)}",
+                    "proofread": "Proofread",
+                    "rewrite": "Rewritten",
+                    "formalize": "Formal style",
+                }[transform]
+                task = TRANSFORM_TASKS[transform].replace(
+                    "{target}", LANGUAGE_NAMES.get(target, target)
+                )
+                await transform_docx(
+                    ctx,
+                    gathered,
+                    docx,
+                    transform=transform,
+                    task=task,
+                    label=label,
+                    target_language=target if transform == "translate" else None,
+                )
+                return
         text = source.text[:SOURCE_CHARS]
         partial = len(source.text) > SOURCE_CHARS
         target = request.target_language or ("en" if ctx.turn.language == "uz" else "uz")

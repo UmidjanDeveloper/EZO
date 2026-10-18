@@ -84,3 +84,12 @@ will be connected to chat in a later step.
 Scans and photos are read locally with Tesseract (Uzbek Latin and Cyrillic, Russian,
 English) during upload and on request in chat. Details, measured results and limits:
 [OCR.md](OCR.md).
+
+## Word files (Step 3 — implemented)
+
+Translation, proofreading, formal style and rewriting of a `.docx` edit **the original
+file in place**: styles, fonts, inline bold/italic/colour, hyperlinks, numbering, tables,
+images, headers/footers and page setup are kept and checked after saving. On request
+the edits are real Word tracked changes. `«X» ni «Y» ga almashtir` is a find-and-replace
+that needs no model. The whole document is processed in batches; nothing is silently
+cut off. Details and measured results: [DOCUMENT_FIDELITY.md](DOCUMENT_FIDELITY.md).

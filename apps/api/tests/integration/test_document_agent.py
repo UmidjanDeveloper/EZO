@@ -98,10 +98,11 @@ async def test_translation_creates_a_new_artifact_and_keeps_the_original(
     doc = (await client.get(f"/api/knowledge/documents/{document['id']}")).json()
     assert doc["size_bytes"] == len(ORIGINAL.encode()) and doc["status"] == document["status"]
 
-    # A follow-up edit of EZO's own document becomes version 2 of the same artifact.
+    # A follow-up edit of EZO's own Word document is done in place (paragraph by paragraph)
+    # and becomes version 2 of the same artifact.
     fake_anthropic.replies = [
-        "TITLE: Contract terms\nCHANGES: Formal wording.\n=====\n# Contract terms\n\n"
-        "The monthly rent amounts to 4,500,000 soums.\n\nPayment shall be made by the 5th.",
+        "[[2]] The monthly rent amounts to 4,500,000 soums.\n"
+        "[[3]] Payment shall be made by the 5th of each month.",
         "Yangilandi.",
     ]
     conversation_id = events[0][1]["conversation_id"]
@@ -110,10 +111,18 @@ async def test_translation_creates_a_new_artifact_and_keeps_the_original(
     )
     [again] = created(follow)
     assert again["id"] == artifact["id"] and again["version"] == 2
-    assert "# Contract terms" in fake_anthropic.requests[-2].messages[0].content
+    sent = fake_anthropic.requests[-2].messages[0].content
+    assert "[[0]] Contract terms" in sent and "[[2]] The rent is 4,500,000" in sent
     versions = (await client.get(f"/api/artifacts/{artifact['id']}")).json()["versions"]
-    assert versions[0]["change_summary"] == "Formal wording."
+    assert versions[0]["change_summary"] == "Formal style"
     assert versions[0]["parent_version_id"] == versions[1]["id"]
+    v2 = (await client.get(f"/api/artifacts/{artifact['id']}/versions/2/download")).content
+    paragraphs = [p.text for p in Document(io.BytesIO(v2)).paragraphs if p.text]
+    assert paragraphs[-3:] == [
+        "Contract terms",
+        "The monthly rent amounts to 4,500,000 soums.",
+        "Payment shall be made by the 5th of each month.",
+    ]
 
 
 async def test_compare_two_uploaded_files(

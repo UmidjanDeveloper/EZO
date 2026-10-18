@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from ezo_api.core.text import normalize
+from ezo_api.core.text import normalize, quoted
 
 PdfOp = Literal[
     "merge",
@@ -146,7 +146,6 @@ _OPS: list[tuple[PdfOp, re.Pattern[str]]] = [
         ),
     ),
 ]
-_QUOTED = re.compile(r"[\"“«'‘]([^\"”»'’]{1,150})[\"”»'’]")
 _DEGREES = re.compile(r"(90|180|270)\s*(?:daraja|°|degrees?|градус\w*)?")
 _LEFT = re.compile(r"\b(chap|left|влево|против час)")
 _UPSIDE = re.compile(r"\b(teskari|upside down|вверх ногами)")
@@ -184,7 +183,7 @@ def parse_pdf_request(text: str) -> list[PdfStep]:
     deletion and page 6 to the move (Uzbek puts pages before the verb, English after).
     """
     norm = normalize(text)
-    quoted = [m.group(1).strip() for m in _QUOTED.finditer(text)]
+    quotes = [q.strip() for q in quoted(text) if len(q.strip()) <= 150]
     found: list[tuple[int, int, PdfOp]] = []
     for op, pattern in _OPS:
         for match in pattern.finditer(norm):
@@ -196,7 +195,7 @@ def parse_pdf_request(text: str) -> list[PdfStep]:
         window_start = found[index - 1][1] if index else 0
         window_end = found[index + 1][0] if index + 1 < len(found) else len(norm)
         try:
-            step = _build(op, norm[window_start:window_end], quoted)
+            step = _build(op, norm[window_start:window_end], quotes)
         except ValueError:
             continue
         if step is not None and step not in steps:
