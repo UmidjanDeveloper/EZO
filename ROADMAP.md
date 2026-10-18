@@ -82,10 +82,28 @@ images) plus the extended local checks listed for that phase.
 - PresentationAgent: generated images on hero slides (per-deck limit), reused on edits;
   details in [docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md)
 
+### Professional writing — alpha
+- `writing/`: 30 document types (ariza, xizmat xati, bayonnoma, buyruq/qaror loyihasi,
+  hisobot, ma'ruza, press-reliz, CV, motivatsion xat, tadqiqot taklifi…) with fields and
+  structure; writing modes; Uzbek style rules and a deterministic style check
+- Drafts validated: unknown details become placeholders, numbers/dates not given by the
+  user are flagged, signing/approval claims are flagged; official papers marked QORALAMA
+- Official-layout DOCX (+ PDF via LibreOffice, Markdown, text); templates without a model;
+  organization profiles (letterhead, contacts, house style, preferred terms) in Settings
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
 - Not started from chat yet (see Phase 6)
+
+## Universal professional agent master prompt (2026-10-18) — stage map
+
+The owner's master prompt orders work as stages; they map onto this roadmap:
+A Office completion → Phase 3 (done) · B Professional writing (done, alpha) ·
+C Translation · D Education & career → Phase 4 · E Government work mode (organization
+profiles started in B) · F Official knowledge → Phase 7 · G Press secretary / Telegram ·
+H Durable missions → Phases 5–6 · I Advanced (voice, browser, developer, data, video,
+business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the owner approves).
 
 ## Next (in this order)
 
@@ -103,9 +121,10 @@ images) plus the extended local checks listed for that phase.
 - **Done:** long documents processed completely (section-aware parts, map-reduce
   summaries, resumable cache, whole-file search for questions); the 40,000-character
   limit is gone
-- **Not yet:** XLSX → PDF, editing Word footnotes/comments/charts, LibreOffice in the
-  Docker image (PDF exports of DOCX/XLSX), handwriting OCR, an LLM planner for sheet
-  operations, a document-viewer UI with page thumbnails beyond the first page
+- **Done (2026-10-18, Stage A):** Word/Excel → PDF with LibreOffice (in the Docker image
+  and CI), export regression fixtures, conversion limits
+- **Not yet:** editing Word footnotes/comments/charts, handwriting OCR, an LLM planner for
+  sheet operations, a document-viewer UI with page thumbnails beyond the first page
 
 ### Phase 4 — Education, academic research and career
 - EducationAgent: lesson packages (plan, timing, lecture notes, PPTX, quiz, homework,

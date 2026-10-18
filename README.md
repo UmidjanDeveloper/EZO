@@ -260,6 +260,19 @@ Details: [docs/EZO_OFFICE.md](docs/EZO_OFFICE.md), [docs/OCR.md](docs/OCR.md),
 the Docker image. For local development, install `tesseract-ocr` with the `uzb`, `uzb-cyrl`,
 `rus` and `eng` packs.
 
+## Professional writing (Professional yozish)
+
+| Try | What happens |
+|---|---|
+| “Shu faktlar asosida tushuntirish xati yoz va Word qilib ber: …” | An official-layout **DOCX** (+ PDF, .md, .txt); details you did not give stay as `[placeholders]`, numbers you did not give are flagged |
+| “Tashkilotimiz uslubida xizmat xati tayyorla” | Uses your organization profile (Settings → Tashkilot profili): letterhead, contacts, house style |
+| “Bayonnoma shablonini tayyorla” | A template with placeholders — works **without an AI key** |
+| “CV / motivatsion xat / tadqiqot taklifi tayyorla” | Career and academic documents, no invented achievements or findings |
+
+30 document types; official papers are marked **QORALAMA** (draft) until an authorized person
+approves them, and EZO never adds signatures or seals. Details:
+[docs/PROFESSIONAL_WRITING.md](docs/PROFESSIONAL_WRITING.md).
+
 ## Language practice (Til mashg'ulotlari)
 
 Practise English by simply talking to EZO, by typing or by voice:

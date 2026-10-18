@@ -167,6 +167,11 @@ documents, chat attachments.
 | Prompt injection inside documents | document text is sent as data; EZO never follows instructions from it to call tools; outputs are written as text into the user's own new artifact | design |
 | Originals modified | every operation writes a new artifact or version; inputs are read-only | integration tests check the upload size/hash afterwards |
 
+Professional writing: organization profiles are stored per user and passed to the AI
+provider only as data inside the user's own drafting request (never as instructions). The
+writer cannot produce signatures, seals or registration marks: the renderer always prints
+placeholders for them, and claims of signing or approval in the text are flagged.
+
 Known residual risks:
 
 - PDF parsing and rendering run in a worker thread. A tool timeout stops waiting for it,

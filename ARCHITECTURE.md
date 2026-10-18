@@ -282,6 +282,18 @@ version's `generation_metadata.exports` (keys are internal; the API returns `exp
 name, filename, type and size). `GET /api/artifacts/{id}/versions/{n}/exports/{name}`
 serves them (PNG previews inline, everything else as attachments).
 
+### Professional writing
+
+`writing/` holds the document-type catalog (`catalog.py`: 30 types with fields,
+sections, layout, default mode and draft flag), writing modes, Uzbek style rules and the
+deterministic style check (`style.py`). It also has the drafting contract and validation
+(`service.py`: JSON content from the model; invented numbers and dates removed or flagged;
+approval claims flagged) and the official-layout DOCX renderer (`render.py`).
+`agents/writing_office.py` runs the flow inside DocumentAgent: one model call, or none for
+templates. EzoCore routes "<document type> + writing verb" to DocumentAgent.
+Organization profiles live in `organization_profiles` (migration 0008) and are managed at
+`/api/writing/organizations`.
+
 ### Language Coach (Phase 1)
 
 `agents/language_coach.py` keeps real session state (`db/models/language.py`, migration 0004).
