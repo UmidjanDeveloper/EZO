@@ -76,25 +76,27 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #20 (CI), commit `c286b73`, all jobs green:
+**CI verified** — run #24 (CI), commit `a78fe8f`, all jobs green:
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 353 | 349 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
-| API · PostgreSQL | 353 | 350 | 0 | 3 | 3 LibreOffice not installed |
-| Web unit (Vitest) | 38 | 38 | 0 | 0 | — |
+| API · SQLite | 385 | 381 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
+| API · PostgreSQL | 385 | 382 | 0 | 3 | 3 LibreOffice not installed |
+| Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 20 | 20 | 0 | 0 | — |
+| Playwright e2e | 22 | 22 | 0 | 0 | — |
 
-Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migration
-0004 included), ESLint, TypeScript, the web production build and the Docker job (Compose
-config including the `voice` profile, API and web image builds, API container migrates and
-answers `/api/health`, web container serves `/`).
+Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL, ESLint,
+TypeScript, the web production build and the Docker job (Compose config including the
+`voice` profile, API and web image builds, API container migrates and answers
+`/api/health`, web container serves `/`).
 
-**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 352 passed
-+ 1 skipped; PostgreSQL 353 passed). Migration 0004 was also run up → `alembic check` → down
-→ up on both SQLite and PostgreSQL. The API Docker image was rebuilt in the sandbox; it
-migrated to 0004 and `/api/language/progress` answered.
+**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 384 passed
++ 1 skipped; PostgreSQL 385 passed); the full Playwright suite passed locally (22); the API
+Docker image was rebuilt in the sandbox and, inside the container, rendered a diagram and
+built a deck with a slide image (no QA issues). Live image generation was **not** run: there
+are no provider keys in this environment, so the OpenAI and Gemini adapters are verified with
+SDK-shaped fakes only.
 
 ## Sprint 0 — Stabilization (2026-10-17)
 
@@ -141,7 +143,79 @@ repository's default branch.
 shows the test table. `curl localhost:8000/api/status` lists agents with
 `maturity`/`phase`.
 
+## Phase 2 — Visual Agent (2026-10-18) — alpha
+
+*(Called "Phase 6" before the 2026-10-18 renumbering.)*
+
+**What changed**
+- Image providers behind `ImageProvider` / `ImageEditProvider`: OpenAI (Images API) and
+  Gemini (image output) adapters; model IDs, quality and limits are settings
+  (`EZO_IMAGE_*`). `VisualService` falls back in order but never after a content-policy
+  refusal, and re-encodes every returned image (format allowlist, pixel cap, metadata
+  stripped).
+- `VisualAgent` (alpha): images, hero and product visuals, edits of the conversation's image
+  or an uploaded image, diagrams, social graphics (square / 4:5 / story / landscape), logo
+  concepts with variants. One cheap `chat`-route call writes the prompt or spec; no call is
+  made when a picture is needed but no provider exists.
+- EZO draws all text: diagrams through the slide engine (PNG + SVG), social graphics and logo
+  sheets with EZO fonts. Without a provider the picture is an abstract placeholder recorded as
+  `placeholder: true` with a reason.
+- Every output is a versioned `image` artifact (edits add versions) with provider, model,
+  prompt, revised prompt, dimensions, quality, attempts, conversation and project; uploads
+  keep a source reference.
+- Presentations: new `ImageBox` primitive in PPTX/PDF/PNG/HTML; hero slides get generated
+  images (`EZO_IMAGE_MAX_PER_DECK`), reused when a deck is edited; model-written image ids
+  are discarded and only the user's own image artifacts are loaded; story scenes link them.
+- Routing: broader uz/en/ru visual signals; "fonini ko'k qil" after an image edits it.
+  `/api/status` lists `image_providers`; `visual` feature is alpha.
+- Web: image preview in the chat card; artifacts page shows the preview, how it was made, or
+  the placeholder notice; uz/en/ru strings.
+- Roadmap renumbered to the 2026-10-18 master prompt (catalog and features follow).
+
+**Files added:** `apps/api/src/ezo_api/visual/{base,images,openai_images,gemini_images,service,compose,kinds}.py`,
+`apps/api/src/ezo_api/agents/visual.py`, `apps/api/src/ezo_api/tools/visual_tools.py`,
+`apps/api/tests/unit/test_visual.py`, `apps/api/tests/integration/test_visual_agent.py`,
+`apps/web/components/artifacts/VersionExports.test.ts`, `tests/e2e/specs/visual.spec.ts`,
+`docs/VISUAL_AGENT.md`.
+**Files modified:** slide engine (primitives, layouts, QA, build, spec, PPTX/PDF/PNG/HTML
+renderers), PresentationAgent, `create_presentation`, story-from-deck, EzoCore routing,
+intent rules, agent registry and catalog, `maturity.py`, settings, services, status schema
+and route, test fakes and four existing tests (a planned agent is now Business, not Visual),
+web artifact card/page/exports, i18n, shared types, `.env.example`, ROADMAP, README,
+ARCHITECTURE, TROUBLESHOOTING, `docs/SECURITY.md`, `docs/LANGUAGE_COACH.md`.
+**Database migrations:** none (`image` was already an artifact type; `alembic check` clean).
+
+**Tests added:** 22 unit test cases (image safety: crop, re-encode, EXIF removal, non-images,
+decompression bombs, downscaling; request rules; OpenAI and Gemini adapters incl. refusals;
+fallback order and refusal stop; settings → providers; diagram/social/logo layouts; slide
+images in every format; placeholder QA; image-id validation) and 10 integration tests
+(generate + follow-up edit as version 2, no provider = no call and nothing stored, diagram
+without provider, labelled social placeholder, logo variants + text edit reusing the symbol,
+final refusal, upload edit, deck images generated and reused on edit, deck without provider,
+status); one web unit test; one Playwright spec (2 tests).
+
+**Security changes:** untrusted image gate (decode, allowlist, 25 MB / 40 MP, re-encode);
+SVG only as a sandboxed attachment; model-written artifact ids discarded and ownership checked
+before an image is embedded; refusals never routed around; per-request and per-deck limits
+for paid image calls.
+
+**User-visible changes:** ask for an image, a diagram, a social graphic or a logo in chat;
+image previews in chat and on **Yaratilganlar**; picture slides in presentations.
+
+**Known limitations:** rule-based kind/edit detection; diagrams limited to the slide engine's
+flow/process/timeline layouts; no masks, upscaling or transparent exports yet; only hero
+slides get generated images; image generation runs inside the chat request (durable jobs are
+Phase 5); the adapters are tested with SDK-shaped fakes, not against live provider accounts
+(no keys in CI). See `docs/VISUAL_AGENT.md`.
+
+**How the owner can test:** put `OPENAI_API_KEY` (or `GEMINI_API_KEY`) in `.env`, restart,
+then in chat: “Kosmosdagi mushuk rasmini chiz” → “Fonini to'q ko'k qil” → open
+**Yaratilganlar** (two versions). Without a key: “EZO arxitekturasi diagrammasini chiz”
+still works, and “Instagram story tayyorla” shows a labelled placeholder.
+
 ## Phase 5 — Language Coach + IELTS-style simulator (2026-10-17) — alpha
+
+*(Phase 1 after the 2026-10-18 renumbering.)*
 
 **What changed**
 - `LanguageCoachAgent`: real practice sessions with recorded learner and coach turns,
@@ -479,7 +553,8 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-**Phase 6 — VisualAgent** (image providers behind an interface, versioned image artifacts,
-PresentationAgent visuals, honest placeholders without a provider), then OCR and document
-fidelity. Ruflo orchestration is audited and its architecture is
-prepared (`docs/RUFLO_INTEGRATION_PLAN.md`); execution is scheduled after the foundations.
+**Phase 3 — OCR + EZO Office**: a real `OCRProvider` (scanned PDFs, photos, screenshots, with
+page numbers and confidence), PDF tools (merge, split, delete/reorder/rotate/extract pages,
+image ↔ PDF, page numbers, watermark, compress), formatting-preserving DOCX edits and
+chunk-aware long-document workflows. Then Phase 4 (education, academic research, career).
+Ruflo stays off (Phase 14).
