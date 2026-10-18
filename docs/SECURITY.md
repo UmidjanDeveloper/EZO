@@ -172,6 +172,14 @@ provider only as data inside the user's own drafting request (never as instructi
 writer cannot produce signatures, seals or registration marks: the renderer always prints
 placeholders for them, and claims of signing or approval in the text are flagged.
 
+Translation: glossary terms are per user (an organization's terms are only used with that
+organization, and are deleted with it); every glossary endpoint checks ownership. Text
+to translate is sent to the AI provider inside `<text>` tags as data, never as
+instructions, and the reply is only ever used as text. Latin ↔ Cyrillic conversion and the
+quality checks run locally. Voice interpretation keeps audio in memory only, like
+`/api/voice`. Users are told not to send confidential government or personal documents to
+an external provider without authorization (docs/TRANSLATION.md → Privacy).
+
 Known residual risks:
 
 - PDF parsing and rendering run in a worker thread. A tool timeout stops waiting for it,

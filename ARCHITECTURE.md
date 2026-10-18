@@ -294,6 +294,23 @@ templates. EzoCore routes "<document type> + writing verb" to DocumentAgent.
 Organization profiles live in `organization_profiles` (migration 0008) and are managed at
 `/api/writing/organizations`.
 
+### Translation
+
+`translation/` holds the model-free parts: `translit.py` (Uzbek Latin ↔ Cyrillic rules,
+span output for run-level Word edits), `languages.py` (codes uz, uz-cyrl, ru, en; reading
+source/target and style from a request), `glossary.py` (matching terms with word endings
+and either script, loading the user's and the default organization's terms), `quality.py`
+(numbers, months, links, surnames, glossary use, paragraphs, script) and `documents.py`
+(Word script conversion in place, bilingual Word files, paragraph pairs). `service.py` is
+the text translation (paragraph batches, ambiguity notes; Cyrillic produced by converting
+the model's Uzbek) and `interpreter.py` the turn-based voice interpreter plus the
+`StreamingInterpreter` interface. In chat, `agents/translate_office.py` handles text in the
+message, script conversion and glossary commands; files go through
+`DocumentAgent._transform`, which adds the plan, glossary and a review hook to the
+DOCX-fidelity editor (`transform_docx(review=…)`). EzoCore routes explicit translation
+requests (`translation/requests.py`) to DocumentAgent unless a language practice session
+is active. Terms live in `glossary_terms` (migration 0009); API under `/api/translation`.
+
 ### Language Coach (Phase 1)
 
 `agents/language_coach.py` keeps real session state (`db/models/language.py`, migration 0004).

@@ -182,6 +182,12 @@ def test_quality_report() -> None:
         target_language="uz",
     )
     assert cyr.names_to_check == []
+    romanised = check(
+        [("Bahodir Xo'jayev keldi.", "Bahodir Khodjaev arrived.")],
+        source_language="uz",
+        target_language="en",
+    )
+    assert romanised.names_to_check == []
     paragraphs = check(
         [
             ("Birinchi xatboshi juda muhim ma'lumotlarni o'z ichiga oladi.", ""),

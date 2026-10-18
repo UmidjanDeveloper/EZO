@@ -273,6 +273,18 @@ the Docker image. For local development, install `tesseract-ocr` with the `uzb`,
 approves them, and EZO never adds signatures or seals. Details:
 [docs/PROFESSIONAL_WRITING.md](docs/PROFESSIONAL_WRITING.md).
 
+## Translation (Tarjima)
+
+| Try | What happens |
+|---|---|
+| “Inglizchaga tarjima qil: …” | The translation, then EZO's checks (numbers, dates, links, names, glossary terms, missing paragraphs) |
+| Attach a Word file: “Shu ruscha hujjatni o'zbek lotiniga tarjima qil, formatini saqla” | A translated **Word file with the original formatting**; add “ikki tilli” for a bilingual two-column file |
+| “Kirillga o'gir: …” / “Shu faylni lotin yozuviga o'tkaz” | Uzbek Latin ↔ Cyrillic by fixed rules — **no AI key needed**, Word formatting kept |
+| “Glossariyga qo'sh (inglizcha): «hokimlik» → «khokimiyat»” | Your terminology, used and checked in later translations |
+
+The **Tarjima** page has text translation, the Latin ↔ Cyrillic buttons and the glossary.
+Voice interpretation is turn-based (API only). Details: [docs/TRANSLATION.md](docs/TRANSLATION.md).
+
 ## Language practice (Til mashg'ulotlari)
 
 Practise English by simply talking to EZO, by typing or by voice:
