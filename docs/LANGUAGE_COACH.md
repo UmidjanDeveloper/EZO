@@ -1,4 +1,4 @@
-# Language Coach (Phase 5) — alpha
+# Language Coach (Phase 1) — alpha
 
 EZO's Language Coach turns practice into real **sessions** with recorded turns, measured
 numbers, an assessment, recurring-mistake tracking and progress over time. There is no
@@ -34,7 +34,7 @@ deleted, together with its transcript, results and mistakes.
 - **Pronunciation** cannot be judged from text. In a typed session it is *not assessed*. In a
   spoken session the model may give a cautious *transcript-assisted* estimate. That estimate
   is labelled as such and **never counted in the overall range**. Real acoustic analysis is an
-  open interface (`PronunciationConfidence = "acoustic"`) planned with realtime voice (Phase 7).
+  open interface (`PronunciationConfidence = "acoustic"`) planned with realtime voice (Phase 8).
 - A "mistake" is stored only if the learner actually said its quoted text. Invented mistakes
   are dropped and counted. Unknown categories become `other`.
 - Measured numbers are computed exactly from the transcript, not by a model: words, lexical
@@ -105,6 +105,6 @@ exports).
 - Mode, command and level detection is rule-based (uz/en/ru phrases). Unusual phrasing may
   start a free conversation instead of the intended mode.
 - The Part 2 preparation minute is not timed by the app.
-- Pronunciation is transcript-assisted at best until realtime/acoustic analysis (Phase 7).
+- Pronunciation is transcript-assisted at best until realtime/acoustic analysis (Phase 8).
 - Bands come from a language model checked by rules. They are practice estimates, not
   calibrated against real exam results.

@@ -55,11 +55,20 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
 - Spreadsheet cells that start with `=`, `+`, `-` or `@` are neutralised to stop formula
   injection.
 
+- Images (provider output and uploads to be edited) must decode as PNG, JPEG, WebP or GIF,
+  ≤ 25 MB and ≤ 40 megapixels (checked before decoding). They are re-encoded to PNG, which
+  drops EXIF/location metadata. SVG diagrams are served only as attachments under a
+  `sandbox` CSP; only PNG previews are shown inline.
+
 ## 4. Model input (prompt injection)
 
 - Text from files and web pages is wrapped as `<source n="…">…</source>` with an explicit
   "data, not instructions" rule. It is never placed in the system prompt as instructions.
 - Citations are verified: numbers that do not match a real source are removed.
+- Artifact IDs that a model writes into a presentation plan are discarded. EZO sets them
+  itself and loads only image artifacts owned by the same user.
+- An image provider's content-policy refusal is final: EZO never retries the request with
+  another provider or a reworded prompt.
 - Hidden model reasoning is never stored. Execution traces hold step names, timings and short
   summaries only.
 

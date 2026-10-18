@@ -10,8 +10,9 @@ longer workflows. The interface is Uzbek first, with English and Russian built i
 
 > **Status: alpha.** Working today: chat with memory, files and research with sources,
 > turn-by-turn voice, documents (DOCX/PDF/XLSX), presentations (PPTX/PDF/web), versioned
-> “Created” files and English practice with an IELTS-style speaking simulator (estimated bands).
-> Next: the Visual Agent (images).
+> “Created” files, English practice with an IELTS-style speaking simulator (estimated bands)
+> and the Visual Agent (images, edits, diagrams, social graphics, logo concepts, slide images).
+> Next: OCR + EZO Office (PDF tools, scans, long documents).
 > The screen shows only the EZO robot and your conversation history. You can type, talk to EZO
 > out loud, give it your files, or ask it to research the web — answers come with sources.
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
@@ -153,7 +154,7 @@ shows which providers are connected and which model each route uses.
 - **Give EZO your files:** click the paperclip next to the message box, or open **Files**
   (bottom-left icon) and drop files there. Supported: PDF, Word (DOCX), Excel (XLSX), CSV,
   TXT, Markdown, and web pages by link. Images are accepted and stored, but reading text in
-  images (OCR) arrives in a later phase (ROADMAP Phase 6.5) — EZO says so instead of pretending.
+  images (OCR) arrives in a later phase (ROADMAP Phase 3) — EZO says so instead of pretending.
 - **Answers with sources:** when your question is about your files, EZO searches them and
   answers with numbered citations like `[1]`. Under the answer you see the sources (file,
   page, version). Citation numbers that do not match a real source are removed automatically,
@@ -195,7 +196,7 @@ EZO never stores your voice recordings. If the server voice fails, EZO tells you
 with the browser’s voice; if reading a reply aloud fails, the browser reads it instead. Tap the
 robot while EZO speaks to interrupt it and talk. Choose the speech language (UZ / EN / RU) above
 the robot; **Settings → System status → Voice** shows which engine is active. Fully realtime,
-streaming voice (talk over each other, word-by-word) is planned for ROADMAP Phase 7.
+streaming voice (talk over each other, word-by-word) is planned for ROADMAP Phase 8.
 
 ## Created files and versions (Yaratilganlar)
 
@@ -234,8 +235,9 @@ Just ask in chat — EZO picks the right specialist itself:
 
 Every presentation goes through a layout check (text that does not fit, tiny fonts, elements
 outside the slide, broken chart data…). EZO repairs problems once automatically and tells you
-honestly if anything remains. Images are abstract visuals for now (image generation arrives
-with the Visual Agent). Scanned PDFs need OCR, which is not built in yet.
+honestly if anything remains. With an OpenAI or Gemini key, picture slides get generated
+images; without one they show an abstract visual and EZO says so. Scanned PDFs need OCR,
+which is not built in yet.
 
 ## Language practice (Til mashg'ulotlari)
 
@@ -257,6 +259,21 @@ Practise English by simply talking to EZO, by typing or by voice:
   official IELTS score. Pronunciation is not judged from typed text; from voice it is at most a
   transcript-assisted estimate and is not counted in the band. Details:
   [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md).
+
+## Images and diagrams (Rasmlar va diagrammalar)
+
+- “**Kosmosdagi mushuk rasmini chiz**” generates an image. “**Fonini to'q ko'k qil**” right
+  after it edits that image and saves it as version 2. Upload a photo and say “**bu rasmning
+  fonini olib tashla**” to edit your own picture; the original file stays untouched.
+- “**EZO arxitekturasi diagrammasini chiz**” draws a diagram with exact labels, as PNG and SVG.
+  This works even without an image key.
+- “**Instagram story tayyorla**”, “**LinkedIn post**”, “**afisha**” make social graphics.
+  “**Logo yarat, 3 ta variant**” makes logo concept sheets. EZO draws every word itself, so
+  there is no garbled AI text.
+- Generated pictures need `OPENAI_API_KEY` or `GEMINI_API_KEY`. Without one, EZO never
+  pretends: plain images are not made, and social graphics and logos get an abstract
+  placeholder that is clearly labelled as such. The model, quality and limits are settings
+  (`EZO_IMAGE_*` in `.env.example`). Details: [docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md).
 
 ## Optional integrations
 
@@ -302,12 +319,12 @@ keeps working if it is missing or broken. Licence details:
 - **Developer mode (without Docker):** run VoiceStudio yourself (it listens on
   `http://localhost:3900`) and set `VOICESTUDIO_URL=http://localhost:3900`.
 
-### OpenMontage — video production (planned, Phase 4)
+### OpenMontage — video production (planned, Phase 12)
 
 Not integrated yet. It will be an optional `studio` Docker profile that renders videos from
 EZO’s presentation/story projects. It is AGPL-3.0 and will run as a separate service.
 
-### REA — binary analysis (planned, Phase 6)
+### REA — binary analysis (planned, with the Developer Agent, Phase 9)
 
 Not integrated. It will only be offered to the DeveloperAgent, off by default, and only for
 software you own or are allowed to analyse.

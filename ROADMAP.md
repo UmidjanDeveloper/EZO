@@ -4,6 +4,11 @@ This is the **only** roadmap. Phase names here are the ones used in the code
 (`apps/api/src/ezo_api/agents/catalog.py`, `apps/api/src/ezo_api/maturity.py`; a test keeps
 them in sync) and in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
+Phase numbers follow the owner's *Universal Professional AI Robot* master prompt (2026-10-18):
+Phase 1 Language Coach, Phase 2 Visual Agent, Phase 3 OCR + EZO Office, … Phase 14 optional
+Ruflo. Older records in IMPLEMENTATION_STATUS keep the names they had when they were written
+(there the Language Coach was "Phase 5" and the Visual Agent "Phase 6").
+
 Maturity labels: **planned** (not built) · **experimental** (works in tests, may change) ·
 **alpha** (usable end to end, young) · **beta** · **stable**. Nothing in EZO is beta or stable yet.
 
@@ -54,7 +59,7 @@ images) plus the extended local checks listed for that phase.
 - Docker images built and smoke-tested in CI, dependency audits, `docs/SECURITY.md`,
   Git workflow and licence decision documented for the owner
 
-### Phase 5 — Language Coach + IELTS — alpha
+### Phase 1 — Language Coach + IELTS — alpha
 - LanguageCoachAgent with persistent sessions, turns, metrics, mistakes, goals, vocabulary
   (migration 0004); an active session keeps learner answers with the coach
 - Modes: free conversation, IELTS-style speaking (Parts 1–3, original questions, *estimated*
@@ -65,37 +70,57 @@ images) plus the extended local checks listed for that phase.
   only transcript-assisted and excluded from bands; licensed knowledge via the user's own files
 - “Til mashg'ulotlari” page; details in [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md)
 
+### Phase 2 — Visual Agent — alpha
+- `ImageProvider` / `ImageEditProvider` with OpenAI and Gemini adapters; model IDs, quality
+  and limits are configuration; fallback that never retries a declined request
+- Every image re-encoded and checked (format allowlist, pixel cap, metadata stripped)
+- VisualAgent: images, hero and product visuals, edits (conversation image or upload),
+  diagrams, social graphics, logo concepts with variants — all versioned image artifacts with
+  provider, model, prompt and dimensions
+- Text is always drawn by EZO (diagrams, social graphics, logo sheets); without a provider the
+  picture is an abstract, clearly labelled placeholder and nothing is claimed
+- PresentationAgent: generated images on hero slides (per-deck limit), reused on edits;
+  details in [docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md)
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
-- Not started from chat yet (see *Missions* below)
+- Not started from chat yet (see Phase 6)
 
 ## Next (in this order)
 
-### Phase 6 — Visual Agent ← current
-- `ImageProvider` / `ImageEditProvider` (OpenAI, Gemini, later local), configurable models
-- Image generation and editing, diagrams, social graphics, logo concepts, product visuals
-- PresentationAgent requests visuals; honest placeholders when no provider is available
+### Phase 3 — OCR + EZO Office ← current
+- Real `OCRProvider` implementations (scanned PDF, photos, screenshots, tables) with page
+  numbers, confidence and citations; low confidence is shown, never treated as exact
+- PDF tools: merge, split, delete / reorder / rotate / extract pages, image ↔ PDF, page
+  numbers, watermark, header/footer, compress where possible, metadata cleanup, compare
+- DOCX editing that preserves formatting (headings, tables, styles, page breaks, images);
+  XLSX → PDF; every change a new artifact version
+- Chunk-aware long-document workflows (section map → process → reassemble), replacing the
+  current 40,000-character limit
 
-### Phase 6.5 — OCR + document fidelity + long documents
-- Real `OCRProvider` implementations with page numbers, confidence and text blocks
-- DOCX editing that preserves formatting; chunk-aware map/reduce for long documents
-  (replaces the current 40,000-character limit)
+### Phase 4 — Education, academic research and career
+- EducationAgent: lesson packages (plan, timing, lecture notes, PPTX, quiz, homework,
+  rubric, handout), syllabus and assessment tools, level adaptation
+- AcademicResearchAgent: research questions, literature, methodology, citations (APA, MLA,
+  Chicago, Harvard, IEEE) without invented sources or data; academic-integrity rules
+- CareerAgent: reusable master profile, CV, cover and motivation letters, interview practice;
+  never invents achievements
 
-### Infrastructure — durable jobs
+### Phase 5 — Durable tasks, jobs and worker
 - Persistent Task / Job / JobEvent / JobArtifact / JobApproval, `services/worker` with a real
   queue (Redis), recovery after restarts; chat never depends on the worker being up
-- `S3StorageProvider`, backups and restore procedure
+- Real schedules for personal automations; `S3StorageProvider`, backups and restore
 
-### Missions — persistent native orchestration
+### Phase 6 — Persistent native missions
 - Mission tables + migration, missions started from chat for complex requests, progress
   (“3/5 steps”), approval cards for external-impact actions
 
-### Phase 8 — Uzbekistan government knowledge
+### Phase 7 — Uzbekistan government and legal intelligence
 - LegalResearchAgent; LexUz, President.uz, E-qaror, Gov.uz connectors
-- Versioned legal documents (never overwritten), currentness checks, admin sync status
+- Versioned legal documents (never overwritten), currentness checks, revision comparison
 
-### Phase 7 — Realtime voice
+### Phase 8 — Realtime voice
 - Streaming STT → streaming response → streaming TTS, barge-in, turn detection, low latency;
   stronger pronunciation analysis for the Language Coach
 
@@ -103,17 +128,25 @@ images) plus the extended local checks listed for that phase.
 - Sandboxed repository tools (no unrestricted shell), approvals for push/deploy/destructive
   changes, inspect → reproduce → patch → test → lint → typecheck → build → diff → report
 
-### Video / Motion
+### Phase 10 — Data Analyst
+- DataAnalystAgent: computed (never guessed) statistics, anomalies, trends, forecasts where
+  appropriate, charts, dashboards, reports
+
+### Phase 11 — Browser Agent
+- Approved web actions (navigate, fill forms, download); approval before submitting,
+  publishing, paying or changing accounts
+
+### Phase 12 — Video / Motion
 - StoryProject → scenes → visuals → narration → timeline → render → video artifact
   (OpenMontage only as an optional external AGPL service; licences re-checked first)
 
-### Business
+### Phase 13 — Business
 - BusinessAgent: idea, competitor and market analysis, pricing, unit economics, SWOT, pitch;
   every number marked as source-backed fact, estimate or assumption
 
-### Last — optional Ruflo provider
-- Only after native missions are proven stable; see
-  [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
+### Phase 14 — optional Ruflo provider
+- Only after native missions, approvals, tool permissions and the developer sandbox are
+  mature; see [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
 ## Known limitations (current)
 
@@ -121,10 +154,12 @@ images) plus the extended local checks listed for that phase.
 - Semantic search and semantic memory need an OpenAI or Gemini key for embeddings; without one
   EZO uses keyword search and says so.
 - Images and scanned PDFs are stored but not read (no OCR yet).
+- Image generation needs an OpenAI or Gemini key; EZO-drawn diagrams work without one.
 - Ingestion runs in the API process (resumed at startup); no separate worker yet.
-- Voice is turn-by-turn; realtime voice is Phase 7.
+- Voice is turn-by-turn; realtime voice is Phase 8.
 - The rate limiter is in memory (one API process).
 - Single-owner authentication; no multi-user accounts.
 - Some API status/error texts are English-only (new texts are added in uz/en/ru).
-- Default model names in `apps/api/config/models.toml` must be kept current.
+- Default model names in `apps/api/config/models.toml` and the image model settings must be
+  kept current.
 - Not yet: Qdrant vector store, S3 storage, model-based reranker (interfaces exist).

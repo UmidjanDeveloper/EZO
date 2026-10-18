@@ -1,7 +1,7 @@
 """Turn a presentation (DeckSpec) into story scenes.
 
 The StoryProject keeps the narrative independent of the file format, so the same
-story can later become a video (Phase 7) or be regenerated as a new deck.
+story can later become a video (ROADMAP Phase 12) or be regenerated as a new deck.
 """
 
 from __future__ import annotations

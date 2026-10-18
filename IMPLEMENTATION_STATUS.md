@@ -40,6 +40,9 @@ Test counts are not a quality score: a phase is judged by which failure modes it
 
 ## Current capabilities
 
+Phase numbers follow the 2026-10-18 master prompt (see ROADMAP.md); the history below keeps
+the names used when each record was written.
+
 Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also returned by
 `GET /api/status` as `agents` and `features`). A test keeps them consistent with ROADMAP.md.
 
@@ -53,15 +56,20 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | DocumentAgent + document formats | Documents | alpha |
 | PresentationAgent + slide engine | Presentations | alpha |
 | Native missions (in memory, not in chat) | Orchestration foundation | experimental |
-| LanguageCoachAgent, IELTS-style simulator, progress | Phase 5 | alpha |
-| VisualAgent | Phase 6 | planned |
-| OCR | Phase 6.5 | planned |
-| Durable jobs / worker | Infrastructure | planned |
-| LegalResearchAgent | Phase 8 | planned |
-| Realtime voice | Phase 7 | planned |
-| DeveloperAgent | Phase 9 | planned |
-| BusinessAgent | Business | planned |
-| Ruflo provider | Last | planned (off by default) |
+| LanguageCoachAgent, IELTS-style simulator, progress | Phase 1 | alpha |
+| VisualAgent: images, edits, diagrams, social graphics, logos, slide images | Phase 2 | alpha |
+| OCR + EZO Office (PDF tools, DOCX fidelity, long documents) | Phase 3 | planned |
+| Education, academic research and career agents | Phase 4 | planned |
+| Durable tasks / jobs / worker | Phase 5 | planned |
+| Persistent missions in chat | Phase 6 | planned |
+| LegalResearchAgent | Phase 7 | planned |
+| Realtime voice | Phase 8 | planned |
+| DeveloperAgent + website builder | Phase 9 | planned |
+| DataAnalystAgent | Phase 10 | planned |
+| BrowserAgent | Phase 11 | planned |
+| Video / motion | Phase 12 | planned |
+| BusinessAgent | Phase 13 | planned |
+| Ruflo provider | Phase 14 | planned (off by default) |
 
 Planned agents are never shown as working: the GeneralAgent answers and states the
 limitation.

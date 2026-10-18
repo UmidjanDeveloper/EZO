@@ -16,7 +16,7 @@ from ezo_api.db.models.types import JSONType
 class KnowledgeSource(UUIDPrimaryKey, Timestamps, Base):
     """Where documents come from: user uploads, a web page, or a connector.
 
-    Connectors (e.g. government knowledge, ROADMAP Phase 8) are not implemented yet.
+    Connectors (e.g. government knowledge, ROADMAP Phase 7) are not implemented yet.
     """
 
     __tablename__ = "knowledge_sources"

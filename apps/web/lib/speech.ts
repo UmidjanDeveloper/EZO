@@ -3,7 +3,7 @@
  *
  * Uses the Web Speech API built into Chrome, Edge and Safari. Firefox has no
  * speech recognition; callers must check `speechRecognitionSupported()`.
- * Server-side realtime voice providers replace this in ROADMAP Phase 7 (realtime voice).
+ * Server-side realtime voice providers replace this in ROADMAP Phase 8 (realtime voice).
  */
 
 import type { LanguageCode } from "@ezo/shared";

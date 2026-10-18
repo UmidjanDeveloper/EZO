@@ -184,7 +184,7 @@ answer   ─► verify_citations removes numbers that match no source; cited sou
 ```
 
 Statuses: `queued → processing → indexed | partial (no embeddings: keyword only) | needs_ocr
-(images/scans, OCR in ROADMAP Phase 6.5) | failed (with a readable reason)`. Only the current
+(images/scans, OCR in ROADMAP Phase 3) | failed (with a readable reason)`. Only the current
 revision of `indexed`/`partial` documents is searchable. Source text is wrapped in `<source>`
 tags and the prompt tells the model to treat it as data, not instructions.
 
@@ -201,7 +201,7 @@ a `tool_calls` row with redacted arguments.
 Users see, add and delete memories on the **Memory** page (and per project). Automatic memory
 can be switched off in Settings.
 
-### Artifacts and story projects (Phase 3)
+### Artifacts and story projects
 
 `artifacts/service.py` (`ArtifactService`) is the only code that writes artifact content:
 
@@ -225,7 +225,7 @@ Agents report what they created in `Gathered.artifacts`. EzoCore stores it in th
 sequential timeline in which a scene lasts its planned duration, or longer if its narration
 needs more time (about 2.4 words per second), so narration is never cut off.
 
-### Documents and presentations (Phase 4)
+### Documents and presentations
 
 Format services live in `documents/` and know nothing about agents or models:
 
@@ -265,7 +265,7 @@ version's `generation_metadata.exports` (keys are internal; the API returns `exp
 name, filename, type and size). `GET /api/artifacts/{id}/versions/{n}/exports/{name}`
 serves them (PNG previews inline, everything else as attachments).
 
-### Language Coach (Phase 5)
+### Language Coach (Phase 1)
 
 `agents/language_coach.py` keeps real session state (`db/models/language.py`, migration 0004).
 `language/` holds the parts that need no model:
@@ -284,6 +284,30 @@ messages may carry `speech_seconds` (measured by the web VAD), stored per turn f
 words-per-minute. Practice replies use the `chat` route and the assessment uses `reasoning`.
 Details: [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md).
 
+### Visual Agent (Phase 2)
+
+`visual/` keeps EZO independent of image vendors:
+- `base.py`: `ImageProvider` / `ImageEditProvider`, `ImageRequest`, `ImageError` kinds;
+- `openai_images.py`, `gemini_images.py`: adapters (model IDs from settings);
+- `service.py`: `VisualService`, the ordered fallback and limits; a `refused` error stops it;
+- `images.py`: the safety gate (decode, format allowlist, pixel cap, re-encode to PNG,
+  cover-fit crops for slides);
+- `compose.py`: graphics EZO lays out itself (diagrams through the slide engine, social
+  graphics, logo sheets); the picture is optional, the text is always EZO's;
+- `kinds.py`: kind, aspect ratio, variants, social format, edit and "no images" rules.
+
+`agents/visual.py` makes one `chat`-route call for the prompt or spec JSON. It then calls the
+tools in `tools/visual_tools.py`: `generate_image`, `edit_image` and `create_graphic`. They
+store versioned `image` artifacts with a preview, a `spec` export and full generation
+metadata. EzoCore sends a general-intent edit ("fonini ko'k qil") to the Visual Agent when the
+conversation's newest artifact is an image.
+
+The slide engine has an `ImageBox` primitive in all four renderers. `PresentationAgent`
+requests images for `hero_image` slides through `generate_image`, puts the artifact IDs in
+the deck spec (ids from the model are discarded), and reuses them when a deck is edited.
+`create_presentation` loads only the user's own image artifacts. Details:
+[docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md).
+
 ### Orchestration (prepared, not wired into chat)
 
 `orchestration/` holds optional multi-agent **missions** behind one interface,
@@ -301,7 +325,7 @@ deny-list, secret redaction, hardened minimal environment). See
 ### Voice providers
 
 `voice/base.py` defines `SpeechToTextProvider`, `TextToSpeechProvider` and
-`RealtimeVoiceProvider` (interface only, ROADMAP Phase 7). `voice/openai_audio.py` implements
+`RealtimeVoiceProvider` (interface only, ROADMAP Phase 8). `voice/openai_audio.py` implements
 the first two over the OpenAI audio protocol and serves two providers: **OpenAI** and the
 optional **VoiceStudio** service. VoiceStudio is a separate AGPL-3.0 process reached over
 HTTP; its code is never imported. `VoiceService` tries the providers in

@@ -79,7 +79,7 @@ pnpm with `npm install -g pnpm`.
 | “The file is not a real PDF/…” | The file was renamed (e.g. `.exe` → `.pdf`) or is damaged. Export it again from the original program. |
 | “The file is too large” (413) | Raise `EZO_MAX_UPLOAD_MB` in `.env` (default 25) and restart, or split the file. |
 | Status **Qisman / Partial** | Files are found by keywords only. Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to `.env`, restart, then press **Qayta o‘qish / Re-read** on the file. |
-| Status **OCR kerak / Needs OCR** | The file is an image or a scanned PDF without a text layer. Reading text from images arrives in a later phase (ROADMAP Phase 6.5); for now use a PDF with selectable text. |
+| Status **OCR kerak / Needs OCR** | The file is an image or a scanned PDF without a text layer. Reading text from images arrives in ROADMAP Phase 3; for now use a PDF with selectable text. |
 | Status **Xato / Failed** | The message under the file says why (password-protected, damaged, empty). Fix the file and upload again. |
 | A file stays **O‘qilmoqda / Reading** | Large PDFs take a while. If the API restarted, reading resumes automatically. Check `docker compose logs api`. |
 | EZO answers without using my file | Ask about the file’s content directly (“shartnomada muddat qancha?”). In casual chat EZO only uses files that clearly match. Files in a project are used only inside that project. |
@@ -178,3 +178,14 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
   (the browser's own speech recognition does not report timing).
 - **Wrong mode.** Name it clearly: “IELTS”, “job interview”, “travel”, “grammar”, “vocabulary”,
   “debate”, “business English”.
+
+## Images and diagrams
+
+| Symptom | Cause and fix |
+|---|---|
+| EZO says no image was generated | No image provider is configured. Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to `.env` and restart. Check `GET /api/status` → `image_providers`. `EZO_IMAGE_PROVIDERS=none` also turns images off. |
+| Images fail with an auth or "not found" error | The image model ID is wrong or not enabled for your key. Set `EZO_OPENAI_IMAGE_MODEL` / `EZO_GEMINI_IMAGE_MODEL` to a model your account can use. |
+| "The image service declined this request" | The provider's content policy refused it. EZO does not retry elsewhere; change what you ask for. |
+| A social graphic or logo shows shapes instead of a picture | It is a labelled placeholder: no provider, or generation failed. The artifact page shows the reason; ask again once a provider works. |
+| Slides show abstract visuals | No image provider, the deck asked for "rasmsiz", or the per-deck limit was reached (`EZO_IMAGE_MAX_PER_DECK`). EZO's summary names which. |
+| "Fonini o'zgartir" started something else | Edits go to the newest image of the **same conversation**, or a newer upload. Say "bu rasmni …" in the conversation where the image was made. |
