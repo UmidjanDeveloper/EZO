@@ -11,6 +11,7 @@ from docx import Document
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from ezo_api.db.models import OrganizationProfile, User
 from ezo_api.main import create_app
 from tests.conftest import make_settings
 from tests.fakes import FakeProvider
@@ -197,3 +198,32 @@ async def test_offline_gets_a_labelled_template(database_url: str) -> None:
             assert "ARIZA" in [p.text for p in document.paragraphs]
     finally:
         await app.state.services.db.dispose()
+
+
+async def test_organization_profiles_are_private_and_one_is_default(
+    client: AsyncClient, app: FastAPI
+) -> None:
+    services = app.state.services
+    async with services.db.sessionmaker() as session:
+        stranger = User(email="other@x", display_name="Other", preferences={})
+        session.add(stranger)
+        await session.flush()
+        foreign = OrganizationProfile(user_id=stranger.id, name="Begona tashkilot")
+        session.add(foreign)
+        await session.commit()
+        foreign_id = foreign.id
+    first = (await client.post("/api/writing/organizations", json={"name": "Birinchi"})).json()
+    second = (await client.post("/api/writing/organizations", json={"name": "Ikkinchi"})).json()
+    listed = (await client.get("/api/writing/organizations")).json()
+    assert [(o["name"], o["is_default"]) for o in listed] == [
+        ("Ikkinchi", True),
+        ("Birinchi", False),
+    ]
+    assert {first["id"], second["id"]} == {o["id"] for o in listed}
+    for method in ("PUT", "DELETE"):
+        response = await client.request(
+            method,
+            f"/api/writing/organizations/{foreign_id}",
+            json={"name": "x"} if method == "PUT" else None,
+        )
+        assert response.status_code == 404, method

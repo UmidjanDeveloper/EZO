@@ -12,17 +12,18 @@ Two kinds of results are reported, **never mixed**:
    `scripts/test_report.py` table (collected / passed / failed / skipped and every skip
    reason) in the job log and the run summary. Quote that table, with the run number and
    commit.
-2. **Extended local verification** — checks CI cannot run, listed by name: LibreOffice
-   opening generated files (CI has no LibreOffice, so 3 tests skip there), Docker builds in
-   the development sandbox, live provider calls, manual UI checks. These are reported as
-   "local, not in CI".
+2. **Extended local verification** — checks CI cannot run, listed by name: Docker builds
+   in the development sandbox, live provider calls, manual UI checks. These are reported
+   as "local, not in CI". (Since Stage A, CI installs LibreOffice and Tesseract and sets
+   `EZO_REQUIRE_OFFICE=1` / `EZO_REQUIRE_TESSERACT=1`, so those tests fail instead of
+   skipping when the tools are missing.)
 
 Why the numbers differ between environments (all expected):
 
-| Test | SQLite (CI) | PostgreSQL (CI) | Local with LibreOffice |
+| Test | SQLite (CI) | PostgreSQL (CI) | Local |
 |---|---|---|---|
 | pgvector store test | skipped (needs PostgreSQL + pgvector) | runs | runs on PostgreSQL |
-| LibreOffice open/convert tests (3) | skipped (no LibreOffice on the runner) | skipped | run |
+| LibreOffice and Tesseract tests | run (required) | run (required) | skip unless installed, or fail with `EZO_REQUIRE_OFFICE=1` / `EZO_REQUIRE_TESSERACT=1` |
 
 Produce the same table locally:
 
@@ -58,7 +59,8 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | Native missions (in memory, not in chat) | Orchestration foundation | experimental |
 | LanguageCoachAgent, IELTS-style simulator, progress | Phase 1 | alpha |
 | VisualAgent: images, edits, diagrams, social graphics, logos, slide images | Phase 2 | alpha |
-| OCR + EZO Office (PDF tools, OCR, DOCX fidelity, tables, sheets, long documents) | Phase 3 | alpha (partially complete) |
+| OCR + EZO Office (PDF tools, OCR, DOCX fidelity, tables, sheets, long documents, Word/Excel → PDF) | Phase 3 | alpha (partially complete) |
+| Professional writing (30 document types, official layout, organization profile, validation) | Professional writing | alpha |
 | Education, academic research and career agents | Phase 4 | planned |
 | Durable tasks / jobs / worker | Phase 5 | planned |
 | Persistent missions in chat | Phase 6 | planned |
@@ -76,34 +78,108 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #37 (CI), commit `0ea8d6e`, all jobs green:
+**CI verified** — run #42 (CI), commit `26eb571`, all jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39141204596):
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 535 | 530 | 0 | 5 | 1 needs PostgreSQL + pgvector; 4 LibreOffice not installed |
-| API · PostgreSQL | 535 | 531 | 0 | 4 | 4 LibreOffice not installed |
+| API · SQLite | 605 | 604 | 0 | 1 | needs PostgreSQL + pgvector |
+| API · PostgreSQL | 605 | 605 | 0 | 0 | — |
 | Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 23 | 23 | 0 | 0 | — |
+| Playwright e2e | 24 | 24 | 0 | 0 | — |
 
-Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL, ESLint,
-TypeScript, the web production build, and the Docker job. The Docker job covers the
-Compose config, the API and web image builds, the check that the API image has Tesseract
-with `uzb`, `uzb_cyrl`, `rus`, `eng` and `osd`, the API container migrating and answering
-`/api/health`, and the web container serving `/`. CI installs Tesseract and sets
-`EZO_REQUIRE_TESSERACT=1`, so the real OCR tests **run** (they fail rather than skip if
-Tesseract is missing).
+Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migration
+0008 included), ESLint, TypeScript, the web production build, and the Docker job. The
+Docker job covers the Compose config, the API and web image builds, Tesseract with `uzb`,
+`uzb_cyrl`, `rus`, `eng` and `osd` in the API image, **the API image converting a Word
+and an Excel file to PDF with LibreOffice**, the API container migrating and answering
+`/api/health`, and the web container serving `/`. CI installs Tesseract and LibreOffice
+and sets `EZO_REQUIRE_TESSERACT=1` and `EZO_REQUIRE_OFFICE=1`, so the OCR and LibreOffice
+tests **run** (no LibreOffice skips any more).
 
 **Extended local verification** (not in CI):
 
-- Same commit, with LibreOffice and Tesseract 5.3.4: SQLite 534 passed + 1 skipped
-  (pgvector); PostgreSQL 535 passed.
-- Migrations 0006 and 0007 verified up → check → down → up on SQLite and PostgreSQL.
-- The full Playwright suite passed locally (23).
-- The API Docker image could **not** be rebuilt in the sandbox: the sandbox proxy blocks
-  deb.debian.org, so the Tesseract apt step cannot run there. The CI Docker job built and
-  checked it.
-- Live image provider test **not performed** (no provider keys here).
+- Same code, with LibreOffice and Tesseract 5.3.4: SQLite 604 passed + 1 skipped
+  (pgvector); PostgreSQL 605 passed.
+- Migration 0008 verified up → check → down → up on SQLite and PostgreSQL.
+- The full Playwright suite passed locally (24).
+- The API Docker image could **not** be rebuilt in the sandbox (the sandbox proxy blocks
+  deb.debian.org). The CI Docker job built and checked it.
+- Live provider tests **not performed** (no provider keys here): the quality of AI-written
+  drafts has only been checked with scripted model replies.
+
+## Stage B — Professional writing (2026-10-18) — alpha
+
+Commits `535d16c` (service, layouts, organization profile API, chat), `ccac79e` (Settings
+card), `26eb571` (docs). CI run #42 green. Details: [docs/PROFESSIONAL_WRITING.md](docs/PROFESSIONAL_WRITING.md).
+
+### What works
+
+- **30 document types** (`writing/catalog.py`): ariza, tushuntirish xati, bildirishnoma,
+  xizmat xati, rasmiy murojaat, javob xati, ma'lumotnoma, tavsiyanoma, taqdimnoma,
+  dalolatnoma, bayonnoma, yig'ilish protokoli, buyruq and qaror (drafts), hisobot, ish
+  rejasi, xulosa, taklif xati, taklifnoma, tabriknoma, ma'ruza, nutq, press-reliz, e'lon,
+  tadbir dasturi, ishonchnoma (draft), CV, motivatsion xat, cover letter, research
+  proposal. Each has its fields, section order, layout and default length. Recognised from uz/ru/en
+  requests ("Hokimlikka xizmat xati tayyorla", "CV yoz", "Bayonnoma shablonini ber").
+- **Options from the request**: writing mode (official, academic, natural, business,
+  journalistic, persuasive, concise, speech…), length, language and script (Latin/Cyrillic, ru, en), audience, "without the
+  draft label".
+- **Drafting**: the model writes only content, as JSON in the type's structure. EZO then
+  validates it: fields carrying a number or date the user never gave are emptied back to
+  a placeholder; such numbers in the body are listed for checking; claims of signing,
+  approval or a seal are flagged; Uzbek style lint (clichés, inflated phrasing, mixed
+  scripts, repetition, very long sentences); length and script checks.
+- **Official layout DOCX** (`writing/render.py`): A4, 30/15/20/20 mm, Times New Roman 14,
+  letterhead with a rule, № and date line, recipient block, centred title, signature table
+  and [M.O.] with placeholders only, "QORALAMA" in the page header of official drafts.
+  Exports: PDF (LibreOffice layout, else EZO's text PDF, labelled), Markdown, plain text.
+- **Templates without a model**: "… shablonini ber", or any writing request when no AI
+  provider is configured, gives the same layout with placeholders (no cost).
+- **Organization profile** (migration 0008, `/api/writing/organizations`, Settings →
+  Organization): name, department, contacts, head, letterhead, house style, preferred
+  terms. Used for the letterhead and given to the model as user-entered facts.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| Explanatory note from the user's facts → title, recipient, signature placeholder; a date the user never gave becomes "[Sana]" | `test_writing.py::test_explanatory_note_from_facts` |
+| Invented number in the body and "imzolandi" → both reported to the user | `test_writing.py::test_invented_numbers_and_claims_are_reported`, `tests/unit/test_writing.py` |
+| Organization profile → letterhead, preferred terms sent to the model; edit and delete | `test_writing.py::test_organization_profile_letterhead_and_terms` |
+| Template request → no drafting call | `test_writing.py::test_template_request_uses_no_model` |
+| No AI provider → labelled template with PDF/MD/TXT exports | `test_writing.py::test_offline_gets_a_labelled_template`, `test_document_agent.py`, `test_convert_office.py` |
+| Russian request → Russian draft | `test_writing.py::test_document_types_endpoint_and_russian` |
+| Another user's profiles are invisible (list, edit, delete → 404); only one default | `test_writing.py::test_organization_profiles_are_private_and_one_is_default` |
+| Settings → Organization profile saves and reloads | e2e `writing.spec.ts` |
+
+### Not done
+
+Logo/seal images and example documents in the profile; verifying names, positions or
+legal grounds against official sources (Stage F); revising an existing draft section by
+section in chat (a follow-up request re-drafts); Telegram/press work (Stage G). Prose
+quality depends on the model and was not measured with a live provider.
+
+## Stage A — Office completion (2026-10-18)
+
+Commits `824dbcf` (LibreOffice conversion), `f9694f0` (CI: Impress for the required
+presentation test). Run #39 failed (the presentation-opening test now runs and needed
+Impress); run #41 green.
+
+- **Word / Excel → PDF with LibreOffice** (`documents/office_convert.py`, tool
+  `office_pdf`): fixed argv, no shell, fresh profile and temp dir per call, process-group
+  kill on timeout, one conversion at a time, input/output size and page limits. Files
+  with external links (linked images, OLE, external data) are refused. Every PDF is
+  reopened and its pages counted. Without LibreOffice, chat says so and labels the
+  text-based fallback.
+- "Word faylni PDF ga aylantir", "Excel faylni PDF qilib ber", "PDFni Wordga aylantir":
+  the target format is the one with a target marker (-ga, qilib, to, into, в…).
+- The API Docker image installs `libreoffice-writer-nogui`, `libreoffice-calc-nogui` and
+  fonts (Liberation, DejaVu); CI checks the conversion inside the image.
+- Regression fixtures: a two-page official letter (letterhead, PAGE footer, Latin +
+  Cyrillic, table, page break), a landscape page, a two-sheet workbook with a formula, a
+  file with an external image link.
 
 ## Sprint 0 — Stabilization (2026-10-17)
 
@@ -208,8 +284,8 @@ Commits `73bdd41` (PDF engine), `d795ba8` (OCR), `6169895` (Word in place), `007
 
 ### Not done (why Phase 3 is "partially complete")
 
-XLSX → PDF; editing Word footnotes/endnotes/comments/charts; LibreOffice in the Docker
-image (DOCX/XLSX → PDF exports need it); handwriting OCR; an LLM planner for sheet
+(XLSX → PDF and LibreOffice in the Docker image were added in Stage A.) Editing Word
+footnotes/endnotes/comments/charts; handwriting OCR; an LLM planner for sheet
 operations; a multi-page document viewer in the UI. Pathological PDFs cannot be killed
 mid-parse (thread), only abandoned. A separate worker process is planned with Phase 5.
 
@@ -692,7 +768,9 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Close the Phase 3 gaps that matter most: LibreOffice in the Docker image (DOCX/XLSX → PDF
-exports in production), XLSX → PDF, and the owner decisions in
-[docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md).
-Then Phase 4 (education, academic research, career). Ruflo stays off (Phase 14).
+Stage C — translation (glossaries, document translation that keeps layout across Word,
+PDF and scans, bilingual output, terminology checks), then Stage D (education and career)
+and Stage E (government work mode). Owner decisions still open: a licence, a protected
+`main` branch, the Dependabot PRs, and the LegalResearchAgent visibility
+([docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md) §6).
+Ruflo stays off (Phase 14).
