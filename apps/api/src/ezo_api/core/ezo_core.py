@@ -165,23 +165,22 @@ def make_title(text: str) -> str:
 
 async def _owned_attachments(
     session: AsyncSession, user_id: uuid.UUID, ids: tuple[uuid.UUID, ...]
-) -> tuple[uuid.UUID, ...]:
-    """The attached files, in the given order; another user's (or unknown) file is an error."""
+) -> tuple[tuple[uuid.UUID, ...], list[str]]:
+    """The attached files (in the given order) and their names; another user's (or an
+    unknown) file is an error."""
     if not ids:
-        return ()
-    owned = set(
-        (
-            await session.scalars(
-                select(KnowledgeDocument.id).where(
-                    KnowledgeDocument.id.in_(ids), KnowledgeDocument.user_id == user_id
-                )
+        return (), []
+    rows = (
+        await session.execute(
+            select(KnowledgeDocument.id, KnowledgeDocument.filename, KnowledgeDocument.title).where(
+                KnowledgeDocument.id.in_(ids), KnowledgeDocument.user_id == user_id
             )
-        ).all()
-    )
-    missing = [i for i in ids if i not in owned]
-    if missing:
+        )
+    ).all()
+    names = {row.id: row.filename or row.title for row in rows}
+    if any(i not in names for i in ids):
         raise TurnError(404, "attachment_not_found", "An attached file was not found.")
-    return ids
+    return ids, [names[i] for i in ids]
 
 
 async def _latest_artifact_is_image(
@@ -267,14 +266,21 @@ class EzoCore:
                 f" covering unavailable {selection.requested.key}" if selection.is_fallback else ""
             )
 
-        attachments = await _owned_attachments(session, user.id, turn.attachments)
+        attachments, attachment_names = await _owned_attachments(session, user.id, turn.attachments)
         user_message = Message(
             conversation_id=conversation.id,
             role="user",
             content=turn.text,
             language=language,
             meta={"channel": turn.channel}
-            | ({"attachments": [str(a) for a in attachments]} if attachments else {}),
+            | (
+                {
+                    "attachments": [str(a) for a in attachments],
+                    "attachment_names": attachment_names,
+                }
+                if attachments
+                else {}
+            ),
         )
         run = AgentRun(
             user_id=user.id,

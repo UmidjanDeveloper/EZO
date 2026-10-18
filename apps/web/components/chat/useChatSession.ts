@@ -112,7 +112,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
     async (
       text: string,
       channel: ChatChannel = "text",
-      options: { speechSeconds?: number | null } = {},
+      options: { speechSeconds?: number | null; attachments?: { id: string; name: string }[] } = {},
     ): Promise<UiMessage | null> => {
       if (streaming) return null;
       const controller = new AbortController();
@@ -121,7 +121,20 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       signal({ type: "send" });
       setMessages((current) => [
         ...current,
-        { id: `local-user-${Date.now()}`, role: "user", content: text, metadata: { channel } },
+        {
+          id: `local-user-${Date.now()}`,
+          role: "user",
+          content: text,
+          metadata: {
+            channel,
+            ...(options.attachments?.length
+              ? {
+                  attachments: options.attachments.map((a) => a.id),
+                  attachment_names: options.attachments.map((a) => a.name),
+                }
+              : {}),
+          },
+        },
         { id: `local-assistant-${Date.now()}`, role: "assistant", content: "", streaming: true },
       ]);
 
@@ -134,6 +147,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
             project_id: conversationId ? null : projectId,
             channel,
             speech_seconds: channel === "voice" ? (options.speechSeconds ?? null) : null,
+            ...(options.attachments?.length ? { attachments: options.attachments.map((a) => a.id) } : {}),
           },
           controller.signal,
         );

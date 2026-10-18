@@ -7,6 +7,8 @@ import { useI18n } from "@/lib/i18n/context";
 
 interface ComposerProps {
   streaming: boolean;
+  /** Why sending is not possible right now (e.g. files still uploading). */
+  blocked?: string;
   onSend: (text: string) => void;
   onStop: () => void;
   /** Switch to voice conversation (hidden when not provided). */
@@ -20,7 +22,7 @@ interface ComposerProps {
 
 const MAX_HEIGHT = 220;
 
-export function Composer({ streaming, onSend, onStop, onVoice, onAttach, above, autoFocus }: ComposerProps) {
+export function Composer({ streaming, blocked, onSend, onStop, onVoice, onAttach, above, autoFocus }: ComposerProps) {
   const { m } = useI18n();
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -35,7 +37,7 @@ export function Composer({ streaming, onSend, onStop, onVoice, onAttach, above, 
 
   function submit() {
     const value = text.trim();
-    if (!value || streaming) return;
+    if (!value || streaming || blocked) return;
     onSend(value);
     setText("");
   }
@@ -115,16 +117,22 @@ export function Composer({ streaming, onSend, onStop, onVoice, onAttach, above, 
             variant="primary"
             size="icon"
             onClick={submit}
-            disabled={!text.trim()}
+            disabled={!text.trim() || Boolean(blocked)}
             aria-label={m.chat.send}
-            title={m.chat.send}
+            title={blocked ?? m.chat.send}
             data-testid="composer-send"
           >
             <ArrowUp size={18} />
           </Button>
         )}
       </div>
-      <p className="mt-1.5 hidden px-2 text-xs text-ink-faint sm:block">{m.chat.hint}</p>
+      {blocked ? (
+        <p className="mt-1.5 px-2 text-xs text-warning" role="status" data-testid="composer-blocked">
+          {blocked}
+        </p>
+      ) : (
+        <p className="mt-1.5 hidden px-2 text-xs text-ink-faint sm:block">{m.chat.hint}</p>
+      )}
     </div>
   );
 }

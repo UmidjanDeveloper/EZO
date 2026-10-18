@@ -46,12 +46,13 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
     stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
   }, []);
 
+  const { take } = attachments;
   const sendText = useCallback(
     (text: string) => {
       stickToBottom.current = true;
-      void send(text, "text");
+      void send(text, "text", { attachments: take() });
     },
-    [send],
+    [send, take],
   );
 
   const empty = !loading && messages.length === 0;
@@ -138,6 +139,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
           </div>
           <Composer
             streaming={streaming}
+            blocked={attachments.uploading ? m.knowledge.waitUploads : undefined}
             onSend={sendText}
             onStop={stop}
             onVoice={() => setMode("voice")}

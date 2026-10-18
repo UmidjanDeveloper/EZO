@@ -222,6 +222,8 @@ const uz = {
     newRevision: "Fayl o‘zgargan — yangi versiya saqlandi (v{n}).",
     uploading: "Yuklanmoqda…",
     attach: "Fayl biriktirish",
+    waitUploads: "Fayllar yuklanmoqda — tugashini kuting.",
+    attachedFiles: "Biriktirilgan fayllar",
     semanticOff: "Ma’no bo‘yicha qidiruv o‘chiq (OpenAI yoki Gemini kaliti kerak). Kalit so‘z bo‘yicha qidiruv ishlaydi.",
     status: {
       queued: "Navbatda",
@@ -526,6 +528,8 @@ const en: Messages = {
     newRevision: "The file changed — saved a new version (v{n}).",
     uploading: "Uploading…",
     attach: "Attach a file",
+    waitUploads: "Files are still uploading — please wait.",
+    attachedFiles: "Attached files",
     semanticOff: "Meaning-based search is off (needs an OpenAI or Gemini key). Keyword search works.",
     status: {
       queued: "Queued",
@@ -828,6 +832,8 @@ const ru: Messages = {
     newRevision: "Файл изменился — сохранена новая версия (v{n}).",
     uploading: "Загрузка…",
     attach: "Прикрепить файл",
+    waitUploads: "Файлы ещё загружаются — подождите.",
+    attachedFiles: "Прикреплённые файлы",
     semanticOff: "Смысловой поиск выключен (нужен ключ OpenAI или Gemini). Поиск по словам работает.",
     status: {
       queued: "В очереди",

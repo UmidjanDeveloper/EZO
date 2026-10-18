@@ -29,7 +29,9 @@ export function ArtifactCard({ artifact }: { artifact: ArtifactRef }) {
 
   return (
     <div className="mt-2 max-w-md rounded-xl border border-line bg-surface" data-testid="artifact-card">
-      {artifact.type === "image" ? <ImageThumb artifact={artifact} /> : null}
+      {artifact.type === "image" || artifact.type === "document" || artifact.type === "other" ? (
+        <ImageThumb artifact={artifact} />
+      ) : null}
       <div className="flex items-center gap-3 px-3 py-2">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
           <ArtifactIcon type={artifact.type} size={18} />
@@ -63,7 +65,8 @@ export function ArtifactCard({ artifact }: { artifact: ArtifactRef }) {
   );
 }
 
-/** The preview of a generated image, shown right in the conversation. */
+/** The preview of a generated image or the first page of a PDF result, shown right in
+ * the conversation (files without a preview show the card only). */
 function ImageThumb({ artifact }: { artifact: ArtifactRef }) {
   const { m } = useI18n();
   const [url, setUrl] = useState<string | null>(null);

@@ -56,6 +56,9 @@ export interface MessageMetadata {
   sources_considered?: number;
   /** Files EZO created (or the user saved) in this turn. */
   artifacts?: ArtifactRef[];
+  /** Uploaded documents attached to a user message (ids, and their names). */
+  attachments?: string[];
+  attachment_names?: string[];
 }
 
 /** One numbered source behind an answer: a file passage or a web page. */
@@ -326,6 +329,8 @@ export interface ChatRequestBody {
   channel?: ChatChannel;
   /** Measured speaking time of a voice message, in seconds (Language Coach). */
   speech_seconds?: number | null;
+  /** Uploaded documents this message is about, in the user's order (max 20). */
+  attachments?: string[];
 }
 
 export interface VoiceAttempt {

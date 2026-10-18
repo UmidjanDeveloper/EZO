@@ -64,6 +64,7 @@ async def test_scenario_a_merge_three_attached_pdfs_and_delete_page_two(
     messages = (await client.get(f"/api/conversations/{conversation}/messages")).json()
     user_message = next(m for m in messages if m["role"] == "user")
     assert user_message["metadata"]["attachments"] == ids
+    assert user_message["metadata"]["attachment_names"] == ["a.pdf", "b.pdf", "c.pdf"]
 
 
 async def test_follow_up_works_on_ezos_latest_pdf(

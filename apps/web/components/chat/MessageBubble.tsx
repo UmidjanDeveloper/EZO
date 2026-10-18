@@ -3,7 +3,7 @@
 import { Badge } from "@ezo/ui";
 import { motion } from "framer-motion";
 import type { ArtifactRef } from "@ezo/shared";
-import { AlertTriangle, Bookmark, BookmarkCheck, Brain, Check, Copy, Mic, ScrollText, Volume2 } from "lucide-react";
+import { AlertTriangle, Bookmark, BookmarkCheck, Brain, Check, Copy, FileText, Mic, ScrollText, Volume2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
@@ -28,8 +28,22 @@ export function MessageBubble({ message, onShowTrace }: Props) {
   const [saving, setSaving] = useState(false);
 
   if (message.role === "user") {
+    const files = message.metadata?.attachment_names ?? [];
     return (
-      <motion.div className="flex justify-end" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+      <motion.div className="flex flex-col items-end gap-1.5" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+        {files.length ? (
+          <ul className="flex max-w-[85%] flex-wrap justify-end gap-1.5" aria-label={m.knowledge.attachedFiles} data-testid="message-attachments">
+            {files.map((name, index) => (
+              <li
+                key={`${name}-${index}`}
+                className="flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-line bg-surface px-2 py-1 text-xs text-ink-muted"
+              >
+                <FileText size={12} className="shrink-0" aria-hidden />
+                <span className="truncate">{name}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <div
           className="flex max-w-[85%] items-start gap-2 whitespace-pre-wrap rounded-2xl rounded-br-md bg-surface-2 px-4 py-2.5 text-[15px] leading-relaxed"
           data-testid="message-user"
