@@ -148,3 +148,32 @@ Every number is computed by EZO and written as a value. The original formatting 
 formulas are not carried over, and the reply says so. Formula cells whose result was
 never saved (e.g. files written by scripts) are **reported, not calculated**. A
 column that does not exist is refused. Macros are never run, and `.xlsm` is not accepted.
+
+## Long documents (Step 5 — implemented)
+
+The old 40,000-character limit is gone. A long file is now processed **completely**:
+
+- **Split at its own structure.** Markdown headings, `1.2.`, `5-modda`, `II bob`, `Статья 5`,
+  `Глава 2`, `Article 3`, short ALL-CAPS headings. Over-long sections are split at
+  paragraph (or sentence) boundaries into parts of ≤ 12,000 characters. Every part keeps
+  its section titles (`documents/longdoc.py`).
+- **Summary** (chat or file): each part is summarised, then the summaries are combined
+  in rounds if needed (map-reduce). The reply says "EZO read ALL of …" with the
+  character and part counts and lists the document's sections.
+- **Translation / proofreading / rewriting** of long text files are done part by part
+  and joined in order. Word files use the in-place editor from Step 3, which also
+  processes the whole file.
+- **Questions** about a long file search **the whole file** (keyword + semantic search
+  restricted to that document) and answer from the most relevant passages, with their
+  pages and sections. If the passages do not contain the answer, EZO says so instead of
+  guessing.
+- **Resumable.** Each finished part is stored (`long_doc_parts`, migration 0007, keyed
+  by the part's content hash and task). If the AI provider fails half-way, the reply
+  says how far it got. Asking again continues from that point: done parts are reused,
+  not paid for twice.
+- **No silent truncation.** Texts over 2,000,000 characters (~800 pages) are refused
+  with an explanation. The artifact metadata records `long_document: {chars, parts,
+  reused_parts, method}` and `partial: false`.
+
+Requires an AI model (summaries and translations are model work). Offline, EZO says so
+and does not pretend.

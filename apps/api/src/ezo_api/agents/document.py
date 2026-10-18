@@ -40,6 +40,12 @@ from ezo_api.agents.convert_office import (
 )
 from ezo_api.agents.docx_office import find_docx, run_replace_action, transform_docx
 from ezo_api.agents.llm import complete, extract_json, sources_block
+from ezo_api.agents.longdoc_office import (
+    answer_sources,
+    summarize_long,
+    too_long_note,
+    transform_long,
+)
 from ezo_api.agents.office import attached_files, run_ocr_action, run_pdf_action
 from ezo_api.agents.references import (
     DocumentRef,
@@ -51,8 +57,9 @@ from ezo_api.agents.references import (
 from ezo_api.artifacts.service import ArtifactError
 from ezo_api.core.intent import Intent
 from ezo_api.core.text import normalize
-from ezo_api.db.models import Artifact
+from ezo_api.db.models import Artifact, DocumentRevision
 from ezo_api.documents.compare import compare_texts
+from ezo_api.documents.longdoc import TooLongError, outline
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
@@ -85,7 +92,10 @@ _ANALYZE = re.compile(
     r"\b(tahlil|analy|анализ|statistik|o'rtacha|jami|sum|average|total|итог|средн|insight)"
 )
 _FILE_WANTED = re.compile(
-    r"\b(fayl|file|файл|docx|word|pdf|hujjat qilib|yuklab|download|скача|документ(ом)? )"
+    r"\b(fayl (qilib|sifatida|ko'rinishida|holida|qil)|faylga|faylda (ber|yubor)|"
+    r"(as|to|into|in) a file|file (version|copy)|файлом|в файл\w*|в виде файла|"
+    r"docx|word\w*|ворд|pdf (qilib|ko'rinishida|formatda)|pdfga|as (a )?pdf|в pdf|"
+    r"hujjat qilib|yuklab|download|скача|документом)"
 )
 _TRANSFORMS: tuple[tuple[Transform, re.Pattern[str]], ...] = (
     ("translate", re.compile(r"\b(tarjima|translate|перевед|перевод|переведи)")),
@@ -250,6 +260,8 @@ class SourceText:
     document: DocumentRef | None = None
     artifact: Artifact | None = None
     table_summary: str = ""
+    truncated: bool = False
+    """True when `text` is only the beginning (see `DocumentAgent._full_text`)."""
 
 
 class DocumentAgent(Agent):
@@ -285,7 +297,18 @@ class DocumentAgent(Agent):
         data = result.data
         source = SourceText(ref.document.title, str(data.get("text", "")), document=ref)
         source.table_summary = str(data.get("table_summary") or "")
+        source.truncated = bool(data.get("truncated"))
         return source
+
+    async def _full_text(self, ctx: GatherContext, source: SourceText) -> str:
+        """The complete text of the source: the stored revision when the tool's read was cut."""
+        if not source.truncated or source.document is None:
+            return source.text
+        document = source.document.document
+        if document.current_revision_id is None:
+            return source.text
+        revision = await ctx.tools.session.get(DocumentRevision, document.current_revision_id)
+        return revision.raw_text if revision is not None and revision.raw_text else source.text
 
     async def _artifact_text(self, tools: ToolContext) -> SourceText | None:
         """EZO's latest document in this conversation (its Markdown), for follow-up edits."""
@@ -595,22 +618,21 @@ class DocumentAgent(Agent):
     async def _transform(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest
     ) -> None:
-        sources = await self._sources_for(ctx, gathered, 1, SOURCE_CHARS)
+        sources = await self._sources_for(ctx, gathered, 1, MAX_READ_CHARS)
         if not sources:
             gathered.notes.append(NO_FILE_NOTE)
             return
         source = sources[0]
+        full = await self._full_text(ctx, source)
         transform = request.transform or "rewrite"
         if transform == "summarize" and not request.wants_file and source.document is not None:
-            # A summary in the chat: the model reads the file as a cited source.
-            gathered.sources = [
-                document_source(source.document.document, source.text, ANSWER_CHARS)
-            ]
-            if len(source.text) > ANSWER_CHARS:
-                gathered.notes.append(
-                    f"Only the first {ANSWER_CHARS:,} characters of “{source.title}” fit; say the "
-                    "summary covers the beginning of the file."
-                )
+            if len(full) <= ANSWER_CHARS:
+                # A summary in the chat: the model reads the file as a cited source.
+                gathered.sources = [document_source(source.document.document, full, ANSWER_CHARS)]
+                return
+            if self._offline(ctx, gathered):
+                return
+            await self._summarize_long_in_chat(ctx, gathered, source, full)
             return
         if self._offline(ctx, gathered):
             return
@@ -637,10 +659,15 @@ class DocumentAgent(Agent):
                     target_language=target if transform == "translate" else None,
                 )
                 return
-        text = source.text[:SOURCE_CHARS]
-        partial = len(source.text) > SOURCE_CHARS
         target = request.target_language or ("en" if ctx.turn.language == "uz" else "uz")
         task = TRANSFORM_TASKS[transform].replace("{target}", LANGUAGE_NAMES.get(target, target))
+        if len(full) > SOURCE_CHARS:
+            await self._transform_long(
+                ctx, gathered, request, source, full, transform, task, target
+            )
+            return
+        text = full
+        partial = False
         tools = ctx.tools
         if tools.on_activity is not None:
             tools.on_activity("creating")
@@ -716,6 +743,103 @@ class DocumentAgent(Agent):
             )
         )
 
+    async def _summarize_long_in_chat(
+        self, ctx: GatherContext, gathered: Gathered, source: SourceText, full: str
+    ) -> None:
+        language = LANGUAGE_NAMES.get(ctx.turn.language, "Uzbek")
+        try:
+            summary = await summarize_long(ctx, gathered, source.title, full, language)
+        except TooLongError as exc:
+            gathered.notes.append(too_long_note(source.title, exc.chars))
+            return
+        if summary is None:
+            return
+        outline_titles = outline(full, 25)
+        gathered.notes.append(
+            f"EZO read ALL of “{source.title}” ({summary.chars:,} characters) in "
+            f"{summary.parts} parts that follow its sections"
+            + (f" ({summary.reused} part(s) reused from earlier work)" if summary.reused else "")
+            + ", summarised each part and combined them. Present this summary (you may shorten "
+            "it to fit the reply, but do not add facts) and say it covers the whole document."
+            + (f"\nThe document's sections: {'; '.join(outline_titles)}" if outline_titles else "")
+            + f"\nSUMMARY:\n{summary.text}"
+        )
+
+    async def _transform_long(
+        self,
+        ctx: GatherContext,
+        gathered: Gathered,
+        request: DocumentRequest,
+        source: SourceText,
+        full: str,
+        transform: str,
+        task: str,
+        target: str,
+    ) -> None:
+        language = LANGUAGE_NAMES.get(request.target_language or ctx.turn.language, "Uzbek")
+        try:
+            if transform == "summarize":
+                summary = await summarize_long(ctx, gathered, source.title, full, language)
+                if summary is None:
+                    return
+                title = f"{source.title} — summary"
+                markdown = f"# {title}\n\n{summary.text}"
+                parts, reused = summary.parts, summary.reused
+                provider, model = summary.provider, summary.model
+            else:
+                key = f"{transform}:{target if transform == 'translate' else language}"
+                done = await transform_long(
+                    ctx, gathered, source.title, full, transform=transform, task=task, task_key=key
+                )
+                if done is None:
+                    return
+                body, run, parts = done
+                reused, provider, model = run.reused, run.provider, run.model
+                suffix = f" ({target})" if transform == "translate" else ""
+                title = f"{source.title}{suffix}"
+                markdown = body if body.lstrip().startswith("# ") else f"# {title}\n\n{body}"
+        except TooLongError as exc:
+            gathered.notes.append(too_long_note(source.title, exc.chars))
+            return
+        summary_text = {
+            "summarize": "Summarized (whole document)",
+            "translate": f"Translated to {LANGUAGE_NAMES.get(target, target)} (whole document)",
+            "proofread": "Proofread (whole document)",
+            "rewrite": "Rewritten (whole document)",
+            "formalize": "Formal style (whole document)",
+        }[transform]
+        info = await self._save_document(
+            ctx,
+            gathered,
+            title=title,
+            markdown=markdown,
+            fmt=request.target_format or "docx",
+            artifact=source.artifact,
+            change_summary=summary_text,
+            metadata={
+                "action": transform,
+                **self._origin(source),
+                "long_document": {
+                    "chars": len(full),
+                    "parts": parts,
+                    "reused_parts": reused,
+                    "method": "map-reduce summary" if transform == "summarize" else "part by part",
+                },
+                "partial": False,
+                **({"target_language": target} if transform == "translate" else {}),
+            },
+            provider=provider,
+            model=model,
+        )
+        if info is None:
+            return
+        gathered.notes.append(
+            f"Processed ALL of “{source.title}” ({len(full):,} characters) in {parts} parts that "
+            f"follow its sections{f' ({reused} reused from earlier work)' if reused else ''}; "
+            f"saved as “{title}” ({info['words']} words, formats {', '.join(info['formats'])}). "
+            "The original file is unchanged. Say that the whole document was covered."
+        )
+
     async def _create(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest
     ) -> None:
@@ -774,13 +898,29 @@ class DocumentAgent(Agent):
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest
     ) -> None:
         tools = ctx.tools
-        refs = await find_documents(
-            tools.session, tools.user_id, tools.project_scope, ctx.turn.text
+        attached = await attached_files(tools, ctx.turn.attachments)
+        refs = (
+            [DocumentRef(d, "attached") for d in attached]
+            if attached
+            else await find_documents(
+                tools.session, tools.user_id, tools.project_scope, ctx.turn.text
+            )
         )
         if refs:
             read = await self._read(gathered, tools, refs[0], ANSWER_CHARS)
             if read is not None:
-                gathered.sources = [document_source(refs[0].document, read.text, ANSWER_CHARS)]
+                if not read.truncated:
+                    gathered.sources = [document_source(refs[0].document, read.text, ANSWER_CHARS)]
+                    return
+                # A long file: search all of it and answer from the most relevant passages.
+                found = await answer_sources(ctx, refs[0].document, ctx.turn.text)
+                gathered.sources = found
+                gathered.notes.append(
+                    f"“{read.title}” is long; EZO searched the WHOLE file and gives the "
+                    f"{len(found)} most relevant passages (with their pages/sections). Answer "
+                    "only from them and cite them; if they do not contain the answer, say that "
+                    "the answer was not found in the file — do not guess."
+                )
                 return
         gathered.sources = await self._knowledge(ctx, gathered)
         if not gathered.sources and refers_to_a_file(ctx.turn.text):

@@ -162,3 +162,24 @@ class OcrPage(UUIDPrimaryKey, Base):
     page_image_sha256: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     warnings: Mapped[list[str]] = mapped_column(JSONType, default=list, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+
+class LongDocPart(UUIDPrimaryKey, Base):
+    """The result of one model call on one part of a long document (a part summary, a
+    translated part...). Keyed by the part's content hash and the task, so a long job
+    that stopped half-way continues where it stopped and unchanged parts are reused."""
+
+    __tablename__ = "long_doc_parts"
+    __table_args__ = (UniqueConstraint("user_id", "task", "part_sha256"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    task: Mapped[str] = mapped_column(String(120), nullable=False)
+    part_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    part_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    result: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

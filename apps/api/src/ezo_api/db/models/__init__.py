@@ -15,6 +15,7 @@ from ezo_api.db.models.knowledge import (
     KnowledgeChunk,
     KnowledgeDocument,
     KnowledgeSource,
+    LongDocPart,
     OcrPage,
     VectorEntry,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "LanguageVocabularyItem",
     "LegalDocument",
     "LegalRevision",
+    "LongDocPart",
     "Memory",
     "Message",
     "OcrPage",
