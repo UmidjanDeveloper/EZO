@@ -538,3 +538,24 @@ export interface VocabularyItem {
   status: string;
   created_at: string;
 }
+
+/** Who the user writes for: letterhead, contacts, house style (all entered by the user). */
+export interface OrganizationProfileInput {
+  name: string;
+  org_type: "government" | "university" | "school" | "company" | "research" | "nonprofit" | "other";
+  department?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  head_position?: string | null;
+  head_name?: string | null;
+  letterhead?: string | null;
+  style_notes?: string | null;
+  terminology?: Record<string, string>;
+  is_default?: boolean;
+}
+
+export interface OrganizationProfile extends OrganizationProfileInput {
+  id: string;
+}

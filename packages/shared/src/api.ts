@@ -5,6 +5,8 @@
 import { SseParser } from "./sse";
 import type {
   AgentRun,
+  OrganizationProfile,
+  OrganizationProfileInput,
   Artifact,
   ArtifactDetail,
   ArtifactType,
@@ -188,6 +190,12 @@ export function createApiClient(options: ApiClientOptions) {
       }),
 
     voiceStatus: () => request<VoiceStatus>("/api/voice/status"),
+    organizations: () => request<OrganizationProfile[]>("/api/writing/organizations"),
+    createOrganization: (body: OrganizationProfileInput) =>
+      request<OrganizationProfile>("/api/writing/organizations", { method: "POST", ...json(body) }),
+    updateOrganization: (id: string, body: OrganizationProfileInput) =>
+      request<OrganizationProfile>(`/api/writing/organizations/${id}`, { method: "PUT", ...json(body) }),
+    deleteOrganization: (id: string) => request<void>(`/api/writing/organizations/${id}`, { method: "DELETE" }),
     /** Send a short recording; the API transcribes it and keeps no audio. */
     transcribe: (audio: Blob, filename: string, language?: string | null, signal?: AbortSignal) => {
       const form = new FormData();

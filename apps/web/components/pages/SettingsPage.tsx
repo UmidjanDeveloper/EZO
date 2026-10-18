@@ -8,6 +8,7 @@ import { useApp } from "@/lib/app-state";
 import { UI_LANGUAGES, useI18n } from "@/lib/i18n/context";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
 import { useApiData } from "@/lib/use-api-data";
+import { OrganizationCard } from "../settings/OrganizationCard";
 import { PageFrame } from "./PageFrame";
 
 export function SettingsPage() {
@@ -136,6 +137,8 @@ export function SettingsPage() {
             />
           </div>
         </Card>
+
+        <OrganizationCard />
 
         <Card data-testid="system-status">
           <h2 className="mb-4 font-medium">{m.settings.system}</h2>
