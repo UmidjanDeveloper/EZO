@@ -233,6 +233,13 @@ export interface RouteCandidate {
   effort: string | null;
 }
 
+export interface ImageProviderInfo {
+  name: string;
+  model: string;
+  /** Can also edit existing images. */
+  edit: boolean;
+}
+
 export interface SystemStatus {
   version: string;
   environment: string;
@@ -246,6 +253,8 @@ export interface SystemStatus {
   };
   agents: AgentInfo[];
   features: FeatureInfo[];
+  /** Image providers in fallback order; empty when no image generation is configured. */
+  image_providers: ImageProviderInfo[];
   personality: {
     name: string;
     tagline: string;

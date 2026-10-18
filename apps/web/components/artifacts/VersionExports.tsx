@@ -10,9 +10,35 @@ import { useI18n } from "@/lib/i18n/context";
 const PREVIEW = /^preview-(\d+)$/;
 const MAX_THUMBNAILS = 24;
 
-/** Other formats of a version (PDF, web version, Word…) and, for presentations, slide previews. */
-export function VersionExports({ artifactId, version }: { artifactId: string; version: ArtifactVersion }) {
+export interface ImageInfo {
+  placeholder: boolean;
+  /** "provider · model" of a generated picture, "EZO" for diagrams, null if unknown. */
+  madeBy: string | null;
+}
+
+/** How an image version was made, from its generation metadata. */
+export function imageInfo(meta: Record<string, unknown>): ImageInfo {
+  const placeholder = meta["placeholder"] === true;
+  if (meta["kind"] === "diagram") return { placeholder: false, madeBy: "EZO" };
+  const provider = typeof meta["provider"] === "string" ? meta["provider"] : null;
+  const model = typeof meta["model"] === "string" ? meta["model"] : null;
+  if (placeholder || !provider) return { placeholder, madeBy: null };
+  return { placeholder, madeBy: model ? `${provider} · ${model}` : provider };
+}
+
+/** Other formats of a version (PDF, web version, Word…), slide previews, or an image preview. */
+export function VersionExports({
+  artifactId,
+  version,
+  artifactType,
+}: {
+  artifactId: string;
+  version: ArtifactVersion;
+  artifactType?: string;
+}) {
   const { m, f } = useI18n();
+  const isImage = artifactType === "image";
+  const info = isImage ? imageInfo(version.generation_metadata) : null;
   const files = version.exports.filter((e) => !PREVIEW.test(e.name));
   const previews = version.exports
     .filter((e) => PREVIEW.test(e.name))
@@ -49,18 +75,34 @@ export function VersionExports({ artifactId, version }: { artifactId: string; ve
           {qa.passed ? m.artifacts.qaPassed : f(m.artifacts.qaIssues, { n: qa.errors ?? 0 })}
         </p>
       ) : null}
+      {info && (info.placeholder || info.madeBy) ? (
+        <p className={`text-xs ${info.placeholder ? "text-danger" : "text-ink-faint"}`} data-testid="image-origin">
+          {info.placeholder ? m.artifacts.placeholder : f(m.artifacts.madeBy, { who: info.madeBy ?? "" })}
+        </p>
+      ) : null}
       {previews.length ? (
         <SlideThumbnails
           artifactId={artifactId}
           version={version.version_number}
           names={previews.slice(0, MAX_THUMBNAILS).map((p) => p.name)}
+          single={isImage}
         />
       ) : null}
     </div>
   );
 }
 
-function SlideThumbnails({ artifactId, version, names }: { artifactId: string; version: number; names: string[] }) {
+function SlideThumbnails({
+  artifactId,
+  version,
+  names,
+  single = false,
+}: {
+  artifactId: string;
+  version: number;
+  names: string[];
+  single?: boolean;
+}) {
   const { m, f } = useI18n();
   const [urls, setUrls] = useState<string[]>([]);
   const key = names.join(",");
@@ -88,6 +130,17 @@ function SlideThumbnails({ artifactId, version, names }: { artifactId: string; v
     };
   }, [artifactId, version, key]);
 
+  if (single) {
+    return urls[0] ? (
+      // eslint-disable-next-line @next/next/no-img-element -- local blob URL
+      <img
+        src={urls[0]}
+        alt={m.artifacts.preview}
+        className="max-h-96 max-w-full rounded-lg border border-line object-contain"
+        data-testid="image-preview"
+      />
+    ) : null;
+  }
   return (
     <div>
       <p className="mb-1 text-xs text-ink-faint">{m.artifacts.slides}</p>

@@ -250,7 +250,7 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
         </Button>
       </div>
 
-      {current ? <VersionExports artifactId={id} version={current} /> : null}
+      {current ? <VersionExports artifactId={id} version={current} artifactType={detail.type} /> : null}
 
       {renaming ? (
         <form onSubmit={saveTitle} className="mt-3 flex gap-2">
