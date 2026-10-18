@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Literal
@@ -77,12 +79,14 @@ class OfficialSyncService:
         fetcher: SafeFetcher,
         storage: StorageProvider,
         sleep: Sleep | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.settings = settings
         self.knowledge = knowledge
         self.fetcher = fetcher
         self.storage = storage
         self._sleep = sleep
+        self._clock = clock
 
     @property
     def enabled(self) -> list[str]:
@@ -98,6 +102,7 @@ class OfficialSyncService:
             min_interval=self.settings.official_min_interval_seconds,
             max_requests=max_requests,
             sleep=self._sleep,
+            clock=self._clock,
         )
 
     # ------------------------------------------------------------------ runs

@@ -63,7 +63,12 @@ async def env(database_url: str) -> AsyncIterator[Env]:
     site = FakeSite()
     sleeps = Sleeps()
     sync = OfficialSyncService(
-        settings, services.knowledge, site.fetcher(), services.storage, sleep=sleeps
+        settings,
+        services.knowledge,
+        site.fetcher(),
+        services.storage,
+        sleep=sleeps,
+        clock=sleeps.clock,
     )
     async with services.db.sessionmaker() as session:
         user = await services.auth.ensure_owner(session)

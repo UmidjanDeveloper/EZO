@@ -227,8 +227,8 @@ Just ask in chat — EZO picks the right specialist itself:
 | “Shu PDF asosida taqdimot tayyorla” (after uploading) | The deck is built from your file and ends with a *Manbalar / Sources* slide |
 | “3-slaydni qisqartir” | The same presentation gets **version 2**; version 1 is kept |
 | “Hokimga rasmiy ariza yozib ber” | A **DOCX** (+ PDF, Markdown) with placeholders like `[F.I.Sh.]` for details you did not give |
-| “Shu faylni ingliz tiliga tarjima qil” | A new translated document with a change summary; your upload is never changed |
-| “Bu ikki hujjatni solishtir” | A paragraph-level comparison (works offline) |
+| “Shu faylni ingliz tiliga tarjima qil” | A new translated document; a Word file is translated **in place** with its formatting, tables and images kept; your upload is never changed |
+| “Bu ikki hujjatni solishtir” | A paragraph-level comparison, page-level for PDFs (works offline) |
 | “Shu excel jadvalni tahlil qil” | Exact column statistics computed by EZO, explained in plain words |
 | “Oylik xarajatlar uchun excel jadval yarat” | An **XLSX** (+ CSV); unknown values stay empty, never invented |
 | “Shu faylni PDF ga aylantir” | Format conversion — works even without an AI key |
@@ -236,8 +236,29 @@ Just ask in chat — EZO picks the right specialist itself:
 Every presentation goes through a layout check (text that does not fit, tiny fonts, elements
 outside the slide, broken chart data…). EZO repairs problems once automatically and tells you
 honestly if anything remains. With an OpenAI or Gemini key, picture slides get generated
-images; without one they show an abstract visual and EZO says so. Scanned PDFs need OCR,
-which is not built in yet.
+images; without one they show an abstract visual and EZO says so.
+
+## EZO Office: PDF, scans, Word, Excel (Ofis ishlari)
+
+Attach files with the paperclip (several at once, in order) and say what to do. These work
+**without any AI key** unless marked:
+
+| Try | What happens |
+|---|---|
+| “Shu 3 ta PDFni birlashtir va 2-betni olib tashla” | One merged PDF; page numbers refer to the merged file; every result is reopened and checked |
+| “4-betni o'chir, 6-betni birinchi betga ko'chir”, “2-betni 90 daraja bur”, “sahifa raqamlarini qo'y”, `suv belgisi "MAXFIY"`, “hajmini kamaytir”, “rasmga aylantir” | The matching PDF operation; password-protected PDFs are refused, signed PDFs get a warning |
+| “Rasmdagi matnni chiqarib ber” (photo or scan) | Local OCR (Uzbek Latin & Cyrillic, Russian, English) → a `.txt` file and the text in the reply |
+| “Shu skanni Word ga aylantir” / “…asl ko'rinishini saqlab” | Editable or layout-preserving Word from a scan |
+| “Bu PDFni qidiriladigan PDF qil” | The same pages with an invisible text layer (searchable, copyable) |
+| “Shu PDFdagi jadvalni Excelga chiqar” | Tables → XLSX, one sheet per table |
+| “Aholi bo'yicha kamayish tartibida sarala”, “dublikatlarni o'chir”, “Viloyat bo'yicha guruhlab yig'indisini hisobla” | The spreadsheet operation; every number computed by EZO |
+| `«Ijarachi» ni «Arendator» ga almashtir` | Find-and-replace in a Word file, formatting kept (add “track changes” for Word revisions) |
+| “Shu faylning qisqacha mazmunini yoz” (long file) | **Needs an AI key.** The whole file is read part by part; nothing is silently cut |
+
+Details: [docs/EZO_OFFICE.md](docs/EZO_OFFICE.md), [docs/OCR.md](docs/OCR.md),
+[docs/DOCUMENT_FIDELITY.md](docs/DOCUMENT_FIDELITY.md). OCR needs Tesseract, which is included in
+the Docker image. For local development, install `tesseract-ocr` with the `uzb`, `uzb-cyrl`,
+`rus` and `eng` packs.
 
 ## Language practice (Til mashg'ulotlari)
 

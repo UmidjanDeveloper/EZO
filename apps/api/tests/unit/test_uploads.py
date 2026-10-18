@@ -73,3 +73,21 @@ def test_rejected_files(filename: str, data: bytes, code: str) -> None:
         detect_kind(filename, data)
     assert info.value.code == code
     assert info.value.message  # human-readable
+
+
+def test_macro_payloads_in_office_files_are_refused() -> None:
+    import io
+    import zipfile
+
+    from tests.docx_fixtures import rich_docx
+
+    source = zipfile.ZipFile(io.BytesIO(rich_docx()))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as target:
+        for item in source.infolist():
+            target.writestr(item, source.read(item.filename))
+        target.writestr("word/vbaProject.bin", b"\x00macro")
+    with pytest.raises(UploadRejectedError) as caught:
+        detect_kind("renamed.docx", buffer.getvalue())
+    assert caught.value.code == "macros"
+    assert detect_kind("clean.docx", rich_docx()).category == "docx"

@@ -141,3 +141,13 @@ async def test_page_count_question_is_answered_from_the_file(
     )
     assert created(events) == []
     assert "3 pages" in system_of(fake_anthropic)
+
+
+async def test_two_pdfs_are_compared_page_by_page(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    old = await upload(client, "eski.pdf", make_pdf(["Birinchi bet", "Narx 100"], title="v1"))
+    new = await upload(client, "yangi.pdf", make_pdf(["Birinchi bet", "Narx 120"], title="v2"))
+    await stream_chat(client, message="Bu ikki PDFni solishtir", attachments=[new["id"], old["id"]])
+    system = system_of(fake_anthropic)
+    assert "PDF page-level comparison" in system and "pages with different text: 2" in system

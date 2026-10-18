@@ -92,6 +92,11 @@ def _check_zip(data: bytes, required_member: str, label: str) -> None:
                 raise UploadRejectedError(
                     "too_large", f"The {label} file is too large when unpacked."
                 )
+            if any(name.lower().endswith(("vbaproject.bin", "vbadata.xml")) for name in names):
+                # A macro-enabled file renamed to .docx/.xlsx: EZO never keeps or runs macros.
+                raise UploadRejectedError(
+                    "macros", f"This {label} file contains macros, which EZO does not accept."
+                )
     except zipfile.BadZipFile as exc:
         raise UploadRejectedError(
             "corrupt", f"The {label} file is damaged or not really {label}."

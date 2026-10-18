@@ -232,7 +232,20 @@ Format services live in `documents/` and know nothing about agents or models:
 - `model.py` + `markdown_io.py`: a format-neutral `DocumentSpec` parsed from Markdown.
 - `docx/`, `pdf/`, `spreadsheet/` writers; `spreadsheet/analysis.py` computes column facts
   (types, missing values, sum/mean/median/min/max, top values) without pandas.
-- `compare.py`: paragraph-level diff; `ocr.py`: the `OCRProvider` interface.
+- `compare.py`: paragraph-level diff.
+- `pdf/engine.py` + `pdf/plan.py` + `pdf/requests.py`: the offline PDF engine (pypdf for
+  structure, pypdfium2 for rendering, reportlab for stamps), multi-step plans with page
+  identity, and the uz/ru/en request parser. Every output is reopened and verified.
+- `ocr/`: `OCRProvider`; `TesseractOCRProvider` (fixed argv, no shell, stdin, timeout,
+  output limit; packs checked against `--list-langs`), `preprocess.py` (contrast, upscale,
+  deskew), `export.py` (editable / layout DOCX, searchable PDF). Per-page results live in
+  `ocr_pages` (migration 0006).
+- `docx/fidelity.py`: in-place Word editing on the original XML (run segments, ⟦k⟧ markers,
+  difflib fallback, tracked changes, structural inventory before/after).
+- `tables.py`: Word tables, PDF word boxes (PDFium) and OCR word boxes → detected tables.
+  `spreadsheet/ops.py`: deterministic sheet operations and the formula report.
+- `longdoc.py`: section-aware parts for long texts; per-part model results are cached in
+  `long_doc_parts` (migration 0007) so long jobs resume.
 - `render/`: the slide engine. `spec.py` validates a `DeckSpec` (24 layouts), `layouts.py`
   lays every slide out **once** into primitives on a 960×540 pt canvas, fitting text with the
   bundled Liberation Sans metrics (Arial-compatible), and four renderers draw the same plan:
@@ -255,8 +268,12 @@ means, scoped to the project).
   `check_deck` QA → one repair call if there are errors → `create_presentation` (PPTX + PDF +
   web + previews + JSON spec as exports, a linked `StoryProject`) → a short report on the cheap
   `chat` route. “3-slaydni qisqartir” edits the conversation's latest deck into a new version.
-- **DocumentAgent** picks an action without a model call (convert, compare, analyze,
-  spreadsheet, transform, create, answer). Conversion and comparison need no model and work
+- **DocumentAgent** first tries the deterministic EZO Office actions (`agents/office.py`:
+  PDF operations and OCR; `agents/convert_office.py`: scan → Word/searchable PDF, tables,
+  sheet operations; `agents/docx_office.py`: in-place Word edits and find-and-replace).
+  They act on the files attached to the message, or on files the request clearly refers to.
+  Long files go through `agents/longdoc_office.py`. Otherwise it picks an action without a
+  model call (convert, compare, analyze, spreadsheet, transform, create, answer). Conversion and comparison need no model and work
   offline. Transformations of an upload create a derived artifact; of an EZO document, a new
   version. Both record `derived_from`, a change summary and diff statistics.
 

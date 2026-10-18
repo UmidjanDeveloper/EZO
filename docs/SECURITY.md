@@ -146,3 +146,30 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
 - No malware scanning of uploads (only type and size checks).
 - No encryption at rest inside EZO.
 - No security review by a third party yet.
+
+## Phase 3 — EZO Office security review (2026-10-18)
+
+Reviewed: PDF engine, OCR, Word in-place editing, tables, spreadsheet operations, long
+documents, chat attachments.
+
+| Risk | Control | Verified by |
+|---|---|---|
+| Shell / command injection via OCR | Tesseract runs with a fixed argument list, `shell` never used, image bytes on stdin, minimal environment, timeout, 8 MB output limit; binary from server config (`EZO_TESSERACT_CMD` via `shutil.which`), never from a request | code review; `tests/unit/test_ocr.py` |
+| Invented / injected language identifiers | packs must match `^[a-z]{3}(_[a-z]{3,4})?$` **and** be listed by `tesseract --list-langs`; `"uzb; rm -rf /"` is rejected | `test_language_packs_are_checked_not_invented` |
+| Someone else's files | attachments are ownership-checked (404 `attachment_not_found`); every tool loads files through `load_file` with `user_id` checks; OCR and long-document caches are per user | `test_someone_elses_attachment_is_rejected` |
+| Decompression bombs / oversized input | uploads: size limit, ≤ 5,000 zip parts, ≤ 200 MB unpacked; PDFs: 200 MB, 3,000 pages, render ≤ 40 M pixels, dpi ≤ 300; OCR ≤ `EZO_OCR_MAX_PAGES`; Word edits ≤ 50 MB and 400,000 characters; long documents ≤ 2,000,000 characters (refused, never cut) | unit tests |
+| Macros | `.docm` / `.xlsm` are not accepted; a `.docx` / `.xlsx` that contains `vbaProject.bin` is rejected at upload; openpyxl never runs macros | `test_macro_payloads_in_office_files_are_refused` |
+| XML entity attacks | python-docx parses with `resolve_entities=False`; openpyxl uses the standard library parser, which has expat's billion-laughs protection | code review |
+| Password-protected / restricted PDFs | never decrypted beyond an empty user password; files whose permissions forbid changes are refused for changes; signed PDFs get a "signature will be invalid" warning | `test_encrypted_restricted_and_corrupt_inputs_are_refused`, `test_signed_pdfs_get_a_warning` |
+| Spreadsheet formula injection | text cells starting with `= + - @` are written as text (also for tables read from PDFs and scans) | `test_xlsx_numbers_headers_and_formula_safety` |
+| Model output executing actions | model replies are only paragraph texts or validated `PdfStep` JSON (fixed operations, page-spec pattern); nothing is executed from free text | `test_steps_are_validated` |
+| Prompt injection inside documents | document text is sent as data; EZO never follows instructions from it to call tools; outputs are written as text into the user's own new artifact | design |
+| Originals modified | every operation writes a new artifact or version; inputs are read-only | integration tests check the upload size/hash afterwards |
+
+Known residual risks:
+
+- PDF parsing and rendering run in a worker thread. A tool timeout stops waiting for it,
+  but cannot kill a pathological file mid-parse (Python threads cannot be cancelled). A
+  separate worker process with a CPU limit is planned with the job system (Phase 5).
+- OCR results can be wrong. EZO always labels OCR text as such and shows the engine's
+  own confidence as a score, not as a probability.

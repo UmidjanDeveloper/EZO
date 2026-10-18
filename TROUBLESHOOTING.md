@@ -189,3 +189,24 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
 | A social graphic or logo shows shapes instead of a picture | It is a labelled placeholder: no provider, or generation failed. The artifact page shows the reason; ask again once a provider works. |
 | Slides show abstract visuals | No image provider, the deck asked for "rasmsiz", or the per-deck limit was reached (`EZO_IMAGE_MAX_PER_DECK`). EZO's summary names which. |
 | "Fonini o'zgartir" started something else | Edits go to the newest image of the **same conversation**, or a newer upload. Say "bu rasmni …" in the conversation where the image was made. |
+
+## EZO Office: OCR, PDF and Word edits
+
+- **"OCR is not available on this server"**: Tesseract is not installed, or `EZO_OCR_PROVIDER=none`.
+  The Docker image includes it. For local runs install `tesseract-ocr` plus the `tesseract-ocr-uzb`,
+  `-uzb-cyrl`, `-rus` and `-eng` packs and check with `tesseract --list-langs`. `GET /api/status`
+  → `ocr` shows the installed and missing packs. Then press **Reindex** on the scan.
+- **"The OCR language pack … is not installed"**: install that pack (exact Tesseract names:
+  `uzb` = Uzbek Latin, `uzb_cyrl` = Uzbek Cyrillic) or remove it from `EZO_OCR_LANGUAGES`.
+- **OCR text has mistakes**: check the page warnings and the engine confidence (an engine
+  score, not an accuracy). Blurry photos, small print, stamps and handwriting read poorly.
+  Rescan at 300 dpi.
+- **"This PDF is password-protected"**: EZO never tries to open protected PDFs. Remove the
+  password in the program that created the file, then upload again.
+- **A Word paragraph lost its bold word after an edit**: the reply and the artifact metadata
+  list "formatting fallback" paragraphs. The model changed the text too much to map the
+  formatting back. Use find-and-replace for exact edits.
+- **"stopped after N of M parts"** (long documents): the AI provider failed half-way. Ask
+  again; the finished parts are reused.
+- **Sheet operation refused ("column does not exist")**: use the column name exactly as it
+  appears in the header row.

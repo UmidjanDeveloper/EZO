@@ -100,10 +100,16 @@ class FakeSite:
 
 
 class Sleeps:
-    """Records requested sleeps instead of sleeping."""
+    """Records requested sleeps instead of sleeping, with a clock that only moves when
+    something sleeps (so pacing checks do not depend on how fast the database is)."""
 
     def __init__(self) -> None:
         self.calls: list[float] = []
+        self.now = 1_000.0
 
     async def __call__(self, seconds: float) -> None:
         self.calls.append(seconds)
+        self.now += seconds
+
+    def clock(self) -> float:
+        return self.now

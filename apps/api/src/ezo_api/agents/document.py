@@ -18,6 +18,7 @@ Format generation lives in ``ezo_api.documents`` and runs through logged tools.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass
@@ -60,10 +61,13 @@ from ezo_api.core.text import normalize
 from ezo_api.db.models import Artifact, DocumentRevision
 from ezo_api.documents.compare import compare_texts
 from ezo_api.documents.longdoc import TooLongError, outline
+from ezo_api.documents.pdf import engine as pdf_engine
+from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
+from ezo_api.storage.base import StorageError
 from ezo_api.tools.base import ToolContext
 from ezo_api.tools.document_tools import MAX_READ_CHARS
 
@@ -508,12 +512,18 @@ class DocumentAgent(Agent):
             }
         )
         diff = comparison.to_markdown(limit=30)
+        pdf_facts = await self._compare_pdfs(ctx, second, first)
         gathered.notes.append(
             f"Comparison of “{second.title}” (original) and “{first.title}” (newer): "
-            f"{comparison.summary()}.\nDifferences (paragraph level):\n{diff[:8_000]}"
+            f"{comparison.summary()}."
+            + (f"\nPDF page-level comparison (computed by EZO): {pdf_facts}" if pdf_facts else "")
+            + f"\nDifferences (paragraph level):\n{diff[:8_000]}"
         )
         if request.wants_file:
-            markdown = f"# {first.title} — {second.title}\n\n{comparison.summary()}\n\n{diff}"
+            pages = f"{pdf_facts}\n\n" if pdf_facts else ""
+            markdown = (
+                f"# {first.title} — {second.title}\n\n{comparison.summary()}\n\n{pages}{diff}"
+            )
             await self._save_document(
                 ctx,
                 gathered,
@@ -523,6 +533,24 @@ class DocumentAgent(Agent):
                 artifact_type="report",
                 metadata={"action": "compare", "comparison": comparison.summary()},
             )
+
+    async def _compare_pdfs(
+        self, ctx: GatherContext, original: SourceText, newer: SourceText
+    ) -> str:
+        """Page counts, changed pages and metadata differences when both files are PDFs."""
+        docs = [s.document.document for s in (original, newer) if s.document is not None]
+        if len(docs) != 2 or any(
+            d.mime_type != "application/pdf" or not d.storage_key for d in docs
+        ):
+            return ""
+        storage = ctx.tools.services.storage
+        try:
+            a = await storage.get(docs[0].storage_key or "")
+            b = await storage.get(docs[1].storage_key or "")
+            result = await asyncio.to_thread(pdf_engine.compare_pdfs, a, b)
+        except (PdfError, StorageError):
+            return ""
+        return result.summary()
 
     async def _analyze(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest

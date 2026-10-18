@@ -75,7 +75,9 @@ FEATURES: tuple[Feature, ...] = (
         "ezo_office",
         "OCR + EZO Office: PDF tools, scans, DOCX fidelity, long documents",
         "Phase 3",
-        "planned",
+        "alpha",
+        "OCR needs Tesseract (in the Docker image); summaries and translations need a model; "
+        "layout Word is not pixel-exact; XLSX → PDF and Word footnotes not done",
     ),
     Feature(
         "education_academic_career",

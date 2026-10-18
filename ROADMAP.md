@@ -89,15 +89,23 @@ images) plus the extended local checks listed for that phase.
 
 ## Next (in this order)
 
-### Phase 3 — OCR + EZO Office ← current
-- Real `OCRProvider` implementations (scanned PDF, photos, screenshots, tables) with page
-  numbers, confidence and citations; low confidence is shown, never treated as exact
-- PDF tools: merge, split, delete / reorder / rotate / extract pages, image ↔ PDF, page
-  numbers, watermark, header/footer, compress where possible, metadata cleanup, compare
-- DOCX editing that preserves formatting (headings, tables, styles, page breaks, images);
-  XLSX → PDF; every change a new artifact version
-- Chunk-aware long-document workflows (section map → process → reassemble), replacing the
-  current 40,000-character limit
+### Phase 3 — OCR + EZO Office ← current (alpha, partially complete — 2026-10-18)
+- **Done:** local Tesseract OCR (uzb, uzb_cyrl, rus, eng) for scans and photos with page
+  numbers, line boxes, engine confidence (shown as an engine score), orientation and
+  deskew; OCR in ingestion and citations; scan → editable / layout Word and searchable PDF
+- **Done:** offline PDF engine: merge, split, delete / extract / move / rotate pages,
+  orientation, image ↔ PDF, page numbers, watermark, header/footer, lossless compression,
+  metadata cleanup, inspect, page-level compare; chat attachments; uz/ru/en requests
+- **Done:** DOCX edits in place that keep formatting (runs, styles, numbering, tables,
+  images, headers/footers, hyperlinks), real tracked changes on request, find-and-replace
+- **Done:** tables → Excel (Word exact; PDF and scans detected), spreadsheet operations
+  (sort, filter, duplicates, totals, group-by) computed by EZO
+- **Done:** long documents processed completely (section-aware parts, map-reduce
+  summaries, resumable cache, whole-file search for questions); the 40,000-character
+  limit is gone
+- **Not yet:** XLSX → PDF, editing Word footnotes/comments/charts, LibreOffice in the
+  Docker image (PDF exports of DOCX/XLSX), handwriting OCR, an LLM planner for sheet
+  operations, a document-viewer UI with page thumbnails beyond the first page
 
 ### Phase 4 — Education, academic research and career
 - EducationAgent: lesson packages (plan, timing, lecture notes, PPTX, quiz, homework,

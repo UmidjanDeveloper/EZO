@@ -58,7 +58,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | Native missions (in memory, not in chat) | Orchestration foundation | experimental |
 | LanguageCoachAgent, IELTS-style simulator, progress | Phase 1 | alpha |
 | VisualAgent: images, edits, diagrams, social graphics, logos, slide images | Phase 2 | alpha |
-| OCR + EZO Office (PDF tools, DOCX fidelity, long documents) | Phase 3 | planned |
+| OCR + EZO Office (PDF tools, OCR, DOCX fidelity, tables, sheets, long documents) | Phase 3 | alpha (partially complete) |
 | Education, academic research and career agents | Phase 4 | planned |
 | Durable tasks / jobs / worker | Phase 5 | planned |
 | Persistent missions in chat | Phase 6 | planned |
