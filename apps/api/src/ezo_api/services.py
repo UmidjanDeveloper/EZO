@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ezo_api.academic.scholar import OpenAlexClient, ScholarSearch
 from ezo_api.agents.registry import AgentRegistry
 from ezo_api.artifacts.service import ArtifactService
 from ezo_api.auth.local import LocalOwnerAuth
@@ -84,6 +85,7 @@ class Services:
     official: OfficialSyncService
     ocr: OCRProvider
     office: OfficeConverter | None
+    scholar: ScholarSearch | None = None
 
 
 def build_services(
@@ -95,6 +97,7 @@ def build_services(
     visual: VisualService | None = None,
     ocr: OCRProvider | None = None,
     office: OfficeConverter | Literal["auto"] | None = "auto",
+    scholar: ScholarSearch | Literal["auto"] | None = "auto",
 ) -> Services:
     """Wire everything together. Tests can inject providers, web search, fetcher, voice and
     image providers."""
@@ -197,6 +200,13 @@ def build_services(
         )
         if office == "auto"
         else office,
+        scholar=(
+            OpenAlexClient(safe_fetcher, settings.openalex_mailto)
+            if settings.scholar_provider == "openalex"
+            else None
+        )
+        if scholar == "auto"
+        else scholar,
     )
     core.services = services
     core.memory_index = memory_index

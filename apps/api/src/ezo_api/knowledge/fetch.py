@@ -133,12 +133,12 @@ class SafeFetcher:
         if not addresses or not all(_is_public(address) for address in addresses):
             raise FetchError("blocked", "This address points to a private network and is blocked.")
 
-    def _client(self) -> httpx.AsyncClient:
+    def _client(self, accept: tuple[str, ...] = ALLOWED_CONTENT_TYPES) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             transport=self._transport,
             timeout=TIMEOUT,
             follow_redirects=False,
-            headers={"User-Agent": USER_AGENT, "Accept": ", ".join(ALLOWED_CONTENT_TYPES)},
+            headers={"User-Agent": USER_AGENT, "Accept": ", ".join(accept)},
         )
 
     async def allowed_by_robots(self, url: str) -> bool:
@@ -164,9 +164,15 @@ class SafeFetcher:
             raise FetchError("robots", "The website does not allow automated access to this page.")
         return await self._get(url, MAX_BYTES)
 
-    async def _get(self, url: str, max_bytes: int) -> FetchedPage:
+    async def fetch_json(self, url: str, max_bytes: int = 2_000_000) -> FetchedPage:
+        """A JSON API response (same SSRF and size protections; only application/json)."""
+        return await self._get(url, max_bytes, accept=("application/json",))
+
+    async def _get(
+        self, url: str, max_bytes: int, accept: tuple[str, ...] = ALLOWED_CONTENT_TYPES
+    ) -> FetchedPage:
         current = url
-        async with self._client() as client:
+        async with self._client(accept) as client:
             for _ in range(MAX_REDIRECTS + 1):
                 await self.check_host(current)
                 try:
@@ -186,7 +192,7 @@ class SafeFetcher:
                             )
                         content_type = response.headers.get("content-type", "").split(";")[0]
                         content_type = content_type.strip().lower()
-                        if content_type and not content_type.startswith(ALLOWED_CONTENT_TYPES):
+                        if content_type and not content_type.startswith(accept):
                             raise FetchError(
                                 "content_type", f"Unsupported content type: {content_type}."
                             )

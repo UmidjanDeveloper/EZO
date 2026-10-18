@@ -18,6 +18,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ezo_api import __version__
 from ezo_api.api.routes import (
+    academic,
     artifacts,
     chat,
     conversations,
@@ -178,6 +179,7 @@ def create_app(
         official,
         writing,
         translation,
+        academic,
     ):
         app.include_router(module.router)
 

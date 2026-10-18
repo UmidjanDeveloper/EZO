@@ -70,6 +70,7 @@ def make_settings(database_url: str, **overrides: object) -> Settings:
         # Deterministic by default; OCR tests opt in (tests/integration/test_ocr.py).
         "EZO_OCR_PROVIDER": "none",
         "EZO_OFFICE_CONVERTER": "none",
+        "EZO_SCHOLAR_PROVIDER": "none",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

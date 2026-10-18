@@ -25,6 +25,7 @@ LABELS: dict[str, dict[str, str]] = {
         "total": "Jami", "checkpoints": "Nazorat nuqtalari", "resources": "Manbalar",
         "sources_needed": "Kerakli manbalar (EZO o'ylab topmaydi — o'zingiz qo'shing)",
         "open": "Ochiq savol", "issues": "EZO tekshiruvi", "slides": "Slaydlar",
+        "outline": "Javob rejasi", "why": "Nega so'raladi", "defense": "Ehtimoliy savollar",
     },
     "ru": {
         "subject": "Предмет", "level": "Уровень", "duration": "Продолжительность", "minutes": "мин",
@@ -41,6 +42,7 @@ LABELS: dict[str, dict[str, str]] = {
         "total": "Итого", "checkpoints": "Контрольные точки", "resources": "Ресурсы",
         "sources_needed": "Нужные источники (EZO их не придумывает — добавьте сами)",
         "open": "Открытый вопрос", "issues": "Проверка EZO", "slides": "Слайды",
+        "outline": "План ответа", "why": "Почему спрашивают", "defense": "Вероятные вопросы",
     },
     "en": {
         "subject": "Subject", "level": "Level", "duration": "Length", "minutes": "min",
@@ -57,6 +59,7 @@ LABELS: dict[str, dict[str, str]] = {
         "total": "Total", "checkpoints": "Checkpoints", "resources": "Resources",
         "sources_needed": "Sources needed (EZO does not invent them — add your own)",
         "open": "Open question", "issues": "EZO checks", "slides": "Slides",
+        "outline": "Answer outline", "why": "Why it is asked", "defense": "Likely questions",
     },
 }  # fmt: skip
 
@@ -173,12 +176,20 @@ def to_markdown(kind: Kind, material: Material, check: Check, language: str) -> 
         lines += [f"## {t['homework']}", "", *[f"- {h}" for h in material.homework], ""]
     if material.criteria:
         lines += [f"## {t['rubric']}", "", *_criteria(material, check, t)]
-    if material.questions:
+    if material.questions and kind.key == "defense":
+        lines += [f"## {t['defense']}", ""]
+        for number, question in enumerate(material.questions, start=1):
+            lines += [f"**{number}. {question.question}**", ""]
+            if question.answer:
+                lines += [f"*{t['outline']}:* {question.answer}", ""]
+            if question.explanation:
+                lines += [f"*{t['why']}:* {question.explanation}", ""]
+    elif material.questions:
         lines += [f"## {t['quiz']}", "", *_questions(material, t)]
     if material.exercises and any(e.answer for e in material.exercises):
         rows = [[str(i), e.answer] for i, e in enumerate(material.exercises, start=1)]
         lines += [f"## {t['exercises']} — {t['answer']}", "", *_table(["№", t["answer"]], rows)]
-    if material.questions:
+    if material.questions and kind.key != "defense":
         lines += _key(material, check, t)
     resources = material.resources + material.sources_needed
     if resources:

@@ -98,10 +98,10 @@ async def make_material(
         material = parsed
     report = check(kind, material, options)
     markdown = to_markdown(kind, material, report, model_language)
-    sheets = to_sheets(kind, material, report, model_language)
+    sheets = to_sheets(kind, material, report, model_language) if "xlsx" in kind.outputs else []
     deck = (
         to_deck(material, model_language)
-        if not template and (kind.key == "lesson" or options.slides)
+        if not template and ("pptx" in kind.outputs or options.slides)
         else None
     )
     if language == "uz-cyrl":

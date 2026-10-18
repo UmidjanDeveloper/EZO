@@ -24,6 +24,8 @@ import re
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
+from ezo_api.academic.requests import citation_request, wants_research_plan
+from ezo_api.agents.academic_office import run_citations, run_research_plan
 from ezo_api.agents.base import (
     Agent,
     AgentPlan,
@@ -424,6 +426,13 @@ class DocumentAgent(Agent):
         # Deterministic EZO Office operations first: they need no model and no API key.
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
+            return gathered
+        style = citation_request(ctx.turn.text)
+        if style is not None:
+            await run_citations(ctx, gathered, style, await self._file_sources(ctx, gathered))
+            return gathered
+        if wants_research_plan(ctx.turn.text) and request.action not in ("convert", "compare"):
+            await run_research_plan(ctx, gathered, await self._attached_sources(ctx, gathered))
             return gathered
         education = wants_education(ctx.turn.text)
         if education is not None and request.action not in ("convert", "compare"):
@@ -1022,8 +1031,8 @@ class DocumentAgent(Agent):
             + ("\n" + "\n".join(extra_lines) if extra_lines else "")
         )
 
-    async def _file_sources(self, ctx: GatherContext, gathered: Gathered) -> list[SourceRef]:
-        """Attached files (up to three) as numbered sources, else the knowledge base."""
+    async def _attached_sources(self, ctx: GatherContext, gathered: Gathered) -> list[SourceRef]:
+        """Attached files (up to three) as sources."""
         tools = ctx.tools
         sources: list[SourceRef] = []
         for document in (await attached_files(tools, ctx.turn.attachments))[:3]:
@@ -1032,6 +1041,12 @@ class DocumentAgent(Agent):
             )
             if read is not None and read.text.strip():
                 sources.append(document_source(document, read.text, ANSWER_CHARS))
+        return sources
+
+    async def _file_sources(self, ctx: GatherContext, gathered: Gathered) -> list[SourceRef]:
+        """Attached files (up to three) as numbered sources, else the knowledge base."""
+        tools = ctx.tools
+        sources = await self._attached_sources(ctx, gathered)
         if not sources and not tools.services.router.is_offline:
             sources = await self._knowledge(ctx, gathered)
         number_sources(sources)

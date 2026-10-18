@@ -64,6 +64,16 @@ KINDS: tuple[Kind, ...] = (
         ("docx", "xlsx"),
     ),
     Kind(
+        "defense",
+        {"uz": "Himoyaga tayyorgarlik", "ru": "Подготовка к защите", "en": "Defense preparation"},
+        re.compile(
+            r"\b(himoya (savol|uchun savol)\w*|himoyaga tayyor\w*|himoyaga savol\w*|"
+            r"defen[cs]e (questions|preparation|prep)|viva (questions|preparation)|"
+            r"вопрос\w* (к|на|для) защит\w*|подготовк\w* к защите)"
+        ),
+        ("docx",),
+    ),
+    Kind(
         "quiz",
         {"uz": "Test savollari", "ru": "Тест", "en": "Quiz"},
         re.compile(
@@ -79,7 +89,8 @@ BY_KEY = {kind.key: kind for kind in KINDS}
 
 _MAKE = re.compile(
     r"\b(tuz|tayyorla|yarat|yoz|ishlab chiq|qilib ber|make|create|prepare|write|draft|"
-    r"generate|design|составь|подготов|создай|сделай|напиши|разработай|shablon\w*|template|шаблон\w*)"
+    r"generate|design|составь|подготов|создай|сделай|напиши|разработай|shablon\w*|template|"
+    r"шаблон\w*|tayyorgarlik|tayyorlan\w*|yordam ber|help me)"
 )
 _NOT_EDUCATION = re.compile(
     r"\b(unit test|pytest|test coverage|testlarni ishga|run (the )?tests|kod\w*|code|"

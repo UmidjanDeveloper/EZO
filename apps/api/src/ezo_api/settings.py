@@ -153,6 +153,11 @@ class Settings(BaseSettings):
     # Word/Excel → PDF with LibreOffice (docs/EZO_OFFICE.md). "auto" uses it when installed.
     office_converter: Literal["auto", "none"] = Field(default="auto", alias="EZO_OFFICE_CONVERTER")
     soffice_cmd: str = Field(default="soffice", alias="EZO_SOFFICE_CMD")
+    scholar_provider: Literal["openalex", "none"] = Field(
+        default="openalex", alias="EZO_SCHOLAR_PROVIDER"
+    )
+    """Scholarly literature search for research plans (OpenAlex: free, no key)."""
+    openalex_mailto: str = Field(default="", alias="EZO_OPENALEX_MAILTO")
     office_convert_timeout_seconds: float = Field(
         default=120.0, ge=10, le=900, alias="EZO_OFFICE_CONVERT_TIMEOUT_SECONDS"
     )

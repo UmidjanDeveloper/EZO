@@ -157,3 +157,28 @@ def test_templates_and_prompt() -> None:
     prompt = build_prompt(BY_KEY["quiz"], Options(questions=12), "Russian", "")
     assert "Exactly 12 questions" in prompt and "Never invent statistics" in prompt
     assert "Language: Russian" in prompt
+
+
+def test_defense_questions_have_outlines_not_an_answer_key() -> None:
+    kind = wants_education("Shu dissertatsiya bo'yicha himoya savollarini tuz")
+    assert kind is not None and kind.key == "defense" and kind.outputs == ("docx",)
+    material = Material.model_validate(
+        {
+            "title": "Himoyaga tayyorgarlik",
+            "questions": [
+                {
+                    "type": "mcq",
+                    "question": "Ilmiy yangilik nimada?",
+                    "answer": "2-bobdagi modelni ayting",
+                    "explanation": "Komissiya har doim so'raydi",
+                }
+            ],
+        }
+    )
+    report = check(kind, material, Options())
+    assert report.issues == [] and material.questions[0].type == "open"
+    markdown = to_markdown(kind, material, report, "uz")
+    assert "*Javob rejasi:* 2-bobdagi modelni ayting" in markdown
+    assert "Javoblar kaliti" not in markdown
+    assert "Exactly" not in build_prompt(kind, Options(), "Uzbek", "")
+    assert "15 likely committee questions" in build_prompt(kind, Options(), "Uzbek", "")

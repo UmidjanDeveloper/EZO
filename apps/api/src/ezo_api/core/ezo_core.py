@@ -25,6 +25,7 @@ import anyio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ezo_api.academic.requests import citation_request, wants_research_plan
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.references import latest_artifact
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
@@ -269,6 +270,16 @@ class EzoCore:
                 # translation work, whatever the text is about (not language practice;
                 # presentations and images keep their own agents).
                 intent = IntentResult(Intent.DOCUMENT, 1.0, ("translation",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and (wants_research_plan(turn.text) or citation_request(turn.text) is not None)
+                and intent.intent
+                in (Intent.GENERAL, Intent.RESEARCH, Intent.LANGUAGE_COACH, Intent.BUSINESS)
+                and await active_language_session(session, user.id, conversation.id) is None
+            ):
+                # "Ilmiy manbalarni top, tadqiqot rejasini tuz", "APA formatiga o'tkaz":
+                # literature, plan and reference list as files.
+                intent = IntentResult(Intent.DOCUMENT, 1.0, ("academic",), intent.scores)
             elif (
                 turn.forced_agent is None
                 and (education := wants_education(turn.text)) is not None
