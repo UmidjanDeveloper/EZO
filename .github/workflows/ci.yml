@@ -36,7 +36,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
             tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
-            libreoffice-writer-nogui libreoffice-calc-nogui fonts-liberation fonts-dejavu-core
+            libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui \
+            fonts-liberation fonts-dejavu-core
           tesseract --version && tesseract --list-langs && soffice --version
       - run: uv sync --frozen
       - run: uv run ruff check src tests migrations ../../scripts
