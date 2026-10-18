@@ -34,6 +34,11 @@ import type {
   VocabularyItem,
   VoiceStatus,
   VoiceTranscript,
+  GlossaryTerm,
+  GlossaryTermInput,
+  TranslateRequest,
+  TranslateResult,
+  TransliterateResult,
 } from "./types";
 
 export class ApiError extends Error {
@@ -196,6 +201,15 @@ export function createApiClient(options: ApiClientOptions) {
     updateOrganization: (id: string, body: OrganizationProfileInput) =>
       request<OrganizationProfile>(`/api/writing/organizations/${id}`, { method: "PUT", ...json(body) }),
     deleteOrganization: (id: string) => request<void>(`/api/writing/organizations/${id}`, { method: "DELETE" }),
+    translate: (body: TranslateRequest) =>
+      request<TranslateResult>("/api/translation/translate", { method: "POST", ...json(body) }),
+    /** Uzbek Latin ↔ Cyrillic by fixed rules (no AI model, works offline). */
+    transliterate: (text: string, to: "latin" | "cyrillic") =>
+      request<TransliterateResult>("/api/translation/transliterate", { method: "POST", ...json({ text, to }) }),
+    glossary: () => request<GlossaryTerm[]>("/api/translation/glossary"),
+    createGlossaryTerm: (body: GlossaryTermInput) =>
+      request<GlossaryTerm>("/api/translation/glossary", { method: "POST", ...json(body) }),
+    deleteGlossaryTerm: (id: string) => request<void>(`/api/translation/glossary/${id}`, { method: "DELETE" }),
     /** Send a short recording; the API transcribes it and keeps no audio. */
     transcribe: (audio: Blob, filename: string, language?: string | null, signal?: AbortSignal) => {
       const form = new FormData();

@@ -559,3 +559,67 @@ export interface OrganizationProfileInput {
 export interface OrganizationProfile extends OrganizationProfileInput {
   id: string;
 }
+
+/** Translation (Stage C). */
+export type TranslationLanguage = "uz" | "uz-cyrl" | "ru" | "en";
+export type GlossaryLanguage = "uz" | "ru" | "en";
+export type TranslationDomain = "general" | "official" | "academic" | "business" | "technical" | "legal";
+
+export interface TranslateRequest {
+  text: string;
+  target: TranslationLanguage;
+  source?: TranslationLanguage | null;
+  domain?: TranslationDomain;
+  use_glossary?: boolean;
+  organization_id?: string | null;
+}
+
+/** EZO's checks of a translation against its source (warnings, nothing is changed). */
+export interface TranslationQuality {
+  ok: boolean;
+  paragraphs: number;
+  missing_numbers: string[];
+  extra_numbers: string[];
+  links_changed: string[];
+  names_to_check: string[];
+  terms_missing: string[];
+  terms_used: number;
+  empty_paragraphs: number[];
+  untranslated_paragraphs: number[];
+  length_warnings: number[];
+  script_note: string | null;
+  ambiguities: string[];
+}
+
+export interface TranslateResult {
+  text: string;
+  source_language: TranslationLanguage;
+  target_language: TranslationLanguage;
+  /** "model" or "transliteration" (Uzbek script change, no AI model). */
+  method: string;
+  quality: TranslationQuality;
+  warnings: string[];
+  terms: { source: string; target: string }[];
+  provider: string | null;
+  model: string | null;
+}
+
+export interface TransliterateResult {
+  text: string;
+  from_script: "latin" | "cyrillic" | null;
+  to: "latin" | "cyrillic";
+  engine: string;
+}
+
+export interface GlossaryTermInput {
+  source_language: GlossaryLanguage;
+  target_language: GlossaryLanguage;
+  source_term: string;
+  target_term: string;
+  note?: string | null;
+  organization_id?: string | null;
+}
+
+export interface GlossaryTerm extends GlossaryTermInput {
+  id: string;
+}
