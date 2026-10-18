@@ -17,6 +17,7 @@ from ezo_api.knowledge.ingestion.service import KnowledgeService
 from ezo_api.knowledge.retrieval.retriever import Retriever
 from ezo_api.knowledge.vectorstores import VectorStoreResolver
 from ezo_api.memory.service import MemoryIndex
+from ezo_api.official.sync import OfficialSyncService
 from ezo_api.personality.profile import PersonalityProfile, load_personality
 from ezo_api.providers.base import ModelProvider
 from ezo_api.providers.offline import OfflineProvider
@@ -69,6 +70,7 @@ class Services:
     artifacts: ArtifactService
     stories: StoryService
     visual: VisualService
+    official: OfficialSyncService
 
 
 def build_services(
@@ -158,6 +160,7 @@ def build_services(
         artifacts=ArtifactService(storage),
         stories=StoryService(),
         visual=visual or build_visual_service(settings),
+        official=OfficialSyncService(settings, knowledge, safe_fetcher, storage),
     )
     core.services = services
     core.memory_index = memory_index

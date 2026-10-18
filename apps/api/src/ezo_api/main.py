@@ -98,6 +98,10 @@ def create_app(
             mode,
             "sqlite" if settings.is_sqlite else "postgresql",
         )
+        async with services.db.sessionmaker() as session:
+            interrupted = await services.official.recover_interrupted(session)
+        if interrupted:
+            logger.info("Marked %s interrupted official-source sync run(s)", interrupted)
         resumed = await services.ingestion.resume_unfinished()
         if resumed:
             logger.info("Resumed ingestion of %s unfinished document(s)", resumed)

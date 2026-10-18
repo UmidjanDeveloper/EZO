@@ -138,6 +138,24 @@ class Settings(BaseSettings):
     image_max_per_deck: int = Field(default=4, ge=0, le=20, alias="EZO_IMAGE_MAX_PER_DECK")
     image_timeout_seconds: float = Field(default=120.0, ge=10, le=600, alias="EZO_IMAGE_TIMEOUT")
 
+    # Official knowledge sources (docs/OFFICIAL_SOURCES.md). Off unless listed here, after
+    # the owner has reviewed the source's terms: e.g. EZO_OFFICIAL_SOURCES=lexuz
+    official_sources: Annotated[list[str], NoDecode] = Field(
+        default=[], alias="EZO_OFFICIAL_SOURCES"
+    )
+    official_min_interval_seconds: float = Field(
+        default=5.0, ge=1.0, le=600.0, alias="EZO_OFFICIAL_MIN_INTERVAL_SECONDS"
+    )
+    official_max_documents_per_run: int = Field(
+        default=25, ge=1, le=500, alias="EZO_OFFICIAL_MAX_DOCUMENTS_PER_RUN"
+    )
+    official_max_retry_after_seconds: float = Field(
+        default=120.0, ge=0, le=3600, alias="EZO_OFFICIAL_MAX_RETRY_AFTER_SECONDS"
+    )
+    official_status_max_age_hours: float = Field(
+        default=24.0, ge=0.1, le=24 * 365, alias="EZO_OFFICIAL_STATUS_MAX_AGE_HOURS"
+    )
+
     @field_validator(
         "openai_api_key",
         "anthropic_api_key",
@@ -181,6 +199,13 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             names = [name.strip().lower() for name in value.split(",") if name.strip()]
             return names or ["auto"]
+        return value
+
+    @field_validator("official_sources", mode="before")
+    @classmethod
+    def _split_official_sources(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [name.strip().lower() for name in value.split(",") if name.strip()]
         return value
 
     @field_validator("image_providers", mode="before")

@@ -215,6 +215,72 @@ class KnowledgeService:
         await session.flush()
         return AddResult(document, duplicate=False, new_revision=new_revision)
 
+    async def add_connector_document(
+        self,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        *,
+        source_name: str,
+        source_url: str,
+        filename: str,
+        title: str,
+        markdown: str,
+        meta: dict[str, object],
+    ) -> AddResult:
+        """Add (or revise) one document delivered by a connector, e.g. an official source.
+
+        The text is stored as Markdown so its sections (articles) survive chunking. One
+        knowledge source per connector; the document is keyed by its official URL.
+        """
+        data = markdown.encode("utf-8")
+        content_hash = sha256_hex(data)
+        source = await session.scalar(
+            select(KnowledgeSource).where(
+                KnowledgeSource.user_id == user_id,
+                KnowledgeSource.source_type == "connector",
+                KnowledgeSource.name == source_name,
+                KnowledgeSource.project_id.is_(None),
+            )
+        )
+        if source is None:
+            source = KnowledgeSource(
+                user_id=user_id, name=source_name, source_type="connector", meta={}
+            )
+            session.add(source)
+            await session.flush()
+        source.last_sync_at = utcnow()
+        document = await session.scalar(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.source_id == source.id,
+                KnowledgeDocument.source_url == source_url,
+            )
+        )
+        if document is not None and document.content_hash == content_hash:
+            return AddResult(document, duplicate=True, new_revision=False)
+        key = f"connectors/{user_id}/{content_hash[:2]}/{content_hash}.md"
+        await self.storage.put(key, data)
+        new_revision = document is not None
+        if document is None:
+            document = KnowledgeDocument(
+                user_id=user_id,
+                source_id=source.id,
+                title=title[:300],
+                filename=sanitize_filename(filename),
+                source_url=source_url,
+                mime_type="text/markdown",
+                meta={},
+            )
+            session.add(document)
+        document.title = title[:300]
+        document.storage_key = key
+        document.size_bytes = len(data)
+        document.content_hash = content_hash
+        document.status = "queued"
+        document.error = None
+        document.meta = {**(document.meta or {}), **meta, "category": "markdown"}
+        await session.flush()
+        return AddResult(document, duplicate=False, new_revision=new_revision)
+
     # ------------------------------------------------------------------ ingest
 
     async def ingest(self, session: AsyncSession, document_id: uuid.UUID) -> KnowledgeDocument:
