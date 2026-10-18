@@ -61,6 +61,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | VisualAgent: images, edits, diagrams, social graphics, logos, slide images | Phase 2 | alpha |
 | OCR + EZO Office (PDF tools, OCR, DOCX fidelity, tables, sheets, long documents, Word/Excel → PDF) | Phase 3 | alpha (partially complete) |
 | Professional writing (30 document types, official layout, organization profile, validation) | Professional writing | alpha |
+| Translation (uz Latin/Cyrillic, ru, en; Word in place; glossary; quality checks; bilingual files; turn-based interpretation API) | Translation | alpha |
 | Education, academic research and career agents | Phase 4 | planned |
 | Durable tasks / jobs / worker | Phase 5 | planned |
 | Persistent missions in chat | Phase 6 | planned |
@@ -78,19 +79,19 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #42 (CI), commit `26eb571`, all jobs green
-(https://github.com/UmidjanDeveloper/EZO/actions/runs/39141204596):
+**CI verified** — run #46 (CI), commit `29577b9`, all jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39145075911):
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 605 | 604 | 0 | 1 | needs PostgreSQL + pgvector |
-| API · PostgreSQL | 605 | 605 | 0 | 0 | — |
+| API · SQLite | 632 | 631 | 0 | 1 | needs PostgreSQL + pgvector |
+| API · PostgreSQL | 632 | 632 | 0 | 0 | — |
 | Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 24 | 24 | 0 | 0 | — |
+| Playwright e2e | 25 | 25 | 0 | 0 | — |
 
 Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migration
-0008 included), ESLint, TypeScript, the web production build, and the Docker job. The
+0009 included), ESLint, TypeScript, the web production build, and the Docker job. The
 Docker job covers the Compose config, the API and web image builds, Tesseract with `uzb`,
 `uzb_cyrl`, `rus`, `eng` and `osd` in the API image, **the API image converting a Word
 and an Excel file to PDF with LibreOffice**, the API container migrating and answering
@@ -100,14 +101,62 @@ tests **run** (no LibreOffice skips any more).
 
 **Extended local verification** (not in CI):
 
-- Same code, with LibreOffice and Tesseract 5.3.4: SQLite 604 passed + 1 skipped
-  (pgvector); PostgreSQL 605 passed.
-- Migration 0008 verified up → check → down → up on SQLite and PostgreSQL.
-- The full Playwright suite passed locally (24).
+- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: PostgreSQL 632
+  passed.
+- Migrations 0008 and 0009 verified up → check → down → up on SQLite and PostgreSQL.
+- The full Playwright suite passed locally (25).
 - The API Docker image could **not** be rebuilt in the sandbox (the sandbox proxy blocks
   deb.debian.org). The CI Docker job built and checked it.
 - Live provider tests **not performed** (no provider keys here): the quality of AI-written
-  drafts has only been checked with scripted model replies.
+  drafts and translations has only been checked with scripted model replies.
+
+## Stage C — Translation (2026-10-18) — alpha
+
+Commits `2830ab5` (service, Latin/Cyrillic, glossary, checks, chat, API), `1d5635a`
+(Translation page), `29577b9` (docs). CI runs #44, #45, #46 green. Details:
+[docs/TRANSLATION.md](docs/TRANSLATION.md).
+
+### What works
+
+- **Text translation** between uz (Latin), uz (Cyrillic), ru and en, in chat ("Inglizchaga
+  tarjima qil: …") and at `/api/translation/translate` and on the Tarjima page. Source
+  and target are read from the request ("ruschadan o'zbek lotiniga", "с русского на
+  узбекский", "kirillga"); styles: general, official, academic, business, technical,
+  legal. Long texts go in paragraph batches; the model lists ambiguous places.
+- **Uzbek Latin ↔ Cyrillic without a model** (`translation/translit.py`): text, and Word
+  files converted in place run by run (formatting, tables, headers kept). Into Uzbek
+  Cyrillic from another language, the model writes Uzbek and EZO converts the script.
+- **Documents** reuse the existing pipeline: Word in place (DOCX fidelity with a review
+  hook), other files through Markdown, long files part by part. "ikki tilli" adds a
+  two-column bilingual Word file.
+- **Terminology memory**: glossary per user, optionally per organization (migration
+  0009), editable on the page or in chat ("Glossariyga qo'sh (inglizcha): «X» → «Y»").
+  Matching tolerates word endings and either script; only matching terms go to the model.
+- **Checks** (`translation/quality.py`, no model): numbers (separators, month names),
+  links, surnames in any script, glossary use, empty / untranslated / length-changed
+  paragraphs, script, ambiguities. Shown in chat, the page and the artifact metadata.
+- **Turn-based voice interpretation** at `/api/translation/interpret` (speech → text →
+  translation → speech; in a conversation, whichever side speaks is translated to the
+  other). Simultaneous interpretation is only an interface.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| "Shu ruscha hujjatni o'zbek kirilliga tarjima qil, ikki tilli…" → Word file in Cyrillic, heading style and bold kept, glossary term used, bilingual export | `tests/integration/test_translation.py::test_russian_word_file_into_uzbek_cyrillic_with_bilingual_export` |
+| Text in the message with a glossary term → term sent to the model, checks pass | `::test_text_in_the_message_with_glossary_and_checks` |
+| Changed number, invented number, changed name, ambiguity → all reported | `::test_problems_are_reported_not_hidden`, `tests/unit/test_translation.py::test_quality_report` |
+| No AI key: Latin ↔ Cyrillic of text and a Word file works; translation says it needs a provider | `::test_script_conversion_works_without_a_model`, e2e `translation.spec.ts` |
+| Glossary: API, chat command, unclear languages refused, another user's terms invisible, organization deletion removes its terms | `::test_glossary_api_chat_and_privacy` |
+| Interpretation turn: transcript, translation, speech | `::test_turn_based_interpretation` |
+| Latin ↔ Cyrillic rule cases (o'/g', ye/yo, e/э, ц, ъ, months, links, all caps, split runs) | `tests/unit/test_translation.py` |
+
+### Not done
+
+PDF page layout is not kept (PDF and scans are translated as text into Word); no UI for
+voice interpretation; no glossary import/export; the ц/soft-sign vocabulary for Latin →
+Cyrillic is short; translation quality with a live provider was not measured; Russian
+text written in Cyrillic would be letter-converted by "lotinga o'gir" (use translation).
 
 ## Stage B — Professional writing (2026-10-18) — alpha
 
@@ -768,9 +817,9 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Stage C — translation (glossaries, document translation that keeps layout across Word,
-PDF and scans, bilingual output, terminology checks), then Stage D (education and career)
-and Stage E (government work mode). Owner decisions still open: a licence, a protected
-`main` branch, the Dependabot PRs, and the LegalResearchAgent visibility
+Stage D — education and career (Phase 4: lesson packages, academic research with real
+citations, CV and interview practice), then Stage E (government work mode). Owner
+decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and the
+LegalResearchAgent visibility
 ([docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md) §6).
 Ruflo stays off (Phase 14).
