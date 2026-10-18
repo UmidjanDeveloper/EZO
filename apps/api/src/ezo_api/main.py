@@ -29,6 +29,7 @@ from ezo_api.api.routes import (
     stories,
     system,
     voice,
+    writing,
 )
 from ezo_api.auth.base import AuthError
 from ezo_api.providers.base import ModelProvider
@@ -174,6 +175,7 @@ def create_app(
         stories,
         language,
         official,
+        writing,
     ):
         app.include_router(module.router)
 

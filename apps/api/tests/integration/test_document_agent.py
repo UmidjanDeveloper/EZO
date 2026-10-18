@@ -41,10 +41,14 @@ async def test_create_official_document_as_docx_with_pdf_export(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
     fake_anthropic.replies = [
-        "TITLE: Ariza\nCHANGES: new document\n=====\n# Ariza\n\nTuman hokimi [F.I.Sh.] ga\n\n"
-        "## Mazmuni\n\nMen, [F.I.Sh.], uy-joy masalasida yordam so'rayman.\n\n"
-        "- Manzil: [manzil]\n\n"
-        "Sana: [sana]",
+        json.dumps(
+            {
+                "title": "Ariza",
+                "fields": {"recipient": "Tuman hokimiga", "applicant": None, "date": None},
+                "sections": [{"heading": None, "text": "Uy-joy masalasida yordam so'rayman."}],
+                "missing": ["ariza beruvchining F.I.Sh. va manzili"],
+            }
+        ),
         "Ariza tayyor.",
     ]
     events = await stream_chat(client, message="Hokimga rasmiy ariza yozib ber, word fayl qilib")
@@ -52,18 +56,23 @@ async def test_create_official_document_as_docx_with_pdf_export(
     [artifact] = created(events)
     assert artifact["type"] == "document" and artifact["title"] == "Ariza"
     writer = fake_anthropic.requests[0]
-    assert writer.model == "claude-opus-5-5" and "Uzbekistan" in (writer.system or "")
+    assert "Application" in (writer.system or "") and "JSON" in (writer.system or "")
     system = fake_anthropic.requests[-1].system or ""
-    assert "Placeholders the user must fill in" in system and "[F.I.Sh.]" in system
+    assert "Placeholders to fill in" in system and "[Ariza beruvchi" in system
+    assert "DRAFT" in system
 
     detail = (await client.get(f"/api/artifacts/{artifact['id']}")).json()
     version = detail["current_version"]
     assert version["filename"] == "Ariza.docx"
-    assert {e["name"] for e in version["exports"]} == {"pdf", "markdown"}
-    assert version["generation_metadata"]["action"] == "create"
+    assert {e["name"] for e in version["exports"]} == {"pdf", "markdown", "text"}
+    meta = version["generation_metadata"]
+    assert meta["action"] == "write" and meta["doc_type"] == "ariza" and meta["draft"] is True
     docx = await client.get(f"/api/artifacts/{artifact['id']}/versions/1/download")
-    paragraphs = [p.text for p in Document(io.BytesIO(docx.content)).paragraphs]
-    assert "Ariza" in paragraphs and "Mazmuni" in paragraphs
+    document = Document(io.BytesIO(docx.content))
+    paragraphs = [p.text for p in document.paragraphs]
+    assert "ARIZA" in paragraphs and "Tuman hokimiga" in paragraphs
+    assert "Uy-joy masalasida yordam so'rayman." in paragraphs
+    assert document.sections[0].header.paragraphs[0].text == "QORALAMA"
     pdf = await client.get(f"/api/artifacts/{artifact['id']}/versions/1/exports/pdf")
     assert pdf.content.startswith(b"%PDF")
 
@@ -197,8 +206,12 @@ async def test_conversion_works_offline(database_url: str) -> None:
             detail = (await client.get(f"/api/artifacts/{artifact['id']}")).json()
             assert detail["current_version"]["filename"] == "shartnoma.pdf"
             assert detail["current_version"]["generation_metadata"]["action"] == "convert"
-            # Writing needs a model: offline it is refused honestly, nothing is created.
-            refused = await stream_chat(client, message="Hokimga rasmiy ariza yozib ber")
-            assert created(refused) == []
+            # Writing needs a model: offline EZO makes the template (placeholders only).
+            offline = await stream_chat(client, message="Hokimga rasmiy ariza yozib ber")
+            [template] = created(offline)
+            meta = (await client.get(f"/api/artifacts/{template['id']}")).json()["current_version"][
+                "generation_metadata"
+            ]
+            assert meta["action"] == "template" and meta["doc_type"] == "ariza"
     finally:
         await app.state.services.db.dispose()

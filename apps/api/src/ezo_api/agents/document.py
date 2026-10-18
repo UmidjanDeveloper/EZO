@@ -55,6 +55,7 @@ from ezo_api.agents.references import (
     latest_artifact,
     refers_to_a_file,
 )
+from ezo_api.agents.writing_office import write_document
 from ezo_api.artifacts.service import ArtifactError
 from ezo_api.core.intent import Intent
 from ezo_api.core.text import normalize
@@ -71,6 +72,7 @@ from ezo_api.storage.base import StorageError
 from ezo_api.tools.base import ToolContext
 from ezo_api.tools.convert_tools import DOCX_MIME, XLSX_MIME
 from ezo_api.tools.document_tools import MAX_READ_CHARS
+from ezo_api.writing.catalog import DocType, wants_writing
 
 logger = logging.getLogger(__name__)
 
@@ -408,6 +410,10 @@ class DocumentAgent(Agent):
         # Deterministic EZO Office operations first: they need no model and no API key.
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
+            return gathered
+        writing = wants_writing(normalize(ctx.turn.text))
+        if writing is not None and request.transform is None:
+            await self._write(ctx, gathered, writing)
             return gathered
         for action in (
             run_ocr_export_action,
@@ -937,6 +943,21 @@ class DocumentAgent(Agent):
             f"saved as “{title}” ({info['words']} words, formats {', '.join(info['formats'])}). "
             "The original file is unchanged. Say that the whole document was covered."
         )
+
+    async def _write(self, ctx: GatherContext, gathered: Gathered, doc: DocType) -> None:
+        """Professional writing: facts from attached files (or the knowledge base) only."""
+        tools = ctx.tools
+        sources: list[SourceRef] = []
+        for document in (await attached_files(tools, ctx.turn.attachments))[:3]:
+            read = await self._read(
+                gathered, tools, DocumentRef(document, "attached"), ANSWER_CHARS
+            )
+            if read is not None and read.text.strip():
+                sources.append(document_source(document, read.text, ANSWER_CHARS))
+        if not sources and not tools.services.router.is_offline:
+            sources = await self._knowledge(ctx, gathered)
+        number_sources(sources)
+        await write_document(ctx, gathered, doc, sources)
 
     async def _create(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest

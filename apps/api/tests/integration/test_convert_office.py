@@ -149,4 +149,5 @@ async def test_spreadsheet_operations_without_a_model(offline: AsyncClient) -> N
 async def test_old_scans_are_not_converted_by_unrelated_requests(offline: AsyncClient) -> None:
     await upload(offline, "skan.png", png(page_image(UZ_LATIN)))
     events = await stream_chat(offline, message="Hokimga ariza yozib ber, word fayl qilib")
-    assert created(events) == []  # offline: writing needs a model; the scan is left alone
+    [template] = created(events)  # an ariza template (offline), not an OCR of the old scan
+    assert template["title"] == "Ariza"

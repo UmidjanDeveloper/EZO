@@ -77,7 +77,16 @@ FEATURES: tuple[Feature, ...] = (
         "Phase 3",
         "alpha",
         "OCR needs Tesseract (in the Docker image); summaries and translations need a model; "
-        "layout Word is not pixel-exact; XLSX → PDF and Word footnotes not done",
+        "layout Word is not pixel-exact; Word footnotes/comments not edited",
+    ),
+    Feature(
+        "professional_writing",
+        "Professional writing: 30 official, academic and career document types, "
+        "organization profiles",
+        "Professional writing",
+        "alpha",
+        "drafts need an AI key (templates work offline); official papers stay drafts "
+        "until a person approves them",
     ),
     Feature(
         "education_academic_career",

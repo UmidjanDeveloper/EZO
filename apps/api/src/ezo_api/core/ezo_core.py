@@ -31,6 +31,7 @@ from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.core import messages
 from ezo_api.core.intent import Intent, IntentResult, classify_intent
 from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
+from ezo_api.core.text import normalize
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import AgentRun, Conversation, KnowledgeDocument, Message, Project, User
@@ -56,6 +57,7 @@ from ezo_api.providers.router import (
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
 from ezo_api.tools.base import ToolContext
 from ezo_api.visual.kinds import wants_edit as wants_visual_edit
+from ezo_api.writing.catalog import wants_writing
 
 if TYPE_CHECKING:
     from ezo_api.services import Services
@@ -248,6 +250,13 @@ class EzoCore:
             ):
                 # "Fonini ko'k qil" right after an image: a change to that image.
                 intent = IntentResult(Intent.VISUAL, 1.0, ("image_follow_up",), intent.scores)
+            elif (
+                intent.intent == Intent.GENERAL
+                and turn.forced_agent is None
+                and wants_writing(normalize(turn.text)) is not None
+            ):
+                # "Tushuntirish xati yoz", "CV tayyorla": a document to draft.
+                intent = IntentResult(Intent.DOCUMENT, 1.0, ("writing",), intent.scores)
             elif (
                 intent.intent == Intent.GENERAL
                 and turn.forced_agent is None
