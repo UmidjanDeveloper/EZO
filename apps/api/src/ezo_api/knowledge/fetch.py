@@ -38,10 +38,30 @@ ALLOWED_CONTENT_TYPES = (
 class FetchError(Exception):
     """Fetching failed. `message` is safe to show to the user."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        status: int | None = None,
+        retry_after: float | None = None,
+    ) -> None:
         self.code = code
         self.message = message
+        self.status = status
+        """HTTP status for `http` errors (lets callers tell 403 from 429 from 503)."""
+        self.retry_after = retry_after
+        """Seconds from a `Retry-After` header, when the server sent one."""
         super().__init__(message)
+
+
+def _retry_after(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value.strip()))
+    except ValueError:
+        return None  # HTTP-date form: treated as "unknown"
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +179,10 @@ class SafeFetcher:
                             continue
                         if response.status_code >= 400:
                             raise FetchError(
-                                "http", f"The website answered with error {response.status_code}."
+                                "http",
+                                f"The website answered with error {response.status_code}.",
+                                status=response.status_code,
+                                retry_after=_retry_after(response.headers.get("retry-after")),
                             )
                         content_type = response.headers.get("content-type", "").split(";")[0]
                         content_type = content_type.strip().lower()
