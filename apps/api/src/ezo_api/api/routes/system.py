@@ -18,6 +18,7 @@ from ezo_api.schemas.api import (
     AgentInfo,
     AgentRunOut,
     FeatureInfo,
+    ImageProviderInfo,
     Preferences,
     PreferencesUpdate,
     ProviderStatus,
@@ -67,6 +68,10 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
         offline_mode=router_.is_offline,
         providers=providers,
         routing=router_.describe(),
+        image_providers=[
+            ImageProviderInfo(name=str(i["name"]), model=str(i["model"]), edit=bool(i["edit"]))
+            for i in services.visual.describe()
+        ],
         agents=[
             AgentInfo(
                 key=spec.key,

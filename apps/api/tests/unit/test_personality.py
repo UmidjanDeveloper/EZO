@@ -48,9 +48,9 @@ def test_fixed_language_rule() -> None:
 
 
 def test_registry_falls_back_to_general_for_unavailable_agents() -> None:
-    selection = AgentRegistry().select(Intent.VISUAL)
+    selection = AgentRegistry().select(Intent.BUSINESS)
     assert selection.agent.spec.key == "general"
-    assert selection.requested.key == "visual"
+    assert selection.requested.key == "business"
     assert selection.is_fallback
 
 

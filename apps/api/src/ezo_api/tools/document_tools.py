@@ -11,6 +11,7 @@ import asyncio
 import json
 import uuid
 from collections import Counter
+from functools import partial
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, Field, ValidationError
@@ -333,6 +334,30 @@ def deck_exports(build: DeckBuild, stem: str) -> dict[str, tuple[str, bytes]]:
     return exports
 
 
+async def slide_images(ctx: ToolContext, deck: DeckSpec) -> tuple[dict[int, bytes], int]:
+    """Images for slides that name an image artifact (only the user's own image artifacts).
+
+    Returns {slide number: image bytes} and how many named images could not be used; those
+    slides lose the reference and get the abstract visual instead.
+    """
+    images: dict[int, bytes] = {}
+    missing = 0
+    for number, slide in enumerate(deck.slides, start=1):
+        if not slide.image_artifact_id:
+            continue
+        try:
+            artifact = await owned_artifact(ctx, uuid.UUID(slide.image_artifact_id), ("image",))
+            assert artifact is not None
+            version = await ctx.services.artifacts.current_version(ctx.session, artifact)
+            if version is None:
+                raise ArtifactError("not_found", "The image has no content.")
+            images[number] = await ctx.services.artifacts.read(version)
+        except ArtifactError:
+            slide.image_artifact_id = ""
+            missing += 1
+    return images, missing
+
+
 class CreatePresentationTool(Tool[CreatePresentationArgs]):
     name: ClassVar[str] = "create_presentation"
     activity: ClassVar[str] = "creating"
@@ -357,8 +382,9 @@ class CreatePresentationTool(Tool[CreatePresentationArgs]):
         self, deck: DeckSpec, args: CreatePresentationArgs, ctx: ToolContext
     ) -> ToolResult:
         existing = await owned_artifact(ctx, args.artifact_id, ("presentation",))
+        images, missing = await slide_images(ctx, deck)
         try:
-            build = await asyncio.to_thread(build_deck, deck)
+            build = await asyncio.to_thread(partial(build_deck, deck, images=images))
         except DeckBuildError as exc:
             return ToolResult(ok=False, summary="", error=str(exc))
         stem = file_stem(deck.title, "presentation")
@@ -372,6 +398,7 @@ class CreatePresentationTool(Tool[CreatePresentationArgs]):
             "qa": build.qa.to_dict(),
             "fixes": build.fixes,
             "previews": len(build.previews),
+            "images": len(images),
         }
         exports = deck_exports(build, stem)
         if existing is None:
@@ -432,6 +459,8 @@ class CreatePresentationTool(Tool[CreatePresentationArgs]):
                 "theme": build.theme.name,
                 "qa": qa.to_dict(),
                 "fixes": build.fixes,
+                "images": len(images),
+                "missing_images": missing,
                 "story_id": (result.artifact.meta or {}).get("story_id"),
             },
         )

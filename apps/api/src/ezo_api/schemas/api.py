@@ -211,6 +211,12 @@ class FeatureInfo(BaseModel):
     note: str
 
 
+class ImageProviderInfo(BaseModel):
+    name: str
+    model: str
+    edit: bool
+
+
 class SystemStatus(BaseModel):
     version: str
     environment: str
@@ -220,5 +226,7 @@ class SystemStatus(BaseModel):
     routing: dict[str, Any]
     agents: list[AgentInfo]
     features: list[FeatureInfo]
+    image_providers: list[ImageProviderInfo] = []
+    """Configured image providers in fallback order (empty: no image generation)."""
     personality: dict[str, Any]
     debug_traces: bool

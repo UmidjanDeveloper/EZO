@@ -190,16 +190,35 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\bмаркетинг", 2.5),
     ],
     Intent.VISUAL: [
-        (r"\brasm (chiz|yarat|yasa|gener)", 3),
-        (r"\bgenerate an? image\b", 3),
+        (r"\b(rasm|surat)\w*\s+(chiz|yarat|yasa|gener|qil|tayyorla)", 3),
+        (r"\b(rasm|surat)\w*\s+(o'zgartir|tahrirla)", 3),
+        (r"\bgenerate (an? )?(image|picture|photo)", 3),
+        (r"\b(create|make|design) (an? )?(image|picture|illustration|banner|graphic)", 3),
+        (r"\b(image|picture|photo|illustration) of\b", 2),
         (r"\bdraw\b", 2),
         (r"\blogo", 2.5),
         (r"\blogotip", 2.5),
         (r"\billustration", 2),
-        (r"\bкартинк", 2.5),
+        (r"\bkartinka|\bкартинк", 2.5),
         (r"\bизображени", 2.5),
-        (r"\bнарисуй", 3),
-        (r"\bposter\b", 1.5),
+        (r"\bнарисуй|\bсгенерируй (картин|изображ)", 3),
+        (r"\bposter\b|\bafisha|\bафиш", 2),
+        (r"\bbanner|\bбаннер", 2),
+        (r"\b(instagram|telegram|linkedin|facebook)\s*(post|story|uchun)", 2.5),
+        (
+            r"\b(diagramm?a|sxema|flowchart|diagram|схем|диаграмм)\w*\s*"
+            r"(chiz|yarat|tayyorla|qil|draw|create|make|нарису|созда|сдела)",
+            3,
+        ),
+        (r"\b(draw|create|make) (an? )?(diagram|flowchart)", 3),
+        (r"\b(hero|product) (image|shot|visual)", 2.5),
+        (r"\bmahsulot (rasm|surat|foto)", 3),
+        (r"\binfografika|\binfographic|\bинфографик", 2.5),
+        (
+            r"\b(rasm|surat|image|picture|photo|картинк|фото|изображени)\w*\b.{0,30}"
+            r"(fon|o'zgartir|olib tashla|tahrirla|background|remove|edit|убери|фон|измени)",
+            3,
+        ),
     ],
 }
 

@@ -77,7 +77,7 @@ def create_app(
     providers: dict[str, ModelProvider] | None = None,
     **overrides: Any,
 ) -> FastAPI:
-    """Build the app. `overrides` (web_search, fetcher, voice) are for tests."""
+    """Build the app. `overrides` (web_search, fetcher, voice, visual) are for tests."""
     settings = settings or get_settings()
     logging.basicConfig(
         level=settings.log_level.upper(),

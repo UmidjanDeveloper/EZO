@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import ValidationError
@@ -53,6 +54,7 @@ from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
 from ezo_api.tools.base import ToolContext
+from ezo_api.visual.kinds import wants_no_images
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +81,7 @@ LAYOUT_GUIDE = """Layouts and the fields each one uses:
 - title_subtitle: title, subtitle
 - section: kicker (e.g. "01"), title, subtitle — a chapter divider
 - bullets: title, bullets (3-5 short points, max 6)
-- hero_image: title, body (one sentence), image_prompt (an abstract visual is drawn; no photo is generated)
+- hero_image: title, body (one sentence), image_prompt (English description of a picture for this slide — subject, setting, style; never text or letters in it; EZO generates it when an image provider exists, otherwise draws an abstract visual)
 - big_number: title, metric {value, label}, body
 - kpi: title, metrics [{value, label}] (2-4)
 - quote: quote, author
@@ -112,6 +114,8 @@ evidence → solution/plan → next steps. Vary layouts; avoid many plain bullet
 - One idea per slide. Titles are short statements (max ~8 words). Bullets max ~12 words. \
 No slide over 60 words of visible text; put detail in speaker_notes (2-4 sentences).
 - Every slide title must be unique.
+- Use hero_image where a picture really helps the story (at most 3 per deck). Image prompts must \
+not depict real, identifiable private persons or imitate existing brands.
 - Facts: use ONLY the numbered sources and well-established general knowledge. Never invent \
 statistics, quotes, names, dates or prices. Put the source numbers a slide relies on in its \
 "sources". A chart or number from a source must keep its exact values. If you show an \
@@ -147,7 +151,8 @@ PRESENTATION_INSTRUCTIONS = (
     "- what was created: title, number of slides, the storyline in one line, the theme;\n"
     "- the quality check: say honestly if any issues remain and which slides;\n"
     "- which sources were used (cite them with [n]) — or that it is based on general knowledge;\n"
-    "- that images are abstract visuals for now (only if the notes say images were planned);\n"
+    "- the slide images: generated (name the provider) or abstract placeholders — only if the "
+    "notes mention images, and never call a placeholder a real image;\n"
     "- 2-3 concrete follow-ups the user can ask for (e.g. “3-slaydni qisqartir”).\n"
     "The file appears as a card under your message (PPTX, PDF and a web version): never invent "
     "links or paths. Do not paste the slides. If the build failed, explain it plainly and "
@@ -210,6 +215,52 @@ def add_sources_slide(deck: DeckSpec, sources: list[SourceRef]) -> list[SourceRe
     if len(deck.slides) < 60:
         deck.slides.insert(position, slide)
     return used
+
+
+@dataclass(slots=True)
+class ImageStats:
+    planned: int = 0
+    generated: int = 0
+    reused: int = 0
+    refused: int = 0
+    limited: int = 0
+    failed: str | None = None
+    no_provider: bool = False
+    skipped: bool = False
+    provider: str = ""
+
+    def notes(self, missing: int = 0) -> list[str]:
+        if not self.planned:
+            return []
+        lines = []
+        if self.generated:
+            lines.append(
+                f"{self.generated} slide image(s) were generated with {self.provider} and "
+                "placed on the slides; each is also saved as an image artifact."
+            )
+        if self.reused:
+            lines.append(f"{self.reused} existing slide image(s) were kept.")
+        if self.no_provider:
+            lines.append(
+                "Some slides planned an image, but no image provider is configured, so an "
+                "abstract visual (not a real image) is used there."
+            )
+        if self.skipped:
+            lines.append("Slide images were skipped as requested; abstract visuals are used.")
+        if self.limited:
+            lines.append(
+                f"{self.limited} more slide(s) use an abstract visual because of the per-deck "
+                "image limit (EZO_IMAGE_MAX_PER_DECK)."
+            )
+        if self.refused:
+            lines.append(f"The image service declined {self.refused} slide image(s).")
+        if self.failed:
+            lines.append(
+                f"Image generation failed ({self.failed}); remaining slides use abstract visuals."
+            )
+        if missing:
+            lines.append(f"{missing} earlier slide image(s) could not be loaded.")
+        return lines
 
 
 class PresentationAgent(Agent):
@@ -428,6 +479,9 @@ class PresentationAgent(Agent):
 
         if aspect == "4:3" and existing is None:
             deck.aspect_ratio = "4:3"
+        images = await self._visuals(
+            tools, gathered, deck, existing[1] if existing else None, turn.text
+        )
         used = add_sources_slide(deck, sources) if sources else []
         references = [s.to_metadata() for s in used]
         if existing is not None:
@@ -457,12 +511,89 @@ class PresentationAgent(Agent):
             return gathered
         info = result.data
         gathered.artifacts.append(info["artifact"])
-        gathered.notes.append(self._summary_note(deck, info, existing is not None, change_summary))
+        gathered.notes.append(
+            self._summary_note(deck, info, existing is not None, change_summary, images)
+        )
         return gathered
+
+    async def _visuals(
+        self,
+        tools: ToolContext,
+        gathered: Gathered,
+        deck: DeckSpec,
+        previous: dict[str, Any] | None,
+        text: str,
+    ) -> ImageStats:
+        """Give hero slides a generated image (VisualAgent's generate_image tool).
+
+        An edited deck keeps its images: a slide with the same image prompt (or title) as
+        before reuses that image artifact. Image ids written by the model are ignored.
+        """
+        stats = ImageStats()
+        by_prompt: dict[str, str] = {}
+        by_title: dict[str, str] = {}
+        for old in (previous or {}).get("slides", []):
+            if isinstance(old, dict) and old.get("image_artifact_id"):
+                by_prompt.setdefault(str(old.get("image_prompt") or ""), old["image_artifact_id"])
+                by_title.setdefault(str(old.get("title") or ""), old["image_artifact_id"])
+        wanted: list[SlideSpec] = []
+        for slide in deck.slides:
+            slide.image_artifact_id = ""
+            if slide.layout != "hero_image" or not slide.image_prompt:
+                continue
+            stats.planned += 1
+            reused = (slide.image_prompt and by_prompt.get(slide.image_prompt)) or by_title.get(
+                slide.title
+            )
+            if reused:
+                slide.image_artifact_id = reused
+                stats.reused += 1
+            else:
+                wanted.append(slide)
+        visual = tools.services.visual
+        if not wanted:
+            return stats
+        if wants_no_images(text) or visual.max_per_deck == 0:
+            stats.skipped = True
+            return stats
+        if not visual.can_generate:
+            stats.no_provider = True
+            return stats
+        aspect = "2:3" if deck.aspect_ratio == "4:3" else "3:4"
+        stats.limited = max(0, len(wanted) - visual.max_per_deck)
+        for slide in wanted[: visual.max_per_deck]:
+            result = await call_tool(
+                gathered,
+                tools,
+                "generate_image",
+                {
+                    "prompt": f"{slide.image_prompt}. A presentation visual that suits a "
+                    f"{deck.theme} slide theme. No text, letters or logos in the image.",
+                    "title": f"{deck.title} — {slide.title}"[:200],
+                    "kind": "presentation",
+                    "aspect_ratio": aspect,
+                    "alt_text": slide.title[:500],
+                    "used_in": deck.title[:300],
+                },
+            )
+            if result.ok:
+                slide.image_artifact_id = result.data["artifact"]["id"]
+                stats.generated += 1
+                stats.provider = f"{result.data['provider']}/{result.data['model']}"
+            elif (result.data or {}).get("error_kind") == "refused":
+                stats.refused += 1
+            else:
+                stats.failed = result.error or "the image service failed"
+                break  # an unavailable service would fail for every slide
+        return stats
 
     @staticmethod
     def _summary_note(
-        deck: DeckSpec, info: dict[str, Any], edited: bool, change_summary: str
+        deck: DeckSpec,
+        info: dict[str, Any],
+        edited: bool,
+        change_summary: str,
+        images: ImageStats | None = None,
     ) -> str:
         qa = info["qa"]
         issues = "; ".join(
@@ -470,7 +601,6 @@ class PresentationAgent(Agent):
             for i in qa["issues"]
             if i["severity"] in ("error", "warning")
         )[:1_200]
-        images = any(slide.image_prompt for slide in deck.slides)
         outline = " → ".join(slide.title for slide in deck.slides[:14] if slide.title)[:900]
         lines = [
             ("Edited" if edited else "Created")
@@ -487,9 +617,6 @@ class PresentationAgent(Agent):
             lines.append("Automatic fixes: " + "; ".join(info["fixes"])[:600])
         if change_summary:
             lines.append(f"What changed: {change_summary}")
-        if images:
-            lines.append(
-                "Some slides planned an image; image generation is not available yet, so an "
-                "abstract visual is used there."
-            )
+        if images is not None:
+            lines.extend(images.notes(info.get("missing_images", 0)))
         return "\n".join(lines)

@@ -64,6 +64,13 @@ FEATURES: tuple[Feature, ...] = (
         "alpha",
         "estimated bands only; pronunciation transcript-assisted",
     ),
+    Feature(
+        "visual",
+        "Images, image edits, diagrams, social graphics, logo concepts, deck visuals",
+        "Phase 6",
+        "alpha",
+        "generated pictures need an OpenAI or Gemini key; text is always drawn by EZO",
+    ),
     Feature("ocr", "OCR for scans and images", "Phase 6.5", "planned"),
     Feature("jobs", "Durable background jobs / worker", "Infrastructure", "planned"),
     Feature("realtime_voice", "Realtime streaming voice", "Phase 7", "planned"),

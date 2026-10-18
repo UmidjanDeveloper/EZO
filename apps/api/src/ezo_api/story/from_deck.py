@@ -41,7 +41,10 @@ def scene_from_slide(slide: SlideSpec) -> SceneIn:
         visual_direction=(slide.visual_direction or slide.image_prompt)[:4000],
         speaker_notes=slide.speaker_notes[:20000],
         duration_seconds=min(seconds, 3600),
-        metadata={"sources": slide.sources} if slide.sources else {},
+        metadata={
+            **({"sources": slide.sources} if slide.sources else {}),
+            **({"image_artifact_id": slide.image_artifact_id} if slide.image_artifact_id else {}),
+        },
         narration=NarrationIn(text=slide.speaker_notes[:8000]) if slide.speaker_notes else None,
     )
 

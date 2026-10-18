@@ -142,16 +142,11 @@ AGENTS: dict[Intent, AgentSpec] = {
             "visual",
             Intent.VISUAL,
             {"uz": "Vizual agent", "en": "Visual Agent", "ru": "Визуальный агент"},
-            "Image generation and editing, logos, diagrams.",
-            maturity="planned",
+            "Image generation and editing, diagrams, social graphics, logo concepts.",
+            maturity="alpha",
             phase="Phase 6",
             context_mode="casual",
             route="chat",
-            limitation_note=(
-                "The Visual Agent (image generation) is not available yet. You cannot create "
-                "images. You may describe a visual concept or write a prompt the user could "
-                "use later, and say that image generation arrives in a later EZO update."
-            ),
         ),
     ]
 }

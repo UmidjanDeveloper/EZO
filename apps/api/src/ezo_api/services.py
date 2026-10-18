@@ -35,7 +35,9 @@ from ezo_api.tools.document_tools import (
 )
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
+from ezo_api.tools.visual_tools import CreateGraphicTool, EditImageTool, GenerateImageTool
 from ezo_api.tools.web_search import WebSearchProvider, build_web_search
+from ezo_api.visual.service import VisualService, build_visual_service
 from ezo_api.voice.service import VoiceService, build_voice_service
 
 
@@ -66,6 +68,7 @@ class Services:
     voice: VoiceService
     artifacts: ArtifactService
     stories: StoryService
+    visual: VisualService
 
 
 def build_services(
@@ -74,8 +77,10 @@ def build_services(
     web_search: WebSearchProvider | Literal["auto"] | None = "auto",
     fetcher: SafeFetcher | None = None,
     voice: VoiceService | None = None,
+    visual: VisualService | None = None,
 ) -> Services:
-    """Wire everything together. Tests can inject providers, web search, fetcher and voice."""
+    """Wire everything together. Tests can inject providers, web search, fetcher, voice and
+    image providers."""
     if settings.auth_mode == "token" and settings.api_token is None:
         raise ConfigurationError(
             "EZO_AUTH_MODE=token requires EZO_API_TOKEN to be set in .env (any long random string)."
@@ -143,12 +148,16 @@ def build_services(
                 CreateDocumentTool(),
                 CreateSpreadsheetTool(),
                 CreatePresentationTool(),
+                GenerateImageTool(),
+                EditImageTool(),
+                CreateGraphicTool(),
             ]
         ),
         memory_index=memory_index,
         voice=voice or build_voice_service(settings),
         artifacts=ArtifactService(storage),
         stories=StoryService(),
+        visual=visual or build_visual_service(settings),
     )
     core.services = services
     core.memory_index = memory_index

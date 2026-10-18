@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
+from ezo_api.agents.references import latest_artifact
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.core import messages
 from ezo_api.core.intent import Intent, IntentResult, classify_intent
@@ -33,6 +34,7 @@ from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import AgentRun, Conversation, Message, Project, User
+from ezo_api.db.models.artifacts import ARTIFACT_TYPES
 from ezo_api.knowledge.retrieval.citations import (
     CITATION_RULES,
     format_sources_for_prompt,
@@ -52,6 +54,7 @@ from ezo_api.providers.router import (
 )
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
 from ezo_api.tools.base import ToolContext
+from ezo_api.visual.kinds import wants_edit as wants_visual_edit
 
 if TYPE_CHECKING:
     from ezo_api.services import Services
@@ -157,6 +160,13 @@ def make_title(text: str) -> str:
     return (cut or title[:TITLE_MAX_CHARS]) + "…"
 
 
+async def _latest_artifact_is_image(
+    session: AsyncSession, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> bool:
+    latest = await latest_artifact(session, user_id, conversation_id, ARTIFACT_TYPES)
+    return latest is not None and latest.artifact_type == "image"
+
+
 class EzoCore:
     def __init__(
         self,
@@ -207,6 +217,14 @@ class EzoCore:
                 intent = IntentResult(
                     Intent.LANGUAGE_COACH, 1.0, ("active_language_session",), intent.scores
                 )
+            elif (
+                intent.intent == Intent.GENERAL
+                and turn.forced_agent is None
+                and wants_visual_edit(turn.text)
+                and await _latest_artifact_is_image(session, user.id, conversation.id)
+            ):
+                # "Fonini ko'k qil" right after an image: a change to that image.
+                intent = IntentResult(Intent.VISUAL, 1.0, ("image_follow_up",), intent.scores)
             step.summary = f"{intent.intent.value} ({intent.confidence:.2f})" + (
                 f" signals={list(intent.signals)}" if intent.signals else ""
             )

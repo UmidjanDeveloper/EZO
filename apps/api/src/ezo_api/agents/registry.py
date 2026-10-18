@@ -11,6 +11,7 @@ from ezo_api.agents.general import GeneralAgent
 from ezo_api.agents.language_coach import LanguageCoachAgent
 from ezo_api.agents.presentation import PresentationAgent
 from ezo_api.agents.research import ResearchAgent
+from ezo_api.agents.visual import VisualAgent
 from ezo_api.core.intent import Intent
 
 
@@ -35,6 +36,7 @@ class AgentRegistry:
             DocumentAgent(),
             PresentationAgent(),
             LanguageCoachAgent(),
+            VisualAgent(),
         ]:
             self._agents[agent.spec.intent] = agent
 
