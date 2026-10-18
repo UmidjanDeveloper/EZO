@@ -29,6 +29,8 @@ class OCRLine:
     confidence: float | None
     block: int = 0
     paragraph: int = 0
+    words: tuple[tuple[str, tuple[int, int, int, int]], ...] = ()
+    """Each word with its box (used for table detection)."""
 
 
 @dataclass(slots=True)

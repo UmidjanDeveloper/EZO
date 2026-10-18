@@ -93,3 +93,58 @@ images, headers/footers and page setup are kept and checked after saving. On req
 the edits are real Word tracked changes. `«X» ni «Y» ga almashtir` is a find-and-replace
 that needs no model. The whole document is processed in batches; nothing is silently
 cut off. Details and measured results: [DOCUMENT_FIDELITY.md](DOCUMENT_FIDELITY.md).
+
+## Conversions, tables and spreadsheets (Step 4 — implemented)
+
+All of these run locally without an AI model or API key
+(`tests/integration/test_convert_office.py` runs them with no provider configured).
+
+### Scan or photo → Word / searchable PDF
+
+| Request | Result |
+| --- | --- |
+| "Shu skanni Word ga aylantir" | **editable** `.docx`: paragraphs and headings in reading order; hyphenated line ends re-joined |
+| "…asl ko'rinishini saqlab Word ga o'tkaz" / "layout" / "как в оригинале" | **layout** `.docx`: one paragraph per recognised line, with its indentation, vertical spacing, approximate font size and a page the size of the original (one section per page) |
+| "Bu PDFni qidiriladigan PDF qil" / "searchable PDF" | **searchable PDF**: the page images as they were, plus an invisible text layer written by Tesseract; pages that already had text are copied unchanged |
+
+Pages where nothing could be read become a visible placeholder
+("[page 2: no text could be read]"); nothing is filled in. Mixed PDFs keep the text of
+pages that already have a text layer. Layout mode is not a pixel copy: fonts, columns
+and pictures are not rebuilt; for the exact look use the searchable PDF.
+
+A PDF that already has text is converted to Word from its text layer (the earlier
+conversion). Its page layout, images and fonts are not carried over, and the reply
+says so.
+
+### Tables → Excel
+
+"Shu PDFdagi jadvalni Excelga chiqar" / "extract the tables" / "извлеки таблицы в Excel"
+→ one `.xlsx` with a sheet per table.
+
+- **Word**: read exactly from the file's table structure (merged cells appear once).
+- **PDF with a text layer**: words and positions from PDFium; a table is ≥ 3
+  consecutive rows that split into ≥ 2 aligned columns (right-aligned numbers
+  included).
+- **Scans/photos**: the same detection on OCR word boxes.
+
+Detected tables carry warnings when rows have missing cells. Tables without clear
+column gaps, or with merged cells spanning columns, may be split or merged wrongly, so
+the reply asks the user to check them.
+
+### Spreadsheet operations
+
+On an attached `.xlsx`/`.csv`, using the sheet's **real column names** found in the
+request:
+
+| Request | Operation |
+| --- | --- |
+| "Aholi bo'yicha kamayish tartibida sarala" / "Отсортируй по … по убыванию" | sort (numbers as numbers, empty cells last) |
+| 'Faqat Viloyat "Toshkent" bo'lgan qatorlarni qoldir', "Aholi > 380000" | filter |
+| "Dublikatlarni o'chir", "bo'sh qatorlarni olib tashla" | remove duplicates (first kept) / empty rows |
+| "Jami qator qo'sh" | total row |
+| "Viloyat bo'yicha guruhlab Aholi yig'indisini hisobla", "group by … average …" | group-by with sum / count / mean / min / max |
+
+Every number is computed by EZO and written as a value. The original formatting and
+formulas are not carried over, and the reply says so. Formula cells whose result was
+never saved (e.g. files written by scripts) are **reported, not calculated**. A
+column that does not exist is refused. Macros are never run, and `.xlsm` is not accepted.

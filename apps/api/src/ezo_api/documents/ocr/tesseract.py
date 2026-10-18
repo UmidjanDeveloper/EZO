@@ -205,6 +205,36 @@ class TesseractOCRProvider(OCRProvider):
         )
         return parse_tsv(out.decode("utf-8", "replace"))
 
+    def pdf_page(self, image: Image.Image, number: int, languages: list[str], dpi: int) -> bytes:
+        """One searchable PDF page: the (upright) page image with an invisible text layer,
+        written by Tesseract itself."""
+        orientation = self._osd(_png(image.convert("L")))
+        script = orientation.script if orientation else None
+        if (
+            orientation is not None
+            and orientation.rotate
+            and orientation.orientation_confidence >= MIN_ORIENTATION_CONFIDENCE
+        ):
+            image = rotate_clockwise(image, orientation.rotate)
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, format="JPEG", quality=80)
+        return _run(
+            [
+                self.binary,
+                "stdin",
+                "stdout",
+                "-l",
+                self._ordered(languages, script),
+                "--psm",
+                "3",
+                "--dpi",
+                str(dpi),
+                "pdf",
+            ],
+            buffer.getvalue(),
+            self.timeout_seconds,
+        )
+
     def read_image(
         self,
         image: Image.Image,
@@ -389,17 +419,24 @@ def parse_tsv(tsv: str) -> list[OCRLine]:
             lines[key] = {"bbox": (left, top, width, height), "words": []}
         elif level == 5 and cells[11].strip():
             entry = lines.setdefault(key, {"bbox": (left, top, width, height), "words": []})
-            entry["words"].append((cells[11].strip(), confidence))
+            entry["words"].append((cells[11].strip(), confidence, (left, top, width, height)))
     result: list[OCRLine] = []
     for (block, par, _), entry in lines.items():
         words = entry["words"]
         if not words:
             continue
-        scored = [(w, c) for w, c in words if c >= 0]
+        scored = [(w, c) for w, c, _ in words if c >= 0]
         weight = sum(len(w) for w, _ in scored)
         line_confidence = round(sum(len(w) * c for w, c in scored) / weight, 1) if weight else None
         result.append(
-            OCRLine(" ".join(w for w, _ in words), entry["bbox"], line_confidence, block, par)
+            OCRLine(
+                " ".join(w for w, _, _ in words),
+                entry["bbox"],
+                line_confidence,
+                block,
+                par,
+                tuple((w, box) for w, _, box in words),
+            )
         )
     return result
 

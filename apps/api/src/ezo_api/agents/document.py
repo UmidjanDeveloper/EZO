@@ -33,6 +33,11 @@ from ezo_api.agents.base import (
     run_tool,
 )
 from ezo_api.agents.catalog import AGENTS
+from ezo_api.agents.convert_office import (
+    run_ocr_export_action,
+    run_sheet_action,
+    run_tables_action,
+)
 from ezo_api.agents.docx_office import find_docx, run_replace_action, transform_docx
 from ezo_api.agents.llm import complete, extract_json, sources_block
 from ezo_api.agents.office import attached_files, run_ocr_action, run_pdf_action
@@ -345,10 +350,15 @@ class DocumentAgent(Agent):
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
             return gathered
-        if await run_ocr_action(ctx, gathered):
-            return gathered
-        if await run_replace_action(ctx, gathered):
-            return gathered
+        for action in (
+            run_ocr_export_action,
+            run_ocr_action,
+            run_replace_action,
+            run_tables_action,
+            run_sheet_action,
+        ):
+            if await action(ctx, gathered):
+                return gathered
         gathered.tool_calls.append(
             {
                 "tool": "classify_document_request",

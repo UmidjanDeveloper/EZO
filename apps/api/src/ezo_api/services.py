@@ -29,6 +29,7 @@ from ezo_api.settings import Settings
 from ezo_api.storage.base import StorageProvider
 from ezo_api.storage.local import LocalStorageProvider
 from ezo_api.story.service import StoryService
+from ezo_api.tools.convert_tools import ExtractTablesTool, OcrExportTool, SheetOpsTool
 from ezo_api.tools.document_tools import (
     CreateDocumentTool,
     CreatePresentationTool,
@@ -169,6 +170,9 @@ def build_services(
                 OfficialSearchTool(),
                 PdfTool(),
                 OcrTool(),
+                OcrExportTool(),
+                ExtractTablesTool(),
+                SheetOpsTool(),
                 VerifyOfficialDocumentTool(),
             ]
         ),
