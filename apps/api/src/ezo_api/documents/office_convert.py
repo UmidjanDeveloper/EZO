@@ -1,0 +1,213 @@
+"""DOCX / XLSX → PDF with LibreOffice (MPL-2.0), run as a separate, locked-down process.
+
+Why LibreOffice: it lays out real Word and Excel files (styles, tables, headers, page
+setup, sheets) far more faithfully than re-rendering their text. It is optional: when it
+is not installed EZO says so and falls back to its own text-based PDF, labelled as such.
+
+Safety:
+- the binary comes from server configuration (`EZO_SOFFICE_CMD`), never from a request;
+- fixed argument list, no shell, a fresh user profile and working directory per call
+  (deleted afterwards), a minimal environment, a timeout that kills the whole process
+  group, one conversion at a time per worker;
+- files that link to external content (linked images, OLE links, external data) are
+  refused, because opening them could make the server fetch URLs;
+- input and output size limits; the PDF is reopened and its pages counted before it is
+  returned.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import os
+import re
+import shutil
+import signal
+import subprocess
+import tempfile
+import threading
+import zipfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Literal
+
+from ezo_api.documents.pdf import engine
+from ezo_api.documents.pdf.engine import PdfError
+
+SourceKind = Literal["docx", "xlsx"]
+MAX_INPUT_BYTES = 50 * 1024 * 1024
+MAX_OUTPUT_BYTES = 200 * 1024 * 1024
+MAX_PAGES = 1_000
+_HYPERLINK = "relationships/hyperlink"
+_EXTERNAL = re.compile(rb'TargetMode\s*=\s*"External"', re.IGNORECASE)
+_RELATIONSHIP = re.compile(rb"<Relationship\b[^>]*>", re.IGNORECASE)
+_LOCK = threading.Lock()
+
+
+class OfficeConvertError(Exception):
+    """Conversion failed. `message` is safe to show to the user."""
+
+    def __init__(self, message: str, code: str = "convert_failed") -> None:
+        self.message = message
+        self.code = code
+        super().__init__(message)
+
+
+@dataclass(frozen=True, slots=True)
+class ConvertResult:
+    pdf: bytes
+    pages: int
+    engine: str
+    duration_ms: int
+
+
+def external_links(data: bytes) -> list[str]:
+    """Relationship types that point outside the file (other than plain hyperlinks)."""
+    found: list[str] = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            for name in archive.namelist():
+                if not name.endswith(".rels"):
+                    continue
+                for rel in _RELATIONSHIP.findall(archive.read(name)):
+                    if _EXTERNAL.search(rel) and _HYPERLINK.encode() not in rel:
+                        kind = re.search(rb'Type\s*=\s*"[^"]*/([^"/]+)"', rel)
+                        found.append(
+                            kind.group(1).decode("ascii", "replace") if kind else "external"
+                        )
+    except zipfile.BadZipFile as exc:
+        raise OfficeConvertError("The file is damaged or not an Office file.", "corrupt") from exc
+    return found
+
+
+class OfficeConverter:
+    """LibreOffice headless conversion to PDF."""
+
+    def __init__(self, binary: str, version: str, timeout_seconds: float = 120.0) -> None:
+        self.binary = binary
+        self.version = version
+        self.timeout_seconds = timeout_seconds
+
+    @classmethod
+    def discover(
+        cls, command: str = "soffice", timeout_seconds: float = 120.0
+    ) -> OfficeConverter | None:
+        binary = shutil.which(command) or (
+            shutil.which("libreoffice") if command == "soffice" else None
+        )
+        if binary is None:
+            return None
+        try:
+            out = subprocess.run(  # noqa: S603 - fixed binary from server config
+                [binary, "--version"],
+                capture_output=True,
+                timeout=30,
+                check=False,
+                env=_env(tempfile.gettempdir()),
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        version = out.stdout.decode("utf-8", "replace").strip().splitlines()
+        return cls(binary, version[0][:80] if version else "LibreOffice", timeout_seconds)
+
+    def status(self) -> dict[str, Any]:
+        return {"available": True, "engine": self.version}
+
+    def to_pdf_sync(self, data: bytes, kind: SourceKind) -> ConvertResult:
+        import time
+
+        if not data:
+            raise OfficeConvertError("The file is empty.", "empty")
+        if len(data) > MAX_INPUT_BYTES:
+            raise OfficeConvertError("The file is too large to convert.", "too_large")
+        links = external_links(data)
+        if links:
+            raise OfficeConvertError(
+                "The file links to external content ("
+                + ", ".join(sorted(set(links))[:5])
+                + "). EZO does not open such files because that could fetch data from the "
+                "internet. Embed the content in the file and try again.",
+                "external_links",
+            )
+        started = time.monotonic()
+        with _LOCK, tempfile.TemporaryDirectory(prefix="ezo-office-") as tmp:
+            work = Path(tmp)
+            source = work / f"input.{kind}"
+            source.write_bytes(data)
+            args = [
+                self.binary,
+                "--headless",
+                "--norestore",
+                "--nolockcheck",
+                "--nodefault",
+                "--nologo",
+                "--nofirststartwizard",
+                f"-env:UserInstallation=file://{work / 'profile'}",
+                "--convert-to",
+                "pdf",
+                "--outdir",
+                str(work / "out"),
+                str(source),
+            ]
+            process = subprocess.Popen(  # noqa: S603 - fixed binary, temporary paths only
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=work,
+                env=_env(tmp),
+                start_new_session=True,
+            )
+            try:
+                _, stderr = process.communicate(timeout=self.timeout_seconds)
+            except subprocess.TimeoutExpired as exc:
+                _kill(process)
+                raise OfficeConvertError(
+                    f"Converting took longer than {self.timeout_seconds:.0f} seconds and was "
+                    "stopped.",
+                    "timeout",
+                ) from exc
+            output = work / "out" / "input.pdf"
+            if process.returncode != 0 or not output.exists():
+                detail = stderr.decode("utf-8", "replace").strip().splitlines()
+                raise OfficeConvertError(
+                    "LibreOffice could not convert the file"
+                    + (f": {detail[-1][:160]}" if detail else "."),
+                )
+            if output.stat().st_size > MAX_OUTPUT_BYTES:
+                raise OfficeConvertError("The PDF would be too large.", "output_limit")
+            pdf = output.read_bytes()
+        try:
+            pages = engine.inspect_pdf(pdf).page_count
+        except PdfError as exc:
+            raise OfficeConvertError("The converted PDF could not be opened.", "verify") from exc
+        if pages < 1 or pages > MAX_PAGES:
+            raise OfficeConvertError(f"The converted PDF has {pages} pages; refused.", "verify")
+        return ConvertResult(pdf, pages, self.version, round((time.monotonic() - started) * 1000))
+
+    async def to_pdf(self, data: bytes, kind: SourceKind) -> ConvertResult:
+        return await asyncio.to_thread(self.to_pdf_sync, data, kind)
+
+
+def _env(home: str) -> dict[str, str]:
+    return {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": home,
+        "LANG": "C.UTF-8",
+        "SAL_USE_VCLPLUGIN": "svp",
+    }
+
+
+def _kill(process: subprocess.Popen[bytes]) -> None:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        process.kill()
+    process.wait(timeout=10)
+
+
+def build_office_converter(
+    mode: str, command: str, timeout_seconds: float
+) -> OfficeConverter | None:
+    if mode == "none":
+        return None
+    return OfficeConverter.discover(command, timeout_seconds)

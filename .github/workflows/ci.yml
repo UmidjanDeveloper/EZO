@@ -31,12 +31,13 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.32"
-      - name: Tesseract OCR with uzb, uzb_cyrl, rus, eng packs (real OCR tests)
+      - name: Tesseract OCR (uzb, uzb_cyrl, rus, eng) and LibreOffice (real OCR and PDF tests)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
-            tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl
-          tesseract --version && tesseract --list-langs
+            tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
+            libreoffice-writer-nogui libreoffice-calc-nogui fonts-liberation fonts-dejavu-core
+          tesseract --version && tesseract --list-langs && soffice --version
       - run: uv sync --frozen
       - run: uv run ruff check src tests migrations ../../scripts
       - run: uv run ruff format --check src tests migrations ../../scripts
@@ -45,11 +46,13 @@ jobs:
         run: uv run pytest -q -rs --junitxml=reports/sqlite.xml
         env:
           EZO_REQUIRE_TESSERACT: "1"
+          EZO_REQUIRE_OFFICE: "1"
       - name: Tests (PostgreSQL)
         run: uv run pytest -q -rs --junitxml=reports/postgres.xml
         env:
           EZO_TEST_DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
           EZO_REQUIRE_TESSERACT: "1"
+          EZO_REQUIRE_OFFICE: "1"
       - name: Migrations are in sync with the models
         run: uv run alembic upgrade head && uv run alembic check
         env:
@@ -107,6 +110,19 @@ jobs:
           langs=$(docker run --rm --entrypoint tesseract ezo-api:ci --list-langs)
           echo "$langs"
           for l in uzb uzb_cyrl rus eng osd; do echo "$langs" | grep -qx "$l"; done
+      - name: API image converts Word and Excel to PDF with LibreOffice
+        run: |
+          docker run --rm --entrypoint python ezo-api:ci -c "
+          import io
+          from docx import Document
+          from openpyxl import Workbook
+          from ezo_api.documents.office_convert import OfficeConverter
+          c = OfficeConverter.discover()
+          assert c is not None, 'LibreOffice missing in the image'
+          d = Document(); d.add_paragraph('Xizmat xati — Служебное письмо'); b = io.BytesIO(); d.save(b)
+          w = Workbook(); w.active.append(['Jami', 1]); x = io.BytesIO(); w.save(x)
+          print(c.version, c.to_pdf_sync(b.getvalue(), 'docx').pages, c.to_pdf_sync(x.getvalue(), 'xlsx').pages)
+          "
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: API image starts, migrates and answers /api/health

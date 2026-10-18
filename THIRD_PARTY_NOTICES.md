@@ -32,6 +32,8 @@ repository and not linked into EZO's code; EZO runs them as separate processes.
 | --- | --- | --- |
 | Tesseract OCR 5 (`tesseract-ocr`) | Apache-2.0 | OCR of scans and photos |
 | tessdata language packs (`tesseract-ocr-uzb`, `-uzb-cyrl`, `-rus`, `-eng`, `-osd`) | Apache-2.0 | recognition models |
+| LibreOffice Writer + Calc (`libreoffice-writer-nogui`, `libreoffice-calc-nogui`) | MPL-2.0 | Word/Excel → PDF |
+| Liberation fonts, DejaVu fonts (`fonts-liberation`, `fonts-dejavu-core`) | SIL OFL 1.1; Bitstream Vera / public-domain changes | Latin + Cyrillic glyphs for converted PDFs |
 
 ## Package dependencies
 

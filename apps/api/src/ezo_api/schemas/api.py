@@ -234,6 +234,8 @@ class SystemStatus(BaseModel):
     image_providers: list[ImageProviderInfo] = []
     """Configured image providers in fallback order (empty: no image generation)."""
     ocr: dict[str, Any] = {}
+    office_converter: dict[str, Any] = {}
+    """Word/Excel → PDF engine (LibreOffice) status."""
     """OCR engine status: provider, version, installed language packs (or why it is off)."""
     personality: dict[str, Any]
     debug_traces: bool

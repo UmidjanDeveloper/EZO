@@ -21,7 +21,6 @@ from ezo_api.documents.spreadsheet.ops import parse_sheet_request
 from ezo_api.tools.convert_tools import DOCX_MIME, XLSX_MIME
 
 CSV_MIME = "text/csv"
-_TO_WORD = re.compile(r"\b(word\w*|docx|ворд\w*|doc\b)")
 _SEARCHABLE = re.compile(
     r"\b(qidiriladigan|qidirish mumkin|matnli pdf|searchable|text layer|"
     r"с текстовым слоем|с поиском|поисков\w*)"
@@ -78,7 +77,9 @@ async def run_ocr_export_action(ctx: GatherContext, gathered: Gathered) -> bool:
     """Scan → Word / searchable PDF."""
     norm = normalize(ctx.turn.text)
     searchable = bool(_SEARCHABLE.search(norm))
-    to_word = bool(_TO_WORD.search(norm)) and bool(_CONVERT.search(norm))
+    from ezo_api.agents.document import requested_format
+
+    to_word = requested_format(norm) == "docx" and bool(_CONVERT.search(norm))
     if not (searchable or to_word):
         return False
     files = await _files(ctx, (PDF_MIME, *IMAGE_MIMES))

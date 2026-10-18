@@ -150,6 +150,13 @@ class Settings(BaseSettings):
     ocr_timeout_seconds: float = Field(default=60.0, ge=5, le=600, alias="EZO_OCR_TIMEOUT_SECONDS")
     ocr_max_pages: int = Field(default=100, ge=1, le=2000, alias="EZO_OCR_MAX_PAGES")
 
+    # Word/Excel → PDF with LibreOffice (docs/EZO_OFFICE.md). "auto" uses it when installed.
+    office_converter: Literal["auto", "none"] = Field(default="auto", alias="EZO_OFFICE_CONVERTER")
+    soffice_cmd: str = Field(default="soffice", alias="EZO_SOFFICE_CMD")
+    office_convert_timeout_seconds: float = Field(
+        default=120.0, ge=10, le=900, alias="EZO_OFFICE_CONVERT_TIMEOUT_SECONDS"
+    )
+
     # Official knowledge sources (docs/OFFICIAL_SOURCES.md). Off unless listed here, after
     # the owner has reviewed the source's terms: e.g. EZO_OFFICIAL_SOURCES=lexuz
     official_sources: Annotated[list[str], NoDecode] = Field(

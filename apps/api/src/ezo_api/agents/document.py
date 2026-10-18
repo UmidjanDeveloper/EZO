@@ -21,7 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from ezo_api.agents.base import (
@@ -69,6 +69,7 @@ from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedE
 from ezo_api.providers.types import ChatMessage
 from ezo_api.storage.base import StorageError
 from ezo_api.tools.base import ToolContext
+from ezo_api.tools.convert_tools import DOCX_MIME, XLSX_MIME
 from ezo_api.tools.document_tools import MAX_READ_CHARS
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,9 @@ _COMPARE = re.compile(
 )
 _CONVERT = re.compile(
     r"\b(aylantir|konvert|convert|o'gir|ko'chir|экспорт|конверт|преобраз|сохрани как|save as|export)"
+)
+_FORMAT_AS = re.compile(
+    r"\b(pdf|word|docx|excel|xlsx)\w*\s+(qilib|qil\b|ko'rinishida|formatida|formatda|holida)"
 )
 _SHEET_NOUN = re.compile(r"\b(excel|xlsx|spreadsheet|jadval|таблиц|эксель)")
 _MAKE = re.compile(
@@ -202,11 +206,26 @@ class DocumentRequest:
     wants_file: bool
 
 
+_TARGET_AFTER = re.compile(r"^\w*\s*(ga|ka|qa|qil|ko'rinish|formatda|holida|sifatida|fayl qil)")
+_TARGET_BEFORE = re.compile(r"(\b(to|into|as)|\bв|\bформат\w*)\s*$")
+
+
 def requested_format(norm: str) -> Format | None:
+    """The output format asked for. "Word faylni PDF ga aylantir" → pdf, "PDFni Word ga" →
+    docx: a format marked as the target (-ga, qilib, to/into/as, в) wins, else the last
+    one mentioned (the source is usually named first)."""
+    mentions: list[tuple[int, int, Format]] = []
     for fmt, pattern in _FORMATS:
-        if pattern.search(norm):
+        mentions += [(m.start(), m.end(), fmt) for m in pattern.finditer(norm)]
+    if not mentions:
+        return None
+    mentions.sort()
+    for start, end, fmt in mentions:
+        if _TARGET_AFTER.search(norm[end : end + 25]) or _TARGET_BEFORE.search(
+            norm[max(0, start - 12) : start]
+        ):
             return fmt
-    return None
+    return mentions[-1][2]
 
 
 def classify_request(text: str) -> DocumentRequest:
@@ -220,7 +239,11 @@ def classify_request(text: str) -> DocumentRequest:
     action: Action
     if _COMPARE.search(norm):
         action = "compare"
-    elif _CONVERT.search(norm) and fmt is not None and transform is None:
+    elif (
+        (_CONVERT.search(norm) or (_FORMAT_AS.search(norm) and refers_to_a_file(text)))
+        and fmt is not None
+        and transform is None
+    ):
         action = "convert"
     elif _ANALYZE.search(norm) and _SHEET_NOUN.search(norm) and transform is None:
         action = "analyze"
@@ -373,6 +396,15 @@ class DocumentAgent(Agent):
     async def gather(self, ctx: GatherContext) -> Gathered:
         gathered = Gathered()
         request = classify_request(ctx.turn.text)
+        if (
+            ctx.turn.attachments
+            and request.target_format is not None
+            and request.transform is None
+            and request.action in ("create", "spreadsheet")
+            and _FORMAT_AS.search(normalize(ctx.turn.text))
+        ):
+            # "Excel faylni PDF qilib ber" with a file attached: convert that file.
+            request = replace(request, action="convert")
         # Deterministic EZO Office operations first: they need no model and no API key.
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
@@ -470,6 +502,8 @@ class DocumentAgent(Agent):
             return
         source = sources[0]
         fmt = request.target_format or "docx"
+        if fmt == "pdf" and await self._office_pdf(ctx, gathered, source):
+            return
         info = await self._save_document(
             ctx,
             gathered,
@@ -490,6 +524,42 @@ class DocumentAgent(Agent):
                 f"Converted “{source.title}” to {fmt.upper()} ({info['words']} words; also available "
                 f"as {', '.join(f.upper() for f in info['formats'][1:])}).{layout_note}"
             )
+
+    async def _office_pdf(self, ctx: GatherContext, gathered: Gathered, source: SourceText) -> bool:
+        """Word/Excel → PDF with its layout (LibreOffice). False: use the text conversion."""
+        ref: dict[str, str] | None = None
+        if source.document is not None:
+            doc = source.document.document
+            if doc.mime_type in (DOCX_MIME, XLSX_MIME):
+                ref = {"kind": "document", "id": str(doc.id)}
+        elif source.artifact is not None:
+            version = await ctx.tools.services.artifacts.current_version(
+                ctx.tools.session, source.artifact
+            )
+            if version is not None and version.filename.lower().endswith((".docx", ".xlsx")):
+                ref = {"kind": "artifact", "id": str(source.artifact.id)}
+        if ref is None:
+            return False
+        result = await call_tool(gathered, ctx.tools, "office_pdf", {"input": ref})
+        if not result.ok:
+            if (result.data or {}).get("error_kind") == "unavailable":
+                gathered.notes.append(
+                    "LibreOffice is not installed on this server, so the PDF below is made from "
+                    "the file's text: its page layout, tables' look, images and fonts are not "
+                    "carried over. Say this clearly."
+                )
+                return False
+            gathered.notes.append(f"The PDF could not be made: {result.error} Say so plainly.")
+            return True
+        data = result.data or {}
+        gathered.artifacts.extend(data.get("artifacts", []))
+        gathered.notes.append(
+            f"Converted “{source.title}” to PDF with LibreOffice from the original "
+            f"{str(data.get('kind', '')).upper()} file, keeping its layout (styles, tables, "
+            f"headers, page setup): {data.get('pages')} page(s), reopened and checked. Fonts "
+            "the server does not have are replaced by similar ones. The original is unchanged."
+        )
+        return True
 
     async def _compare(
         self, ctx: GatherContext, gathered: Gathered, request: DocumentRequest

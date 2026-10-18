@@ -108,7 +108,7 @@ def _is_pdf(file: LoadedFile) -> bool:
     return file.mime_type.startswith("application/pdf") or file.data[:5] == b"%PDF-"
 
 
-def _previews(data: bytes, pages: int, stem: str) -> dict[str, tuple[str, bytes]]:
+def pdf_previews(data: bytes, pages: int, stem: str) -> dict[str, tuple[str, bytes]]:
     try:
         images = engine.render_pages(data, list(range(1, min(pages, PREVIEW_PAGES) + 1)), dpi=60)
     except PdfError:
@@ -277,7 +277,7 @@ class PdfTool(Tool[PdfToolArgs]):
                 created_by_agent="document",
                 generation_metadata=meta,
                 source_references=references,
-                exports=await asyncio.to_thread(_previews, output.data, pages, stem),
+                exports=await asyncio.to_thread(pdf_previews, output.data, pages, stem),
                 change_summary="Created",
             )
             stored.append(artifact_entry(created))

@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import time
+import zipfile
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, Field
@@ -16,6 +18,7 @@ from ezo_api.artifacts.service import ArtifactError
 from ezo_api.db.models import OcrPage
 from ezo_api.documents.ocr import OCRError, OCRLine, OCRPage, TesseractOCRProvider
 from ezo_api.documents.ocr.export import ocr_to_docx, searchable_pdf
+from ezo_api.documents.office_convert import OfficeConvertError
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.documents.spreadsheet.analysis import read_sheets
@@ -36,7 +39,7 @@ from ezo_api.documents.tables import (
 )
 from ezo_api.tools.base import Tool, ToolContext, ToolResult
 from ezo_api.tools.document_tools import artifact_entry, file_stem
-from ezo_api.tools.pdf_tools import IMAGE_TYPES, FileRef, LoadedFile, load_file
+from ezo_api.tools.pdf_tools import IMAGE_TYPES, FileRef, LoadedFile, load_file, pdf_previews
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -431,4 +434,92 @@ class SheetOpsTool(Tool[SheetOpsArgs]):
                 "preview": result.sheet.rows[:10],
                 "rows": len(result.sheet.rows),
             },
+        )
+
+
+# --------------------------------------------------------------------------- Word/Excel → PDF
+
+
+class OfficePdfArgs(BaseModel):
+    input: FileRef
+    title: str = Field(default="", max_length=200)
+
+
+def office_kind(file: LoadedFile) -> Literal["docx", "xlsx"] | None:
+    name = file.title.lower()
+    if file.mime_type == DOCX_MIME or name.endswith(".docx"):
+        return "docx"
+    if file.mime_type == XLSX_MIME or name.endswith(".xlsx"):
+        return "xlsx"
+    if file.data[:2] == b"PK":
+        try:
+            names = zipfile.ZipFile(io.BytesIO(file.data)).namelist()
+        except zipfile.BadZipFile:
+            return None
+        if "word/document.xml" in names:
+            return "docx"
+        if "xl/workbook.xml" in names:
+            return "xlsx"
+    return None
+
+
+class OfficePdfTool(Tool[OfficePdfArgs]):
+    name: ClassVar[str] = "office_pdf"
+    activity: ClassVar[str] = "working"
+    timeout_seconds: ClassVar[float] = 300.0
+    description: ClassVar[str] = (
+        "Convert a Word (DOCX) or Excel (XLSX) file to PDF with LibreOffice, keeping its "
+        "layout (styles, tables, headers, page setup, sheets)."
+    )
+    args_model: ClassVar[type[BaseModel]] = OfficePdfArgs
+
+    async def run(self, args: OfficePdfArgs, ctx: ToolContext) -> ToolResult:
+        converter = ctx.services.office
+        if converter is None:
+            return ToolResult(
+                ok=False,
+                summary="",
+                error="LibreOffice is not installed on this server, so Word/Excel files cannot "
+                "be converted with their layout.",
+                data={"error_kind": "unavailable"},
+            )
+        try:
+            file = await load_file(ctx, args.input)
+        except ArtifactError as exc:
+            return ToolResult(ok=False, summary="", error=exc.message)
+        kind = office_kind(file)
+        if kind is None:
+            return ToolResult(
+                ok=False, summary="", error="Only Word (.docx) and Excel (.xlsx) files work here."
+            )
+        try:
+            result = await converter.to_pdf(file.data, kind)
+        except OfficeConvertError as exc:
+            return ToolResult(
+                ok=False, summary="", error=exc.message, data={"error_kind": exc.code}
+            )
+        stem = file_stem(args.title or file.title.rsplit(".", 1)[0], "document")
+        meta = {
+            "operation": f"{kind}_to_pdf",
+            "engine": result.engine,
+            "pages": result.pages,
+            "verification": {"reopened": True, "page_count": result.pages},
+            "duration_ms": result.duration_ms,
+            "note": "Laid out by LibreOffice from the original file (styles, tables, headers, "
+            "page setup). Fonts missing on the server are replaced by similar ones.",
+        }
+        previews = await asyncio.to_thread(pdf_previews, result.pdf, result.pages, stem)
+        entry = await _store(
+            ctx,
+            file,
+            title=f"{stem} — PDF",
+            filename=f"{stem}.pdf",
+            data=result.pdf,
+            metadata=meta,
+            exports=previews,
+        )
+        return ToolResult(
+            ok=True,
+            summary=f"{kind.upper()} → PDF, {result.pages} page(s)",
+            data={"artifacts": [entry], "pages": result.pages, "kind": kind},
         )

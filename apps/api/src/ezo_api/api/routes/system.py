@@ -73,6 +73,12 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
             for i in services.visual.describe()
         ],
         ocr=services.ocr.status(),
+        office_converter=services.office.status()
+        if services.office
+        else {
+            "available": False,
+            "reason": "LibreOffice is not installed (or EZO_OFFICE_CONVERTER=none).",
+        },
         agents=[
             AgentInfo(
                 key=spec.key,

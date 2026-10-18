@@ -210,3 +210,11 @@ In developer mode uploaded files are in `apps/api/storage/` (or `EZO_STORAGE_DIR
   again; the finished parts are reused.
 - **Sheet operation refused ("column does not exist")**: use the column name exactly as it
   appears in the header row.
+- **"LibreOffice is not installed"** when converting Word/Excel to PDF: the Docker image
+  includes it. Locally install `libreoffice-writer` and `libreoffice-calc` (or the `-nogui`
+  variants) and check `soffice --version`. `GET /api/status` → `office_converter`.
+- **"The file links to external content"**: the document contains a linked (not embedded)
+  picture or object. In Word use *File → Info → Edit links → Break link*, or insert the
+  picture again as embedded, then upload the file again.
+- **Converted PDF uses a different font**: the document's font is not installed on the
+  server; LibreOffice substitutes a similar one. Install the font in the image if needed.

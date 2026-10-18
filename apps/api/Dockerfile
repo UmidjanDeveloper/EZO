@@ -9,11 +9,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # Tesseract OCR (Apache-2.0) with Uzbek Latin + Cyrillic, Russian and English packs
-# (osd = orientation/script detection). See docs/OCR.md.
+# (osd = orientation/script detection), see docs/OCR.md; LibreOffice Writer + Calc
+# without GUI (MPL-2.0) for Word/Excel → PDF, with Latin + Cyrillic fonts.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
         tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
+        libreoffice-writer-nogui libreoffice-calc-nogui \
+        fonts-liberation fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv==0.11.32

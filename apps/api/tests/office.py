@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -10,7 +11,11 @@ from pathlib import Path
 import pytest
 
 SOFFICE = shutil.which("soffice") or shutil.which("libreoffice")
-requires_office = pytest.mark.skipif(SOFFICE is None, reason="LibreOffice is not installed")
+REQUIRE_OFFICE = bool(os.environ.get("EZO_REQUIRE_OFFICE"))
+"""Set in CI: a missing LibreOffice then fails these tests instead of skipping them."""
+requires_office = pytest.mark.skipif(
+    SOFFICE is None and not REQUIRE_OFFICE, reason="LibreOffice is not installed"
+)
 
 
 def office_to_pdf(data: bytes, suffix: str) -> bytes:

@@ -177,3 +177,32 @@ The old 40,000-character limit is gone. A long file is now processed **completel
 
 Requires an AI model (summaries and translations are model work). Offline, EZO says so
 and does not pretend.
+
+## Word / Excel → PDF with LibreOffice (Stage A — implemented)
+
+"Shu Word faylni PDF ga aylantir", "Excel faylni PDF qilib ber" (attached file, an upload
+the request refers to, or EZO's latest Word/Excel result) → a PDF laid out by
+**LibreOffice** from the original file. Styles, tables, headers/footers with page numbers,
+page size and orientation, every sheet of a workbook. Formulas are calculated by
+LibreOffice while it lays out the PDF. Works without any AI key.
+
+- Engine: `documents/office_convert.py`, tool `office_pdf`. `/api/status` →
+  `office_converter` shows whether it is available.
+- Every PDF is reopened and its pages counted. Previews of the first pages are exports.
+- **Refused:** files linking to external content (linked images, OLE links, external data
+  sources). Opening them could make the server fetch URLs. Ordinary hyperlinks are fine.
+- **Limits:** input 50 MB, output 200 MB / 1,000 pages, `EZO_OFFICE_CONVERT_TIMEOUT_SECONDS`
+  (default 120 s; the whole LibreOffice process group is killed on timeout), one conversion
+  at a time per API worker, a fresh LibreOffice profile per conversion (deleted after).
+- **Without LibreOffice** (`EZO_OFFICE_CONVERTER=none`, or not installed), EZO makes its
+  own PDF from the file's text and the reply says that the layout, images and fonts were
+  not carried over.
+- **Fonts:** the Docker image has Liberation (metric-compatible with Times New Roman,
+  Arial, Courier New) and DejaVu (wide Cyrillic coverage). Fonts a document uses that are
+  not installed are substituted by LibreOffice.
+- **Verified by:** `tests/unit/test_office_convert.py` (two-page official letter with
+  letterhead header, PAGE footer, Latin + Cyrillic, table and page break; landscape page;
+  an edited Word file; a two-sheet workbook with a SUM formula; refusals; timeout and
+  recovery) and `tests/integration/test_office_pdf.py` (chat, no AI provider). CI installs
+  LibreOffice and **requires** these tests to run (`EZO_REQUIRE_OFFICE=1`). The CI Docker job
+  converts a Word and an Excel file inside the API image.

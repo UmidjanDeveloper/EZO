@@ -11,6 +11,7 @@ from ezo_api.auth.local import LocalOwnerAuth
 from ezo_api.core.ezo_core import EzoCore
 from ezo_api.db.session import Database
 from ezo_api.documents.ocr import OCRProvider, build_ocr_provider
+from ezo_api.documents.office_convert import OfficeConverter, build_office_converter
 from ezo_api.knowledge.embeddings.service import EmbeddingService
 from ezo_api.knowledge.fetch import SafeFetcher
 from ezo_api.knowledge.ingestion.runner import IngestionRunner
@@ -29,7 +30,12 @@ from ezo_api.settings import Settings
 from ezo_api.storage.base import StorageProvider
 from ezo_api.storage.local import LocalStorageProvider
 from ezo_api.story.service import StoryService
-from ezo_api.tools.convert_tools import ExtractTablesTool, OcrExportTool, SheetOpsTool
+from ezo_api.tools.convert_tools import (
+    ExtractTablesTool,
+    OcrExportTool,
+    OfficePdfTool,
+    SheetOpsTool,
+)
 from ezo_api.tools.document_tools import (
     CreateDocumentTool,
     CreatePresentationTool,
@@ -77,6 +83,7 @@ class Services:
     visual: VisualService
     official: OfficialSyncService
     ocr: OCRProvider
+    office: OfficeConverter | None
 
 
 def build_services(
@@ -87,6 +94,7 @@ def build_services(
     voice: VoiceService | None = None,
     visual: VisualService | None = None,
     ocr: OCRProvider | None = None,
+    office: OfficeConverter | Literal["auto"] | None = "auto",
 ) -> Services:
     """Wire everything together. Tests can inject providers, web search, fetcher, voice and
     image providers."""
@@ -173,6 +181,7 @@ def build_services(
                 OcrExportTool(),
                 ExtractTablesTool(),
                 SheetOpsTool(),
+                OfficePdfTool(),
                 VerifyOfficialDocumentTool(),
             ]
         ),
@@ -183,6 +192,11 @@ def build_services(
         visual=visual or build_visual_service(settings),
         official=OfficialSyncService(settings, knowledge, safe_fetcher, storage),
         ocr=ocr_provider,
+        office=build_office_converter(
+            settings.office_converter, settings.soffice_cmd, settings.office_convert_timeout_seconds
+        )
+        if office == "auto"
+        else office,
     )
     core.services = services
     core.memory_index = memory_index
