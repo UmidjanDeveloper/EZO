@@ -9,6 +9,7 @@ from ezo_api.agents.catalog import AGENTS, AgentSpec
 from ezo_api.agents.document import DocumentAgent
 from ezo_api.agents.general import GeneralAgent
 from ezo_api.agents.language_coach import LanguageCoachAgent
+from ezo_api.agents.legal_research import LegalResearchAgent
 from ezo_api.agents.presentation import PresentationAgent
 from ezo_api.agents.research import ResearchAgent
 from ezo_api.agents.visual import VisualAgent
@@ -37,6 +38,7 @@ class AgentRegistry:
             PresentationAgent(),
             LanguageCoachAgent(),
             VisualAgent(),
+            LegalResearchAgent(),
         ]:
             self._agents[agent.spec.intent] = agent
 

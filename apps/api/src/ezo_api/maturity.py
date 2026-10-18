@@ -85,6 +85,13 @@ FEATURES: tuple[Feature, ...] = (
     ),
     Feature("jobs", "Durable tasks, jobs and background worker", "Phase 5", "planned"),
     Feature("missions", "Persistent native missions in chat", "Phase 6", "planned"),
+    Feature(
+        "official_sources",
+        "Official legal sources: connector framework, LEX.UZ proof of concept, sync",
+        "Phase 7",
+        "experimental",
+        "LEX.UZ off by default; live access not yet verified; other sources not reviewed",
+    ),
     Feature("realtime_voice", "Realtime streaming voice", "Phase 8", "planned"),
     Feature("data_analyst", "Data analyst agent and dashboards", "Phase 10", "planned"),
     Feature("browser_agent", "Approved browser actions", "Phase 11", "planned"),

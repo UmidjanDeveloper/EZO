@@ -90,18 +90,12 @@ AGENTS: dict[Intent, AgentSpec] = {
                 "en": "Legal Research Agent",
                 "ru": "Агент правовых исследований",
             },
-            "Uzbekistan legislation with official sources (LEX.UZ) and currentness checks.",
-            maturity="planned",
+            "Uzbekistan legislation from synchronized official texts (LEX.UZ proof of "
+            "concept), with status, dates and live currentness checks.",
+            maturity="experimental",
             phase="Phase 7",
             context_mode="professional",
             route="reasoning",
-            limitation_note=(
-                "The Legal Research Agent with synchronized official sources (LEX.UZ, "
-                "president.uz) is not available yet, and you have no live access to them. "
-                "Do NOT state document numbers, dates or article contents unless you are "
-                "certain, and say they must be verified on https://lex.uz. Give general "
-                "orientation only. This is informational help, not legal advice."
-            ),
         ),
         AgentSpec(
             "research",

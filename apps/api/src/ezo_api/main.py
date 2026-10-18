@@ -24,6 +24,7 @@ from ezo_api.api.routes import (
     knowledge,
     language,
     memory,
+    official,
     projects,
     stories,
     system,
@@ -172,6 +173,7 @@ def create_app(
         artifacts,
         stories,
         language,
+        official,
     ):
         app.include_router(module.router)
 
