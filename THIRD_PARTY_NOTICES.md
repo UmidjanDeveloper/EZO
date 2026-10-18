@@ -23,6 +23,16 @@ their own licences, and are not distributed with EZO.
 The fonts are used unmodified to measure text and to draw PDFs and slide previews. They are
 not sold on their own.
 
+## System tools used at runtime
+
+Installed as operating-system packages (Docker image, CI), not vendored in this
+repository and not linked into EZO's code; EZO runs them as separate processes.
+
+| Tool | License | Use |
+| --- | --- | --- |
+| Tesseract OCR 5 (`tesseract-ocr`) | Apache-2.0 | OCR of scans and photos |
+| tessdata language packs (`tesseract-ocr-uzb`, `-uzb-cyrl`, `-rus`, `-eng`, `-osd`) | Apache-2.0 | recognition models |
+
 ## Package dependencies
 
 EZO installs the following direct dependencies through `uv` and `pnpm`. They are not

@@ -138,6 +138,18 @@ class Settings(BaseSettings):
     image_max_per_deck: int = Field(default=4, ge=0, le=20, alias="EZO_IMAGE_MAX_PER_DECK")
     image_timeout_seconds: float = Field(default=120.0, ge=10, le=600, alias="EZO_IMAGE_TIMEOUT")
 
+    # OCR (docs/OCR.md). "auto" uses Tesseract when it is installed; language identifiers
+    # must be Tesseract pack names (uzb = Uzbek Latin, uzb_cyrl = Uzbek Cyrillic).
+    ocr_provider: Literal["auto", "tesseract", "none"] = Field(
+        default="auto", alias="EZO_OCR_PROVIDER"
+    )
+    tesseract_cmd: str = Field(default="tesseract", alias="EZO_TESSERACT_CMD")
+    ocr_languages: Annotated[list[str], NoDecode] = Field(
+        default=["uzb", "uzb_cyrl", "rus", "eng"], alias="EZO_OCR_LANGUAGES"
+    )
+    ocr_timeout_seconds: float = Field(default=60.0, ge=5, le=600, alias="EZO_OCR_TIMEOUT_SECONDS")
+    ocr_max_pages: int = Field(default=100, ge=1, le=2000, alias="EZO_OCR_MAX_PAGES")
+
     # Official knowledge sources (docs/OFFICIAL_SOURCES.md). Off unless listed here, after
     # the owner has reviewed the source's terms: e.g. EZO_OFFICIAL_SOURCES=lexuz
     official_sources: Annotated[list[str], NoDecode] = Field(
@@ -203,6 +215,14 @@ class Settings(BaseSettings):
     def _split_official_sources(cls, value: object) -> object:
         if isinstance(value, str):
             return [name.strip().lower() for name in value.split(",") if name.strip()]
+        return value
+
+    @field_validator("ocr_languages", mode="before")
+    @classmethod
+    def _split_ocr_languages(cls, value: object) -> object:
+        if isinstance(value, str):
+            names = [n.strip() for n in value.replace("+", ",").split(",") if n.strip()]
+            return names or ["uzb", "uzb_cyrl", "rus", "eng"]
         return value
 
     @field_validator("image_providers", mode="before")

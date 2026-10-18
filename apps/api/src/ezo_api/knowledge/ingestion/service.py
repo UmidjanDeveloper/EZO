@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,12 +26,16 @@ from ezo_api.db.models import (
     KnowledgeChunk,
     KnowledgeDocument,
     KnowledgeSource,
+    OcrPage,
 )
+from ezo_api.documents.ocr import NoOCRProvider, OCRError, OCRProvider
+from ezo_api.documents.pdf.engine import PdfError, inspect_pdf
 from ezo_api.knowledge.embeddings.service import EmbeddingError, EmbeddingService
 from ezo_api.knowledge.fetch import FetchError, SafeFetcher
 from ezo_api.knowledge.ingestion.chunking import chunk_sections
 from ezo_api.knowledge.ingestion.normalize import normalize_text
 from ezo_api.knowledge.parsers import ParseError, parse
+from ezo_api.knowledge.parsers.base import ParsedDocument, Section
 from ezo_api.knowledge.uploads import (
     UploadRejectedError,
     detect_kind,
@@ -56,6 +60,38 @@ class AddResult:
     new_revision: bool
 
 
+@dataclass(slots=True)
+class OcrOutcome:
+    engine_available: bool
+    ran: bool = False
+    whole_file: bool = False
+    pages: set[int] = field(default_factory=set)
+    reason: str = ""
+    error: str | None = None
+    incomplete: str | None = None
+
+    def covers(self, page_start: int | None, page_end: int | None) -> bool:
+        if self.whole_file:
+            return True
+        if page_start is None or not self.pages:
+            return False
+        return any(p in self.pages for p in range(page_start, (page_end or page_start) + 1))
+
+    def failure_message(self) -> str:
+        """Why a scan or image ended up without readable text (shown to the user)."""
+        if self.error:
+            return f"This file is a scan or an image. OCR could not read it: {self.error}"
+        if self.ran:
+            return (
+                "This file is a scan or an image. OCR (Tesseract) ran but found no readable "
+                "text; the image may be too blurry, too small or contain no text."
+            )
+        return (
+            "This file is a scan or an image, so it has no text layer. It is stored, but OCR "
+            "is not available on this server" + (f": {self.reason}" if self.reason else ".")
+        )
+
+
 class KnowledgeService:
     def __init__(
         self,
@@ -64,7 +100,9 @@ class KnowledgeService:
         vectors: VectorStoreResolver,
         fetcher: SafeFetcher,
         max_upload_bytes: int,
+        ocr: OCRProvider | None = None,
     ) -> None:
+        self.ocr = ocr or NoOCRProvider()
         self.storage = storage
         self.embeddings = embeddings
         self.vectors = vectors
@@ -323,6 +361,9 @@ class KnowledgeService:
         category = str((document.meta or {}).get("category", "text"))
         parsed = await asyncio.to_thread(parse, category, data, document.filename or "file")
 
+        # OCR: pages without a text layer (scans, photos), when an engine is installed.
+        ocr = await self._ocr(session, document, data, category, parsed)
+
         # NORMALIZE + METADATA
         raw_text = normalize_text(parsed.text)
         better_title = _useful_title(parsed.title)
@@ -346,10 +387,7 @@ class KnowledgeService:
             document.current_revision_id = revision.id
             document.chunk_count = 0
             document.status = "needs_ocr"
-            document.error = (
-                "This file is a scan or an image, so it has no readable text. It is stored; "
-                "reading text from images and scans (OCR) arrives in a later EZO update."
-            )
+            document.error = ocr.failure_message()
             await self._clear_index(session, document)
             return
 
@@ -357,6 +395,9 @@ class KnowledgeService:
         chunks = chunk_sections(parsed.sections)
         if not chunks:
             raise ParseError("No readable text was found in the file.")
+        for chunk in chunks:
+            if ocr.covers(chunk.metadata.get("page_start"), chunk.metadata.get("page_end")):
+                chunk.metadata["ocr"] = True
         await session.execute(
             delete(KnowledgeChunk).where(KnowledgeChunk.revision_id == revision.id)
         )
@@ -415,9 +456,90 @@ class KnowledgeService:
                 "Indexed for keyword search. Add OPENAI_API_KEY or GEMINI_API_KEY to .env and "
                 "press Reindex for semantic (meaning-based) search."
             )
+        if ocr.incomplete:
+            status = "partial"
+            error = " ".join(part for part in (ocr.incomplete, error) if part)
         document.status = status
         document.error = error
         document.indexed_at = utcnow()
+
+    async def _ocr(
+        self,
+        session: AsyncSession,
+        document: KnowledgeDocument,
+        data: bytes,
+        category: str,
+        parsed: ParsedDocument,
+    ) -> OcrOutcome:
+        """Read pages that have no text layer with the OCR engine. Section texts of those
+        pages are replaced by what OCR read; nothing is invented for unreadable pages.
+        The per-page results (text, lines with coordinates, languages, engine confidence,
+        preprocessing) are stored in `ocr_pages`."""
+        outcome = OcrOutcome(engine_available=self.ocr.available)
+        document.meta = {k: v for k, v in (document.meta or {}).items() if k != "ocr"}
+        if category == "image":
+            targets: list[int] | None = None
+        elif category == "pdf":
+            # Pages with no text layer, or a few characters on top of an image (a scan with
+            # a stamped page number). Short text-only pages are not scans.
+            try:
+                targets = (await asyncio.to_thread(inspect_pdf, data)).scanned_pages
+            except PdfError:
+                targets = [
+                    s.page for s in parsed.sections if s.page is not None and not s.text.strip()
+                ]
+            if not targets:
+                return outcome
+        else:
+            return outcome
+        await session.execute(delete(OcrPage).where(OcrPage.document_id == document.id))
+        if not self.ocr.available:
+            outcome.reason = str(self.ocr.status().get("reason") or "")
+            return outcome
+        try:
+            result = await self.ocr.extract(data, document.mime_type, pages=targets)
+        except OCRError as exc:
+            outcome.error = exc.message
+            document.meta = {**document.meta, "ocr": {"error": exc.message}}
+            return outcome
+        outcome.ran = True
+        read = {page.number: page for page in result.pages if page.text.strip()}
+        if category == "image":
+            if 1 in read:
+                parsed.sections = [Section(text=read[1].text)]
+                outcome.whole_file = True
+        else:
+            for section in parsed.sections:
+                if section.page in read:
+                    section.text = read[section.page].text
+            outcome.pages = set(read)
+        session.add_all(
+            OcrPage(
+                user_id=document.user_id,
+                document_id=document.id,
+                page_number=page.number,
+                text=page.text,
+                lines=page.lines_json(),
+                width=page.width,
+                height=page.height,
+                dpi=page.dpi,
+                languages=page.languages,
+                script=page.script,
+                detected_language=page.detected_language,
+                method=result.engine,
+                engine_version=result.engine_version[:60],
+                confidence=page.confidence,
+                rotation=page.rotation,
+                deskew_angle=page.deskew_angle,
+                source_content_hash=document.content_hash,
+                page_image_sha256=page.source_sha256,
+                warnings=page.warnings,
+            )
+            for page in result.pages
+        )
+        document.meta = {**document.meta, "ocr": result.summary()}
+        outcome.incomplete = next((w for w in result.warnings if "were not read" in w), None)
+        return outcome
 
     async def _revision_for(
         self, session: AsyncSession, document: KnowledgeDocument, raw_text: str

@@ -233,5 +233,7 @@ class SystemStatus(BaseModel):
     features: list[FeatureInfo]
     image_providers: list[ImageProviderInfo] = []
     """Configured image providers in fallback order (empty: no image generation)."""
+    ocr: dict[str, Any] = {}
+    """OCR engine status: provider, version, installed language packs (or why it is off)."""
     personality: dict[str, Any]
     debug_traces: bool

@@ -72,6 +72,7 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
             ImageProviderInfo(name=str(i["name"]), model=str(i["model"]), edit=bool(i["edit"]))
             for i in services.visual.describe()
         ],
+        ocr=services.ocr.status(),
         agents=[
             AgentInfo(
                 key=spec.key,

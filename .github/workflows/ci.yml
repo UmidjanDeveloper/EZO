@@ -31,16 +31,25 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.32"
+      - name: Tesseract OCR with uzb, uzb_cyrl, rus, eng packs (real OCR tests)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
+            tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl
+          tesseract --version && tesseract --list-langs
       - run: uv sync --frozen
       - run: uv run ruff check src tests migrations ../../scripts
       - run: uv run ruff format --check src tests migrations ../../scripts
       - run: uv run mypy
       - name: Tests (SQLite)
         run: uv run pytest -q -rs --junitxml=reports/sqlite.xml
+        env:
+          EZO_REQUIRE_TESSERACT: "1"
       - name: Tests (PostgreSQL)
         run: uv run pytest -q -rs --junitxml=reports/postgres.xml
         env:
           EZO_TEST_DATABASE_URL: postgresql://ezo:ezo@localhost:5432/ezo_test
+          EZO_REQUIRE_TESSERACT: "1"
       - name: Migrations are in sync with the models
         run: uv run alembic upgrade head && uv run alembic check
         env:
@@ -93,6 +102,11 @@ jobs:
         run: docker compose --profile voice config --quiet
       - name: Build API image
         run: docker build -t ezo-api:ci apps/api
+      - name: API image has Tesseract with the Uzbek, Russian and English packs
+        run: |
+          langs=$(docker run --rm --entrypoint tesseract ezo-api:ci --list-langs)
+          echo "$langs"
+          for l in uzb uzb_cyrl rus eng osd; do echo "$langs" | grep -qx "$l"; done
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: API image starts, migrates and answers /api/health

@@ -205,3 +205,99 @@ async def run_pdf_action(ctx: GatherContext, gathered: Gathered, *, allow_planne
     lines.append("The files appear as cards under your message; never invent links.")
     gathered.notes.append("\n".join(lines))
     return True
+
+
+# --- OCR -------------------------------------------------------------------------------------
+
+_OCR = re.compile(
+    r"\b(ocr\b|matn\w*\s+(o'qi|chiqar|ajrat|ko'chir|tanib|olib ber|yozib ber)|rasmdagi matn|"
+    r"suratdagi matn|skaner\w*\s+(pdf|hujjat|fayl)\w*\s+matn|tanib ol|"
+    r"распозна\w*|извлеки текст|текст с (картинк|фото|изображен|скан)\w*|"
+    r"extract (the )?text|read the text|recogni[sz]e (the )?text|text from (the |this )?"
+    r"(image|photo|picture|scan))"
+)
+_IMAGE_WORDS = re.compile(
+    r"\b(ocr|rasm|surat|skaner|скан|фото|картин|изображен|image|photo|picture|scan)"
+)
+_OCR_LANGUAGES = [
+    (re.compile(r"\b(kirill\w*|кирилл\w*|cyrillic)"), "uzb_cyrl"),
+    (re.compile(r"\b(ruscha|rus tilida|русск\w*|russian)"), "rus"),
+    (re.compile(r"\b(inglizcha|ingliz tilida|english|английск\w*)"), "eng"),
+    (re.compile(r"\b(o'zbekcha|lotin\w*|узбек\w*|uzbek|latin)"), "uzb"),
+]
+
+
+def wants_ocr(text: str) -> bool:
+    return bool(_OCR.search(normalize(text)))
+
+
+def ocr_languages(text: str) -> list[str]:
+    """Tesseract packs the user named ("kirillchada", "ruscha matn"); empty = automatic."""
+    norm = normalize(text)
+    return [lang for pattern, lang in _OCR_LANGUAGES if pattern.search(norm)]
+
+
+async def run_ocr_action(ctx: GatherContext, gathered: Gathered) -> bool:
+    """Read the text of an attached image or scanned PDF. Returns False when not asked."""
+    turn = ctx.turn
+    if not wants_ocr(turn.text):
+        return False
+    attached = await attached_files(ctx.tools, turn.attachments)
+    files = [d for d in attached if d.mime_type == PDF_MIME or d.mime_type in IMAGE_MIMES]
+    if not files and not turn.attachments:
+        files = await recent_files(ctx.tools, (PDF_MIME, *IMAGE_MIMES), 1)
+    if not files:
+        if turn.attachments or not _IMAGE_WORDS.search(normalize(turn.text)):
+            return False  # e.g. "matnini o'qib chiq" about a Word file: not an OCR job
+        gathered.notes.append(
+            "The user wants text read from an image or a scan, but no image or PDF was attached "
+            "or found. Nothing was read. Ask them to attach it with the paperclip button."
+        )
+        return True
+    languages = ocr_languages(turn.text)
+    for document in files[:5]:
+        result = await call_tool(
+            gathered,
+            ctx.tools,
+            "ocr_tool",
+            {"input": {"kind": "document", "id": str(document.id)}, "languages": languages},
+        )
+        name = document.filename or document.title
+        if not result.ok:
+            gathered.notes.append(
+                f"OCR could not read “{name}”: {result.error} Say this plainly; do not guess "
+                "what the image says."
+            )
+            continue
+        data = result.data or {}
+        if data.get("empty"):
+            gathered.notes.append(
+                f"OCR ran on “{name}” but recognised no text (the image may be blurry, too "
+                "small or contain no text). Say so; do not guess its content."
+            )
+            continue
+        gathered.artifacts.extend(data.get("artifacts", []))
+        pages = data.get("pages", [])
+        ocr_pages = [p for p in pages if p["method"] == "ocr"]
+        scores = [p["confidence"] for p in ocr_pages if p.get("confidence") is not None]
+        lines = [
+            f"Text read from “{name}” (local OCR, {data.get('engine', {}).get('version', '')}; "
+            f"{len(pages)} page(s), {len(ocr_pages)} by OCR"
+            + (f", language packs {ocr_pages[0]['languages']}" if ocr_pages else "")
+            + (
+                f", mean Tesseract confidence {sum(scores) / len(scores):.0f}/100 — the "
+                "engine's own score, not a calibrated accuracy"
+                if scores
+                else ""
+            )
+            + "). The full text is in the file card.",
+            *[f"WARNING: {w}" for w in data.get("warnings", [])[:10]],
+            "Show the text exactly as recognised (or its beginning if long). Do not correct, "
+            "translate, complete or re-order it, and never fill in unreadable parts.",
+            "RECOGNISED TEXT"
+            + (" (beginning)" if data.get("truncated") else "")
+            + ":\n"
+            + str(data.get("preview", "")),
+        ]
+        gathered.notes.append("\n".join(lines))
+    return True

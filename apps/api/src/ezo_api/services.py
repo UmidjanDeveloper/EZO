@@ -10,6 +10,7 @@ from ezo_api.artifacts.service import ArtifactService
 from ezo_api.auth.local import LocalOwnerAuth
 from ezo_api.core.ezo_core import EzoCore
 from ezo_api.db.session import Database
+from ezo_api.documents.ocr import OCRProvider, build_ocr_provider
 from ezo_api.knowledge.embeddings.service import EmbeddingService
 from ezo_api.knowledge.fetch import SafeFetcher
 from ezo_api.knowledge.ingestion.runner import IngestionRunner
@@ -34,6 +35,7 @@ from ezo_api.tools.document_tools import (
     CreateSpreadsheetTool,
     ReadDocumentTool,
 )
+from ezo_api.tools.ocr_tools import OcrTool
 from ezo_api.tools.official_tools import OfficialSearchTool, VerifyOfficialDocumentTool
 from ezo_api.tools.pdf_tools import PdfTool
 from ezo_api.tools.registry import ToolRegistry
@@ -73,6 +75,7 @@ class Services:
     stories: StoryService
     visual: VisualService
     official: OfficialSyncService
+    ocr: OCRProvider
 
 
 def build_services(
@@ -82,6 +85,7 @@ def build_services(
     fetcher: SafeFetcher | None = None,
     voice: VoiceService | None = None,
     visual: VisualService | None = None,
+    ocr: OCRProvider | None = None,
 ) -> Services:
     """Wire everything together. Tests can inject providers, web search, fetcher, voice and
     image providers."""
@@ -115,8 +119,15 @@ def build_services(
     embeddings = EmbeddingService(routing.embeddings, model_providers)
     vectors = VectorStoreResolver(settings.vector_store)
     safe_fetcher = fetcher or SafeFetcher(settings.fetch_allow_private_networks)
+    ocr_provider = ocr or build_ocr_provider(
+        settings.ocr_provider,
+        settings.tesseract_cmd,
+        settings.ocr_languages,
+        timeout_seconds=settings.ocr_timeout_seconds,
+        max_pages=settings.ocr_max_pages,
+    )
     knowledge = KnowledgeService(
-        storage, embeddings, vectors, safe_fetcher, settings.max_upload_bytes
+        storage, embeddings, vectors, safe_fetcher, settings.max_upload_bytes, ocr=ocr_provider
     )
     if web_search == "auto":
         web_search = build_web_search(
@@ -157,6 +168,7 @@ def build_services(
                 CreateGraphicTool(),
                 OfficialSearchTool(),
                 PdfTool(),
+                OcrTool(),
                 VerifyOfficialDocumentTool(),
             ]
         ),
@@ -166,6 +178,7 @@ def build_services(
         stories=StoryService(),
         visual=visual or build_visual_service(settings),
         official=OfficialSyncService(settings, knowledge, safe_fetcher, storage),
+        ocr=ocr_provider,
     )
     core.services = services
     core.memory_index = memory_index

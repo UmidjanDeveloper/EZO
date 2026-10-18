@@ -34,7 +34,7 @@ from ezo_api.agents.base import (
 )
 from ezo_api.agents.catalog import AGENTS
 from ezo_api.agents.llm import complete, extract_json, sources_block
-from ezo_api.agents.office import run_pdf_action
+from ezo_api.agents.office import run_ocr_action, run_pdf_action
 from ezo_api.agents.references import (
     DocumentRef,
     document_source,
@@ -338,6 +338,8 @@ class DocumentAgent(Agent):
         # Deterministic EZO Office operations first: they need no model and no API key.
         planner_ok = request.action not in ("convert", "compare", "transform", "analyze")
         if await run_pdf_action(ctx, gathered, allow_planner=planner_ok):
+            return gathered
+        if await run_ocr_action(ctx, gathered):
             return gathered
         gathered.tool_calls.append(
             {

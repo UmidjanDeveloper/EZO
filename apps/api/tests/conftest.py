@@ -67,6 +67,8 @@ def make_settings(database_url: str, **overrides: object) -> Settings:
         "EZO_API_TOKEN": "",
         "VOICESTUDIO_URL": "",
         "EZO_VOICE_PROVIDERS": "auto",
+        # Deterministic by default; OCR tests opt in (tests/integration/test_ocr.py).
+        "EZO_OCR_PROVIDER": "none",
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

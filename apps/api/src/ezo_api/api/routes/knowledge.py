@@ -15,6 +15,7 @@ from ezo_api.db.models import (
     KnowledgeChunk,
     KnowledgeDocument,
     KnowledgeSource,
+    OcrPage,
     Project,
 )
 from ezo_api.knowledge.fetch import FetchError
@@ -49,6 +50,7 @@ _PUBLIC_META = (
     "date",
     "sitename",
     "final_url",
+    "ocr",
 )
 
 
@@ -286,6 +288,44 @@ async def reindex_document(
     await services.ingestion.submit(document.id)
     await session.refresh(document)
     return await _document_out(session, document)
+
+
+@router.get("/documents/{document_id}/ocr")
+async def get_document_ocr(
+    document_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> list[dict[str, Any]]:
+    """What OCR read on each page, with line boxes, language packs, the engine's own
+    confidence (0-100, not a calibrated accuracy), preprocessing and warnings."""
+    document = await _owned(session, user.id, document_id)
+    rows = (
+        await session.scalars(
+            select(OcrPage)
+            .where(OcrPage.document_id == document.id, OcrPage.user_id == user.id)
+            .order_by(OcrPage.page_number)
+        )
+    ).all()
+    return [
+        {
+            "page": r.page_number,
+            "text": r.text,
+            "lines": r.lines,
+            "width": r.width,
+            "height": r.height,
+            "dpi": r.dpi,
+            "languages": r.languages,
+            "script": r.script,
+            "detected_language": r.detected_language,
+            "method": r.method,
+            "engine_version": r.engine_version,
+            "confidence": r.confidence,
+            "rotation": r.rotation,
+            "deskew_angle": r.deskew_angle,
+            "current": r.source_content_hash == document.content_hash,
+            "warnings": r.warnings,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
 
 
 @router.delete("/documents/{document_id}", status_code=204)

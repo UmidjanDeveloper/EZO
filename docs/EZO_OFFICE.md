@@ -75,6 +75,12 @@ Verified by `tests/unit/test_pdf_engine.py` (real PDFs generated in the test),
 `tests/integration/test_pdf_office.py` (chat end to end, including offline with no
 providers configured).
 
-Not yet: lossy image recompression, page-level crop, form filling, redaction,
+Not yet (PDF): lossy image recompression, page-level crop, form filling, redaction,
 signing. Comparison of two PDFs is implemented in the engine (`compare_pdfs`) and
 will be connected to chat in a later step.
+
+## OCR (Step 2 — implemented)
+
+Scans and photos are read locally with Tesseract (Uzbek Latin and Cyrillic, Russian,
+English) during upload and on request in chat. Details, measured results and limits:
+[OCR.md](OCR.md).

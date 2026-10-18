@@ -219,5 +219,6 @@ def _to_source(
         extra={
             "vector_score": candidate.vector_score,
             "keyword_coverage": round(candidate.coverage, 2),
+            **({"ocr": True} if meta.get("ocr") else {}),
         },
     )

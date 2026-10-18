@@ -126,3 +126,39 @@ class VectorEntry(UUIDPrimaryKey, Base):
     dim: Mapped[int] = mapped_column(Integer, nullable=False)
     vector: Mapped[list[float]] = mapped_column(JSONType, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
+
+
+class OcrPage(UUIDPrimaryKey, Base):
+    """Text read by OCR from one page of a stored file, with its provenance: the lines
+    and their coordinates, the language packs, the engine's own confidence, and what was
+    done to the page image. Replaced when the document is OCR'd again."""
+
+    __tablename__ = "ocr_pages"
+    __table_args__ = (UniqueConstraint("document_id", "page_number"),)
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("knowledge_documents.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    page_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    lines: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list, nullable=False)
+    width: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dpi: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    languages: Mapped[str] = mapped_column(String(100), default="", nullable=False)
+    script: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    detected_language: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    method: Mapped[str] = mapped_column(String(30), nullable=False)  # tesseract
+    engine_version: Mapped[str] = mapped_column(String(60), default="", nullable=False)
+    confidence: Mapped[float | None] = mapped_column(nullable=True)
+    """Mean engine word confidence (0-100). Not a calibrated accuracy."""
+    rotation: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    deskew_angle: Mapped[float] = mapped_column(default=0.0, nullable=False)
+    source_content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    """Hash of the stored file the page came from."""
+    page_image_sha256: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    warnings: Mapped[list[str]] = mapped_column(JSONType, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)

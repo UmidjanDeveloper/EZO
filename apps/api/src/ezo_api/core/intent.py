@@ -153,6 +153,7 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\b(oxirgi|birinchi) (bet|sahifa)", 1.5),
         (r"\b(page|pages|страниц\w*)\s*\d", 1.5),
         (r"\b(suv belgi|watermark|водян|sahifa raqam|bet raqam|page numbers|нумерац)", 2),
+        (r"\b(ocr\b|rasmdagi matn|suratdagi matn|распозна|extract (the )?text)", 3),
         (r"\bpdf", 3),
         (r"\bdocx?\b", 3),
         (r"\bxlsx\b", 3),

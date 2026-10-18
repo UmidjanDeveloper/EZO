@@ -45,6 +45,8 @@ class SourceRef:
             parts.append(pages)
         if self.heading:
             parts.append(f"section “{self.heading}”")
+        if self.extra.get("ocr"):
+            parts.append("text read by OCR")
         if self.revision_number:
             parts.append(f"revision {self.revision_number}")
         if self.chunk_index is not None:

@@ -8,6 +8,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
+# Tesseract OCR (Apache-2.0) with Uzbek Latin + Cyrillic, Russian and English packs
+# (osd = orientation/script detection). See docs/OCR.md.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
+        tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir uv==0.11.32
 
 WORKDIR /app
