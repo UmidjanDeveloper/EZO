@@ -62,7 +62,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | Education, academic research and career agents | Phase 4 | planned |
 | Durable tasks / jobs / worker | Phase 5 | planned |
 | Persistent missions in chat | Phase 6 | planned |
-| LegalResearchAgent | Phase 7 | planned |
+| LegalResearchAgent + official-source framework (LEX.UZ proof of concept, off by default, live access unverified) | Phase 7 | experimental |
 | Realtime voice | Phase 8 | planned |
 | DeveloperAgent + website builder | Phase 9 | planned |
 | DataAnalystAgent | Phase 10 | planned |

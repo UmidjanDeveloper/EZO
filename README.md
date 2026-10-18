@@ -275,6 +275,20 @@ Practise English by simply talking to EZO, by typing or by voice:
   placeholder that is clearly labelled as such. The model, quality and limits are settings
   (`EZO_IMAGE_*` in `.env.example`). Details: [docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md).
 
+## Laws and official sources (Qonunlar va rasmiy manbalar) — experimental
+
+- EZO can answer questions about Uzbekistan's legislation **from official texts it has
+  retrieved**, with the act's number, date, status, article, retrieval date and official link.
+  Ask, for example, “Normativ-huquqiy hujjatlar toʻgʻrisidagi qonunda rasmiy eʼlon qilish haqida
+  nima deyilgan?”. Uzbek Latin, Uzbek Cyrillic and Russian all work.
+- Before each answer EZO re-checks the act on its official page. If that check fails, EZO tells
+  you when the text was last verified and does not say the act is "in force".
+- **Off by default.** The LEX.UZ connector is a proof of concept: read lex.uz's terms first,
+  then set `EZO_OFFICIAL_SOURCES=lexuz` and synchronize the acts you need by their LEX.UZ
+  number. gov.uz, president.uz and E-qaror are not connected yet. Without synchronized acts
+  EZO says so and gives general orientation only. Details:
+  [docs/OFFICIAL_SOURCES.md](docs/OFFICIAL_SOURCES.md).
+
 ## Optional integrations
 
 None of these is needed for normal EZO chat. Each one is off until you turn it on, and EZO
@@ -323,6 +337,12 @@ keeps working if it is missing or broken. Licence details:
 
 Not integrated yet. It will be an optional `studio` Docker profile that renders videos from
 EZO’s presentation/story projects. It is AGPL-3.0 and will run as a separate service.
+
+### OpenCode — coding execution backend (evaluated, not installed)
+
+Evaluated as an optional, sandboxed backend for the future Developer Agent (Phase 9). It is not
+installed, and it would never replace EzoCore or get unrestricted shell, file, network, Git or
+secret access. See [docs/OPENCODE_INTEGRATION_PLAN.md](docs/OPENCODE_INTEGRATION_PLAN.md).
 
 ### REA — binary analysis (planned, with the Developer Agent, Phase 9)
 

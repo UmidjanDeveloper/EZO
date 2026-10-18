@@ -117,8 +117,13 @@ images) plus the extended local checks listed for that phase.
   (“3/5 steps”), approval cards for external-impact actions
 
 ### Phase 7 — Uzbekistan government and legal intelligence
-- LegalResearchAgent; LexUz, President.uz, E-qaror, Gov.uz connectors
-- Versioned legal documents (never overwritten), currentness checks, revision comparison
+- **Foundation done early (experimental, 2026-10-18):** `OfficialSourceConnector` framework,
+  legal documents with revisions (migration 0005), rate-limited resumable sync, live
+  verification, LegalResearchAgent, LEX.UZ proof-of-concept connector — **off by default,
+  live access not yet verified**; see [docs/OFFICIAL_SOURCES.md](docs/OFFICIAL_SOURCES.md)
+- Next: verify LEX.UZ live with the owner's permission; access reviews and connectors for
+  president.uz, E-qaror, gov.uz and ministry/education sites; a verified change feed;
+  scheduled re-checks (needs Phase 5 jobs); publication/effective dates
 
 ### Phase 8 — Realtime voice
 - Streaming STT → streaming response → streaming TTS, barge-in, turn detection, low latency;
@@ -127,6 +132,8 @@ images) plus the extended local checks listed for that phase.
 ### Phase 9 — Developer Agent + website builder
 - Sandboxed repository tools (no unrestricted shell), approvals for push/deploy/destructive
   changes, inspect → reproduce → patch → test → lint → typecheck → build → diff → report
+- OpenCode evaluated as an optional, isolated execution backend only
+  ([docs/OPENCODE_INTEGRATION_PLAN.md](docs/OPENCODE_INTEGRATION_PLAN.md)); not installed
 
 ### Phase 10 — Data Analyst
 - DataAnalystAgent: computed (never guessed) statistics, anomalies, trends, forecasts where

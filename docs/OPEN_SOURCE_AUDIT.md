@@ -11,12 +11,13 @@
 |---|---|---|---|
 | [APEX-UI](https://github.com/RubenM1990/APEX-UI) | MIT | **No** | Design inspiration only. EZO's orb is written from scratch. |
 | [VoiceStudio](https://github.com/debpalash/VoiceStudio) | AGPL-3.0-only (+ separate model licences) | **No** | Optional external service, called over its HTTP API. |
-| [OpenMontage](https://github.com/calesthio/OpenMontage) | AGPL-3.0 | **No** | Optional external worker (Phase 4). Pipeline ideas studied. |
+| [OpenMontage](https://github.com/calesthio/OpenMontage) | AGPL-3.0 | **No** | Optional external worker (Phase 12). Pipeline ideas studied. |
 | [REA](https://github.com/morluto/rea) | MIT (+ many third-party engine licences) | **No** | Not integrated. Optional future DeveloperAgent tool, off by default. |
 | [open-higgsfield](https://github.com/wide-trace/open-higgsfield) | **None** (no LICENSE file) | **No** (not allowed) | Design/architecture reference only. |
 | [Ruflo](https://github.com/ruvnet/ruflo) | MIT (+ Apache-2.0 fork inside, some unlabelled packages) | **No** | Optional external MCP orchestrator, **off by default**, behind a strict allow-list. Not active yet. |
+| [OpenCode](https://github.com/anomalyco/opencode) | MIT (full dependency scan pending) | **No** | Evaluated only: possible sandboxed coding backend for the future Developer Agent. Not installed. |
 
-**Result:** no third-party source code from these six projects is in the EZO
+**Result:** no third-party source code from these seven projects is in the EZO
 repository. `THIRD_PARTY_NOTICES.md` therefore lists only EZO's own package
 dependencies.
 
@@ -237,6 +238,16 @@ are preconditions. **Development-time use:** not enabled. Ruflo was not initiali
 installed in this repository, and no mods or plugins were enabled.
 
 ---
+
+## 7. OpenCode
+
+- **Repository:** <https://github.com/anomalyco/opencode> (formerly `sst/opencode`), evaluated
+  2026-10-18. Versions: v1.19.3 (GitHub release) and 2.0.32 (npm `@opencode/*`, V2).
+- **License:** MIT (root `LICENSE`, and the CLI/SDK/plugin packages). Spot-checked
+  dependencies are MIT or Apache-2.0. **A full transitive licence scan has not been done.**
+- **Use in EZO:** none. Evaluated only, as an optional, sandboxed coding execution backend
+  for the future Developer Agent. Not vendored, not installed, not called.
+- **Plan and isolation rules:** [OPENCODE_INTEGRATION_PLAN.md](OPENCODE_INTEGRATION_PLAN.md).
 
 ## Rules going forward
 

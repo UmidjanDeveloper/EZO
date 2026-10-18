@@ -308,6 +308,26 @@ the deck spec (ids from the model are discarded), and reuses them when a deck is
 `create_presentation` loads only the user's own image artifacts. Details:
 [docs/VISUAL_AGENT.md](docs/VISUAL_AGENT.md).
 
+### Official sources and legal research (Phase 7 foundation, experimental)
+
+`official/` adds official legal texts to the existing knowledge base:
+- `base.py`: `OfficialSourceConnector` (validate ID → official URL → parse) and each source's
+  `AccessReview`; unverified sources cannot be enabled;
+- `http.py`: `OfficialHttpClient` on top of `SafeFetcher` (host allow-list, robots.txt
+  fail-closed, pacing, budget, no work-around for 401/403/451, Retry-After);
+- `lexuz.py`: the LEX.UZ proof of concept; `registry.py`: all sources, planned ones included;
+- `legal_text.py`: numbers, types, dates and status labels in Uzbek Latin/Cyrillic and Russian,
+  plus Latin ↔ Cyrillic query variants;
+- `sync.py`: `OfficialSyncService`, resumable runs with per-document checkpoints, hash-based
+  new / unchanged / amended / duplicate, live verification.
+
+The text goes through the normal `KnowledgeService` pipeline (Markdown → revision → chunks →
+vectors), so retrieval and citation checks are unchanged. Legal metadata is in
+`legal_documents` / `legal_revisions`, and runs are in `official_sync_runs` (migration 0005).
+`agents/legal_research.py` uses the `official_search` and `verify_official_document` tools.
+`/api/official` exposes sources, runs, documents and live checks. Details:
+[docs/OFFICIAL_SOURCES.md](docs/OFFICIAL_SOURCES.md).
+
 ### Orchestration (prepared, not wired into chat)
 
 `orchestration/` holds optional multi-agent **missions** behind one interface,

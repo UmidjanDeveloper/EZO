@@ -152,9 +152,6 @@ class Settings(BaseSettings):
     official_max_retry_after_seconds: float = Field(
         default=120.0, ge=0, le=3600, alias="EZO_OFFICIAL_MAX_RETRY_AFTER_SECONDS"
     )
-    official_status_max_age_hours: float = Field(
-        default=24.0, ge=0.1, le=24 * 365, alias="EZO_OFFICIAL_STATUS_MAX_AGE_HOURS"
-    )
 
     @field_validator(
         "openai_api_key",

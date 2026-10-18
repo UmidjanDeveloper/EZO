@@ -85,6 +85,14 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   escape, system directories and secret files are blocked; push, deploy and destructive
   actions need approval.
 
+- Official sources (LEX.UZ) are contacted only through `OfficialHttpClient`. It allows only
+  the source's own hosts, obeys robots.txt (no fetch when robots.txt cannot be read), waits
+  at least 5 s between requests and honours `Crawl-delay` and `Retry-After`. Any refusal
+  (401/403/451) stops the run without retries or work-arounds. Sources whose access has not
+  been reviewed cannot be enabled. See `docs/OFFICIAL_SOURCES.md`.
+- OpenCode is evaluated only (not installed). The isolation rules a future integration must
+  follow are in `docs/OPENCODE_INTEGRATION_PLAN.md`.
+
 ### Optional external services
 
 | Service | Policy |
