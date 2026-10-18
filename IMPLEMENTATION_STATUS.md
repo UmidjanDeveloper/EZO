@@ -76,12 +76,12 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #24 (CI), commit `a78fe8f`, all jobs green:
+**CI verified** — run #28 (CI), commit `429a52b`, all jobs green:
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 385 | 381 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
-| API · PostgreSQL | 385 | 382 | 0 | 3 | 3 LibreOffice not installed |
+| API · SQLite | 423 | 419 | 0 | 4 | 1 needs PostgreSQL + pgvector; 3 LibreOffice not installed |
+| API · PostgreSQL | 423 | 420 | 0 | 3 | 3 LibreOffice not installed |
 | Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
 | Playwright e2e | 22 | 22 | 0 | 0 | — |
@@ -91,8 +91,9 @@ TypeScript, the web production build and the Docker job (Compose config includin
 `voice` profile, API and web image builds, API container migrates and answers
 `/api/health`, web container serves `/`).
 
-**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 384 passed
-+ 1 skipped; PostgreSQL 385 passed); the full Playwright suite passed locally (22); the API
+**Extended local verification** (not in CI): the 3 LibreOffice tests pass (SQLite 422 passed
++ 1 skipped; PostgreSQL 423 passed at the legal-agent commit); migration 0005 verified up →
+check → down → up on SQLite and PostgreSQL; the full Playwright suite passed locally (22); the API
 Docker image was rebuilt in the sandbox and, inside the container, rendered a diagram and
 built a deck with a slide image (no QA issues). Live image generation was **not** run: there
 are no provider keys in this environment, so the OpenAI and Gemini adapters are verified with
@@ -142,6 +143,75 @@ repository's default branch.
 **How the owner can test:** open the Actions tab → latest *CI* run → each job's summary
 shows the test table. `curl localhost:8000/api/status` lists agents with
 `maturity`/`phase`.
+
+## Official knowledge sources + OpenCode evaluation (2026-10-18) — experimental
+
+**What changed**
+- `OfficialSourceConnector` framework (`official/`): each source has an `AccessReview` (official
+  API, robots.txt, terms, formats, rate limits, legal basis); unverified sources cannot be
+  enabled. `OfficialHttpClient` allows only the source's hosts, obeys robots.txt (fail closed),
+  paces requests (≥ 5 s, Crawl-delay), caps requests per run, never works around 401/403/451
+  and honours 429 Retry-After.
+- LEX.UZ proof-of-concept connector (public `/docs/<id>` and `/ru/docs/<id>` pages), **off by
+  default**. Metadata comes from the page title; the status only from an explicit label.
+  gov.uz, president.uz, E-qaror and ministry sites are registered as unverified (no invented
+  endpoints).
+- Resumable, rate-limited sync into the existing knowledge base. Each document is new,
+  unchanged, amended (new revision, history kept) or a duplicate. Outdated acts are filtered
+  out, interrupted runs are recovered at startup and can be resumed, and live verification
+  keeps the last verified time when it fails.
+- LegalResearchAgent (experimental): `official_search` (both Uzbek scripts) and
+  `verify_official_document` tools. Answers carry number, date, status, article, retrieval
+  date and official URL; EZO never claims "in force" when the status is unconfirmed or a live
+  check failed; it compares the last two retrieved revisions on request.
+- `/api/official`: sources with access reviews, sync, runs, resume, documents with revisions
+  and provenance, live verify (audited, rate-limited).
+- `docs/OPENCODE_INTEGRATION_PLAN.md`: OpenCode (MIT) recommended only as an optional,
+  sandboxed coding backend behind a future DeveloperAgent; not installed.
+
+**Files added:** `apps/api/src/ezo_api/official/{base,http,legal_text,lexuz,registry,sync}.py`,
+`apps/api/src/ezo_api/db/models/official.py`, `migrations/versions/0005_official_knowledge_sources.py`,
+`apps/api/src/ezo_api/tools/official_tools.py`, `apps/api/src/ezo_api/agents/legal_research.py`,
+`apps/api/src/ezo_api/api/routes/official.py`, `tests/official_fixtures.py`,
+`tests/unit/test_official_sources.py`, `tests/integration/test_official_sync.py`,
+`tests/integration/test_legal_research.py`, `docs/OFFICIAL_SOURCES.md`,
+`docs/OPENCODE_INTEGRATION_PLAN.md`.
+**Files modified:** `knowledge/fetch.py` (HTTP status and Retry-After on errors),
+`KnowledgeService.add_connector_document`, settings (`EZO_OFFICIAL_*`), services, startup
+recovery, agent registry and catalog (legal_research experimental), `maturity.py`, intent rules
+(Uzbek Cyrillic legal words), two existing tests, docs, `.env.example`.
+**Database migrations:** `0005_official_knowledge_sources` — `legal_documents`,
+`legal_revisions`, `official_sync_runs`. Verified up → `alembic check` → down → up on SQLite
+and PostgreSQL.
+
+**Tests added:** 19 unit cases (title parsing in 4 forms, document types, impossible dates,
+status only from labels, transliteration, articles, LEX.UZ ID/URL validation, parsing in Uzbek
+Latin/Cyrillic and Russian, robots.txt obey/fail-closed, refusals, rate limits, host
+allow-list, budget, network errors, registry), 12 sync integration tests (metadata + indexing
++ raw provenance, unchanged/amended with history, duplicates, outdated filtering,
+Cyrillic/Russian, interrupted-run recovery and resume, repeated network failures, access
+refusal, robots disallow, Retry-After within/over the cap, pacing, unsupported/disabled sources,
+live verification incl. failure) and 7 agent/API tests.
+
+**Security changes:** host allow-list and robots/rate-limit compliance for official sources;
+digit-only document IDs; sync owner-triggered, rate-limited and audited; unverified sources
+cannot be enabled; OpenCode isolation rules written down before any integration.
+
+**User-visible changes:** with `EZO_OFFICIAL_SOURCES=lexuz` and synchronized acts, legal
+questions are answered from official texts with full metadata and a live currentness check.
+Without it, EZO says that no official texts are synchronized.
+
+**Known limitations (honest):** **no live LEX.UZ traffic has ever happened**. lex.uz was
+unreachable from the build environment, so robots.txt and the terms are unverified, and the
+connector has only parsed synthetic test pages (the real LRU-682 number and date, with
+illustrative article text). Other sources have no connector. There is no change feed, so new
+acts are added by ID. No scheduler until Phase 5. Publication and effective dates are not
+extracted. Official texts are per user (single-owner EZO). The OpenCode V2 docs were
+unreachable, and its full dependency-licence scan is pending.
+
+**How the owner can test:** follow `docs/OFFICIAL_SOURCES.md` → *Enabling LEX.UZ*: review the
+terms and robots.txt, set `EZO_OFFICIAL_SOURCES=lexuz`, sync `5695915`, compare
+`GET /api/official/documents/{id}` with the lex.uz page, then ask the legal question in chat.
 
 ## Phase 2 — Visual Agent (2026-10-18) — alpha
 
