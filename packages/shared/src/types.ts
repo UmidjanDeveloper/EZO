@@ -692,3 +692,92 @@ export interface CareerProfile {
   languages?: { language: string; level?: string }[];
   certificates?: { name: string; issuer?: string; year?: string }[];
 }
+
+/** Knowledge OS (K1): named libraries of sources EZO has read. Read-only: nothing from a
+ * source is executed or installed. */
+export interface KnowledgeLibrary {
+  id: string;
+  name: string;
+  description: string;
+  sources: number;
+  created_at: string;
+}
+
+export type LearnedSourceKind = "website" | "github" | "pypi" | "npm";
+export type LearnedSourceStatus = "queued" | "inspecting" | "reading" | "indexing" | "indexed" | "partial" | "failed";
+
+export interface LearnedSourceLimits {
+  max_pages?: number;
+  max_depth?: number;
+  max_total_mb?: number;
+  max_file_kb?: number;
+  max_seconds?: number;
+  min_interval_seconds?: number;
+  include_code?: boolean;
+}
+
+export interface LicenseReview {
+  license: string | null;
+  category: "permissive" | "copyleft_or_restricted" | "other" | "unknown";
+  needs_review: boolean;
+  note: string;
+}
+
+export interface LearnedSource {
+  id: string;
+  library_id: string;
+  kind: LearnedSourceKind;
+  target: string;
+  title: string;
+  status: LearnedSourceStatus;
+  version: string | null;
+  license: string | null;
+  profile: {
+    url?: string;
+    access?: string;
+    access_note?: string;
+    publisher?: string | null;
+    description?: string | null;
+    license_review?: LicenseReview;
+    docs_site?: { url: string; pages_read: number; error?: string };
+    [key: string]: unknown;
+  };
+  limits: LearnedSourceLimits;
+  stats: {
+    documents?: number;
+    indexed?: number;
+    keyword_only?: number;
+    failed?: number;
+    skipped?: number;
+    stopped?: string | null;
+    seconds?: number;
+    content_changed?: boolean;
+  };
+  security_flags: { kind: string; location: string; excerpt: string }[];
+  error: string | null;
+  last_checked_at: string | null;
+  indexed_at: string | null;
+  created_at: string;
+  /** Only on POST: false when the source was already in that library. */
+  created?: boolean | null;
+}
+
+export interface LearnedSourceDetail extends LearnedSource {
+  documents: {
+    id: string;
+    title: string;
+    url: string | null;
+    status: KnowledgeStatus;
+    chunk_count: number;
+    size_bytes: number | null;
+    error: string | null;
+  }[];
+}
+
+export interface LearnSourceRequest {
+  target: string;
+  kind?: "auto" | LearnedSourceKind;
+  library_id?: string | null;
+  library_name?: string | null;
+  limits?: LearnedSourceLimits;
+}

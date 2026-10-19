@@ -10,6 +10,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const PYTHON = process.env.EZO_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
 const WEB_PORT = 3100;
 const API_PORT = 8100;
+const DOCS_PORT = 8200;
 
 export default defineConfig({
   testDir: "./specs",
@@ -37,7 +38,16 @@ export default defineConfig({
       url: `http://localhost:${API_PORT}/api/health`,
       timeout: 120_000,
       reuseExistingServer: false,
-      env: { EZO_CORS_ORIGINS: `http://localhost:${WEB_PORT}` },
+      // Private networks are allowed ONLY for this test API, so the Knowledge OS spec can
+      // learn the fixture documentation site served on 127.0.0.1 below.
+      env: { EZO_CORS_ORIGINS: `http://localhost:${WEB_PORT}`, EZO_FETCH_ALLOW_PRIVATE_NETWORKS: "true" },
+    },
+    {
+      command: `${PYTHON} -m http.server ${DOCS_PORT} --bind 127.0.0.1 --directory tests/e2e/fixtures/docs-site`,
+      cwd: ROOT,
+      url: `http://127.0.0.1:${DOCS_PORT}/guide/`,
+      timeout: 30_000,
+      reuseExistingServer: false,
     },
     {
       command: `pnpm --filter @ezo/web build && pnpm --filter @ezo/web exec next start --port ${WEB_PORT}`,

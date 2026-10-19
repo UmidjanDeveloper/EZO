@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n/context";
 import { formatSize, isPending } from "@/lib/knowledge";
 import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "../pages/PageFrame";
+import { LearnedSources } from "./LearnedSources";
 import { StatusBadge } from "./StatusBadge";
 
 type Notice = { tone: "info" | "error"; text: string } | null;
@@ -184,6 +185,8 @@ export function KnowledgePage() {
           ))
         )}
       </div>
+
+      <LearnedSources />
     </PageFrame>
   );
 }

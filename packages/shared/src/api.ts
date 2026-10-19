@@ -5,6 +5,10 @@
 import { SseParser } from "./sse";
 import type {
   AgentRun,
+  KnowledgeLibrary,
+  LearnedSource,
+  LearnedSourceDetail,
+  LearnSourceRequest,
   OrganizationFile,
   OrganizationProfile,
   OrganizationProfileInput,
@@ -196,6 +200,23 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
         ...json({ query, project_id: projectId ?? null }),
       }),
+
+    /** Knowledge OS: libraries and learned sources (websites, GitHub, PyPI, npm). */
+    knowledgeLibraries: () => request<KnowledgeLibrary[]>("/api/learning/libraries"),
+    createKnowledgeLibrary: (name: string, description = "") =>
+      request<KnowledgeLibrary>("/api/learning/libraries", { method: "POST", ...json({ name, description }) }),
+    deleteKnowledgeLibrary: (id: string) => request<void>(`/api/learning/libraries/${id}`, { method: "DELETE" }),
+    learnedSources: (libraryId?: string) =>
+      request<LearnedSource[]>(
+        `/api/learning/sources${libraryId ? `?library_id=${encodeURIComponent(libraryId)}` : ""}`,
+      ),
+    /** Register a source and start reading it (status starts at "queued"). */
+    learnSource: (body: LearnSourceRequest) =>
+      request<LearnedSource>("/api/learning/sources", { method: "POST", ...json(body) }),
+    learnedSource: (id: string) => request<LearnedSourceDetail>(`/api/learning/sources/${id}`),
+    refreshLearnedSource: (id: string) =>
+      request<LearnedSource>(`/api/learning/sources/${id}/refresh`, { method: "POST" }),
+    deleteLearnedSource: (id: string) => request<void>(`/api/learning/sources/${id}`, { method: "DELETE" }),
 
     voiceStatus: () => request<VoiceStatus>("/api/voice/status"),
     organizations: () => request<OrganizationProfile[]>("/api/writing/organizations"),

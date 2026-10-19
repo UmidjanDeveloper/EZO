@@ -69,6 +69,10 @@ async def test_website_is_read_within_its_folder_rules_and_limits(
     assert (
         source["title"] == "Widget guide" and source["profile"]["publisher"] == "docs.example.org"
     )
+    # Learned pages are listed under their source, not among the user's own files.
+    assert (await api.get("/api/knowledge/documents")).json() == []
+    everything = (await api.get("/api/knowledge/documents?include_learned=true")).json()
+    assert len(everything) == len(source["documents"])
     # The injection attempt is recorded, not obeyed, and audit-logged.
     [flag, *_] = source["security_flags"]
     assert flag["kind"] == "override" and flag["location"].endswith("quickstart.html")

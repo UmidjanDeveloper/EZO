@@ -144,8 +144,16 @@ async def list_documents(
     user: CurrentUser,
     project_id: uuid.UUID | None = None,
     limit: int = Query(default=200, ge=1, le=1000),
+    include_learned: bool = False,
 ) -> list[KnowledgeDocumentOut]:
+    """The user's files and pages. Pages of learned sources (Knowledge OS) are listed under
+    their source (/api/learning/sources/{id}) unless `include_learned` is set."""
     statement = select(KnowledgeDocument).where(KnowledgeDocument.user_id == user.id)
+    if not include_learned:
+        learned = select(KnowledgeSource.id).where(
+            KnowledgeSource.user_id == user.id, KnowledgeSource.source_type == "learned"
+        )
+        statement = statement.where(KnowledgeDocument.source_id.not_in(learned))
     if project_id is not None:
         statement = statement.where(KnowledgeDocument.project_id == project_id)
     statement = statement.order_by(KnowledgeDocument.updated_at.desc()).limit(limit)
