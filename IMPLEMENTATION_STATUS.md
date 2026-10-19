@@ -62,7 +62,8 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 | OCR + EZO Office (PDF tools, OCR, DOCX fidelity, tables, sheets, long documents, Word/Excel → PDF) | Phase 3 | alpha (partially complete) |
 | Professional writing (30 document types, official layout, organization profile, validation) | Professional writing | alpha |
 | Translation (uz Latin/Cyrillic, ru, en; Word in place; glossary; quality checks; bilingual files; turn-based interpretation API) | Translation | alpha |
-| Education, academic research and career agents | Phase 4 | planned |
+| Education materials (lesson packages, quizzes, syllabi, rubrics, study plans) | Phase 4 | alpha |
+| Academic research (OpenAlex, research plans, 6 citation styles) and career (profile, CV, letters, interviews) | Phase 4 | alpha |
 | Durable tasks / jobs / worker | Phase 5 | planned |
 | Persistent missions in chat | Phase 6 | planned |
 | LegalResearchAgent + official-source framework (LEX.UZ proof of concept, off by default, live access unverified) | Phase 7 | experimental |
@@ -79,19 +80,19 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #46 (CI), commit `29577b9`, all jobs green
-(https://github.com/UmidjanDeveloper/EZO/actions/runs/39145075911):
+**CI verified** — run #52 (CI), commit `7317af8`, all jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39186012850):
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 632 | 631 | 0 | 1 | needs PostgreSQL + pgvector |
-| API · PostgreSQL | 632 | 632 | 0 | 0 | — |
-| Web unit (Vitest) | 41 | 41 | 0 | 0 | — |
+| API · SQLite | 654 | 653 | 0 | 1 | needs PostgreSQL + pgvector |
+| API · PostgreSQL | 654 | 654 | 0 | 0 | — |
+| Web unit (Vitest) | 42 | 42 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 25 | 25 | 0 | 0 | — |
+| Playwright e2e | 27 | 27 | 0 | 0 | — |
 
-Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migration
-0009 included), ESLint, TypeScript, the web production build, and the Docker job. The
+Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migrations
+up to 0010), ESLint, TypeScript, the web production build, and the Docker job. The
 Docker job covers the Compose config, the API and web image builds, Tesseract with `uzb`,
 `uzb_cyrl`, `rus`, `eng` and `osd` in the API image, **the API image converting a Word
 and an Excel file to PDF with LibreOffice**, the API container migrating and answering
@@ -101,14 +102,64 @@ tests **run** (no LibreOffice skips any more).
 
 **Extended local verification** (not in CI):
 
-- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: PostgreSQL 632
-  passed.
-- Migrations 0008 and 0009 verified up → check → down → up on SQLite and PostgreSQL.
-- The full Playwright suite passed locally (25).
+- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 653
+  passed + 1 skipped (pgvector); PostgreSQL 654 passed.
+- Migrations 0009 and 0010 verified up → check → down → up on SQLite and PostgreSQL.
+- The full Playwright suite passed locally (27).
+- OpenAlex live access **not verified**: the sandbox network blocks it; the client is
+  tested with a mock transport and the chat flows with a fake search.
 - The API Docker image could **not** be rebuilt in the sandbox (the sandbox proxy blocks
   deb.debian.org). The CI Docker job built and checked it.
 - Live provider tests **not performed** (no provider keys here): the quality of AI-written
-  drafts and translations has only been checked with scripted model replies.
+  drafts, translations, teaching materials and research plans has only been checked with
+  scripted model replies.
+
+## Stage D — Education, academic research and career (2026-10-19) — alpha
+
+Commits `67bb6a1` (education materials), `0420e86` (academic), `e7f6aa6` (career),
+`739ae1d` (web: career profile, e2e), `7317af8` (docs). CI runs #48–#52 green. Details:
+[docs/EDUCATION_CAREER.md](docs/EDUCATION_CAREER.md).
+
+### What works
+
+- **Teaching and study materials** (`education/`, `agents/education_office.py`): lesson
+  package (Word + PDF, Excel with quiz/timing/rubric, slides through the presentation
+  engine), quiz with an EZO-built answer key, syllabus, rubric, study plan, thesis-defense
+  and job-interview questions. Options from the request (questions, minutes / "para",
+  weeks, level, slides, language, Cyrillic). Attached files are the source material.
+  EZO checks answers, question counts, lesson timing, syllabus weights and week numbers,
+  rubric points and weekly minutes. Templates without a model.
+- **Academic** (`academic/`, `agents/academic_office.py`): OpenAlex literature search
+  (no key) through `SafeFetcher.fetch_json`; a research plan that may cite only the found
+  works as [n] (non-existent citations removed, stated "results" flagged); reference
+  lists written by EZO in APA 7, MLA 9, Chicago, Harvard, IEEE and GOST; an Excel
+  literature matrix; a literature list without a model; pasted reference lists split by
+  the model and every value verified against the user's text. `/api/academic`.
+- **Career** (`career/profile.py`, migration 0010): career profile in Settings; a CV
+  built exactly from it with no model; cover and motivation letters with the profile as
+  their only facts (other numbers flagged); interview questions from the profile.
+  `/api/career/profile`.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| Lesson request → Word + Excel + 3-slide PPTX, 45 minutes checked, key "A" | `tests/integration/test_education.py::test_lesson_package_makes_word_excel_and_slides` |
+| Quiz from an attached lecture: file text sent, broken answer and short count reported | `::test_quiz_from_an_attached_lecture_reports_problems` |
+| No AI key: Cyrillic study-plan template; lesson template totals 45 minutes | `::test_template_without_a_model_and_cyrillic`, e2e `education.spec.ts` |
+| Research plan: only found works cited, [7] removed, "Natijalar shuni ko'rsatdiki" flagged, APA list by EZO, missing fields listed | `tests/integration/test_academic.py::test_research_plan_cites_only_found_works` |
+| Literature list without a model (IEEE); search off → nothing invented, 503 | `::test_literature_list_without_a_model_and_search_off` |
+| Pasted references: an invented DOI dropped | `::test_reference_formatting_drops_invented_fields`, `tests/unit/test_academic.py` |
+| Six citation styles, OpenAlex parsing and request URL | `tests/unit/test_academic.py` |
+| CV from the profile with no model call; profile replace/delete | `tests/integration/test_career.py::test_profile_api_and_cv_without_a_model`, e2e |
+| Letter: profile number kept, invented 45 % flagged; interview answers from the profile | `::test_letters_and_interview_use_only_profile_facts` |
+
+### Not done
+
+No grade book or online tests; quizzes are files. The CV keeps the profile's entries in
+the language they were written. OpenAlex coverage of Uzbek-language journals is limited
+and live access was not verified here. Content quality with a live model was not
+measured.
 
 ## Stage C — Translation (2026-10-18) — alpha
 
@@ -817,9 +868,9 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Stage D — education and career (Phase 4: lesson packages, academic research with real
-citations, CV and interview practice), then Stage E (government work mode). Owner
-decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and the
-LegalResearchAgent visibility
+Stage E — government work mode (organization profiles extended for public bodies, meeting
+minutes from recordings, citizen appeals, reports), then Stage F (official knowledge).
+Owner decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and
+the LegalResearchAgent visibility
 ([docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md) §6).
 Ruflo stays off (Phase 14).
