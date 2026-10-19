@@ -291,8 +291,15 @@ deterministic style check (`style.py`). It also has the drafting contract and va
 approval claims flagged) and the official-layout DOCX renderer (`render.py`).
 `agents/writing_office.py` runs the flow inside DocumentAgent: one model call, or none for
 templates. EzoCore routes "<document type> + writing verb" to DocumentAgent.
-Organization profiles live in `organization_profiles` (migration 0008) and are managed at
-`/api/writing/organizations`.
+Organization profiles live in `organization_profiles` (migration 0008; formatting and
+logo in 0011) and are managed at `/api/writing/organizations`. `organization/` (Stage E1)
+holds the formatting model and its application to Word (`formatting.py`), approved
+templates with the `{{matn}}` marker (`templates.py`), upload checks for logos,
+templates and examples (`files.py`), `load_facts` (default profile → `OrgFacts` with logo,
+the template for the document type and up to two examples; `service.py`), the letterhead
+for other documents and decks (`letterhead.py`) and the ZIP export (`export.py`).
+Templates and examples are rows of `organization_assets` (0011) with their bytes in the
+storage provider under `organizations/{user}/{org}/`.
 
 ### Translation
 

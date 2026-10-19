@@ -172,6 +172,16 @@ provider only as data inside the user's own drafting request (never as instructi
 writer cannot produce signatures, seals or registration marks: the renderer always prints
 placeholders for them, and claims of signing or approval in the text are flagged.
 
+Organization files (Stage E1): logos, templates and examples are owned by one user and
+checked on every endpoint. Types come from the content; the logo is decoded and
+re-encoded to PNG; templates are opened before storing, and files with macros or external
+relationships (remote images, linked files) are refused; uploads are capped at 10 MB
+(logo 5 MB). Template and example contents are untrusted data: examples reach the AI
+provider only as short excerpts inside `<example>` tags with the instruction to copy no
+facts, and numbers found only in an example are flagged in the result. Files are served
+with `nosniff`, a sandboxing CSP and `no-store`. Deleting a profile deletes its stored
+files. Every change and export is audit-logged.
+
 Translation: glossary terms are per user (an organization's terms are only used with that
 organization, and are deleted with it); every glossary endpoint checks ownership. Text
 to translate is sent to the AI provider inside `<text>` tags as data, never as

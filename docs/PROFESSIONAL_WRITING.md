@@ -62,7 +62,12 @@ Settings → *Tashkilot profili*, or `/api/writing/organizations`. It holds the 
 type, department, address, contacts, the head's position and name, the letterhead lines,
 house-style notes and preferred terms (`{"avoid": "use instead"}`). Only what the user
 enters is used. The profile is passed to the writer as data, never as instructions. It
-can be edited and deleted.
+can be edited, exported and deleted.
+
+Since Stage E1 it also holds the standard formatting (font, size, spacing, indent,
+margins), a logo, approved Word templates (`{{matn}}` marks where the text goes) and
+example documents used only as style references. See
+[GOVERNMENT_WORK.md](GOVERNMENT_WORK.md).
 
 ## Limits (honest)
 
@@ -70,5 +75,6 @@ can be edited and deleted.
   perfect Uzbek; the style check catches common machine patterns only.
 - Names are not verified against anything; a name the model adds is visible in the draft
   for the user to check. Numbers and dates are verified against the request.
-- Logos and uploaded example documents in the profile are planned (Stage E).
+- Logos, approved templates and example documents: see
+  [GOVERNMENT_WORK.md](GOVERNMENT_WORK.md) (Stage E1).
 - Telegram posts and other social media content are planned (Stage G).

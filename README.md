@@ -266,6 +266,7 @@ the Docker image. For local development, install `tesseract-ocr` with the `uzb`,
 |---|---|
 | “Shu faktlar asosida tushuntirish xati yoz va Word qilib ber: …” | An official-layout **DOCX** (+ PDF, .md, .txt); details you did not give stay as `[placeholders]`, numbers you did not give are flagged |
 | “Tashkilotimiz uslubida xizmat xati tayyorla” | Uses your organization profile (Settings → Tashkilot profili): letterhead, contacts, house style |
+| “Tashkilotimiz blankasida xizmat xati tayyorla” | Writes into your **approved Word template** (or EZO's letterhead with your logo and formatting); see [docs/GOVERNMENT_WORK.md](docs/GOVERNMENT_WORK.md) |
 | “Bayonnoma shablonini tayyorla” | A template with placeholders — works **without an AI key** |
 | “CV / motivatsion xat / tadqiqot taklifi tayyorla” | Career and academic documents, no invented achievements or findings |
 

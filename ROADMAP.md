@@ -113,6 +113,14 @@ images) plus the extended local checks listed for that phase.
   and interview questions grounded in it
 - Not yet: grade books, online tests, profile translation, live OpenAlex verification
 
+### Government work mode — E1 organization profiles alpha (2026-10-19, Stage E)
+- E1 (alpha): standard formatting, logo, approved Word templates with the `{{matn}}`
+  marker, example documents as style references, terminology, ZIP export, deletion with
+  files (migration 0011); used by official letters, other documents ("blankasida") and
+  presentations
+- Next: E2 secretary (minutes and task registers from notes, documents and — only with a
+  real transcription provider — audio), E3 citizen appeals, E4 reports
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
@@ -122,8 +130,8 @@ images) plus the extended local checks listed for that phase.
 
 The owner's master prompt orders work as stages; they map onto this roadmap:
 A Office completion → Phase 3 (done) · B Professional writing (done, alpha) ·
-C Translation (done, alpha) · D Education & career → Phase 4 (done, alpha) · E Government work mode (organization
-profiles started in B) · F Official knowledge → Phase 7 · G Press secretary / Telegram ·
+C Translation (done, alpha) · D Education & career → Phase 4 (done, alpha) · E Government work mode (E1
+organization profiles done, alpha; E2–E4 next) · F Official knowledge → Phase 7 · G Press secretary / Telegram ·
 H Durable missions → Phases 5–6 · I Advanced (voice, browser, developer, data, video,
 business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the owner approves).
 
