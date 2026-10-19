@@ -124,6 +124,15 @@ jobs:
           w = Workbook(); w.active.append(['Jami', 1]); x = io.BytesIO(); w.save(x)
           print(c.version, c.to_pdf_sync(b.getvalue(), 'docx').pages, c.to_pdf_sync(x.getvalue(), 'xlsx').pages)
           "
+      - name: Office tests pass with the image's own LibreOffice version
+        # The production image ships a different LibreOffice than the CI runner; the
+        # conversion tests (mounted read-only, dev tools added to a throwaway container)
+        # must pass against the exact build users get.
+        run: |
+          docker run --rm --user root -e EZO_REQUIRE_OFFICE=1 \
+            -v "$PWD/apps/api/tests:/app/tests:ro" --entrypoint sh ezo-api:ci -c \
+            "uv sync --frozen --quiet && python -m pytest -q -p no:cacheprovider \
+              tests/unit/test_office_convert.py tests/integration/test_office_pdf.py"
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: Unsafe production configuration fails before HTTP startup

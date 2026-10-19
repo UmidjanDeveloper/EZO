@@ -38,6 +38,22 @@ def pages_text(pdf: bytes) -> list[str]:
     return [page.extract_text() or "" for page in PdfReader(io.BytesIO(pdf)).pages]
 
 
+def page_band(pdf: bytes, index: int, *, top: bool) -> str:
+    """Text drawn in the top or bottom tenth of a page (header / footer), by position:
+    LibreOffice versions serialize the footer before or after the body text."""
+    page = PdfReader(io.BytesIO(pdf)).pages[index]
+    height = float(page.mediabox.height)
+    found: list[str] = []
+
+    def visit(text: str, cm: list[float], tm: list[float], *_: object) -> None:
+        y = tm[4] * cm[1] + tm[5] * cm[3] + cm[5]
+        if text.strip() and (y > height * 0.9 if top else y < height * 0.1):
+            found.append(text.strip())
+
+    page.extract_text(visitor_text=visit)
+    return " ".join(found)
+
+
 @requires_office
 def test_official_letter_keeps_pages_header_footer_table_and_scripts(
     converter: OfficeConverter,
@@ -49,7 +65,11 @@ def test_official_letter_keeps_pages_header_footer_table_and_scripts(
     assert "XIZMAT XATI" in first and "3 450 o'quvchi" in first
     assert "Ўзбекистон Республикаси" in first  # Cyrillic survives
     assert "Bog'ishamol" in first and "2250" in first  # table cells
-    assert first.rstrip().endswith("1") and second.rstrip().endswith("2")  # PAGE field
+    # The PAGE field renders the right number in each page's footer, and the letterhead
+    # in each header (checked by position, independent of text serialization order).
+    assert page_band(result.pdf, 0, top=False) == "1"
+    assert page_band(result.pdf, 1, top=False) == "2"
+    assert "XATIRCHI TUMANI HOKIMLIGI" in page_band(result.pdf, 1, top=True)
     assert "Ilova: 2 varaqda." in second  # the page break was honoured
     fonts = PdfReader(io.BytesIO(result.pdf)).pages[0]["/Resources"]["/Font"]
     assert len(fonts) >= 1
