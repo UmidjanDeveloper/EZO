@@ -26,13 +26,15 @@ not sold on their own.
 ## System tools used at runtime
 
 Installed as operating-system packages (Docker image, CI), not vendored in this
-repository and not linked into EZO's code; EZO runs them as separate processes.
+repository. OCR and Office run as separate processes; the native launcher dynamically
+loads the system libseccomp library. Package copyright/license files remain in the image.
 
 | Tool | License | Use |
 | --- | --- | --- |
 | Tesseract OCR 5 (`tesseract-ocr`) | Apache-2.0 | OCR of scans and photos |
 | tessdata language packs (`tesseract-ocr-uzb`, `-uzb-cyrl`, `-rus`, `-eng`, `-osd`) | Apache-2.0 | recognition models |
 | LibreOffice Writer + Calc (`libreoffice-writer-nogui`, `libreoffice-calc-nogui`) | MPL-2.0 | Word/Excel → PDF |
+| libseccomp (`libseccomp2`) | LGPL-2.1-only | dynamically loaded by the separate native launcher to deny new IPv4/IPv6 sockets; unmodified Debian library |
 | Liberation fonts, DejaVu fonts (`fonts-liberation`, `fonts-dejavu-core`) | SIL OFL 1.1; Bitstream Vera / public-domain changes | Latin + Cyrillic glyphs for converted PDFs |
 
 ## Package dependencies
@@ -69,6 +71,7 @@ installed package's metadata (2026-10-17).
 | pillow | 13.0.0 | MIT-CMU (HPND) |
 | reportlab | 5.0.1 | BSD-3-Clause |
 | lxml (via python-docx / python-pptx) | 6.1.3 | BSD-3-Clause |
+| defusedxml | 0.7.1 | Python Software Foundation License — bounded OOXML relationship parsing, DTD/entities disabled |
 | XlsxWriter (installed by python-pptx; EZO itself writes XLSX with openpyxl) | 3.2.9 | BSD-2-Clause |
 | python-multipart | 0.0.32 | Apache-2.0 |
 | tzdata | 2026.5 | Apache-2.0 |

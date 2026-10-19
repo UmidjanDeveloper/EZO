@@ -206,9 +206,13 @@ async def test_analysis_refused_while_reading_and_never_executes(
     monkeypatch.setattr(os, "system", forbidden)
     monkeypatch.setattr(socket.socket, "connect", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
+    monkeypatch.setattr(k3_app.state.services.fetcher, "fetch", forbidden)
+    tools_before = k3_app.state.services.tools.names()
     analysed = await client.post(f"/api/learning/sources/{source_id}/analyze")
     assert analysed.status_code == 200
-    assert all(c["status"] == "proposal" for c in analysed.json()["capabilities"])
+    proposals = analysed.json()["capabilities"]
+    assert proposals and all(c["status"] == "proposal" for c in proposals)
+    assert k3_app.state.services.tools.names() == tools_before
     monkeypatch.undo()
 
     # A source that is being read cannot be analysed yet.
@@ -219,3 +223,4 @@ async def test_analysis_refused_while_reading_and_never_executes(
         await session.commit()
     busy = await client.post(f"/api/learning/sources/{source_id}/analyze")
     assert busy.status_code == 409
+    assert (await client.get(f"/api/learning/sources/{source_id}/capabilities")).status_code == 409

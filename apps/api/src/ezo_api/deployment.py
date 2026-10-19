@@ -184,8 +184,14 @@ def check_database(settings: Settings) -> None:
                 )
             exposed = connection.scalar(
                 text(
-                    "SELECT count(*) FROM information_schema.role_table_grants "
-                    "WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated')"
+                    "SELECT count(*) FROM pg_roles r CROSS JOIN pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE r.rolname IN ('anon', 'authenticated') "
+                    "AND n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f') "
+                    "AND (has_table_privilege(r.oid, c.oid, "
+                    "'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') "
+                    "OR has_any_column_privilege(r.oid, c.oid, "
+                    "'SELECT,INSERT,UPDATE,REFERENCES'))"
                 )
             )
             if exposed:

@@ -20,28 +20,30 @@ from __future__ import annotations
 import asyncio
 import io
 import os
-import re
 import shutil
 import signal
 import subprocess
 import tempfile
-import threading
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+from xml.etree.ElementTree import ParseError
+
+from defusedxml.common import DefusedXmlException
+from defusedxml.ElementTree import fromstring
 
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
+from ezo_api.documents.process_limits import NATIVE_PROCESS_LOCK, limited_command
 
 SourceKind = Literal["docx", "xlsx"]
 MAX_INPUT_BYTES = 50 * 1024 * 1024
 MAX_OUTPUT_BYTES = 200 * 1024 * 1024
 MAX_PAGES = 1_000
 _HYPERLINK = "relationships/hyperlink"
-_EXTERNAL = re.compile(rb'TargetMode\s*=\s*"External"', re.IGNORECASE)
-_RELATIONSHIP = re.compile(rb"<Relationship\b[^>]*>", re.IGNORECASE)
-_LOCK = threading.Lock()
+MAX_RELATIONSHIP_BYTES = 1024 * 1024
+MAX_TOTAL_RELATIONSHIP_BYTES = 8 * 1024 * 1024
 
 
 class OfficeConvertError(Exception):
@@ -66,15 +68,28 @@ def external_links(data: bytes) -> list[str]:
     found: list[str] = []
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            for name in archive.namelist():
-                if not name.endswith(".rels"):
+            total = 0
+            for info in archive.infolist():
+                if not info.filename.endswith(".rels"):
                     continue
-                for rel in _RELATIONSHIP.findall(archive.read(name)):
-                    if _EXTERNAL.search(rel) and _HYPERLINK.encode() not in rel:
-                        kind = re.search(rb'Type\s*=\s*"[^"]*/([^"/]+)"', rel)
-                        found.append(
-                            kind.group(1).decode("ascii", "replace") if kind else "external"
-                        )
+                total += info.file_size
+                if info.file_size > MAX_RELATIONSHIP_BYTES or total > MAX_TOTAL_RELATIONSHIP_BYTES:
+                    raise OfficeConvertError("Office relationship data is too large.", "too_large")
+                root = fromstring(
+                    archive.read(info), forbid_dtd=True, forbid_entities=True, forbid_external=True
+                )
+                for rel in root.iter():
+                    if rel.tag.rsplit("}", 1)[-1] != "Relationship":
+                        continue
+                    if rel.get("TargetMode", "").casefold() != "external":
+                        continue
+                    relation_type = rel.get("Type", "")
+                    if not relation_type.endswith(_HYPERLINK):
+                        found.append(relation_type.rsplit("/", 1)[-1] or "external")
+    except (DefusedXmlException, ParseError) as exc:
+        raise OfficeConvertError(
+            "The Office relationship XML is unsafe or damaged.", "corrupt"
+        ) from exc
     except zipfile.BadZipFile as exc:
         raise OfficeConvertError("The file is damaged or not an Office file.", "corrupt") from exc
     return found
@@ -130,7 +145,7 @@ class OfficeConverter:
                 "external_links",
             )
         started = time.monotonic()
-        with _LOCK, tempfile.TemporaryDirectory(prefix="ezo-office-") as tmp:
+        with NATIVE_PROCESS_LOCK, tempfile.TemporaryDirectory(prefix="ezo-office-") as tmp:
             work = Path(tmp)
             source = work / f"input.{kind}"
             source.write_bytes(data)
@@ -150,7 +165,7 @@ class OfficeConverter:
                 str(source),
             ]
             process = subprocess.Popen(  # noqa: S603 - fixed binary, temporary paths only
-                args,
+                limited_command(args, self.timeout_seconds, MAX_OUTPUT_BYTES),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=work,
@@ -194,6 +209,8 @@ def _env(home: str) -> dict[str, str]:
         "HOME": home,
         "LANG": "C.UTF-8",
         "SAL_USE_VCLPLUGIN": "svp",
+        "MAX_CONCURRENCY": "2",  # LibreOffice's supported thread-pool limit
+        "MALLOC_ARENA_MAX": "2",
     }
 
 

@@ -43,6 +43,23 @@ async def api(learning_app: FastAPI) -> AsyncIterator[AsyncClient]:
     await learning_app.state.services.db.dispose()
 
 
+@pytest.mark.parametrize(
+    ("language", "text"),
+    [("uz", "bilim kutubxonasi"), ("en", "knowledge library"), ("ru", "Библиотека знаний")],
+)
+async def test_deleted_library_notice_matches_owner_language(
+    api: AsyncClient, language: str, text: str
+) -> None:
+    await api.patch("/api/me/preferences", json={"ui_language": language})
+    library = (await api.post("/api/learning/libraries", json={"name": "Scoped library"})).json()
+    events = await stream_chat(api, message="Salom", library_id=library["id"])
+    conversation_id = next(data["conversation_id"] for name, data in events if name == "meta")
+    assert (await api.delete(f"/api/learning/libraries/{library['id']}")).status_code == 204
+    messages = (await api.get(f"/api/conversations/{conversation_id}/messages")).json()
+    assert messages[-1]["language"] == language
+    assert text in messages[-1]["content"]
+
+
 async def learn(api: AsyncClient, target: str, **body: Any) -> dict[str, Any]:
     body.setdefault("limits", {"min_interval_seconds": 0})
     response = await api.post("/api/learning/sources", json={"target": target, **body})
