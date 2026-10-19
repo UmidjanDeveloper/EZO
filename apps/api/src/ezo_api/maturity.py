@@ -108,9 +108,13 @@ FEATURES: tuple[Feature, ...] = (
     ),
     Feature(
         "academic_career",
-        "Academic research assistance and career documents",
+        "Academic research assistance (OpenAlex literature, research plans, six citation "
+        "styles, defense questions) and career documents (career profile, CV, letters, "
+        "interview preparation)",
         "Phase 4",
-        "planned",
+        "alpha",
+        "plans and letters need an AI key; literature search, citation formatting and the CV "
+        "from the profile do not; OpenAlex live access was not verified from the build sandbox",
     ),
     Feature("jobs", "Durable tasks, jobs and background worker", "Phase 5", "planned"),
     Feature("missions", "Persistent native missions in chat", "Phase 6", "planned"),

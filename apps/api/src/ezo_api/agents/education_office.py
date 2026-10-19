@@ -15,6 +15,7 @@ from typing import Any
 
 from ezo_api.agents.base import GatherContext, Gathered, call_tool
 from ezo_api.agents.llm import complete, extract_json, sources_block
+from ezo_api.career.profile import facts_text, load_profile
 from ezo_api.core.text import normalize
 from ezo_api.education.catalog import Kind, options_from
 from ezo_api.education.models import build_prompt, check, parse
@@ -59,6 +60,12 @@ async def make_material(
         if tools.on_activity is not None:
             tools.on_activity("creating")
         context = [f"User's request:\n{text}"]
+        if kind.key == "interview":
+            career = await load_profile(tools.session, tools.user_id)
+            context.append(
+                "Career profile (entered by the user; the only facts about them):\n"
+                + (facts_text(career) if career else "(none — the user has not filled it in)")
+            )
         if sources:
             context.append(sources_block(sources))
         questions = options.questions or 10

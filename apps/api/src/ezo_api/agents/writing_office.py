@@ -15,8 +15,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from ezo_api.agents.base import GatherContext, Gathered
+from ezo_api.agents.base import GatherContext, Gathered, call_tool
 from ezo_api.agents.llm import complete, extract_json, sources_block
+from ezo_api.career.profile import cv_markdown, facts_text, load_profile
 from ezo_api.core.text import normalize
 from ezo_api.db.models import OrganizationProfile
 from ezo_api.documents.markdown_io import parse_markdown
@@ -41,6 +42,7 @@ from ezo_api.writing.service import (
 from ezo_api.writing.style import Options, options_from
 
 _LANG = {"uz": "uz", "ru": "ru", "en": "en"}
+_CAREER_DOCS = ("cv", "cover_letter", "motivatsion_xat")
 
 
 async def default_organization(tools: ToolContext) -> tuple[OrgFacts | None, str | None]:
@@ -88,6 +90,10 @@ async def write_document(
     options: Options = options_from(text)
     language = options.language or _LANG.get(ctx.turn.language, "uz")
     org, org_id = await default_organization(tools)
+    career = await load_profile(tools.session, tools.user_id) if doc.key in _CAREER_DOCS else None
+    if doc.key == "cv" and career is not None and not wants_template(normalize(text)):
+        await _cv_from_profile(ctx, gathered, career, language)
+        return
     template = wants_template(normalize(text)) or tools.services.router.is_offline
     draft: Draft | None
     provider = model = None
@@ -98,8 +104,13 @@ async def write_document(
             tools.on_activity("creating")
         words = options.words or doc.words
         context = [f"User's request:\n{text}"]
-        if org is not None:
+        if org is not None and career is None:
             context.append(f"Organization profile (entered by the user):\n{org.block()}")
+        if career is not None:
+            context.append(
+                "Career profile (entered by the user; the ONLY facts about their experience, "
+                f"education, skills and achievements):\n{facts_text(career)}"
+            )
         if sources:
             context.append(sources_block(sources))
         try:
@@ -128,7 +139,14 @@ async def write_document(
                 "was saved; say so and offer to try again or to make the template."
             )
             return
-    evidence = " ".join([text, org.text() if org else "", *(s.excerpt for s in sources)])
+    evidence = " ".join(
+        [
+            text,
+            org.text() if org else "",
+            facts_text(career) if career else "",
+            *(s.excerpt for s in sources),
+        ]
+    )
     report = validate(doc, draft, evidence=evidence, options=options, language=language)
     if not draft.title:
         draft.title = doc.names.get(
@@ -176,6 +194,13 @@ async def write_document(
     gathered.artifacts.append(artifact_entry(created))
     gathered.sources = sources
     gathered.notes.append(_note(doc, draft, report.summary(), template, metadata["draft"], tools))
+    if doc.key in _CAREER_DOCS and career is None:
+        gathered.notes.append(
+            "Suggest filling the career profile (Settings → Karyera profili): EZO then builds "
+            "the CV exactly from it and uses it as the only facts for application letters."
+        )
+    elif career is not None:
+        gathered.notes.append("The letter uses the user's career profile as its only facts.")
 
 
 def _note(
@@ -232,3 +257,30 @@ def _note(
         lines.append("Ask the user for: " + "; ".join(draft.missing[:8]) + ".")
     lines.append("Describe the file briefly; do not paste the whole document. Never invent links.")
     return "\n".join(lines)
+
+
+async def _cv_from_profile(
+    ctx: GatherContext, gathered: Gathered, career: Any, language: str
+) -> None:
+    """A CV exactly from the career profile: no model, nothing added."""
+    result = await call_tool(
+        gathered,
+        ctx.tools,
+        "create_document",
+        {
+            "title": f"CV — {career.full_name}",
+            "markdown": cv_markdown(career, language),
+            "format": "docx",
+            "metadata": {"action": "cv", "source": "career_profile", "language": language},
+        },
+    )
+    if not result.ok:
+        gathered.notes.append(f"Saving the CV failed ({result.error}). Say so.")
+        return
+    gathered.artifacts.append(result.data["artifact"])
+    gathered.notes.append(
+        "EZO built the CV (Word + PDF) EXACTLY from the user's career profile, without an AI "
+        "model: nothing was added or reworded. Section headings follow the requested language; "
+        "the entries stay as the user wrote them (EZO does not translate them). To change it, "
+        "edit the profile in Settings → Karyera profili. Describe it briefly; do not paste it."
+    )

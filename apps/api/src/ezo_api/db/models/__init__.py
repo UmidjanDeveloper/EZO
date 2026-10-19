@@ -9,6 +9,7 @@ from ezo_api.db.models.artifacts import (
     StoryScene,
     StoryTimeline,
 )
+from ezo_api.db.models.career import CareerProfile
 from ezo_api.db.models.conversation import Conversation, Message
 from ezo_api.db.models.knowledge import (
     DocumentRevision,
@@ -40,6 +41,7 @@ __all__ = [
     "Artifact",
     "ArtifactVersion",
     "AuditLog",
+    "CareerProfile",
     "Conversation",
     "DocumentRevision",
     "GlossaryTerm",

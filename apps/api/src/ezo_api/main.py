@@ -20,6 +20,7 @@ from ezo_api import __version__
 from ezo_api.api.routes import (
     academic,
     artifacts,
+    career,
     chat,
     conversations,
     knowledge,
@@ -180,6 +181,7 @@ def create_app(
         writing,
         translation,
         academic,
+        career,
     ):
         app.include_router(module.router)
 

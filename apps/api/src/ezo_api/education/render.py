@@ -176,7 +176,7 @@ def to_markdown(kind: Kind, material: Material, check: Check, language: str) -> 
         lines += [f"## {t['homework']}", "", *[f"- {h}" for h in material.homework], ""]
     if material.criteria:
         lines += [f"## {t['rubric']}", "", *_criteria(material, check, t)]
-    if material.questions and kind.key == "defense":
+    if material.questions and kind.key in ("defense", "interview"):
         lines += [f"## {t['defense']}", ""]
         for number, question in enumerate(material.questions, start=1):
             lines += [f"**{number}. {question.question}**", ""]
@@ -189,7 +189,7 @@ def to_markdown(kind: Kind, material: Material, check: Check, language: str) -> 
     if material.exercises and any(e.answer for e in material.exercises):
         rows = [[str(i), e.answer] for i, e in enumerate(material.exercises, start=1)]
         lines += [f"## {t['exercises']} — {t['answer']}", "", *_table(["№", t["answer"]], rows)]
-    if material.questions and kind.key != "defense":
+    if material.questions and kind.key not in ("defense", "interview"):
         lines += _key(material, check, t)
     resources = material.resources + material.sources_needed
     if resources:

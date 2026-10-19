@@ -144,6 +144,7 @@ SCHEMAS: dict[str, str] = {
     "quiz": '{"title", "subject", "level", "questions": [quiz question], "sources_needed": [str]}',
     "syllabus": '{"title", "subject", "level", "objectives": [str], "weeks": [{"week": int, "topic", "activities": [str], "reading": [str], "assessment"}], "assessment": [{"component", "weight": int percent}], "policies": [str], "sources_needed": [str]}',
     "rubric": '{"title", "subject", "level", "criteria": [rubric criterion]}',
+    "interview": '{"title", "subject": the position, "questions": [quiz question with "type": "open", "answer": an answer outline using ONLY facts from the career profile, "explanation": what the interviewer checks], "objectives": [what to rehearse]}',
     "defense": '{"title", "subject", "questions": [quiz question with "type": "open", "answer": how to answer, based only on the user\'s text, "explanation": why the committee asks it], "objectives": [what to rehearse], "sources_needed": [str]}',
     "study_plan": '{"title", "goal", "level", "plan": [{"week": int, "focus", "sessions": [{"day", "task", "minutes": int}]}], "checkpoints": [str], "resources": [str], "sources_needed": [str]}',
 }
@@ -167,6 +168,7 @@ EXTRA: dict[str, str] = {
     "quiz": "- Exactly {questions} questions; mostly mcq, with some open ones if useful; every question has an explanation.",
     "syllabus": "- {weeks} weeks, numbered 1..{weeks} without gaps. Assessment weights add up to 100.",
     "rubric": "- 4–6 criteria, 3–4 levels each, points consistent (higher level = more points).",
+    "interview": "- {questions} likely interview questions for the position (motivation, experience, skills, situations/STAR, salary and questions to ask). Answer outlines use only facts from the career profile; where it has none, say what the user should prepare instead. Never invent achievements, employers, numbers or dates.",
     "defense": "- {questions} likely committee questions (relevance, novelty, methodology, data, results, limitations, practical value). Base the answer outlines only on the user's thesis text; if no text is given, give preparation advice instead of answers and say the thesis is needed. Never invent results or numbers.",
     "study_plan": "- {weeks} weeks. Sessions must fit the time the user has; use realistic minutes. Include review and practice tests near the end.",
 }
@@ -193,7 +195,8 @@ class Check:
 def build_prompt(kind: Kind, options: Options, language: str, level: str) -> str:
     extra = EXTRA[kind.key].format(
         minutes=options.minutes or 45,
-        questions=options.questions or {"lesson": 5, "defense": 15}.get(kind.key, 10),
+        questions=options.questions
+        or {"lesson": 5, "defense": 15, "interview": 12}.get(kind.key, 10),
         weeks=options.weeks or (15 if kind.key == "syllabus" else 4),
     )
     return SYSTEM.format(
@@ -223,10 +226,10 @@ def letter(index: int) -> str:
 def check(kind: Kind, material: Material, options: Options) -> Check:
     result = Check()
     for number, question in enumerate(material.questions, start=1):
-        if kind.key == "defense":
+        if kind.key in ("defense", "interview"):
             question.type = "open"
         if question.type == "open":
-            if not question.answer and kind.key != "defense":
+            if not question.answer and kind.key not in ("defense", "interview"):
                 result.issues.append(f"Question {number}: no model answer")
             result.answer_key.append((number, question.answer or "—"))
             continue

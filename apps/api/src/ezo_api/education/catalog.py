@@ -74,6 +74,20 @@ KINDS: tuple[Kind, ...] = (
         ("docx",),
     ),
     Kind(
+        "interview",
+        {
+            "uz": "Intervyuga tayyorgarlik",
+            "ru": "Подготовка к собеседованию",
+            "en": "Interview preparation",
+        },
+        re.compile(
+            r"\b(intervyu\w* (savol|uchun|ga tayyor)\w*|ish suhbati\w*|suhbatga tayyor\w*|"
+            r"interview (questions|preparation|prep)|job interview|"
+            r"вопрос\w* (на|для|к) собеседовани\w*|подготовк\w* к собеседовани\w*)"
+        ),
+        ("docx",),
+    ),
+    Kind(
         "quiz",
         {"uz": "Test savollari", "ru": "Тест", "en": "Quiz"},
         re.compile(
