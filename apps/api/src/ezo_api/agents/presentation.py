@@ -51,10 +51,13 @@ from ezo_api.documents.render.spec import DeckSpec, SlideSpec
 from ezo_api.documents.render.theme import THEMES
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
+from ezo_api.organization.letterhead import mentions_organization
+from ezo_api.organization.service import load_facts
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
 from ezo_api.tools.base import ToolContext
 from ezo_api.visual.kinds import wants_no_images
+from ezo_api.writing.service import OrgFacts
 
 logger = logging.getLogger(__name__)
 
@@ -383,6 +386,7 @@ class PresentationAgent(Agent):
         slides_hint = str(count) if count else DEFAULT_SLIDES
         aspect = "4:3" if _FOUR_THREE.search(turn.text) else "16:9"
 
+        org: OrgFacts | None = None
         if existing is not None:
             system = EDIT_SYSTEM
             request = (
@@ -392,8 +396,18 @@ class PresentationAgent(Agent):
             slide_budget = max(len(existing[1].get("slides", [])), count or 0) + 3
         else:
             system = DECK_SYSTEM
+            if mentions_organization(turn.text):
+                org, _ = await load_facts(
+                    tools.session, tools.services.storage, tools.user_id, official=False
+                )
             request = (
-                f"User's request: {turn.text}\n"
+                (
+                    "Organization profile (entered by the user; use its name, house style "
+                    f"and preferred terms):\n{org.block()}\n\n"
+                    if org is not None
+                    else ""
+                )
+                + f"User's request: {turn.text}\n"
                 + (f"Earlier in the conversation: {ctx.history_hint}\n" if ctx.history_hint else "")
                 + f"Language: {turn.language}. Slides: {slides_hint} (including cover and "
                 f"closing). Aspect ratio: {aspect}.\n\n{sources_block(sources)}"
@@ -477,6 +491,8 @@ class PresentationAgent(Agent):
             gathered.sources = sources
             return gathered
 
+        if existing is None and org is not None and not deck.author:
+            deck.author = org.name[:160]  # shown on the cover
         if aspect == "4:3" and existing is None:
             deck.aspect_ratio = "4:3"
         images = await self._visuals(

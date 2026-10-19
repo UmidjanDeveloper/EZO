@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ezo_api.db.base import Base, Timestamps, UUIDPrimaryKey
@@ -39,3 +39,37 @@ class OrganizationProfile(UUIDPrimaryKey, Timestamps, Base):
     terminology: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict, nullable=False)
     """Preferred terms: {"avoid": "use instead"}."""
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    formatting: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict, nullable=False)
+    """Standard formatting: font_name, font_size, margins_cm, line_spacing, indent_cm."""
+    logo_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    """Storage key of the logo (a clean PNG re-encoded by EZO)."""
+
+
+class OrganizationAsset(UUIDPrimaryKey, Timestamps, Base):
+    """A file of an organization profile: an approved Word template or a document example.
+
+    Contents are the user's files and are treated as untrusted data: templates are only
+    copied as Word XML (no macros, no external links); examples reach a model only as
+    style references inside data tags.
+    """
+
+    __tablename__ = "organization_assets"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("organization_profiles.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    """template | example"""
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    filename: Mapped[str] = mapped_column(String(300), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(200), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    doc_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    """Writing catalog key this file is for (None: any official document)."""
+    text_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    """Examples: the extracted text (shortened), used as a style reference."""

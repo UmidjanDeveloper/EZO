@@ -13,17 +13,15 @@ import asyncio
 import re
 from typing import Any
 
-from sqlalchemy import select
-
 from ezo_api.agents.base import GatherContext, Gathered, call_tool
 from ezo_api.agents.llm import complete, extract_json, sources_block
 from ezo_api.career.profile import cv_markdown, facts_text, load_profile
 from ezo_api.core.text import normalize
-from ezo_api.db.models import OrganizationProfile
 from ezo_api.documents.markdown_io import parse_markdown
 from ezo_api.documents.office_convert import OfficeConvertError
 from ezo_api.documents.pdf.writer import render_pdf
 from ezo_api.knowledge.retrieval.sources import SourceRef
+from ezo_api.organization.service import load_facts
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
 from ezo_api.tools.base import ToolContext
@@ -45,29 +43,18 @@ _LANG = {"uz": "uz", "ru": "ru", "en": "en"}
 _CAREER_DOCS = ("cv", "cover_letter", "motivatsion_xat")
 
 
-async def default_organization(tools: ToolContext) -> tuple[OrgFacts | None, str | None]:
-    profile = await tools.session.scalar(
-        select(OrganizationProfile)
-        .where(OrganizationProfile.user_id == tools.user_id)
-        .order_by(OrganizationProfile.is_default.desc(), OrganizationProfile.updated_at.desc())
-        .limit(1)
+async def default_organization(
+    tools: ToolContext, doc: DocType | None = None
+) -> tuple[OrgFacts | None, str | None]:
+    """The default organization profile with its formatting, logo, template and examples."""
+    facts, profile = await load_facts(
+        tools.session,
+        tools.services.storage,
+        tools.user_id,
+        doc_key=doc.key if doc else None,
+        official=doc is not None and doc.layout in ("letter", "act", "minutes"),
     )
-    if profile is None:
-        return None, None
-    facts = OrgFacts(
-        name=profile.name,
-        department=profile.department or "",
-        address=profile.address or "",
-        phone=profile.phone or "",
-        email=profile.email or "",
-        website=profile.website or "",
-        head_position=profile.head_position or "",
-        head_name=profile.head_name or "",
-        letterhead=profile.letterhead or "",
-        style_notes=profile.style_notes or "",
-        terminology={str(k): str(v) for k, v in (profile.terminology or {}).items()},
-    )
-    return facts, str(profile.id)
+    return facts, (str(profile.id) if profile else None)
 
 
 async def _pdf(tools: ToolContext, docx: bytes, markdown: str, title: str) -> tuple[bytes, str]:
@@ -89,7 +76,7 @@ async def write_document(
     text = ctx.turn.text
     options: Options = options_from(text)
     language = options.language or _LANG.get(ctx.turn.language, "uz")
-    org, org_id = await default_organization(tools)
+    org, org_id = await default_organization(tools, doc)
     career = await load_profile(tools.session, tools.user_id) if doc.key in _CAREER_DOCS else None
     if doc.key == "cv" and career is not None and not wants_template(normalize(text)):
         await _cv_from_profile(ctx, gathered, career, language)
@@ -106,6 +93,8 @@ async def write_document(
         context = [f"User's request:\n{text}"]
         if org is not None and career is None:
             context.append(f"Organization profile (entered by the user):\n{org.block()}")
+        if org is not None and org.examples:
+            context.append(org.examples_block())
         if career is not None:
             context.append(
                 "Career profile (entered by the user; the ONLY facts about their experience, "
@@ -168,6 +157,8 @@ async def write_document(
         "validation": report.summary(),
         "missing": draft.missing[:20],
         "pdf_engine": pdf_engine,
+        "organization_template": org.template_title if org and org.template else None,
+        "organization_examples": [t for t, _ in org.examples] if org else [],
         "options": {"words": options.words, "audience": options.audience},
     }
     created = await tools.services.artifacts.create(

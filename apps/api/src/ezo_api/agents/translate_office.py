@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import re
-import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -21,10 +20,10 @@ from sqlalchemy import func, select
 from ezo_api.agents.base import GatherContext, Gathered
 from ezo_api.agents.docx_office import docx_from_document, find_docx
 from ezo_api.agents.office import attached_files
-from ezo_api.agents.writing_office import default_organization
 from ezo_api.core.text import normalize
 from ezo_api.db.models import DocumentRevision, GlossaryTerm, KnowledgeDocument
 from ezo_api.documents.docx.fidelity import DocxEditError, docx_text
+from ezo_api.organization.service import default_profile
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.security.audit import audit
 from ezo_api.tools.base import ToolContext
@@ -77,13 +76,9 @@ def translation_plan(request: str, source_text: str, user_language: str) -> Tran
 
 
 async def load_glossary(tools: ToolContext, source: str, target: str) -> list[glossary.Term]:
-    _, org_id = await default_organization(tools)
+    profile = await default_profile(tools.session, tools.user_id)
     return await glossary.load_terms(
-        tools.session,
-        tools.user_id,
-        source,
-        target,
-        uuid.UUID(org_id) if org_id else None,
+        tools.session, tools.user_id, source, target, profile.id if profile else None
     )
 
 

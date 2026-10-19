@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
-from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
+from ezo_api.api.files import file_response
 from ezo_api.artifacts.service import ArtifactError, is_text
 from ezo_api.db.models import Artifact, ArtifactVersion, Conversation, Message, Project
 from ezo_api.schemas.artifacts import (
@@ -301,22 +301,7 @@ async def download_version(
     return _file_response(data, version.filename, version.mime_type)
 
 
-def _file_response(data: bytes, filename: str, mime_type: str, *, inline: bool = False) -> Response:
-    ascii_name = filename.encode("ascii", "ignore").decode() or "artifact"
-    kind = "inline" if inline else "attachment"
-    disposition = f"{kind}; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
-    return Response(
-        content=data,
-        media_type=mime_type,
-        headers={
-            # Downloads are never rendered as active content in the API's origin
-            # (HTML/SVG cannot run here); only PNG previews are shown inline.
-            "Content-Disposition": disposition,
-            "X-Content-Type-Options": "nosniff",
-            "Content-Security-Policy": "sandbox",
-            "Cache-Control": "private, no-store",
-        },
-    )
+_file_response = file_response
 
 
 @router.get("/{artifact_id}/versions/{number}/exports/{name}")

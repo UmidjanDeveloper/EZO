@@ -31,7 +31,7 @@ from ezo_api.db.models.language import (
 from ezo_api.db.models.memory import Memory
 from ezo_api.db.models.observability import AgentRun, AuditLog, ToolCall
 from ezo_api.db.models.official import LegalDocument, LegalRevision, OfficialSyncRun
-from ezo_api.db.models.organization import OrganizationProfile
+from ezo_api.db.models.organization import OrganizationAsset, OrganizationProfile
 from ezo_api.db.models.project import Project
 from ezo_api.db.models.translation import GlossaryTerm
 from ezo_api.db.models.user import User
@@ -61,6 +61,7 @@ __all__ = [
     "Message",
     "OcrPage",
     "OfficialSyncRun",
+    "OrganizationAsset",
     "OrganizationProfile",
     "Project",
     "StoryAsset",

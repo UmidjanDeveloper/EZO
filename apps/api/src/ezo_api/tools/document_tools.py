@@ -11,6 +11,7 @@ import asyncio
 import json
 import uuid
 from collections import Counter
+from dataclasses import replace
 from functools import partial
 from typing import Any, ClassVar, Literal
 
@@ -21,13 +22,15 @@ from ezo_api.artifacts.service import ArtifactError, VersionResult
 from ezo_api.db.models import Artifact, KnowledgeDocument, StoryProject
 from ezo_api.documents.docx.writer import render_docx
 from ezo_api.documents.markdown_io import parse_markdown, to_markdown, to_text
-from ezo_api.documents.model import word_count
+from ezo_api.documents.model import Paragraph, Rule, Run, word_count
 from ezo_api.documents.pdf.writer import render_pdf
 from ezo_api.documents.render.build import DeckBuild, DeckBuildError, build_deck
 from ezo_api.documents.render.spec import DeckSpec
 from ezo_api.documents.spreadsheet.analysis import describe, read_sheets, summarize_sheet
 from ezo_api.documents.spreadsheet.writer import Sheet, render_csv, render_xlsx
 from ezo_api.knowledge.uploads import sanitize_filename
+from ezo_api.organization.letterhead import Letterhead, from_facts
+from ezo_api.organization.service import load_facts
 from ezo_api.storage.base import StorageError
 from ezo_api.story.from_deck import scene_from_slide, story_from_deck
 from ezo_api.story.service import StoryError
@@ -131,22 +134,34 @@ class CreateDocumentArgs(BaseModel):
     source_references: list[dict[str, Any]] = Field(default_factory=list, max_length=50)
     provider: str | None = None
     model: str | None = None
+    letterhead: bool = Field(
+        default=False, description="Use the default organization profile's letterhead"
+    )
 
 
-def render_document(markdown: str, title: str, fmt: DocumentFormat) -> dict[str, bytes]:
-    """All formats of one document: {extension: bytes}. The requested one comes first."""
+def render_document(
+    markdown: str, title: str, fmt: DocumentFormat, letterhead: Letterhead | None = None
+) -> dict[str, bytes]:
+    """All formats of one document: {extension: bytes}. The requested one comes first.
+    With `letterhead`, the Word file carries the organization's letterhead and formatting
+    and the other formats start with its name lines."""
     spec = parse_markdown(markdown, title=title)
+    plain = spec
+    if letterhead is not None:
+        first, *rest = letterhead.lines
+        head = Paragraph((Run(first, bold=True), *(Run(f" · {line}") for line in rest)))
+        plain = replace(spec, blocks=[head, Rule(), *spec.blocks])
     files: dict[str, bytes] = {}
     order = [fmt, *[f for f in ("docx", "pdf", "md") if f != fmt]]
     for extension in order:
         if extension == "docx":
-            files["docx"] = render_docx(spec)
+            files["docx"] = render_docx(spec, letterhead)
         elif extension == "pdf":
-            files["pdf"] = render_pdf(spec)
+            files["pdf"] = render_pdf(plain)
         elif extension == "md":
-            files["md"] = to_markdown(spec).encode("utf-8")
+            files["md"] = to_markdown(plain).encode("utf-8")
         elif extension == "txt":
-            files["txt"] = to_text(spec).encode("utf-8")
+            files["txt"] = to_text(plain).encode("utf-8")
     return files
 
 
@@ -169,7 +184,15 @@ class CreateDocumentTool(Tool[CreateDocumentArgs]):
     async def _run(self, args: CreateDocumentArgs, ctx: ToolContext) -> ToolResult:
         artifacts = ctx.services.artifacts
         existing = await owned_artifact(ctx, args.artifact_id, ("document", "report"))
-        files = await asyncio.to_thread(render_document, args.markdown, args.title, args.format)
+        letterhead = None
+        if args.letterhead:
+            facts, _ = await load_facts(
+                ctx.session, ctx.services.storage, ctx.user_id, official=False
+            )
+            letterhead = from_facts(facts) if facts is not None else None
+        files = await asyncio.to_thread(
+            render_document, args.markdown, args.title, args.format, letterhead
+        )
         main_ext = args.format
         stem = file_stem(args.title, "document")
         exports = {
@@ -179,6 +202,8 @@ class CreateDocumentTool(Tool[CreateDocumentArgs]):
         }
         spec = parse_markdown(args.markdown, title=args.title)
         metadata = {**args.metadata, "words": word_count(spec), "format": main_ext}
+        if args.letterhead:
+            metadata["letterhead"] = letterhead.name if letterhead else None
         if existing is None:
             result = await artifacts.create(
                 ctx.session,

@@ -561,4 +561,11 @@ def wants_writing(norm: str) -> DocType | None:
 
 
 def wants_template(norm: str) -> bool:
-    return bool(_TEMPLATE.search(norm))
+    """An empty template is asked for ("xizmat xati shabloni", "blank ber"); "blankasida" /
+    "на бланке" means *on the organization's letterhead*, with content."""
+    for match in _TEMPLATE.finditer(norm):
+        word = match.group(0)
+        if word.startswith(("blank", "бланк")) and word.endswith(("da", "да", "е")):
+            continue
+        return True
+    return False

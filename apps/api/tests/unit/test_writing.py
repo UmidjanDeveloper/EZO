@@ -59,6 +59,10 @@ def test_catalog_is_complete_and_requests_need_a_writing_verb() -> None:
     assert wants_writing(normalize("Ariza haqida nima bilasan?")) is None
     assert wants_writing(normalize("Telegram post yoz")) is None
     assert wants_template(normalize("Bayonnoma shablonini ber"))
+    assert wants_template(normalize("Xizmat xati blankini ber"))
+    # "on our letterhead" asks for content, not an empty template.
+    assert not wants_template(normalize("Tashkilotimiz blankasida xizmat xati tayyorla"))
+    assert not wants_template(normalize("Подготовь служебное письмо на бланке"))
 
 
 def test_options_from_words() -> None:

@@ -80,6 +80,8 @@ from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.education.catalog import Kind, wants_education
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
+from ezo_api.organization.letterhead import wants_letterhead
+from ezo_api.organization.service import default_profile
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
 from ezo_api.storage.base import StorageError
@@ -503,6 +505,7 @@ class DocumentAgent(Agent):
         provider: str | None = None,
         model: str | None = None,
         artifact_type: str = "document",
+        letterhead: bool = False,
     ) -> dict[str, Any] | None:
         result = await call_tool(
             gathered,
@@ -519,6 +522,7 @@ class DocumentAgent(Agent):
                 "source_references": references or [],
                 "provider": provider,
                 "model": model,
+                "letterhead": letterhead,
             },
         )
         if not result.ok:
@@ -1100,7 +1104,19 @@ class DocumentAgent(Agent):
             artifact_type="report"
             if re.search(r"\b(hisobot|report|отч[её]т)", normalize(ctx.turn.text))
             else "document",
+            letterhead=wants_letterhead(ctx.turn.text),
         )
+        if info and wants_letterhead(ctx.turn.text):
+            gathered.notes.append(
+                "The user asked for the organization's letterhead. "
+                + (
+                    "The Word file carries the default organization profile's logo, name lines "
+                    "and standard formatting."
+                    if await default_profile(tools.session, tools.user_id)
+                    else "No organization profile exists, so the file has no letterhead; "
+                    "suggest filling Settings → Tashkilot profili."
+                )
+            )
         if info:
             placeholders = sorted(
                 set(re.findall(r"\[[^\]\[]{2,40}\]", markdown)) - {f"[{s.n}]" for s in knowledge}

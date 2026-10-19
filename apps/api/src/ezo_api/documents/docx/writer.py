@@ -4,11 +4,12 @@ List Bullet/Number, Quote, table grid) so the file stays editable and navigable.
 from __future__ import annotations
 
 import io
+from typing import Any
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.shared import Pt, RGBColor
+from docx.shared import Cm, Pt, RGBColor
 
 from ezo_api.documents.fonts import OFFICE_FONT
 from ezo_api.documents.model import (
@@ -22,6 +23,9 @@ from ezo_api.documents.model import (
     Run,
     Table,
 )
+from ezo_api.organization.formatting import apply as apply_formatting
+from ezo_api.organization.formatting import formatting_of
+from ezo_api.organization.letterhead import Letterhead
 
 ACCENT = RGBColor(0x0B, 0x7A, 0x72)
 
@@ -38,22 +42,46 @@ def _add_runs(paragraph, runs: tuple[Run, ...]) -> None:  # type: ignore[no-unty
             run.underline = True
 
 
-def render_docx(spec: DocumentSpec) -> bytes:
+def _letterhead(document: Any, letterhead: Letterhead) -> None:
+    if letterhead.logo:
+        picture = document.add_paragraph()
+        picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        picture.add_run().add_picture(io.BytesIO(letterhead.logo), height=Cm(2))
+    for index, line in enumerate(letterhead.lines):
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.add_run(line).bold = index == 0
+    if letterhead.contacts:
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.add_run(letterhead.contacts).font.size = Pt(9)
+    rule = document.add_paragraph("―" * 30)
+    rule.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+
+def render_docx(spec: DocumentSpec, letterhead: Letterhead | None = None) -> bytes:
+    """`letterhead`: the organization's logo, name lines and standard formatting."""
     document = Document()
     normal = document.styles["Normal"]
-    normal.font.name = OFFICE_FONT
-    normal.font.size = Pt(11)
+    if letterhead is not None:
+        apply_formatting(document, formatting_of(letterhead.formatting))
+    else:
+        normal.font.name = OFFICE_FONT
+        normal.font.size = Pt(11)
     # East-Asian/complex fallbacks so Cyrillic and Uzbek use the same font.
-    normal.element.rPr.rFonts.set(qn("w:eastAsia"), OFFICE_FONT)
+    normal.element.rPr.rFonts.set(qn("w:eastAsia"), normal.font.name or OFFICE_FONT)
     for level in range(1, 5):
         style = document.styles[f"Heading {level}"]
-        style.font.name = OFFICE_FONT
+        style.font.name = normal.font.name or OFFICE_FONT
         style.font.color.rgb = ACCENT if level <= 2 else RGBColor(0x22, 0x2B, 0x38)
 
     document.core_properties.title = spec.title
     document.core_properties.author = spec.author
     document.core_properties.language = spec.language
 
+    if letterhead is not None:
+        _letterhead(document, letterhead)
+        document.core_properties.author = letterhead.name[:200]
     title = document.add_paragraph(spec.title, style="Title")
     title.alignment = WD_ALIGN_PARAGRAPH.LEFT
     if spec.subtitle:

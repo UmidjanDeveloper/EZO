@@ -21,6 +21,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
+from ezo_api.organization.formatting import apply as apply_formatting
+from ezo_api.organization.formatting import formatting_of
+from ezo_api.organization.templates import open_template
 from ezo_api.writing.catalog import DocType
 from ezo_api.writing.service import Draft, OrgFacts
 
@@ -59,7 +62,7 @@ def _rule(paragraph: Any) -> None:
     ppr.append(borders)
 
 
-def _body(document: Any, text: str, *, indent: bool) -> None:
+def _body(document: Any, text: str, *, indent: bool, indent_cm: float = 1.25) -> None:
     for block in [b for b in re.split(r"\n\s*\n", text.strip()) if b.strip()]:
         lines = block.splitlines()
         if all(re.match(r"^\s*[-•]\s+", ln) for ln in lines):
@@ -71,14 +74,14 @@ def _body(document: Any, text: str, *, indent: bool) -> None:
                 match = _NUMBERED.match(line)
                 assert match is not None
                 paragraph = document.add_paragraph()
-                paragraph.paragraph_format.first_line_indent = Cm(1.25) if indent else None
+                paragraph.paragraph_format.first_line_indent = Cm(indent_cm) if indent else None
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 _runs(paragraph, f"{match.group(1)}. {match.group(2)}")
             continue
         paragraph = document.add_paragraph()
         paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        if indent:
-            paragraph.paragraph_format.first_line_indent = Cm(1.25)
+        if indent and indent_cm:
+            paragraph.paragraph_format.first_line_indent = Cm(indent_cm)
         _runs(paragraph, " ".join(ln.strip() for ln in lines))
 
 
@@ -99,38 +102,45 @@ def render_docx(
     language: str = "uz",
     draft_label: bool = True,
 ) -> bytes:
-    document = Document()
     small = doc.layout in ("cv", "academic")
-    normal = document.styles["Normal"]
-    normal.font.name = "Times New Roman"
-    normal.font.size = Pt(12 if small else 14)
-    normal.element.rPr.rFonts.set(qn("w:eastAsia"), "Times New Roman")
-    normal.paragraph_format.space_after = Pt(0 if not small else 4)
-    normal.paragraph_format.line_spacing = 1.15
-    section = document.sections[0]
-    section.page_width, section.page_height = Cm(21), Cm(29.7)
-    section.left_margin, section.right_margin = Cm(3), Cm(1.5)
-    section.top_margin, section.bottom_margin = Cm(2), Cm(2)
+    template = org.template if org else None
+    if template is not None:
+        # The organization's approved blank: its letterhead, styles and margins win.
+        document = open_template(template)
+        section = document.sections[0]
+    else:
+        document = Document()
+        fmt = formatting_of(org.formatting if org else None)
+        apply_formatting(document, fmt, small=small)
+        normal = document.styles["Normal"]
+        normal.paragraph_format.space_after = Pt(0 if not small else 4)
+        section = document.sections[0]
     props = document.core_properties
     props.title = (draft.title or doc.names["uz"])[:200]
     props.author = (org.name if org and org.name else "")[:200]
     props.comments = "Prepared with EZO. Review all facts before use."
     if doc.draft and draft_label:
         props.category = "Draft"
-        header = section.header.paragraphs[0]
-        header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        label = header.add_run(DRAFT_LABEL.get(language, "DRAFT"))
+        header = section.header
+        line = header.paragraphs[0] if template is None else header.add_paragraph()
+        line.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        label = line.add_run(DRAFT_LABEL.get(language, "DRAFT"))
         label.font.size = Pt(9)
         label.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
 
-    if doc.layout in ("letter", "act", "minutes") and org and (org.letterhead or org.name):
+    official = doc.layout in ("letter", "act", "minutes")
+    if template is None and official and org and (org.letterhead or org.name):
+        if org.logo:
+            picture = document.add_paragraph()
+            picture.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            picture.add_run().add_picture(io.BytesIO(org.logo), height=Cm(2))
         lines = [ln for ln in (org.letterhead or "").splitlines() if ln.strip()] or [org.name]
         if not org.letterhead and org.department:
             lines.append(org.department)
-        for index, line in enumerate(lines):
+        for index, text in enumerate(lines):
             paragraph = document.add_paragraph()
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = paragraph.add_run(line.strip())
+            run = paragraph.add_run(text.strip())
             run.bold = index == 0
         contacts = " · ".join(v for v in (org.address, org.phone, org.email, org.website) if v)
         if contacts and not org.letterhead:
@@ -208,7 +218,12 @@ def render_docx(
             paragraph = document.add_paragraph()
             paragraph.paragraph_format.space_before = Pt(6)
             paragraph.add_run(section_part.heading).bold = True
-        _body(document, section_part.text, indent=indent)
+        _body(
+            document,
+            section_part.text,
+            indent=indent,
+            indent_cm=formatting_of(org.formatting if org else None).indent_cm,
+        )
 
     document.add_paragraph()
     if doc.layout == "letter":
