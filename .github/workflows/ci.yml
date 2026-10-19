@@ -13,7 +13,7 @@ jobs:
     name: Secret scan (gitleaks, full history)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
       - name: Install gitleaks (pinned, built from source with the runner's Go)
@@ -39,8 +39,8 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
       - name: Tesseract OCR (uzb, uzb_cyrl, rus, eng) and LibreOffice (real OCR and PDF tests)
@@ -49,7 +49,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
             tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
             libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui \
-            fonts-liberation fonts-dejavu-core
+            fonts-liberation fonts-dejavu-core libseccomp2
           tesseract --version && tesseract --list-langs && soffice --version
       - run: uv sync --frozen
       - run: uv run ruff check src tests migrations ../../scripts
@@ -82,13 +82,13 @@ jobs:
     name: Web (lint, types, unit tests, build, e2e)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: pnpm
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
       - run: pnpm install --frozen-lockfile
@@ -113,7 +113,7 @@ jobs:
     name: Docker (API + web images, Compose config, API smoke test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compose file is valid (optional profiles included)
         run: docker compose --profile voice config --quiet
       - name: Build API image
@@ -138,13 +138,16 @@ jobs:
           "
       - name: Office tests pass with the image's own LibreOffice version
         # The production image ships a different LibreOffice than the CI runner; the
-        # conversion tests (mounted read-only, dev tools added to a throwaway container)
-        # must pass against the exact build users get.
+        # native tests use the runtime stage's exact tools; only the separate test
+        # target contains pytest. Production never ships the test installer/tools.
         run: |
-          docker run --rm --user root -e EZO_REQUIRE_OFFICE=1 \
-            -v "$PWD/apps/api/tests:/app/tests:ro" --entrypoint sh ezo-api:ci -c \
-            "uv sync --frozen --quiet && python -m pytest -q -p no:cacheprovider \
-              tests/unit/test_office_convert.py tests/integration/test_office_pdf.py"
+          docker build --target office-tests -t ezo-api-office:ci apps/api
+          docker run --rm --user 10001 -e EZO_REQUIRE_OFFICE=1 -e EZO_REQUIRE_TESSERACT=1 \
+            -v "$PWD/apps/api/tests:/app/tests:ro" --entrypoint sh ezo-api-office:ci -c \
+            "python -m pytest -q -p no:cacheprovider \
+              tests/unit/test_office_convert.py tests/unit/test_office_safety.py \
+              tests/unit/test_process_limits.py tests/unit/test_ocr.py \
+              tests/integration/test_office_pdf.py"
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: Unsafe production configuration fails before HTTP startup

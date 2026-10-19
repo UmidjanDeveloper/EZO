@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock, Mock
 
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import LearnedSource
@@ -13,6 +15,7 @@ from ezo_api.learning.analyzer import (
     SourceEvidence,
     _assess_license_risk,
     _match_ezo_equivalents,
+    cached_analysis,
 )
 from ezo_api.learning.safety import assess_license
 
@@ -262,3 +265,32 @@ def test_category_uses_whole_words() -> None:
     analyzer = CapabilityAnalyzer()
     assert analyzer._detect_category("a stable and rapid library", "pypi") == "data_processing"
     assert analyzer._detect_category("extracts every table from files", "pypi") == "document"
+
+
+async def test_cache_tracks_registry_and_source_security_metadata() -> None:
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(all=lambda: [])), add=Mock()
+    )
+    source = _make_source()
+    source.content_hash = "unchanged-content"
+    analyzer = CapabilityAnalyzer(registered_tools=[])
+    assert analyzer.registered_tools == []
+    await analyzer.analyze_source(session, source)  # type: ignore[arg-type]
+    assert cached_analysis(source, []) is not None
+    assert cached_analysis(source, ["read_document"]) is None
+    source.license = "GPL-3.0"
+    assert cached_analysis(source, []) is None
+    await analyzer.analyze_source(session, source)  # type: ignore[arg-type]
+    assert cached_analysis(source, []) is not None
+    source.security_flags = [{"kind": "override", "location": "README", "excerpt": "ignore"}]
+    assert cached_analysis(source, []) is None
+
+
+async def test_invalid_cached_payload_is_recomputed_instead_of_returning_500() -> None:
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=SimpleNamespace(all=lambda: [])), add=Mock()
+    )
+    source = _make_source()
+    await CapabilityAnalyzer([]).analyze_source(session, source)  # type: ignore[arg-type]
+    source.profile["capability_analysis"]["capabilities"] = "damaged cache"
+    assert cached_analysis(source, []) is None

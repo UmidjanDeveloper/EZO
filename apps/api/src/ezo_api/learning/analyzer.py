@@ -23,12 +23,14 @@ never executed.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,7 +44,7 @@ CoverageLevel = Literal["full", "partial", "none"]
 LicenseRisk = Literal["safe", "review_needed", "copyleft", "unknown"]
 
 READING = ("queued", "inspecting", "reading", "indexing")
-ANALYZER_VERSION = 2
+ANALYZER_VERSION = 3
 """Bumped when the analysis logic changes, so cached analyses are recomputed."""
 MAX_DOCUMENTS = 50
 MAX_CHARS_PER_DOCUMENT = 20_000
@@ -476,7 +478,9 @@ class CapabilityAnalyzer:
     """
 
     def __init__(self, registered_tools: list[str] | None = None) -> None:
-        self.registered_tools = registered_tools or list(EZO_TOOL_PROFILES.keys())
+        self.registered_tools = (
+            list(EZO_TOOL_PROFILES) if registered_tools is None else list(registered_tools)
+        )
 
     async def analyze_source(
         self,
@@ -584,6 +588,7 @@ class CapabilityAnalyzer:
                 **analysis.model_dump(mode="json"),
                 "content_hash": source.content_hash,
                 "analyzer_version": ANALYZER_VERSION,
+                "context_hash": _analysis_context(source, self.registered_tools),
             },
         }
         session.add(source)
@@ -1157,14 +1162,39 @@ class CapabilityAnalyzer:
         return sorted(set(perms))
 
 
-def cached_analysis(source: LearnedSource) -> SourceCapabilityAnalysis | None:
+def _analysis_context(source: LearnedSource, registered_tools: list[str]) -> str:
+    data = {
+        "tools": sorted(set(registered_tools)),
+        "title": source.title,
+        "target": source.target,
+        "kind": source.kind,
+        "status": source.status,
+        "version": source.version,
+        "license": source.license,
+        "flags": source.security_flags,
+        "profile": {k: v for k, v in (source.profile or {}).items() if k != "capability_analysis"},
+    }
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
+def cached_analysis(
+    source: LearnedSource, registered_tools: list[str]
+) -> SourceCapabilityAnalysis | None:
     """The stored analysis when it still matches the source's content and this analyzer."""
     cached = (source.profile or {}).get("capability_analysis")
     if (
         not isinstance(cached, dict)
         or cached.get("analyzer_version") != ANALYZER_VERSION
         or cached.get("content_hash") != source.content_hash
+        or cached.get("context_hash") != _analysis_context(source, registered_tools)
     ):
         return None
-    data = {k: v for k, v in cached.items() if k not in ("content_hash", "analyzer_version")}
-    return SourceCapabilityAnalysis.model_validate(data)
+    data = {
+        k: v
+        for k, v in cached.items()
+        if k not in ("content_hash", "analyzer_version", "context_hash")
+    }
+    try:
+        return SourceCapabilityAnalysis.model_validate(data)
+    except ValidationError:
+        return None

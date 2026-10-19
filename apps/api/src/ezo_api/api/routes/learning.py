@@ -225,17 +225,29 @@ async def delete_library(
             )
         )
     ).all()
+    language = (user.preferences or {}).get("ui_language", "uz")
+    notices = {
+        "uz": (
+            f"«{library.name}» bilim kutubxonasi o'chirildi. Bu suhbatdagi keyingi "
+            "javoblar endi barcha fayllaringizdan foydalanadi."
+        ),
+        "en": (
+            f"The knowledge library “{library.name}” was deleted. Future answers in this "
+            "conversation will now use all your files."
+        ),
+        "ru": (
+            f"Библиотека знаний «{library.name}» удалена. Следующие ответы в этом "
+            "разговоре будут использовать все ваши файлы."
+        ),
+    }
     for conversation in linked:
         conversation.library_id = None
         session.add(
             Message(
                 conversation_id=conversation.id,
                 role="assistant",
-                content=(
-                    f"«{library.name}» bilim kutubxonasi o'chirildi. Bu suhbatdagi keyingi "
-                    "javoblar endi barcha fayllaringizdan foydalanadi."
-                ),
-                language="uz",
+                content=notices.get(language, notices["uz"]),
+                language=language if language in notices else "uz",
                 agent="knowledge_os",
                 meta={"notice": "library_deleted", "library": library.name},
             )
@@ -451,7 +463,8 @@ async def get_source_capabilities(
     """The stored analysis while it matches the content read; otherwise a fresh one, which
     a GET does not save (use POST …/analyze for that)."""
     source = await _owned_source(session, user.id, source_id)
-    cached = cached_analysis(source)
+    _not_while_reading(source)
+    cached = cached_analysis(source, services.tools.names())
     if cached is not None:
         return cached
     _not_while_reading(source)

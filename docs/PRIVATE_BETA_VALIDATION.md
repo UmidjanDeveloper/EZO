@@ -1,99 +1,127 @@
-# Private beta preparation: validation and review record
+# Private beta hardening: validation and release checklist
 
-Prepared from `7a27466ec2e2b721be3bf0ed02f6753e481fd7e1` on
-`feat/private-beta-deploy`, targeting `claude/gifted-goodall-bpf01s`.
-No live deployment, production credentials or paid resources were used.
-See [the architecture and operations runbook](PRIVATE_BETA_DEPLOYMENT.md).
+Date: 2026-10-19. Verified base: 422beabca8d9d6f96118cd5adc8b0cc2550a781e.
+Branch: fix/final-private-beta-hardening, targeting claude/gifted-goodall-bpf01s.
+No live production credentials, provider calls or paid resources were used.
 
-## Results in the cloud workspace
+## Current results: local cloud workspace
 
-| Check | Result |
+| Check | Exact completed result |
 | --- | --- |
-| Python `ruff check src tests migrations ../../scripts` | Passed |
-| Python `ruff format --check src tests migrations ../../scripts` | Passed, 375 files |
-| `mypy` | Passed, 266 source files |
-| Backend SQLite `pytest -q -rs` | **717 passed, 1 failed, 1 skipped**; skip requires PostgreSQL/pgvector |
-| Backend PostgreSQL 16 + pgvector `pytest -q -rs` | **718 passed, 1 failed** |
-| New production policy, redaction, owner auth, CORS and health regressions | 23 passed (included in the full suites) |
-| PostgreSQL Alembic upgrade through 0013, then `alembic check` | Passed; no schema drift |
-| Frontend lint and workspace TypeScript | Passed |
-| JavaScript unit tests | 63 passed: 53 web + 10 shared |
-| Next.js production build | Passed in browser-test setup and web Docker build |
-| Selected Playwright tests | 7 passed: chat, runtime config, settings, uploads/conversion/download, artifact lifecycle |
-| API and web Docker image builds | Passed, frozen lockfiles and TLS verification retained |
-| Local Compose including optional voice profile | Configuration parsed successfully; voice service was not started |
-| Production API container | Verified PostgreSQL TLS (`verify-full` with a locally trusted test certificate), migrations, `PORT=10000`, health 200, owner auth 401/200, hidden docs, real upload |
-| Durable files after container removal/recreation | Same upload metadata survived in PostgreSQL; reindex read the file from the retained named volume; keyword chunk remained available |
-| Container identity/process | API ran as UID 10001; Uvicorn was PID 1; graceful stop/recreation succeeded |
-| Web container | Homepage HTTP 200; `/ezo-config` emitted only the configured public API origin |
-| Updated Docker CI smoke commands, executed locally on isolated ports/names | Passed: unsafe production rejected, migration failure rejected, owner auth and retained-volume restart |
+| Ruff lint and format | Passed; 389 Python files formatted correctly |
+| Mypy | Passed; 269 source files |
+| SQLite full backend suite | **780 passed, 5 skipped**, 162.88 s |
+| PostgreSQL 16 + pgvector full suite | **785 passed**, 235.47 s; no skips/failures |
+| K3 final no-execution/network/cache regressions | **5 passed**, 2.15 s; registry unchanged and nonempty proposal assertions retained |
+| PostgreSQL effective privileges + native pgvector scope regressions | **4 passed**; PUBLIC table/column grants rejected, other-owner/project/doc IDs excluded |
+| Office relationship bypass fixtures | **6 failed before / 6 passed after** the parser fix |
+| Non-root image-native OCR/Office/security tests | **28 passed**, 17.21 s, UID 10001; same native packages as production |
+| Alembic | Fresh limited ezo_app login upgraded through **0015**; alembic check found no new upgrade operations |
+| Frontend lint + workspace TypeScript | Passed |
+| JavaScript unit tests | **65 passed**: 55 web + 10 shared |
+| Complete Playwright suite | **31 passed**, 2.0 min; desktop plus phone project; nonce CSP, chat, files, memory, K3, IELTS, presentation and voice flows |
+| API and web production Docker builds | Passed; frozen locks, pinned base digests and verified TLS retained |
+| Production API smoke | Passed: locally trusted PostgreSQL verify-full TLS, migrations 0015, PORT=10000, UID 10001, Uvicorn PID 1, owner 401/200, docs 404 and CORS allow/reject |
+| Durable file smoke | Passed: remove/recreate API with same named volume and database; document content survives and reindex reads retained upload; offline keyword mode, partial/1 chunk |
+| Production web smoke | Passed: homepage 200, nonce CSP, no-store runtime JavaScript contains only public API origin |
+| Python runtime dependency audit | **0 known vulnerabilities**; pinned pip-audit 2.10.1, includes new defusedxml dependency |
+| Node production audit | **0 vulnerabilities**, 206 dependencies |
+| Node full development audit | **1 HIGH**, braces 3.0.3, CVE-2026-93687; no published patch in advisory; ESLint-only path, absent from production image |
+| Full-history gitleaks | Passed; 0 leaks; existing single synthetic-fixture fingerprint retained, no new suppression |
+| Trivy API before → after | **83 HIGH / 1 CRITICAL → 79 HIGH / 1 CRITICAL**; 4 fixable build-tool findings removed; 0 remaining fixable HIGH/CRITICAL |
+| Trivy web | **0 HIGH / 0 CRITICAL**, 1 fixable MEDIUM (zlib CVE-2026-85091) |
+| Vulnerability gate | Baseline correctly fails; final API + web pass fixable-HIGH/CRITICAL gate; missing report fails |
 
-PostgreSQL tests were rerun after recovering disk space exhausted by the Docker VFS
-build cache. The table reports the completed rerun, not the aborted/resource-failed
-runs. Build trust used read-only BuildKit CA secrets; verification was not disabled.
-The production smoke used local throwaway PostgreSQL, a local test certificate and a
-generated test owner token. It does not prove Supabase or a deployed host is reachable.
-Uploads used offline keyword indexing (`partial` with one chunk); live semantic
-embeddings and AI providers were not tested.
+The five SQLite skips are deliberately PostgreSQL-only: effective database privilege
+checks (2), advisory-lock migration safety (1) and native pgvector behavior/scope (2).
+Office, OCR, footer geometry and security assertions ran; no failure was suppressed
+or assertion weakened. The historical PDF serialization-order failure is resolved in
+the baseline integration history and passes unchanged in these suites.
 
-## Known failing check: release gate remains open
+Some initial parallel builds exhausted this workspace's 32 GiB VFS filesystem,
+interrupting a PostgreSQL run. Scoped cleanup of this task's build cache and sequential
+builds restored space. The table quotes completed reruns, not aborted results.
+The production smoke used throwaway PostgreSQL, a generated owner token and a trusted
+local test certificate. Docker VFS mounts did not report a separate device, so the test
+explicitly verified its named-volume attachment and used the supported sentinel.
+This proves the local restart path, not Render disk durability or Supabase connectivity.
 
-**Resolved 2026-10-19 (commit `ac41368`).** The assertion relied on text serialization
-order. It now reads each page's bottom tenth by coordinates and requires exactly `1` and
-`2` there (and the letterhead in the header band) — stricter than before, not weaker.
-CI runs `test_office_convert.py` and `test_office_pdf.py` inside the built production
-API image with `EZO_REQUIRE_OFFICE=1` (job *Docker*, step "Office tests pass with the
-image's own LibreOffice version"); it passed in CI run #82. The original record follows.
+## Evidence and reproduction
 
-`apps/api/tests/unit/test_office_convert.py::test_official_letter_keeps_pages_header_footer_table_and_scripts`
-fails at line 52. It asserts that serialized PDF text ends with the page number. The
-same failure was observed before this task, in both complete database suites, and
-when the fixture was converted in the production Docker image (LibreOffice 25.2.3.2).
-The page numbers are present at PDF y=39 on both pages, in the footer; text extraction
-emits them before body text. The host LibreOffice development build also fails this
-ordering assertion. No assertion was modified, skipped or weakened. Independent
-review must resolve this test/serialization assumption before declaring all checks
-green; the PR must not be represented as release-approved while it remains red.
+Workspace evidence is under /workspace/security-evidence (outside git):
+sqlite-final.log/xml, postgres-final.log/xml, web-unit.log, e2e.log,
+production-native-tests.log, production-runtime-smoke.log, runtime-smoke.py,
+limited-role-migrations.log, k3-final.log,
+pip-audit.json, pnpm-audit-production.json, pnpm-audit-all.json, gitleaks.json/log,
+api-baseline.trivy.json, api-final.trivy.json, web-final.trivy.json and build logs.
+The committed [per-finding report](security/private-beta-vulnerabilities.json) records
+all 80 remaining HIGH/CRITICAL package findings, versions, reachability, mitigations,
+image IDs and scanner database timestamp. Future Security CI retains full raw JSON
+as downloadable artifacts; a future run is not claimed to have happened already.
+A separate untracked-directory scan matched the existing synthetic token fixture,
+its bytecode and generated Next.js internal build keys. These are excluded from git;
+no extra ignore/suppression was added. The full-history repository scan is clean.
 
-## Exact changed files
+Representative commands (developer/CI reproduction, not a phone-owner requirement):
 
-- `.dockerignore`
-- `.github/workflows/ci.yml`
-- `apps/api/.dockerignore`
-- `apps/api/Dockerfile`
-- `apps/api/entrypoint.sh`
-- `apps/api/src/ezo_api/deployment.py`
-- `apps/api/src/ezo_api/main.py`
-- `apps/api/src/ezo_api/api/routes/system.py`
-- `apps/api/tests/unit/test_deployment.py`
-- `apps/api/tests/integration/test_deployment.py`
-- `apps/web/Dockerfile`
-- `apps/web/vercel.json`
-- `apps/web/app/ezo-config/route.ts`
-- `apps/web/lib/runtime-config.ts`
-- `apps/web/lib/runtime-config.test.ts`
-- `tests/e2e/specs/deployment.spec.ts`
-- `render.yaml`
-- `deploy/private-beta.env.example`
-- `docs/PRIVATE_BETA_DEPLOYMENT.md`
-- `docs/PRIVATE_BETA_VALIDATION.md`
+    cd apps/api
+    uv sync --frozen
+    uv run ruff check src tests migrations ../../scripts
+    uv run ruff format --check src tests migrations ../../scripts
+    uv run mypy
+    EZO_REQUIRE_OFFICE=1 EZO_REQUIRE_TESSERACT=1 uv run pytest -q -rs --junitxml=reports/sqlite.xml
+    EZO_TEST_DATABASE_URL=postgresql://ezo:ezo@localhost:5432/ezo_test EZO_REQUIRE_OFFICE=1 EZO_REQUIRE_TESSERACT=1 uv run pytest -q -rs --junitxml=reports/postgres.xml
+    uv run alembic upgrade head
+    uv run alembic check
+    cd ../..
+    pnpm lint
+    pnpm typecheck
+    pnpm test
+    pnpm test:e2e
+    docker build -t ezo-api:review apps/api
+    docker build -t ezo-web:review -f apps/web/Dockerfile .
+    docker build --target office-tests -t ezo-api-office:review apps/api
+    docker run --rm --user 10001 -e EZO_REQUIRE_OFFICE=1 -e EZO_REQUIRE_TESSERACT=1 -v "$PWD/apps/api/tests:/app/tests:ro" --entrypoint python ezo-api-office:review -m pytest -q -p no:cacheprovider tests/unit/test_office_convert.py tests/unit/test_office_safety.py tests/unit/test_process_limits.py tests/unit/test_ocr.py tests/integration/test_office_pdf.py
+    gitleaks detect --source . --redact --report-format json --report-path /tmp/gitleaks.json
+    python3 scripts/container_vulnerability_gate.py reports/security/api.trivy.json reports/security/web.trivy.json
 
-No dependency declaration/lockfile or Knowledge OS K3, learning, research, IELTS,
-presentation, SkillForge or capability-analysis implementation was modified. The
-only shared API source overlaps are isolated startup and health changes documented
-in the runbook.
+Database commands must use an isolated test database. Native tools and all five language
+packs are required. This cloud environment uses read-only build CA secrets; it never
+turns off TLS/package checksums. Trivy 0.76.0 uses its current official GHCR database
+because the default mirror is denied by environment policy. No network block was bypassed.
 
-## External verification and owner actions
+## Hosted GitHub evidence and limits
 
-Git fetch works through the supplied proxy. GitHub API access was denied because
-`api.github.com` is outside the enforced environment network policy. Its addition
-was saved in the environment draft for review. A GitHub PR URL and hosted CI conclusion
-must be reported only after creation/inspection succeeds; local checks are not hosted CI.
+- Default/integration branch: claude/gifted-goodall-bpf01s, fetched HEAD 422beab.
+- Baseline public PR page: 0 open PRs; K3 and earlier deployment/review changes are merged.
+- [CI #84](https://github.com/UmidjanDeveloper/EZO/actions/runs/39233572032) and
+  [Security #12](https://github.com/UmidjanDeveloper/EZO/actions/runs/39233572057)
+  show successful baseline jobs on public GitHub pages. These do not validate this new branch.
+- Public branch/rules pages show the default branch is unprotected. The enabled Status
+  ruleset has no branch include target and no required PR/check rules. Settings were unchanged.
+- api.github.com is denied by the managed environment network policy. Git transport works;
+  an injected credential exists. This is not an absent-token diagnosis. API permission
+  inspection/PR creation and hosted final-commit conclusions require permitted API access.
+  The owner can apply the existing network draft without sharing a new token in chat.
 
-Before release: resolve/review the remaining failed check; inspect hosted CI; approve
-provisioning and the exact release commit; configure Supabase extension, verified TLS,
-session connection, backups and disabled public Data API access; attach the Render
-disk; set API-only secrets and exact CORS; set Vercel's public API origin and workspace
-root; complete the real-host owner-auth, file-restart and restore checks. Hosting cost
-estimates, single-instance limits, browser-token risk, interruption behavior and rollback
-constraints are in the runbook. No claim of a live deployment is made.
+## Release readiness checklist
+
+| State | Status / next evidence |
+| --- | --- |
+| Code and local regression checks | Complete for the inspected boundaries; residual native risk remains |
+| CI configuration | Prepared, immutable action pins and complete vulnerability artifacts; new hosted run must be inspected |
+| Infrastructure | Not configured/validated against actual Supabase, Render and Vercel |
+| Actually deployed | **No** |
+| Independent Claude review | Owner must review final diff and native HIGH/CRITICAL risk |
+| GitHub protection | Owner must activate a targeted PR/required-check ruleset |
+| License / visibility | Owner decision; no project LICENSE or visibility mutation |
+| Cost / release commit | Owner approval needed before provisioning/deploying |
+| Real-host acceptance | TLS/session/app role/vector, mounted disk, correct secrets/CORS, live AI/semantic calls and restart durability pending |
+| Backups | Matched database/files off-host backup and isolated restore drill pending |
+
+Verdict: **READY AFTER SPECIFIC FIXES**. Complete native-risk review/mitigation decisions,
+effective branch protection, hosted final-commit checks and approved infrastructure
+acceptance before calling it deployment-ready. Follow the
+[phone guide](MOBILE_PRIVATE_BETA_LAUNCH.md) and
+[operations runbook](PRIVATE_BETA_DEPLOYMENT.md); remaining risks are in the
+[risk register](PRIVATE_BETA_SECURITY_RISK_REGISTER.md).

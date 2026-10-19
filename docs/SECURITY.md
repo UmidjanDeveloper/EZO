@@ -41,6 +41,10 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   a paid AI provider, `EZO_RATE_LIMIT_CHAT_PER_DAY` (1000). A Redis-backed limiter arrives with the
   worker (ROADMAP *Infrastructure*).
 - Write actions (deletes, artifact changes, uploads, settings) are written to the audit log.
+- On the dedicated production database, migrations 0014/0015 revoke public API role
+  privileges and inherited PUBLIC/column access. Startup checks effective table and
+  column privileges for anon/authenticated. Disable the Supabase Data API as well;
+  configure the limited app role from the runbook, with DDL only on its own objects.
 
 ## 2. Secrets and AI-provider keys
 
@@ -96,8 +100,11 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   limits. `EZO_FETCH_ALLOW_PRIVATE_NETWORKS=true` is for local development only.
 - Tools run only through `ToolRegistry`: argument validation, timeouts, a `dangerous` flag that
   needs explicit user confirmation, and a logged `ToolCall` row for every run.
-- There is **no arbitrary shell** reachable from the public API or from model output. The only
-  subprocesses are fixed, argument-list commands in development scripts.
+- There is **no arbitrary shell** reachable from the public API or from model output.
+  Runtime OCR/Office use fixed argument-list commands from server configuration, minimal
+  environments and deadlines. Linux children receive CPU/address-space/file limits,
+  zero core dumps and a libseccomp new-IPv4/IPv6-socket filter. Local IPC remains
+  available. This is not a complete filesystem sandbox or a K4 user-code executor.
 - Future DeveloperAgent tools (ROADMAP Phase 9) must stay inside an approved workspace. Path
   escape, system directories and secret files are blocked; push, deploy and destructive
   actions need approval.
@@ -140,23 +147,27 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
   `--frozen` / `--frozen-lockfile`.
 - **Audits** (`.github/workflows/security.yml`): `pip-audit` on the exported runtime lock and
   `pnpm audit --prod --audit-level high`. They run weekly, on every dependency change and on
-  demand. They are kept separate from CI so a newly published advisory does not block
-  unrelated work, but the run turns red. `pip-audit` is pinned.
+  demand and every PR. The separate Security workflow fails its runtime dependency and
+  fixable HIGH/CRITICAL image gates. The full Node development audit is retained as an
+  explicitly informational report; its braces HIGH finding is documented in the risk
+  register. `pip-audit` is pinned.
 - **Secret scan:** the CI job *Secret scan* runs gitleaks (pinned v8.21.2) over the full git
   history on every push and pull request. `.gitleaksignore` lists reviewed fixtures by
   fingerprint (today only the fake token the redaction test feeds in).
 - **Container images:** the API and web base images are pinned by digest (Dependabot proposes
   rebuilt digests weekly). The *Security* workflow builds both images and scans them with
-  Trivy (pinned 0.56.2): a critical vulnerability that has a fix fails the run; high and
-  critical findings are listed in full. Python code is also checked by ruff's bandit (`S`)
-  rules in CI.
+  Trivy (0.76.0, immutable image digest): fixable HIGH and CRITICAL findings fail the
+  gate; full JSON reports retain unfixed findings and are uploaded as artifacts. Missing
+  reports, scanner and network errors fail. A green fixable-CVE gate is not release
+  approval. Python code also uses ruff's bandit (`S`) rules.
 - **Updates:** Dependabot (`.github/dependabot.yml`) only *opens* pull requests, grouped for
   minor and patch versions. **Major versions are ignored** and upgraded deliberately by hand,
   with the changelog read, all tests passing and Docker images rebuilt. Nothing is merged
   automatically. Never run `npm audit fix --force` or similar commands that apply breaking
   upgrades.
 - New dependencies need a licence check first (THIRD_PARTY_NOTICES.md, OPEN_SOURCE_AUDIT.md).
-  Copyleft (AGPL/GPL) code is never imported into EZO's process.
+  AGPL/GPL adoption requires explicit review; existing LGPL dependencies and separately
+  executed native tools retain their own obligations. See THIRD_PARTY_NOTICES.md.
 - To check locally:
 
   ```bash
@@ -171,20 +182,25 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
   volume `ezo-storage`: uploads, artifacts, exports).
 - Neither is encrypted by EZO. Use disk encryption on the host if the machine can be lost.
 - Backups are the owner's responsibility for now: `pg_dump` plus a copy of the storage volume.
-  S3 storage and a documented backup/restore procedure are planned (ROADMAP *Infrastructure*).
+  The [private-beta runbook](PRIVATE_BETA_DEPLOYMENT.md) requires matched, encrypted,
+  off-host database/file backups with writes paused and a tested isolated restore.
+  Object storage is not implemented; Supabase backups do not contain the Render disk.
 
 ## 9. Known gaps (honest list)
 
 - Single-owner authentication only; no user accounts, roles or 2FA.
 - In-memory rate limiter (one process; resets on restart).
-- First Trivy run (2026-10-19, Security run #10): no critical vulnerability with a fix in
-  either image. The API image (Debian 13) lists 79 high and 1 critical OS findings that
-  Debian has **not** fixed yet (e.g. util-linux, libxml2); they are picked up by the weekly
-  scan and digest updates once fixes ship. The web image's 11 high findings were in the
-  npm CLI bundled with the Node base image; npm, corepack and yarn are now removed from the
-  runtime image (the server needs only `node`).
-- GitHub Actions are pinned by major version tag, not by commit SHA (Dependabot proposes
-  updates); the Compose images (`pgvector/pgvector:pg16`, VoiceStudio) are pinned by tag. `main` branch protection is a repository setting the owner must enable.
+- Local production-image scan on 2026-10-19: API HIGH/CRITICAL decreased from 83/1
+  to 79/1 by removing unused build tools; no remaining HIGH/CRITICAL has a fixed version
+  in the current database. CVE-2026-6653 (libxml2, CRITICAL) is potentially reachable
+  through native document parsing. No blanket exploitability/safety claim is made.
+  See the [per-finding JSON](security/private-beta-vulnerabilities.json),
+  [risk register](PRIVATE_BETA_SECURITY_RISK_REGISTER.md) and [validation](PRIVATE_BETA_VALIDATION.md).
+- GitHub Actions are pinned to verified commit SHAs; Dependabot proposes updates.
+  Development Compose images (`pgvector/pgvector:pg16`, VoiceStudio) remain tag-pinned.
+  The actual default branch is `claude/gifted-goodall-bpf01s`. Its enabled but untargeted
+  Status ruleset supplies no effective PR/required-check protection. Owner setup is
+  documented in the [phone guide](MOBILE_PRIVATE_BETA_LAUNCH.md); settings were not changed.
 - No malware scanning of uploads (only type and size checks).
 - No encryption at rest inside EZO.
 - No security review by a third party yet.
@@ -202,7 +218,7 @@ documents, chat attachments.
 | Decompression bombs / oversized input | uploads: size limit, ≤ 5,000 zip parts, ≤ 200 MB unpacked; PDFs: 200 MB, 3,000 pages, render ≤ 40 M pixels, dpi ≤ 300; OCR ≤ `EZO_OCR_MAX_PAGES`; Word edits ≤ 50 MB and 400,000 characters; long documents ≤ 2,000,000 characters (refused, never cut) | unit tests |
 | LibreOffice conversion (Word/Excel → PDF) | separate process: binary from config, fixed argv, no shell, fresh profile + temp dir per call, minimal env, timeout kills the process group, one at a time; files with external links (linked images, OLE, external data) are refused so the server never fetches URLs while converting | `tests/unit/test_office_convert.py` |
 | Macros | `.docm` / `.xlsm` are not accepted; a `.docx` / `.xlsx` that contains `vbaProject.bin` is rejected at upload; openpyxl never runs macros | `test_macro_payloads_in_office_files_are_refused` |
-| XML entity attacks | python-docx parses with `resolve_entities=False`; openpyxl uses the standard library parser, which has expat's billion-laughs protection | code review |
+| XML entity attacks | bounded .rels parsing uses defusedxml with DTD/entities/external entities forbidden; python-docx disables entity resolution; openpyxl can use installed defusedxml | `test_office_safety.py`, existing document tests |
 | Password-protected / restricted PDFs | never decrypted beyond an empty user password; files whose permissions forbid changes are refused for changes; signed PDFs get a "signature will be invalid" warning | `test_encrypted_restricted_and_corrupt_inputs_are_refused`, `test_signed_pdfs_get_a_warning` |
 | Spreadsheet formula injection | text cells starting with `= + - @` are written as text (also for tables read from PDFs and scans) | `test_xlsx_numbers_headers_and_formula_safety` |
 | Model output executing actions | model replies are only paragraph texts or validated `PdfStep` JSON (fixed operations, page-spec pattern); nothing is executed from free text | `test_steps_are_validated` |
