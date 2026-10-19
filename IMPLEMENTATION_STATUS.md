@@ -3,6 +3,31 @@
 What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
 working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
 
+## Private beta hardening — current verification, 2026-10-19
+
+Verified integration base: 422beabca8d9d6f96118cd5adc8b0cc2550a781e;
+branch: fix/final-private-beta-hardening. K1, K2 and K3 are already merged. This
+change hardens Office XML/resource/network boundaries, effective PostgreSQL Data API
+privileges, K3 cache invalidation and Uzbek/English/Russian deletion notices. It does
+not implement K4–K7 or enable generated-code execution.
+
+Local results: SQLite **780 passed / 5 PostgreSQL-only skips**, PostgreSQL **785 passed**,
+JavaScript **65 passed**, Playwright **31 passed** including mobile; image-native
+OCR/Office/security tests **28 passed** as UID 10001. The geometric Office footer
+assertion passes unchanged. Both production images build. API findings fall from
+83 HIGH / 1 CRITICAL to 79 HIGH / 1 CRITICAL, with no remaining fixable HIGH/CRITICAL;
+unfixed native parsing risks remain open. These are local results, not new hosted CI.
+
+Release remains **READY AFTER SPECIFIC FIXES**: independent review of native risk,
+effective integration branch protection, hosted checks for the final commit and
+owner-configured real infrastructure/backup restoration are pending. No paid resource,
+merge, deployment, project license or repository setting change was performed.
+See [validation](docs/PRIVATE_BETA_VALIDATION.md),
+[risk register](docs/PRIVATE_BETA_SECURITY_RISK_REGISTER.md),
+[deployment runbook](docs/PRIVATE_BETA_DEPLOYMENT.md) and
+[phone launch guide](docs/MOBILE_PRIVATE_BETA_LAUNCH.md). Older dated phase records
+below are historical evidence, not the current release verdict.
+
 ## Verification convention
 
 Two kinds of results are reported, **never mixed**:
@@ -1092,11 +1117,11 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Knowledge OS K2 — library-scoped retrieval in chat, citations, source versions and
-stale-source warnings. Then K3 (capability analysis) and K4 (secure sandbox, required before
-any generated code runs). Government work mode E2–E4 (secretary, citizen appeals, reports)
-remain open after E1.
-Owner decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and
+Knowledge OS K1–K3 are present; finish the private-beta release gates above before
+starting K4 (secure sandbox, required before generated code runs). Government work
+mode E2–E4 (secretary, citizen appeals, reports) remains open after E1.
+Owner decisions still open: a licence/visibility choice, effective protection of
+`claude/gifted-goodall-bpf01s`, the Dependabot PRs, and
 the LegalResearchAgent visibility
 ([docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md) §6).
 Ruflo stays off (Phase 14).

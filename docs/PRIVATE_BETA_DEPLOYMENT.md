@@ -6,29 +6,39 @@ connect this runbook to production automatically from a pull request.
 
 ## Audit of the verified base
 
-Base: `7a27466ec2e2b721be3bf0ed02f6753e481fd7e1` on
-`claude/gifted-goodall-bpf01s`. Deployment branch: `feat/private-beta-deploy`.
+Verified base: `422beabca8d9d6f96118cd5adc8b0cc2550a781e` on
+`claude/gifted-goodall-bpf01s`. Hardening branch: `fix/final-private-beta-hardening`.
+This refresh includes merged deployment preparation, review fixes and Knowledge OS K3.
+See [validation](PRIVATE_BETA_VALIDATION.md), the
+[risk register](PRIVATE_BETA_SECURITY_RISK_REGISTER.md) and the
+[phone-only launch guide](MOBILE_PRIVATE_BETA_LAUNCH.md).
 
 | Boundary | Existing behavior | Private beta decision |
 | --- | --- | --- |
 | Frontend | Next.js monorepo; workspace TS packages; runtime `/ezo-config` | Vercel project rooted at `apps/web`, with workspace access; only public API origin reaches browser |
-| API | Docker with OCR/LibreOffice and a non-root user; fixed port; shell as PID 1 | Render Docker service; configurable `PORT`; `exec` one Uvicorn worker; fail before HTTP if migrations fail |
-| Authentication | Single-owner bearer token exists, but local mode is the default | Preserve it; production startup requires token mode and a 32+ character random token |
+| API | Multi-stage Docker with OCR/LibreOffice and non-root UID 10001 | Render Docker service; configurable `PORT`; `exec` one Uvicorn worker; fail before HTTP if migrations fail |
+| Authentication | Single-owner token; production requires token mode and 32+ characters | Authenticate before consuming bodies; no multi-user login claim |
 | Database | Async psycopg, SQLAlchemy `pool_pre_ping`, Alembic, pgvector | Supabase PostgreSQL via direct/session connection with verified TLS; no transaction pooling |
 | Pool size | SQLAlchemy defaults: 5 persistent + 10 overflow connections per process | One API process; budget 15 connections plus migration/maintenance; no autoscaling |
 | Migrations | Applied before Uvicorn; no external migration worker | Single-instance, fail-fast startup; backup first, additive migrations, manual release |
 | Files | Local storage abstraction; uploads/artifacts reference filesystem keys | Render persistent disk at `/app/storage`; no Supabase Storage integration is claimed |
 | Jobs | In-process ingestion/learning; unfinished work resumed at startup | One always-on instance; restarts may interrupt streams; no serverless/scale-to-zero backend |
 | CORS | Explicit origins supported, defaults point at localhost | Exact owner frontend HTTPS origins; no wildcard or preview-domain patterns |
-| Health | `SELECT 1`, previously HTTP 200 even when degraded | Unauthenticated `/api/health`; HTTP 503 on database failure; no secret details |
-| Logs | Audit IDs and operational logs; exception payloads could reach logs | Production formatter redacts configured credentials and withholds exception payloads; no Uvicorn access URLs |
+| Health | `SELECT 1`; HTTP 503 on database failure | Unauthenticated `/api/health`; no production version or secret details |
+| Logs | Production credential redaction and exception-payload suppression | Keep operational logs restricted; no Uvicorn access URLs |
 | Debug | Owner traces and API schema available by default | Disable traces and public schema/docs in production |
 | OCR/Office | Native Tesseract language packs and LibreOffice in API image | Keep native Docker dependencies and Latin/Cyrillic fonts; avoid Vercel for this work |
 
-Shared-module overlap is limited to `main.py` (startup validation, logging, API docs)
-and `api/routes/system.py` (health status). No learning, research, IELTS, SkillForge,
-presentation or capability-analysis code is changed. These two startup/health hunks
-must be reconciled explicitly if another branch touches the same lines.
+This hardening also changes Office/OCR subprocess controls, database privileges,
+K3 cache invalidation and localized library-deletion notices. Full regression suites
+cover existing IELTS, research, presentation and routing behavior. K4–K7 remain outside scope.
+
+Runtime excludes installers/build caches while retaining native features. OOXML
+relationships use bounded, entity-disabled XML parsing. Linux OCR/Office children share
+a lock, CPU/wall-clock/output/4 GiB virtual-memory limits, zero core dumps and a new
+IPv4/IPv6-socket filter. These are not a complete sandbox or a container RSS limit.
+The remaining 79 HIGH / 1 CRITICAL findings require independent review and an owner
+risk decision before release; a green fixable-CVE gate does not settle that decision.
 
 ## Selected architecture and alternatives
 
@@ -87,13 +97,19 @@ access. A public UI by itself grants no API access.
    Ensure the connection role's search path can resolve the extension and has DDL rights
    for EZO's public tables. EZO does not use Supabase Auth/PostgREST; its tables must not
    be exposed through Supabase's Data API. Disable the Data API for this dedicated
-   project. As a second layer, migration 0014 revokes every privilege of the `anon` and
+   project. Use the [prepared limited-role setup](../deploy/supabase-private-beta-role.sql)
+   for a new dedicated project; set its password only in the protected database UI.
+   The app role needs DDL on its own objects, not superuser, role/database creation
+   or RLS bypass. Do not transfer existing/shared objects without a migration review.
+   As a second layer, migration 0014 revokes every privilege of the `anon` and
    `authenticated` roles on EZO's tables, sequences and functions (also future ones),
-   and the post-migration check refuses to start while any such grant exists. Do not use
-   this database as a public client API.
+   and 0015 also revokes PUBLIC table/sequence and column-level grants. Post-migration
+   checks use effective table/column privileges, including inheritance. Startup refuses
+   exposed tables. Do not use this database as a public client API.
 3. Copy **Connect → Session pooler** (port 5432; usable from IPv4 hosts), or a reachable
-   direct PostgreSQL endpoint. Use the documented `postgres.PROJECT` username for the
-   pooler and percent-encode password special characters. Do not use transaction pooling
+   direct PostgreSQL endpoint. Use the app role with the dashboard's project suffix
+   for the pooler (normally `ezo_app.PROJECT`); direct endpoints use `ezo_app`.
+   Percent-encode password special characters. Do not use transaction pooling
    on port 6543: psycopg prepared statements and schema management expect sessions.
    Production startup refuses a `DATABASE_URL` on port 6543.
    Set `sslmode=verify-full&sslrootcert=system&connect_timeout=10`. If the endpoint's CA
@@ -124,7 +140,8 @@ access. A public UI by itself grants no API access.
    `RAILWAY_ENVIRONMENT` or `DYNO` without `EZO_ENV=production` is refused, so a missing
    variable can never start local owner mode on the internet), runs `alembic upgrade
    head` under a PostgreSQL advisory lock, checks that `pgvector_entries` exists (when
-   `EZO_VECTOR_STORE=pgvector`) and that `anon`/`authenticated` hold no grants, then
+   `EZO_VECTOR_STORE=pgvector`) and that `anon`/`authenticated` have no effective table
+   or column privileges, then
    `exec`s Uvicorn on `PORT`
    (default 8000; blueprint 10000). A preflight/migration error exits nonzero and never
    opens HTTP. Keep one service instance and one worker. Do not use a pre-deploy command

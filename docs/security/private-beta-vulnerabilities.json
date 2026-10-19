@@ -1,0 +1,2181 @@
+{
+  "schema_version": 1,
+  "base_commit": "422beabca8d9d6f96118cd5adc8b0cc2550a781e",
+  "scanner": "Trivy 0.76.0 (official release checksum verified)",
+  "database": {
+    "Version": 2,
+    "NextUpdate": "2026-10-20T13:35:30.519058502Z",
+    "UpdatedAt": "2026-10-19T13:35:30.519058742Z",
+    "DownloadedAt": "2026-10-19T13:52:27.133033165Z"
+  },
+  "baseline_image_id": "sha256:7ca77fb49298513936c4c8da51ad084ba99a223924b53b97d54b5e8049a40f01",
+  "final_image_id": "sha256:95651434e43f2eba667013f4ead4304f9c53fa7236db9c66d7109653f02e7af6",
+  "counting": "package-vulnerability findings; duplicated CVEs across affected binary packages are counted separately",
+  "initial_counts": {
+    "HIGH": 83,
+    "CRITICAL": 1
+  },
+  "final_counts": {
+    "HIGH": 79,
+    "CRITICAL": 1
+  },
+  "fixable_remaining": 0,
+  "unique_remaining_advisories": 29,
+  "removed_build_tool_findings": [
+    {
+      "VulnerabilityID": "GHSA-6v7p-g79w-8964",
+      "PkgName": "msgpack",
+      "InstalledVersion": "1.1.2",
+      "FixedVersion": "1.2.1",
+      "Severity": "HIGH"
+    },
+    {
+      "VulnerabilityID": "CVE-2025-47273",
+      "PkgName": "setuptools",
+      "InstalledVersion": "70.3.0",
+      "FixedVersion": "78.1.1",
+      "Severity": "HIGH"
+    },
+    {
+      "VulnerabilityID": "CVE-2026-97687",
+      "PkgName": "urllib3",
+      "InstalledVersion": "2.7.0",
+      "FixedVersion": "2.8.0",
+      "Severity": "HIGH"
+    },
+    {
+      "VulnerabilityID": "CVE-2026-97689",
+      "PkgName": "urllib3",
+      "InstalledVersion": "2.7.0",
+      "FixedVersion": "2.8.0",
+      "Severity": "HIGH"
+    }
+  ],
+  "remaining_findings": [
+    {
+      "cve": "CVE-2026-76642",
+      "package": "bsdutils",
+      "installed_version": "1:2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "bsdutils",
+      "installed_version": "1:2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "bsdutils",
+      "installed_version": "1:2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "bsdutils",
+      "installed_version": "1:2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "dirmngr",
+      "installed_version": "2.4.7-21+deb13u1+b5",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gnupg",
+      "installed_version": "2.4.7-21+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gnupg-l10n",
+      "installed_version": "2.4.7-21+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gpg",
+      "installed_version": "2.4.7-21+deb13u1+b5",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gpg-agent",
+      "installed_version": "2.4.7-21+deb13u1+b5",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gpgconf",
+      "installed_version": "2.4.7-21+deb13u1+b5",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-24882",
+      "package": "gpgsm",
+      "installed_version": "2.4.7-21+deb13u1+b5",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-24882",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-54369",
+      "package": "libacl1",
+      "installed_version": "2.3.2-2+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-54369",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "libblkid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "libblkid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "libblkid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "libblkid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-12064",
+      "package": "libcurl3t64-gnutls",
+      "installed_version": "8.14.1-2+deb13u7",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-12064",
+      "runtime_use": "Native network support library; EZO does not invoke it directly.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Component is present; native-child IPv4/IPv6 socket creation is denied. CVE-specific invocation remains unverified.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-8458",
+      "package": "libcurl3t64-gnutls",
+      "installed_version": "8.14.1-2+deb13u7",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-8458",
+      "runtime_use": "Native network support library; EZO does not invoke it directly.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Component is present; native-child IPv4/IPv6 socket creation is denied. CVE-specific invocation remains unverified.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-12064",
+      "package": "libcurl4t64",
+      "installed_version": "8.14.1-2+deb13u7",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-12064",
+      "runtime_use": "Native network support library; EZO does not invoke it directly.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Component is present; native-child IPv4/IPv6 socket creation is denied. CVE-specific invocation remains unverified.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-8458",
+      "package": "libcurl4t64",
+      "installed_version": "8.14.1-2+deb13u7",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-8458",
+      "runtime_use": "Native network support library; EZO does not invoke it directly.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Component is present; native-child IPv4/IPv6 socket creation is denied. CVE-specific invocation remains unverified.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "liblastlog2-2",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "liblastlog2-2",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "liblastlog2-2",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "liblastlog2-2",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "libmount1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "libmount1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "libmount1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "libmount1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2025-69720",
+      "package": "libncursesw6",
+      "installed_version": "6.5+20250216-2",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2025-69720",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "libsmartcols1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "libsmartcols1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "libsmartcols1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "libsmartcols1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-16742",
+      "package": "libsystemd0",
+      "installed_version": "257.13-1~deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-16742",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-73066",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-73066",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88047",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88047",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88048",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88048",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88051",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88051",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88052",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88052",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88053",
+      "package": "libtesseract5",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88053",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-36849",
+      "package": "libtiff6",
+      "installed_version": "4.7.0-3+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "will_not_fix",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-36849",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-52490",
+      "package": "libtiff6",
+      "installed_version": "4.7.0-3+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-52490",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2025-69720",
+      "package": "libtinfo6",
+      "installed_version": "6.5+20250216-2",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2025-69720",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-16742",
+      "package": "libudev1",
+      "installed_version": "257.13-1~deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-16742",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "libuuid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "libuuid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "libuuid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "libuuid1",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88806",
+      "package": "libx11-6",
+      "installed_version": "2:1.8.12-1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88806",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88806",
+      "package": "libx11-data",
+      "installed_version": "2:1.8.12-1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88806",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-6653",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "CRITICAL",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-6653",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-74860",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-74860",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86138",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86138",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86139",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86139",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86140",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86140",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86142",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86142",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86143",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86143",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-86144",
+      "package": "libxml2",
+      "installed_version": "2.12.7+dfsg+really2.9.14-2.1+deb13u3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-86144",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88807",
+      "package": "libxrender1",
+      "installed_version": "1:0.9.12-1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88807",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "login",
+      "installed_version": "1:4.16.0-2+really2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "login",
+      "installed_version": "1:4.16.0-2+really2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "login",
+      "installed_version": "1:4.16.0-2+really2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "login",
+      "installed_version": "1:4.16.0-2+really2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "mount",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "mount",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "mount",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "mount",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2025-69720",
+      "package": "ncurses-base",
+      "installed_version": "6.5+20250216-2",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2025-69720",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2025-69720",
+      "package": "ncurses-bin",
+      "installed_version": "6.5+20250216-2",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2025-69720",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-9538",
+      "package": "perl-base",
+      "installed_version": "5.40.1-6+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "fix_deferred",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-9538",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-73066",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-73066",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88047",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88047",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88048",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88048",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88051",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88051",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88052",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88052",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-88053",
+      "package": "tesseract-ocr",
+      "installed_version": "5.5.0-1+b1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-88053",
+      "runtime_use": "Native document/image parsing through LibreOffice/Tesseract; retained for required features.",
+      "user_controlled_input": true,
+      "reachability": "Potentially reachable from owner-uploaded OOXML or embedded image data; exploitation not demonstrated.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-76642",
+      "package": "util-linux",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-76642",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78408",
+      "package": "util-linux",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78408",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78409",
+      "package": "util-linux",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78409",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    },
+    {
+      "cve": "CVE-2026-78410",
+      "package": "util-linux",
+      "installed_version": "2.41.5-0+deb13u1",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "vendor_status": "affected",
+      "advisory": "https://avd.aquasec.com/nvd/cve-2026-78410",
+      "runtime_use": "Installed OS/transitive component; no direct EZO invocation identified for the reported vulnerable operation.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "Unverified indirect reachability; installed package presence is not proof of exploitation or safety.",
+      "evidence": [
+        "apps/api/src/ezo_api/documents/office_convert.py",
+        "apps/api/src/ezo_api/documents/ocr/tesseract.py",
+        "apps/api/src/ezo_api/documents/process_limits.py",
+        "apps/api/src/ezo_api/security/edge.py"
+      ],
+      "mitigations": [
+        "Owner authentication before body consumption",
+        "Input/archive size checks and safe OOXML relationship parsing",
+        "One native conversion at a time; CPU/wall-clock/address-space/file/core limits",
+        "Minimal child environment, no-new-privileges, IPv4/IPv6 socket denial",
+        "Non-root API and host container memory limit"
+      ],
+      "residual_risk": "Unfixed in the scanner database for this Debian package version. Native parser DoS and same-UID filesystem exposure remain possible; this is not a complete sandbox. Confirm advisory applicability with Debian/upstream; owner review required."
+    }
+  ],
+  "web_final": {
+    "image_id": "sha256:da6b0bb7238e0a9f2cb6aba91fbe9f552f1b9175d14482fc6b943f230b163cdb",
+    "counts": {
+      "MEDIUM": 1
+    },
+    "high": 0,
+    "critical": 0,
+    "fixable_high_critical": 0
+  },
+  "web_findings": [
+    {
+      "cve": "CVE-2026-85091",
+      "package": "zlib",
+      "installed_version": "1.3.2-r0",
+      "fixed_version": "1.3.2-r1",
+      "severity": "MEDIUM",
+      "vendor_status": "fixed",
+      "runtime_use": "Installed native compression library in web image; vulnerable call reachability unverified.",
+      "user_controlled_input": "indirect/unknown",
+      "reachability": "No exploitability claim; node/server compression does not itself prove the exact vulnerable native path.",
+      "mitigation": "Review signed Alpine/base update to 1.3.2-r1 and repeat web image/browser verification.",
+      "residual_risk": "Still installed; below current HIGH/CRITICAL gate but requires follow-up."
+    }
+  ],
+  "development_dependency_findings": [
+    {
+      "cve": "CVE-2026-93687",
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "installed_version": "3.0.3",
+      "fixed_version": null,
+      "severity": "HIGH",
+      "runtime_use": false,
+      "dependency_path": "eslint-config-next > @next/eslint-plugin-next > fast-glob > micromatch > braces",
+      "reachability": "ESLint/build input patterns only; absent from scanned production image and production audit. Malicious source branches can reach development tooling.",
+      "user_controlled_input": "repository paths/patterns in a contributor branch, not deployed owner chat input",
+      "mitigation": "No production secrets in lint/build jobs; inspect untrusted branch changes; track upstream patch.",
+      "residual_risk": "Development tooling denial of service remains; do not treat informational audit as clean."
+    }
+  ],
+  "runtime_source_commit": "c94fbc2cae9cf8d26f3aacb6db2fa8bbefb74a4e",
+  "raw_report_locations": {
+    "local_workspace": "/workspace/security-evidence/{api-baseline,api-final,web-final}.trivy.json",
+    "future_ci_artifact": "container-vulnerability-reports (not a claim of a completed hosted run)"
+  }
+}
