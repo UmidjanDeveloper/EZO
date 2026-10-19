@@ -28,3 +28,11 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+  # Base images are pinned by digest; these PRs bring security rebuilds of the same tag.
+  - package-ecosystem: "docker"
+    directories: ["/apps/api", "/apps/web"]
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

@@ -9,6 +9,8 @@ on:
   push:
     branches: [main, "claude/**"]
     paths:
+      - "apps/api/Dockerfile"
+      - "apps/web/Dockerfile"
       - "apps/api/pyproject.toml"
       - "apps/api/uv.lock"
       - "pnpm-lock.yaml"
@@ -16,6 +18,8 @@ on:
       - ".github/workflows/security.yml"
   pull_request:
     paths:
+      - "apps/api/Dockerfile"
+      - "apps/web/Dockerfile"
       - "apps/api/pyproject.toml"
       - "apps/api/uv.lock"
       - "pnpm-lock.yaml"
@@ -58,3 +62,24 @@ jobs:
       - name: Full report including development tools (informational)
         if: always()
         run: pnpm audit || true
+
+  images:
+    name: Container images (Trivy, critical fixable CVEs fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t ezo-api:scan apps/api
+      - run: docker build -t ezo-web:scan -f apps/web/Dockerfile .
+      - name: Scan OS packages and libraries in both images
+        run: |
+          for image in ezo-api:scan ezo-web:scan; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.56.2 \
+              image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 --no-progress "$image"
+          done
+      - name: Full report of high and critical findings (informational)
+        if: always()
+        run: |
+          for image in ezo-api:scan ezo-web:scan; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.56.2 \
+              image --scanners vuln --severity HIGH,CRITICAL --no-progress "$image" || true
+          done
