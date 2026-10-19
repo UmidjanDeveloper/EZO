@@ -7,3 +7,7 @@
 **/playwright-report
 .git
 .env
+**/.env
+**/.env.*
+!**/.env.example
+**/reports

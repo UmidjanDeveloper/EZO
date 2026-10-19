@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, text
 
 from ezo_api import __version__
@@ -32,13 +32,14 @@ router = APIRouter(prefix="/api", tags=["system"], dependencies=[Depends(rate_li
 
 
 @router.get("/health")
-async def health(services: ServicesDep, session: SessionDep) -> dict[str, str]:
+async def health(response: Response, services: ServicesDep, session: SessionDep) -> dict[str, str]:
     try:
         await session.execute(text("SELECT 1"))
         database = "ok"
-    except Exception as exc:
-        logger.error("Database health check failed: %s", exc)
+    except Exception:
+        logger.error("Database health check failed")
         database = "unreachable"
+        response.status_code = 503
     return {
         "status": "ok" if database == "ok" else "degraded",
         "database": database,

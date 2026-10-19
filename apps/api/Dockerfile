@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # EZO API image (Python 3.13 + uv).
 FROM python:3.13-slim AS base
 
@@ -19,29 +20,34 @@ RUN apt-get update \
         fonts-liberation fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir uv==0.11.32
+RUN --mount=type=secret,id=system_ca \
+    if [ -f /run/secrets/system_ca ]; then export PIP_CERT=/run/secrets/system_ca; fi; \
+    pip install --no-cache-dir uv==0.11.32
 
 WORKDIR /app
 
 # Dependencies first (cached unless pyproject/uv.lock change).
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=secret,id=system_ca \
+    if [ -f /run/secrets/system_ca ]; then export SSL_CERT_FILE=/run/secrets/system_ca; fi; \
+    uv sync --frozen --no-dev --no-install-project
 
-COPY alembic.ini ./
-COPY config ./config
-COPY migrations ./migrations
-COPY src ./src
-RUN uv sync --frozen --no-dev
+# .dockerignore excludes local data, secrets, tests and development environments.
+COPY . .
+RUN --mount=type=secret,id=system_ca \
+    if [ -f /run/secrets/system_ca ]; then export SSL_CERT_FILE=/run/secrets/system_ca; fi; \
+    uv sync --frozen --no-dev \
+    && chmod -R a+rX /app && chmod 755 /app/entrypoint.sh \
+    && useradd --create-home --uid 10001 ezo \
+    && mkdir -p /app/storage && chown ezo:ezo /app/storage
 
 # Uploaded files live in /app/storage (a Docker volume, see docker-compose.yml).
 ENV EZO_STORAGE_DIR=/app/storage
-RUN useradd --create-home --uid 10001 ezo \
-    && mkdir -p /app/storage && chown ezo:ezo /app/storage
 USER ezo
 
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=4)"
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8000') + '/api/health', timeout=4)"
 
 # Apply database migrations, then start the API.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn ezo_api.main:create_app --factory --host 0.0.0.0 --port 8000"]
+CMD ["/app/entrypoint.sh"]
