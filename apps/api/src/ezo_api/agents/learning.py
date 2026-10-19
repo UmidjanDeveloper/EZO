@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ezo_api.agents.base import Agent, AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.catalog import AGENTS
@@ -20,6 +20,7 @@ from ezo_api.core.intent import Intent
 from ezo_api.core.text import normalize, quoted
 from ezo_api.db.models import KnowledgeLibrary, LearnedSource
 from ezo_api.knowledge.fetch import FetchError
+from ezo_api.learning.analyzer import CapabilityAnalyzer
 from ezo_api.learning.service import RUNNING, LearningError, get_library
 from ezo_api.learning.targets import parse_target
 
@@ -33,13 +34,31 @@ _LIST = re.compile(
     r"knowledge librar|what (have )?you learned|изученн\w* источник|библиотек\w* знани|"
     r"ўрганган манба)"
 )
+_ANALYZE_CAPABILITIES = re.compile(
+    r"(imkoniyat(lar)?ni tahlil|"
+    r"qanday (foydali )?imkoniyat|"
+    r"qobiliyat(lar)?ni tahlil|"
+    r"nimalar qila olasan shu kutubxona|"
+    r"analyze( the)? documentation|"
+    r"what useful abilities|"
+    r"analyze( the)? capabilit|"
+    r"propose capabilit|"
+    r"проанализируй возможности|"
+    r"какие полезные возможности|"
+    r"что ты можешь получить|"
+    r"имконият(лар)?ни таҳлил)",
+    re.I,
+)
 _LIBRARY = re.compile(r"(kutubxona|library|библиотек|кутубхона)", re.I)
 
 INSTRUCTIONS = (
-    "Role: EZO's Knowledge OS. Report what EZO did with the user's source, exactly as the "
-    "notes state (status, counts, limits, errors, licence, security flags).\n"
+    "Role: EZO's Knowledge OS. Report what EZO did with the user's source or library, "
+    "faithfully using the notes provided (status, counts, limits, errors, licence, "
+    "security flags, capabilities, proposals).\n"
     "- Reading a source saves searchable knowledge only. Never say EZO installed, activated, "
     "ran or can now use the software; no skill or tool was created.\n"
+    "- Capability analysis produces non-executable proposals only; explicitly state they are "
+    "NOT installed or executable.\n"
     "- If reading is still in progress, say so and that the Knowledge page shows the "
     "progress; do not describe content you have not read.\n"
     "- Never invent pages, versions, licences or features of the source.\n"
@@ -48,10 +67,12 @@ INSTRUCTIONS = (
 
 
 def wants_learning(text: str) -> bool:
-    """A source (URL, repository, package) plus a "learn" verb, or a question about the
-    learned sources."""
+    """A source (URL, repository, package) plus a "learn" verb, a question about learned
+    sources, or a request to analyze capabilities."""
     norm = normalize(text)
     if _LIST.search(norm):
+        return True
+    if _ANALYZE_CAPABILITIES.search(norm):
         return True
     return bool(_LEARN.search(norm)) and parse_target(text) is not None
 
@@ -101,11 +122,16 @@ class LearningAgent(Agent):
     spec = AGENTS[Intent.LEARNING]
 
     def plan(self, turn: AgentTurn) -> AgentPlan:
+        steps = (
+            ("identify_source", "inspect_knowledge", "analyze_capabilities", "format_proposals")
+            if _ANALYZE_CAPABILITIES.search(normalize(turn.text))
+            else ("find_source", "register", "read", "index", "report")
+        )
         return AgentPlan(
             route=self.spec.route,
             context_mode=self.spec.context_mode,
             instructions=INSTRUCTIONS,
-            steps=("find_source", "register", "read", "index", "report"),
+            steps=steps,
         )
 
     async def gather(self, ctx: GatherContext) -> Gathered:
@@ -113,6 +139,11 @@ class LearningAgent(Agent):
         tools = ctx.tools
         services = tools.services
         text = ctx.turn.text
+
+        if _ANALYZE_CAPABILITIES.search(normalize(text)):
+            await self._analyze(ctx, gathered)
+            return gathered
+
         target = parse_target(text)
         if target is None or (_LIST.search(normalize(text)) and not _LEARN.search(normalize(text))):
             await self._list(ctx, gathered)
@@ -201,3 +232,197 @@ class LearningAgent(Agent):
             "The user's learned sources (library, then source; list them faithfully):\n"
             + "\n".join(lines)
         )
+
+    async def _analyze(self, ctx: GatherContext, gathered: Gathered) -> None:
+        tools = ctx.tools
+        session = tools.session
+        text = ctx.turn.text
+        registered_tools = tools.services.tools.names() if tools.services else None
+        analyzer = CapabilityAnalyzer(registered_tools=registered_tools)
+
+        # Determine target: specific library_id in turn, or named library, or source target
+        target = parse_target(text)
+        named_lib = library_name(text)
+
+        source: LearnedSource | None = None
+        if target is not None:
+            source = await session.scalar(
+                select(LearnedSource).where(
+                    LearnedSource.user_id == tools.user_id,
+                    LearnedSource.target == target.key,
+                )
+            )
+
+        if source is not None:
+            analysis = await analyzer.analyze_source(session, source)
+            await session.commit()
+            gathered.tool_calls.append(
+                {
+                    "tool": "analyze_capabilities",
+                    "ok": True,
+                    "summary": (
+                        f"Analyzed {source.title}: {len(analysis.capabilities)} "
+                        "capability proposals"
+                    ),
+                    "error": None,
+                }
+            )
+            report_lines = [
+                f"CAPABILITY ANALYSIS REPORT FOR SOURCE: {source.title} (Status: proposal only)",
+                (
+                    f"- Library / Package: {analysis.source_title} ({analysis.source_kind}, "
+                    f"target: {analysis.source_target}, "
+                    f"version: {analysis.source_version or 'unspecified'})"
+                ),
+                f"- Main purpose: {analysis.main_purpose}",
+                f"- License: {analysis.license or 'unknown'} ({analysis.license_risk})",
+                (
+                    f"- Security flags: {analysis.security_flags_count} prompt-injection flag(s) "
+                    "detected and neutralized as data."
+                ),
+                (
+                    "- Evidence completeness: "
+                    f"{'Incomplete evidence' if analysis.is_incomplete else 'Complete evidence'}"
+                ),
+                (
+                    "- Evidence gaps: "
+                    f"{'; '.join(analysis.evidence_gaps) if analysis.evidence_gaps else 'None'}"
+                ),
+                "",
+                "PROPOSED CAPABILITIES (Proposals only; not executed or installed in runtime):",
+            ]
+            for p in analysis.capabilities:
+                equiv_str = (
+                    ", ".join(f"{e.kind}:{e.name} ({e.coverage})" for e in p.existing_equivalents)
+                    if p.existing_equivalents
+                    else "None"
+                )
+                report_lines.append(
+                    f"### Proposal: {p.title} (`{p.name}`)\n"
+                    f"- Description: {p.description}\n"
+                    f"- Category & Relevance: {p.category} | "
+                    f"Relevance: {p.relevance} ({p.relevance_reason})\n"
+                    f"- Existing EZO equivalents: {equiv_str}\n"
+                    f"- Missing EZO functionality: {p.missing_functionality}\n"
+                    f"- Dependencies required: {', '.join(p.required_dependencies)}\n"
+                    f"- Permissions required: {', '.join(p.required_permissions)}\n"
+                    f"- Compatibility: {p.compatibility_notes}\n"
+                    f"- Security: {p.security_notes}\n"
+                    f"- Supporting evidence ({p.confidence * 100:.0f}% confidence): "
+                    + "; ".join(
+                        f'[{ev.evidence_level}] {ev.title}: "{ev.excerpt[:120]}…"'
+                        for ev in p.evidence[:2]
+                    )
+                    + f"\n- Recommended next step: {p.recommended_next_step}"
+                )
+            report_lines.append(
+                "\nDISCLAIMER: K3 Capability Analysis is strictly read-only. "
+                "EZO has not executed external code, installed packages, or activated tools."
+            )
+            gathered.notes.append("\n".join(report_lines))
+            return
+
+        library: KnowledgeLibrary | None = None
+        if tools.library_scope is not None:
+            library = await session.get(KnowledgeLibrary, tools.library_scope)
+            if library is not None and library.user_id != tools.user_id:
+                library = None
+
+        if library is None and named_lib:
+            library = await session.scalar(
+                select(KnowledgeLibrary).where(
+                    KnowledgeLibrary.user_id == tools.user_id,
+                    func.lower(KnowledgeLibrary.name) == named_lib.lower(),
+                )
+            )
+
+        if library is None:
+            library = await session.scalar(
+                select(KnowledgeLibrary)
+                .where(KnowledgeLibrary.user_id == tools.user_id)
+                .order_by(KnowledgeLibrary.created_at.desc())
+            )
+
+        if library is None:
+            gathered.notes.append(
+                "You have no knowledge libraries or learned sources yet. "
+                "Learn a website, GitHub repository, or Python/npm package "
+                "first before analyzing capabilities."
+            )
+            return
+
+        report = await analyzer.analyze_library(session, library)
+        await session.commit()
+        gathered.tool_calls.append(
+            {
+                "tool": "analyze_capabilities",
+                "ok": True,
+                "summary": (
+                    f"Analyzed library '{library.name}': {report.capabilities_count} proposals "
+                    f"from {report.analyzed_sources_count} sources"
+                ),
+                "error": None,
+            }
+        )
+
+        if report.sources_count == 0:
+            gathered.notes.append(
+                f"The library “{library.name}” is empty (0 sources). "
+                "Learn at least one package or repository into this library "
+                "to analyze capabilities."
+            )
+            return
+
+        overlap_str = (
+            "; ".join(report.existing_capabilities_overlap)
+            if report.existing_capabilities_overlap
+            else "None"
+        )
+        missing_str = (
+            "; ".join(report.missing_capabilities_highlight)
+            if report.missing_capabilities_highlight
+            else "None"
+        )
+        sec_warn_str = "; ".join(report.security_warnings) if report.security_warnings else "None"
+        ev_limits_str = (
+            "; ".join(report.evidence_limitations) if report.evidence_limitations else "None"
+        )
+
+        lib_lines = [
+            f"CAPABILITY ANALYSIS REPORT FOR LIBRARY: “{library.name}”",
+            f"- Sources analyzed: {report.analyzed_sources_count} of {report.sources_count}",
+            f"- Capability proposals identified: {report.capabilities_count}",
+            f"- Existing capability overlap: {overlap_str}",
+            f"- Missing capability highlights: {missing_str}",
+            f"- Security warnings: {sec_warn_str}",
+            f"- Evidence limitations: {ev_limits_str}",
+            "",
+            "PROPOSALS (Read-only analysis; not installed or executable in runtime):",
+        ]
+        for p in report.proposals[:5]:
+            equiv_str = (
+                ", ".join(f"{e.kind}:{e.name} ({e.coverage})" for e in p.existing_equivalents)
+                if p.existing_equivalents
+                else "None"
+            )
+            lib_lines.append(
+                f"### {p.title} (`{p.name}`)\n"
+                f"- Description: {p.description}\n"
+                f"- Category & Relevance: {p.category} | {p.relevance} ({p.relevance_reason})\n"
+                f"- Existing EZO equivalents: {equiv_str}\n"
+                f"- Missing EZO functionality: {p.missing_functionality}\n"
+                f"- Dependencies: {', '.join(p.required_dependencies)}\n"
+                f"- Permissions: {', '.join(p.required_permissions)}\n"
+                f"- Security & Licensing: {p.security_notes} | {p.licensing_notes}\n"
+                f"- Evidence ({p.confidence * 100:.0f}% confidence): "
+                + "; ".join(
+                    f'[{ev.evidence_level}] {ev.title}: "{ev.excerpt[:120]}…"'
+                    for ev in p.evidence[:2]
+                )
+                + f"\n- Recommended next step: {p.recommended_next_step}"
+            )
+        lib_lines.append(
+            "\nDISCLAIMER: K3 is strictly an analysis and proposal phase. "
+            "EZO does NOT execute code, install packages, or create skills."
+        )
+        gathered.notes.append("\n".join(lib_lines))

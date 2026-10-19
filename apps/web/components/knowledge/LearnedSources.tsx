@@ -1,9 +1,9 @@
 "use client";
 
-import type { KnowledgeLibrary, LearnedSource, LearnedSourceDetail, LearnedSourceStatus } from "@ezo/shared";
+import type { KnowledgeLibrary, LearnedSource, LearnedSourceDetail, LearnedSourceStatus, LibraryCapabilityReport } from "@ezo/shared";
 import { ApiError } from "@ezo/shared";
 import { Badge, Button, Card, Spinner } from "@ezo/ui";
-import { BookOpen, ChevronDown, Loader2, RotateCw, Search, ShieldAlert, Trash2, X } from "lucide-react";
+import { BookOpen, ChevronDown, Loader2, RotateCw, Search, ShieldAlert, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { formatBytes } from "@/lib/download";
@@ -206,6 +206,22 @@ function LibraryGroup({
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<Array<{ title: string; excerpt: string; url?: string | null }> | null>(null);
+  const [showCapabilities, setShowCapabilities] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [capabilitiesReport, setCapabilitiesReport] = useState<LibraryCapabilityReport | null>(null);
+
+  async function handleAnalyze() {
+    setAnalyzing(true);
+    try {
+      const report = await api.analyzeKnowledgeLibrary(library.id);
+      setCapabilitiesReport(report);
+      setShowCapabilities(true);
+    } catch {
+      setCapabilitiesReport(null);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -231,16 +247,29 @@ function LibraryGroup({
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-medium">{library.name}</h3>
         <span className="text-xs text-ink-faint">{sources.length}</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto"
-          onClick={onDeleteLibrary}
-          disabled={busy || running}
-          aria-label={m.learning.deleteLibrary}
-        >
-          <Trash2 size={14} />
-        </Button>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleAnalyze}
+            disabled={busy || running || analyzing || sources.length === 0}
+            className="h-8 gap-1 text-xs"
+            data-testid={`analyze-capabilities-${library.id}`}
+          >
+            {analyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} className="text-accent" />}
+            {analyzing ? t.analyzingCapabilities : t.analyzeCapabilities}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDeleteLibrary}
+            disabled={busy || running}
+            aria-label={m.learning.deleteLibrary}
+          >
+            <Trash2 size={14} />
+          </Button>
+        </div>
       </div>
 
       {/* Library-Scoped Search */}
@@ -275,6 +304,90 @@ function LibraryGroup({
           {searching ? <Loader2 size={12} className="animate-spin" /> : t.searchButton}
         </Button>
       </form>
+
+      {/* Capabilities Proposal Panel */}
+      {showCapabilities && capabilitiesReport ? (
+        <div className="mb-3 rounded-lg border border-accent/25 bg-surface p-3 text-xs" data-testid={`capabilities-panel-${library.id}`}>
+          <div className="mb-2 flex items-center justify-between border-b border-line/60 pb-2">
+            <div>
+              <div className="flex items-center gap-1.5 font-medium text-ink">
+                <Sparkles size={14} className="text-accent" />
+                <span>{t.capabilitiesTitle}</span>
+                <span className="rounded bg-accent/15 px-1.5 py-0.2 text-[10px] font-medium text-accent">
+                  {t.proposalBadge}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-ink-faint">{t.capabilitiesSubtitle}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCapabilities(false)}
+              className="text-ink-faint hover:text-ink"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {capabilitiesReport.proposals.length === 0 ? (
+            <p className="py-2 text-center text-xs text-ink-faint">{t.noCapabilities}</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {capabilitiesReport.proposals.map((p) => (
+                <div key={p.id} className="rounded-md border border-line/70 bg-surface/70 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-ink">{p.title}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] text-ink-muted">{p.category}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${
+                        p.relevance === "high" ? "bg-accent/15 text-accent font-medium" : "bg-surface-muted text-ink-muted"
+                      }`}>
+                        {t.relevance}: {t.relevanceLevels[p.relevance]}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-ink-muted">{p.description}</p>
+                  <div className="mt-2 grid grid-cols-1 gap-1.5 border-t border-line/40 pt-1.5 sm:grid-cols-2 text-[11px]">
+                    <div>
+                      <span className="font-medium text-ink-muted">{t.existingCoverage}: </span>
+                      <span className="text-ink-faint">
+                        {p.existing_equivalents.length > 0
+                          ? p.existing_equivalents.map((e) => `${e.kind}:${e.name} (${e.coverage})`).join(", ")
+                          : "Yo'q"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-ink-muted">{t.missingFunctionality}: </span>
+                      <span className="text-ink-faint">{p.missing_functionality}</span>
+                    </div>
+                  </div>
+                  {p.required_dependencies.length > 0 ? (
+                    <div className="mt-1 text-[11px]">
+                      <span className="font-medium text-ink-muted">{t.requiredDeps}: </span>
+                      <span className="font-mono text-ink-faint">{p.required_dependencies.join(", ")}</span>
+                    </div>
+                  ) : null}
+                  {p.evidence.length > 0 ? (
+                    <div className="mt-1.5 rounded bg-surface-muted/40 p-1.5 text-[11px]">
+                      <span className="font-medium text-ink-muted">{t.evidenceTitle}:</span>
+                      {p.evidence.slice(0, 1).map((ev, i) => (
+                        <p key={i} className="mt-0.5 italic text-ink-faint">
+                          [{t.evidenceLevels[ev.evidence_level]}] {ev.title}: “{ev.excerpt.slice(0, 120)}…”
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {p.recommended_next_step ? (
+                    <p className="mt-1 text-[10px] text-ink-faint">
+                      <span className="font-medium text-ink-muted">{t.nextStep}:</span> {p.recommended_next_step}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Search results */}
       {searchResults !== null ? (
