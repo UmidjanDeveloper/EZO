@@ -121,6 +121,19 @@ images) plus the extended local checks listed for that phase.
 - Next: E2 secretary (minutes and task registers from notes, documents and — only with a
   real transcription provider — audio), E3 citizen appeals, E4 reports
 
+### Knowledge OS — K1 experimental (2026-10-19, Knowledge OS & SkillForge prompt)
+- K1 (experimental): named knowledge libraries; learned sources — documentation websites
+  (one site and folder, robots.txt, polite pacing, page/depth/size/time budgets), GitHub
+  repositories (API metadata, licence, commit, file tree; README, docs, manifests, API
+  specs, examples and entry points read as text; raw-file fallback), PyPI and npm packages
+  (registry facts, README, linked documentation site); prompt-injection passages flagged
+  and audit-logged; licence assessment for commercial use; migration 0012; chat ("… ni
+  o'rgan", "o'rgangan manbalaringni ko'rsat") and the Knowledge page
+- Next: K2 library-scoped retrieval and citations in chat, versions and stale warnings;
+  K3 capability analysis; K4 secure sandbox (hard prerequisite for running any generated
+  code); K5 skill builder and verification; K6 skill registry and runtime; K7 updates
+- Nothing read from a source is executed or installed; no skill exists before K4–K6
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit

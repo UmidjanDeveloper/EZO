@@ -33,6 +33,13 @@ FEATURES: tuple[Feature, ...] = (
     Feature("chat_core", "EzoCore chat, routing, personality", "Foundation", "alpha"),
     Feature("memory", "Memory (profile, project, semantic)", "Foundation", "alpha"),
     Feature("knowledge", "Files, knowledge base and citations", "Knowledge", "alpha"),
+    Feature(
+        "knowledge_os",
+        "Learned sources: websites, GitHub repositories, PyPI / npm packages, libraries",
+        "Knowledge OS",
+        "experimental",
+        "K1: registry and secure reading; skills (SkillForge) are not built",
+    ),
     Feature("voice_turns", "Turn-by-turn voice (browser / OpenAI / VoiceStudio)", "Voice", "alpha"),
     Feature("presence", "EZO orb activity states", "Voice", "alpha"),
     Feature("artifacts", "Artifacts with versions and exports", "Artifacts", "alpha"),

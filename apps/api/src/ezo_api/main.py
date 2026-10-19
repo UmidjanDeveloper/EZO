@@ -25,6 +25,7 @@ from ezo_api.api.routes import (
     conversations,
     knowledge,
     language,
+    learning,
     memory,
     official,
     projects,
@@ -110,7 +111,13 @@ def create_app(
         resumed = await services.ingestion.resume_unfinished()
         if resumed:
             logger.info("Resumed ingestion of %s unfinished document(s)", resumed)
+        if services.learning is not None:
+            relearn = await services.learning.resume_unfinished()
+            if relearn:
+                logger.info("Resumed reading of %s learned source(s)", relearn)
         yield
+        if services.learning is not None:
+            await services.learning.shutdown()
         await services.ingestion.shutdown()
         await services.db.dispose()
 
@@ -182,6 +189,7 @@ def create_app(
         translation,
         academic,
         career,
+        learning,
     ):
         app.include_router(module.router)
 

@@ -24,6 +24,9 @@ class Intent(StrEnum):
     DOCUMENT = "document"
     BUSINESS = "business"
     VISUAL = "visual"
+    LEARNING = "learning"
+    """Knowledge OS: learn a website, repository or package (chosen by EzoCore's override
+    when a source and a "learn" verb are present; no keyword signals of its own)."""
 
 
 # Each signal is a regex (matched against normalized text) and a weight.

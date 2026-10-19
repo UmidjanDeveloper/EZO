@@ -19,6 +19,7 @@ from ezo_api.knowledge.ingestion.runner import IngestionRunner
 from ezo_api.knowledge.ingestion.service import KnowledgeService
 from ezo_api.knowledge.retrieval.retriever import Retriever
 from ezo_api.knowledge.vectorstores import VectorStoreResolver
+from ezo_api.learning.service import LearningRunner, LearningService
 from ezo_api.memory.service import MemoryIndex
 from ezo_api.official.sync import OfficialSyncService
 from ezo_api.personality.profile import PersonalityProfile, load_personality
@@ -86,6 +87,7 @@ class Services:
     ocr: OCRProvider
     office: OfficeConverter | None
     scholar: ScholarSearch | None = None
+    learning: LearningRunner | None = None
 
 
 def build_services(
@@ -207,6 +209,18 @@ def build_services(
         )
         if scholar == "auto"
         else scholar,
+        learning=LearningRunner(
+            LearningService(
+                knowledge,
+                safe_fetcher,
+                db.sessionmaker,
+                github_token=settings.github_token.get_secret_value()
+                if settings.github_token
+                else None,
+                enabled=settings.learning_enabled,
+            ),
+            settings.ingestion_mode,
+        ),
     )
     core.services = services
     core.memory_index = memory_index

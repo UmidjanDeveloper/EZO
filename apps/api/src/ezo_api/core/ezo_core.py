@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.academic.requests import citation_request, wants_research_plan
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
+from ezo_api.agents.learning import wants_learning
 from ezo_api.agents.references import latest_artifact
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.core import messages
@@ -245,6 +246,10 @@ class EzoCore:
                 intent = IntentResult(
                     Intent.LANGUAGE_COACH, 1.0, ("active_language_session",), intent.scores
                 )
+            elif turn.forced_agent is None and wants_learning(turn.text):
+                # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
+                # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
+                intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
             elif (
                 intent.intent == Intent.GENERAL
                 and turn.forced_agent is None

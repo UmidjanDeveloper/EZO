@@ -142,5 +142,16 @@ AGENTS: dict[Intent, AgentSpec] = {
             context_mode="casual",
             route="chat",
         ),
+        AgentSpec(
+            "knowledge_os",
+            Intent.LEARNING,
+            {"uz": "Bilim tizimi", "en": "Knowledge OS", "ru": "Система знаний"},
+            "Learns websites, GitHub repositories and PyPI/npm packages into named knowledge "
+            "libraries (read-only: nothing from a source is executed or installed).",
+            maturity="experimental",
+            phase="Knowledge OS",
+            context_mode="technical",
+            route="chat",
+        ),
     ]
 }

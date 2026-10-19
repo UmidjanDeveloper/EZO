@@ -5,8 +5,10 @@ Protections (SSRF): only http/https, no credentials in URLs, every hostname
 redirects, timeouts, a response size cap and an allow-list of content types.
 robots.txt is respected for automated fetches.
 
-Residual risk: DNS could change between our check and the connection
-(DNS rebinding). Keep EZO_FETCH_ALLOW_PRIVATE_NETWORKS=false on servers.
+DNS rebinding: after connecting, the address actually connected to is checked
+again (when the connection is direct; through an HTTP proxy the proxy resolves
+the name and the peer is the proxy). Keep EZO_FETCH_ALLOW_PRIVATE_NETWORKS=false
+on servers.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
+from urllib.request import getproxies, proxy_bypass
 from urllib.robotparser import RobotFileParser
 
 import httpx
@@ -141,6 +144,30 @@ class SafeFetcher:
             headers={"User-Agent": USER_AGENT, "Accept": ", ".join(accept)},
         )
 
+    def _check_peer(self, url: str, response: httpx.Response) -> None:
+        """DNS rebinding defense: the address really connected to must be public too."""
+        if self.allow_private:
+            return
+        stream = response.extensions.get("network_stream")
+        if stream is None:
+            return  # test transports have no socket
+        host = urlsplit(url).hostname or ""
+        scheme = urlsplit(url).scheme
+        if getproxies().get(scheme) and not proxy_bypass(host):
+            return  # an HTTP proxy resolved the name; the peer is the proxy
+        peer = stream.get_extra_info("server_addr")
+        if peer and not _is_public(str(peer[0])):
+            raise FetchError("blocked", "This address points to a private network and is blocked.")
+
+    def crawl_delay(self, url: str) -> float | None:
+        """robots.txt Crawl-delay for this origin, when already loaded."""
+        parts = urlsplit(url)
+        cached = self._robots.get(f"{parts.scheme}://{parts.netloc}")
+        if cached is None or cached[1] is None:
+            return None
+        delay = cached[1].crawl_delay(USER_AGENT)
+        return float(delay) if delay is not None else None
+
     async def allowed_by_robots(self, url: str) -> bool:
         parts = urlsplit(url)
         origin = f"{parts.scheme}://{parts.netloc}"
@@ -159,24 +186,38 @@ class SafeFetcher:
         parser = cached[1]
         return True if parser is None else parser.can_fetch(USER_AGENT, url)
 
-    async def fetch(self, url: str, respect_robots: bool = True) -> FetchedPage:
+    async def fetch(
+        self, url: str, respect_robots: bool = True, max_bytes: int = MAX_BYTES
+    ) -> FetchedPage:
         if respect_robots and not await self.allowed_by_robots(url):
             raise FetchError("robots", "The website does not allow automated access to this page.")
-        return await self._get(url, MAX_BYTES)
+        return await self._get(url, min(max_bytes, MAX_BYTES))
 
-    async def fetch_json(self, url: str, max_bytes: int = 2_000_000) -> FetchedPage:
+    async def fetch_json(
+        self, url: str, max_bytes: int = 2_000_000, headers: dict[str, str] | None = None
+    ) -> FetchedPage:
         """A JSON API response (same SSRF and size protections; only application/json)."""
-        return await self._get(url, max_bytes, accept=("application/json",))
+        return await self._get(url, max_bytes, accept=("application/json",), headers=headers)
 
     async def _get(
-        self, url: str, max_bytes: int, accept: tuple[str, ...] = ALLOWED_CONTENT_TYPES
+        self,
+        url: str,
+        max_bytes: int,
+        accept: tuple[str, ...] = ALLOWED_CONTENT_TYPES,
+        headers: dict[str, str] | None = None,
     ) -> FetchedPage:
         current = url
+        origin = urlsplit(url).netloc
         async with self._client(accept) as client:
             for _ in range(MAX_REDIRECTS + 1):
                 await self.check_host(current)
                 try:
-                    async with client.stream("GET", current) as response:
+                    # Extra headers (e.g. an API token) go only to the original host,
+                    # never to a host a redirect points to.
+                    same_host = urlsplit(current).netloc == origin
+                    extra = headers if headers and same_host else None
+                    async with client.stream("GET", current, headers=extra) as response:
+                        self._check_peer(current, response)
                         if response.is_redirect:
                             location = response.headers.get("location")
                             if not location:

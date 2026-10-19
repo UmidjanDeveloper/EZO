@@ -319,6 +319,58 @@ class KnowledgeService:
         await session.flush()
         return AddResult(document, duplicate=False, new_revision=new_revision)
 
+    async def add_source_document(
+        self,
+        session: AsyncSession,
+        source: KnowledgeSource,
+        *,
+        url: str,
+        filename: str,
+        title: str,
+        data: bytes,
+        category: str,
+        meta: dict[str, object],
+    ) -> AddResult:
+        """Add (or revise) one document of a learned source, keyed by its URL inside that
+        source. Unchanged content is reported as a duplicate and not re-indexed."""
+        content_hash = sha256_hex(data)
+        document = await session.scalar(
+            select(KnowledgeDocument).where(
+                KnowledgeDocument.source_id == source.id, KnowledgeDocument.source_url == url
+            )
+        )
+        if document is not None and document.content_hash == content_hash:
+            return AddResult(document, duplicate=True, new_revision=False)
+        ext = {"pdf": ".pdf", "html": ".html", "markdown": ".md"}.get(category, ".txt")
+        key = f"learned/{source.user_id}/{content_hash[:2]}/{content_hash}{ext}"
+        await self.storage.put(key, data)
+        mime = {
+            "pdf": "application/pdf",
+            "html": "text/html",
+            "markdown": "text/markdown",
+        }.get(category, "text/plain")
+        new_revision = document is not None
+        if document is None:
+            document = KnowledgeDocument(
+                user_id=source.user_id,
+                source_id=source.id,
+                project_id=source.project_id,
+                source_url=url,
+                meta={},
+            )
+            session.add(document)
+        document.title = title[:300] or url[:300]
+        document.filename = sanitize_filename(filename)
+        document.mime_type = mime
+        document.storage_key = key
+        document.size_bytes = len(data)
+        document.content_hash = content_hash
+        document.status = "queued"
+        document.error = None
+        document.meta = {**(document.meta or {}), **meta, "category": category}
+        await session.flush()
+        return AddResult(document, duplicate=False, new_revision=new_revision)
+
     # ------------------------------------------------------------------ ingest
 
     async def ingest(self, session: AsyncSession, document_id: uuid.UUID) -> KnowledgeDocument:

@@ -98,6 +98,11 @@ class Settings(BaseSettings):
         default=False, alias="EZO_FETCH_ALLOW_PRIVATE_NETWORKS"
     )
 
+    # Knowledge OS (learning sources). The GitHub token is optional: without it the public
+    # API allows 60 requests per hour; it is sent only to api.github.com.
+    github_token: SecretStr | None = Field(default=None, alias="EZO_GITHUB_TOKEN")
+    learning_enabled: bool = Field(default=True, alias="EZO_LEARNING_ENABLED")
+
     # Voice (server-side speech). The browser's speech features stay as fallback.
     voice_providers: Annotated[list[str], NoDecode] = Field(
         default=["auto"], alias="EZO_VOICE_PROVIDERS"
