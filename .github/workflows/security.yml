@@ -7,7 +7,7 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch:
   push:
-    branches: [main, "claude/**"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness"]
     paths:
       - "apps/api/Dockerfile"
       - "apps/web/Dockerfile"

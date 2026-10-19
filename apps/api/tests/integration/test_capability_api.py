@@ -190,6 +190,7 @@ async def test_analysis_refused_while_reading_and_never_executes(
     import os
     import socket
     import subprocess
+    from pathlib import Path
 
     docs_site(web)
     learned = await client.post(
@@ -207,6 +208,8 @@ async def test_analysis_refused_while_reading_and_never_executes(
     monkeypatch.setattr(socket.socket, "connect", forbidden)
     monkeypatch.setattr(socket, "create_connection", forbidden)
     monkeypatch.setattr(k3_app.state.services.fetcher, "fetch", forbidden)
+    monkeypatch.setattr(Path, "write_text", forbidden)
+    monkeypatch.setattr(Path, "write_bytes", forbidden)
     tools_before = k3_app.state.services.tools.names()
     analysed = await client.post(f"/api/learning/sources/{source_id}/analyze")
     assert analysed.status_code == 200
