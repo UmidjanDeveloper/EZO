@@ -5,8 +5,10 @@
 import { SseParser } from "./sse";
 import type {
   AgentRun,
+  OrganizationFile,
   OrganizationProfile,
   OrganizationProfileInput,
+  WritingDocumentType,
   Artifact,
   ArtifactDetail,
   ArtifactType,
@@ -202,6 +204,38 @@ export function createApiClient(options: ApiClientOptions) {
     updateOrganization: (id: string, body: OrganizationProfileInput) =>
       request<OrganizationProfile>(`/api/writing/organizations/${id}`, { method: "PUT", ...json(body) }),
     deleteOrganization: (id: string) => request<void>(`/api/writing/organizations/${id}`, { method: "DELETE" }),
+    documentTypes: () => request<WritingDocumentType[]>("/api/writing/document-types"),
+    /** Logo (PNG, JPEG, WebP; re-encoded to PNG by the API). */
+    uploadOrganizationLogo: (id: string, file: Blob, filename: string) => {
+      const form = new FormData();
+      form.append("file", file, filename);
+      return request<OrganizationProfile>(`/api/writing/organizations/${id}/logo`, { method: "PUT", body: form });
+    },
+    organizationLogo: (id: string) => fetchFile(`/api/writing/organizations/${id}/logo`),
+    deleteOrganizationLogo: (id: string) =>
+      request<void>(`/api/writing/organizations/${id}/logo`, { method: "DELETE" }),
+    organizationFiles: (id: string) => request<OrganizationFile[]>(`/api/writing/organizations/${id}/files`),
+    /** An approved DOCX template (`{{matn}}` marks where the text goes) or an example document. */
+    uploadOrganizationFile: (
+      id: string,
+      file: Blob,
+      filename: string,
+      kind: OrganizationFile["kind"],
+      options: { title?: string; docType?: string | null } = {},
+    ) => {
+      const form = new FormData();
+      form.append("file", file, filename);
+      form.append("kind", kind);
+      if (options.title) form.append("title", options.title);
+      if (options.docType) form.append("doc_type", options.docType);
+      return request<OrganizationFile>(`/api/writing/organizations/${id}/files`, { method: "POST", body: form });
+    },
+    downloadOrganizationFile: (id: string, fileId: string) =>
+      fetchFile(`/api/writing/organizations/${id}/files/${fileId}/download`),
+    deleteOrganizationFile: (id: string, fileId: string) =>
+      request<void>(`/api/writing/organizations/${id}/files/${fileId}`, { method: "DELETE" }),
+    /** ZIP: profile.json, logo, templates and examples. */
+    exportOrganization: (id: string) => fetchFile(`/api/writing/organizations/${id}/export`),
     translate: (body: TranslateRequest) =>
       request<TranslateResult>("/api/translation/translate", { method: "POST", ...json(body) }),
     /** Uzbek Latin ↔ Cyrillic by fixed rules (no AI model, works offline). */

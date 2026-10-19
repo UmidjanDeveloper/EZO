@@ -554,10 +554,45 @@ export interface OrganizationProfileInput {
   style_notes?: string | null;
   terminology?: Record<string, string>;
   is_default?: boolean;
+  formatting?: OrganizationFormatting;
+}
+
+/** Standard document formatting of an organization (A4; centimetres and points). */
+export interface OrganizationFormatting {
+  font_name: string;
+  font_size: number;
+  line_spacing: number;
+  indent_cm: number;
+  margins_cm: { top: number; bottom: number; left: number; right: number };
 }
 
 export interface OrganizationProfile extends OrganizationProfileInput {
   id: string;
+  has_logo: boolean;
+  formatting: OrganizationFormatting;
+}
+
+/** An approved DOCX template or an example document of an organization. */
+export interface OrganizationFile {
+  id: string;
+  kind: "template" | "example";
+  title: string;
+  filename: string;
+  mime_type: string;
+  size_bytes: number;
+  doc_type: string | null;
+  /** Templates: whether the {{matn}} marker shows where the text goes. */
+  has_marker: boolean | null;
+  excerpt: string | null;
+}
+
+/** A document type EZO can write (Professional Writing catalog). */
+export interface WritingDocumentType {
+  key: string;
+  names: Record<string, string>;
+  layout: string;
+  mode: string;
+  draft: boolean;
 }
 
 /** Translation (Stage C). */
