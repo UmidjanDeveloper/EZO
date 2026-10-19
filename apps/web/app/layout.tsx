@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { themeInitScript } from "@/lib/theme";
@@ -17,14 +18,16 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Per-request nonce from proxy.ts: only scripts carrying it may run (CSP).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="uz" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         {/* Runtime API URL (no rebuild needed to point the web app at another API). */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
-        <script src="/ezo-config" />
+        <script nonce={nonce} src="/ezo-config" />
       </head>
       <body>
         <Providers>

@@ -11,3 +11,30 @@ test("the deployed browser discovers its public API without receiving server sec
     .toBe("http://localhost:8100");
   await expect(page.locator("body")).toBeVisible();
 });
+
+test("every page runs under a nonce content security policy without violations", async ({ page }) => {
+  const violations: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /Content Security Policy/i.test(message.text())) violations.push(message.text());
+  });
+  await page.addInitScript(() => {
+    document.addEventListener("securitypolicyviolation", (event) => {
+      console.error(`Content Security Policy violation: ${event.violatedDirective} ${event.blockedURI}`);
+    });
+  });
+  const response = await page.goto("/");
+  const headers = response?.headers() ?? {};
+  const csp = headers["content-security-policy"] ?? "";
+  expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
+  expect(csp).toContain("connect-src 'self' http://localhost:8100");
+  expect(csp).toContain("frame-ancestors 'none'");
+  expect(headers["x-frame-options"]).toBe("DENY");
+  // The inline theme script and /ezo-config only run because they carry the nonce.
+  expect(await page.evaluate(() => (window as Window & { __EZO_API_URL__?: string }).__EZO_API_URL__))
+    .toBe("http://localhost:8100");
+  for (const path of ["/knowledge", "/settings", "/memory", "/projects", "/artifacts", "/translate", "/language"]) {
+    await page.goto(path);
+    await expect(page.locator("main").first()).toBeVisible();
+  }
+  expect(violations).toEqual([]);
+});
