@@ -623,3 +623,37 @@ export interface GlossaryTermInput {
 export interface GlossaryTerm extends GlossaryTermInput {
   id: string;
 }
+
+/** Career profile (Stage D): the only facts a CV and application letters are built from. */
+export interface CareerExperience {
+  role: string;
+  organization?: string;
+  location?: string;
+  start?: string;
+  end?: string;
+  achievements?: string[];
+}
+
+export interface CareerEducation {
+  institution: string;
+  degree?: string;
+  field?: string;
+  start?: string;
+  end?: string;
+  notes?: string;
+}
+
+export interface CareerProfile {
+  full_name: string;
+  headline?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  links?: string[];
+  summary?: string | null;
+  experience?: CareerExperience[];
+  education?: CareerEducation[];
+  skills?: string[];
+  languages?: { language: string; level?: string }[];
+  certificates?: { name: string; issuer?: string; year?: string }[];
+}

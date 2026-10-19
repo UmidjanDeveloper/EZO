@@ -34,6 +34,7 @@ import type {
   VocabularyItem,
   VoiceStatus,
   VoiceTranscript,
+  CareerProfile,
   GlossaryTerm,
   GlossaryTermInput,
   TranslateRequest,
@@ -207,6 +208,10 @@ export function createApiClient(options: ApiClientOptions) {
     transliterate: (text: string, to: "latin" | "cyrillic") =>
       request<TransliterateResult>("/api/translation/transliterate", { method: "POST", ...json({ text, to }) }),
     glossary: () => request<GlossaryTerm[]>("/api/translation/glossary"),
+    careerProfile: () => request<CareerProfile | null>("/api/career/profile"),
+    saveCareerProfile: (body: CareerProfile) =>
+      request<CareerProfile>("/api/career/profile", { method: "PUT", ...json(body) }),
+    deleteCareerProfile: () => request<void>("/api/career/profile", { method: "DELETE" }),
     createGlossaryTerm: (body: GlossaryTermInput) =>
       request<GlossaryTerm>("/api/translation/glossary", { method: "POST", ...json(body) }),
     deleteGlossaryTerm: (id: string) => request<void>(`/api/translation/glossary/${id}`, { method: "DELETE" }),
