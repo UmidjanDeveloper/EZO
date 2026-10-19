@@ -1,0 +1,41 @@
+# Review only: creating this service incurs charges. No automatic deployments.
+services:
+  - type: web
+    name: ezo-api
+    runtime: docker
+    plan: standard
+    region: frankfurt
+    branch: claude/gifted-goodall-bpf01s
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: "off"
+    numInstances: 1
+    healthCheckPath: /api/health
+    disk:
+      name: ezo-files
+      mountPath: /app/storage
+      sizeGB: 10
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: EZO_ENV
+        value: production
+      - key: EZO_AUTH_MODE
+        value: token
+      - key: EZO_API_TOKEN
+        generateValue: true
+      - key: EZO_DEBUG_TRACES
+        value: "false"
+      - key: EZO_LOG_LEVEL
+        value: INFO
+      - key: EZO_FETCH_ALLOW_PRIVATE_NETWORKS
+        value: "false"
+      - key: EZO_STORAGE_DIR
+        value: /app/storage
+      - key: EZO_VECTOR_STORE
+        value: pgvector
+      - key: DATABASE_URL
+        sync: false
+      - key: EZO_CORS_ORIGINS
+        sync: false

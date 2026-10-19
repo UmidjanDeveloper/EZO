@@ -126,16 +126,53 @@ jobs:
           "
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
-      - name: API image starts, migrates and answers /api/health
+      - name: Unsafe production configuration fails before HTTP startup
         run: |
+          if docker run --rm -e EZO_ENV=production ezo-api:ci; then
+            echo "Unsafe production configuration was accepted"
+            exit 1
+          fi
+      - name: Migration failure prevents HTTP startup
+        run: |
+          if docker run --rm -e EZO_ENV=test -e DATABASE_URL=sqlite:////proc/ezo-unwritable.db ezo-api:ci; then
+            echo "API started despite a failed migration"
+            exit 1
+          fi
+      - name: API image migrates, authenticates and retains files across restart
+        run: |
+          export EZO_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          docker volume create ezo-ci-storage
           docker run -d --name ezo-api -p 8000:8000 \
-            -e DATABASE_URL=sqlite:////app/storage/ci.db -e EZO_ENV=test ezo-api:ci
+            -v ezo-ci-storage:/app/storage \
+            -e DATABASE_URL=sqlite:////app/storage/ci.db -e EZO_ENV=test \
+            -e EZO_AUTH_MODE=token -e EZO_API_TOKEN ezo-api:ci
+          ready=false
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/api/health 2>/dev/null; then exit 0; fi
+            if curl -fsS http://localhost:8000/api/health 2>/dev/null; then ready=true; break; fi
             sleep 2
           done
-          docker logs ezo-api
-          exit 1
+          if [ "$ready" != true ]; then docker logs ezo-api; exit 1; fi
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/me)" = 401
+          curl -fsS -o /dev/null -H "Authorization: Bearer ${EZO_API_TOKEN}" http://localhost:8000/api/me
+          docker exec ezo-api python -c "
+          import asyncio
+          from ezo_api.settings import Settings
+          from ezo_api.storage.local import LocalStorageProvider
+          asyncio.run(LocalStorageProvider(Settings().storage_dir).put('ci/persistence.txt', b'persistent'))
+          "
+          docker restart ezo-api
+          ready=false
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/health 2>/dev/null; then ready=true; break; fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then docker logs ezo-api; exit 1; fi
+          docker exec ezo-api python -c "
+          import asyncio
+          from ezo_api.settings import Settings
+          from ezo_api.storage.local import LocalStorageProvider
+          assert asyncio.run(LocalStorageProvider(Settings().storage_dir).get('ci/persistence.txt')) == b'persistent'
+          "
       - name: Web image starts and serves the app
         run: |
           docker run -d --name ezo-web -p 3000:3000 -e EZO_API_URL=http://localhost:8000 ezo-web:ci

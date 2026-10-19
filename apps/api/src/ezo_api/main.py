@@ -36,6 +36,7 @@ from ezo_api.api.routes import (
     writing,
 )
 from ezo_api.auth.base import AuthError
+from ezo_api.deployment import configure_production_logging, validate_production
 from ezo_api.providers.base import ModelProvider
 from ezo_api.security.rate_limit import RateLimitExceededError
 from ezo_api.services import Services, build_services
@@ -85,10 +86,12 @@ def create_app(
 ) -> FastAPI:
     """Build the app. `overrides` (web_search, fetcher, voice, visual) are for tests."""
     settings = settings or get_settings()
+    validate_production(settings)
     logging.basicConfig(
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    configure_production_logging(settings)
     services: Services = build_services(settings, providers, **overrides)
 
     @asynccontextmanager
@@ -125,6 +128,9 @@ def create_app(
         title="EZO API",
         version=__version__,
         description="EZO — Sen bilan o‘sadigan shaxsiy sun’iy intellekt.",
+        docs_url=None if settings.environment == "production" else "/docs",
+        redoc_url=None if settings.environment == "production" else "/redoc",
+        openapi_url=None if settings.environment == "production" else "/openapi.json",
         lifespan=lifespan,
     )
     app.state.services = services
