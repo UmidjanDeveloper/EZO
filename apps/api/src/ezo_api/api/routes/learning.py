@@ -18,6 +18,11 @@ from sqlalchemy import func, select
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.models import KnowledgeDocument, KnowledgeLibrary, LearnedSource
 from ezo_api.knowledge.fetch import FetchError
+from ezo_api.learning.analyzer import (
+    CapabilityAnalyzer,
+    LibraryCapabilityReport,
+    SourceCapabilityAnalysis,
+)
 from ezo_api.learning.base import Limits
 from ezo_api.learning.service import (
     RUNNING,
@@ -217,6 +222,42 @@ async def delete_library(
     return Response(status_code=204)
 
 
+@router.post("/libraries/{library_id}/analyze", status_code=200)
+async def analyze_library_capabilities(
+    library_id: uuid.UUID,
+    session: SessionDep,
+    services: ServicesDep,
+    user: CurrentUser,
+) -> LibraryCapabilityReport:
+    """Analyze all sources in a knowledge library to generate capability proposals (read-only)."""
+    library = await _owned_library(session, user.id, library_id)
+    analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
+    report = await analyzer.analyze_library(session, library)
+    audit(
+        session,
+        user.id,
+        "learning.library_capability_analysis",
+        "knowledge_library",
+        library.id,
+        {"capabilities_count": report.capabilities_count, "sources_count": report.sources_count},
+    )
+    await session.commit()
+    return report
+
+
+@router.get("/libraries/{library_id}/capabilities")
+async def get_library_capabilities(
+    library_id: uuid.UUID,
+    session: SessionDep,
+    services: ServicesDep,
+    user: CurrentUser,
+) -> LibraryCapabilityReport:
+    """Retrieve capability analysis for a knowledge library."""
+    library = await _owned_library(session, user.id, library_id)
+    analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
+    return await analyzer.analyze_library(session, library)
+
+
 @router.get("/sources")
 async def list_sources(
     session: SessionDep, user: CurrentUser, library_id: uuid.UUID | None = None
@@ -335,3 +376,44 @@ async def delete_source(
     await _service(services).delete(session, source)
     await session.commit()
     return Response(status_code=204)
+
+
+@router.post("/sources/{source_id}/analyze", status_code=200)
+async def analyze_source_capabilities(
+    source_id: uuid.UUID,
+    session: SessionDep,
+    services: ServicesDep,
+    user: CurrentUser,
+) -> SourceCapabilityAnalysis:
+    """Analyze a single learned source and formulate capability proposals."""
+    source = await _owned_source(session, user.id, source_id)
+    analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
+    analysis = await analyzer.analyze_source(session, source)
+    audit(
+        session,
+        user.id,
+        "learning.source_capability_analysis",
+        "learned_source",
+        source.id,
+        {"capabilities_count": len(analysis.capabilities)},
+    )
+    await session.commit()
+    return analysis
+
+
+@router.get("/sources/{source_id}/capabilities")
+async def get_source_capabilities(
+    source_id: uuid.UUID,
+    session: SessionDep,
+    services: ServicesDep,
+    user: CurrentUser,
+) -> SourceCapabilityAnalysis:
+    """Retrieve capability analysis for a single learned source."""
+    source = await _owned_source(session, user.id, source_id)
+    cached = (source.profile or {}).get("capability_analysis")
+    if cached:
+        return SourceCapabilityAnalysis.model_validate(cached)
+    analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
+    analysis = await analyzer.analyze_source(session, source)
+    await session.commit()
+    return analysis

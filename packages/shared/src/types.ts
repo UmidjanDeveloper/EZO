@@ -797,3 +797,81 @@ export interface LearnSourceRequest {
   library_name?: string | null;
   limits?: LearnedSourceLimits;
 }
+
+/** Knowledge OS K3: Capability Analyzer domain models */
+export type EvidenceLevel = "directly_supported" | "inferred" | "unverified";
+export type RelevanceLevel = "high" | "medium" | "low" | "irrelevant";
+export type CoverageLevel = "full" | "partial" | "none";
+export type LicenseRisk = "safe" | "review_needed" | "copyleft" | "unknown";
+
+export interface SourceEvidence {
+  document_id?: string | null;
+  title: string;
+  url?: string | null;
+  chunk_id?: string | null;
+  excerpt: string;
+  evidence_level: EvidenceLevel;
+  outdated_warning?: string | null;
+}
+
+export interface ExistingEquivalent {
+  kind: "tool" | "agent";
+  name: string;
+  coverage: CoverageLevel;
+  notes: string;
+}
+
+export interface ProposedCapability {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  relevance: RelevanceLevel;
+  relevance_reason: string;
+  is_already_supported: boolean;
+  existing_equivalents: ExistingEquivalent[];
+  missing_functionality: string;
+  required_dependencies: string[];
+  required_permissions: string[];
+  compatibility_notes: string;
+  security_notes: string;
+  licensing_notes: string;
+  evidence: SourceEvidence[];
+  confidence: number;
+  evidence_gaps: string[];
+  recommended_next_step: string;
+  status: "proposal";
+}
+
+export interface SourceCapabilityAnalysis {
+  source_id: string;
+  source_title: string;
+  source_target: string;
+  source_kind: string;
+  source_version?: string | null;
+  license?: string | null;
+  license_risk: LicenseRisk;
+  main_purpose: string;
+  security_flags_count: number;
+  capabilities: ProposedCapability[];
+  evidence_gaps: string[];
+  is_incomplete: boolean;
+  analyzed_at: string;
+  status: "proposal";
+}
+
+export interface LibraryCapabilityReport {
+  library_id: string;
+  library_name: string;
+  sources_count: number;
+  analyzed_sources_count: number;
+  capabilities_count: number;
+  proposals: ProposedCapability[];
+  existing_capabilities_overlap: string[];
+  missing_capabilities_highlight: string[];
+  security_warnings: string[];
+  evidence_limitations: string[];
+  status: "proposal";
+  generated_at: string;
+}

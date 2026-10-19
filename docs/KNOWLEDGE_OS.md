@@ -1,15 +1,16 @@
 # Knowledge OS and SkillForge
 
-Status: **K1 & K2 completed — source registry, secure reading, library-scoped retrieval & chat integration.**
-K3–K7 are not built.
+Status: **K1, K2 & K3 completed — source registry, secure reading, library-scoped retrieval, chat integration, and capability analyzer.**
+K4–K7 are not built.
 SkillForge (turning knowledge into tools) does not exist yet: **EZO cannot create,
-install or run skills.** Reading a source only adds searchable knowledge.
+install or run skills.** Reading a source only adds searchable knowledge; capability analysis
+produces strictly read-only, non-executable proposals.
 
 | Phase | What | State |
 | --- | --- | --- |
 | K1 | Libraries, learned sources, secure reading of websites / GitHub / PyPI / npm | done |
 | K2 | Library-scoped retrieval in chat, citations, versions, stale-source warnings | done (2026-10-19) |
-| K3 | Capability analysis, comparison with existing EZO tools, skill proposals | not built |
+| K3 | Capability analysis, comparison with existing EZO tools, skill proposals | done (2026-10-19) |
 | K4 | Secure sandbox (isolated container, no secrets, no network by default) | not built — required before any generated code runs |
 | K5 | Skill builder and verification | not built |
 | K6 | Skill registry, approval, restricted runtime, rollback | not built |
@@ -104,6 +105,48 @@ an unreachable documentation site, or the GitHub fallback. The reason is shown.
 - **Turn Continuity & Switching**: Library scope persists across chat turns in the conversation. Users can switch libraries or clear the scope (`clear_library: true`) to return to normal global retrieval.
 - **Knowledge Page Search**: Filter and search within a specific library directly on the Knowledge page.
 - **Multi-lingual**: Fully localized in Uzbek, Russian, and English.
+
+## K3 — Capability Analyzer (what works)
+
+K3 enables EZO to inspect previously learned libraries and sources to formulate grounded capability proposals:
+
+- **10-Point Structured Analysis**:
+  1. Source identity and version (e.g. `pypi:pypdf`, version `6.21.1`).
+  2. Main purpose and domain summary.
+  3. Described capabilities and technical modular features.
+  4. Active EZO registry equivalents (matched against `EZO_TOOL_PROFILES` and `EZO_AGENT_PROFILES`).
+  5. Missing functionality specific to EZO's current toolset.
+  6. Domain relevance and mission alignment rationale (`high`, `medium`, `low`, `irrelevant`).
+  7. Third-party dependencies and required security permissions (`file_read`, `isolated_sandbox`, `network_outbound`).
+  8. License review and compatibility risk assessment (`safe`, `copyleft`, `review_needed`, `unknown`).
+  9. Future implementation roadmap and next development steps (e.g. for K4 Sandbox).
+  10. Multi-level evidence grading (`directly_supported`, `inferred`, `unverified`) and completeness assessment.
+
+- **Strict Read-Only Guarantee**:
+  - All proposals are assigned `status: "proposal"`.
+  - External documentation text is treated strictly as passive untrusted data.
+  - Prompt-injection attempts (`override`, `exfiltration`, `system_prompt`) are neutralized, logged as passive data, and recorded under `security_warnings`.
+  - EZO **never** executes code, installs packages, runs shell commands, creates executable skills, or edits runtime files.
+
+- **Deduplication Engine**:
+  - Multiple sources in a library describing overlapping capabilities are unified into merged proposals with combined evidence and dependency unions.
+
+- **API Endpoints**:
+  | Method | Path | Description |
+  | --- | --- | --- |
+  | `POST` | `/api/learning/libraries/{id}/analyze` | Analyzes all sources in a library, aggregates proposals, and deduplicates. |
+  | `GET` | `/api/learning/libraries/{id}/capabilities` | Retrieves existing capability analysis report for a library. |
+  | `POST` | `/api/learning/sources/{id}/analyze` | Runs deep capability analysis on a specific learned source. |
+  | `GET` | `/api/learning/sources/{id}/capabilities` | Retrieves stored capability analysis profile for a source. |
+
+- **Chat Integration**:
+  - Natural language queries like *"EZO, analyze the documentation you learned from this Python library. What useful abilities could you gain?"* trigger capability analysis.
+  - Formats structured reports with full evidence citations and explicit read-only disclaimers.
+
+- **Web UI Integration**:
+  - **Imkoniyatlarni tahlil qilish** button on each library card in the Knowledge page.
+  - Interactive proposal drawer with capability badges, relevance scores, evidence excerpts, and license risks.
+  - Explicit warning badges confirming that proposals are non-executable and not installed.
 
 ### Configuration
 

@@ -9,6 +9,8 @@ import type {
   LearnedSource,
   LearnedSourceDetail,
   LearnSourceRequest,
+  LibraryCapabilityReport,
+  SourceCapabilityAnalysis,
   OrganizationFile,
   OrganizationProfile,
   OrganizationProfileInput,
@@ -238,6 +240,14 @@ export function createApiClient(options: ApiClientOptions) {
     refreshLearnedSource: (id: string) =>
       request<LearnedSource>(`/api/learning/sources/${id}/refresh`, { method: "POST" }),
     deleteLearnedSource: (id: string) => request<void>(`/api/learning/sources/${id}`, { method: "DELETE" }),
+    analyzeKnowledgeLibrary: (id: string) =>
+      request<LibraryCapabilityReport>(`/api/learning/libraries/${id}/analyze`, { method: "POST" }),
+    getLibraryCapabilities: (id: string) =>
+      request<LibraryCapabilityReport>(`/api/learning/libraries/${id}/capabilities`),
+    analyzeLearnedSource: (id: string) =>
+      request<SourceCapabilityAnalysis>(`/api/learning/sources/${id}/analyze`, { method: "POST" }),
+    getSourceCapabilities: (id: string) =>
+      request<SourceCapabilityAnalysis>(`/api/learning/sources/${id}/capabilities`),
 
     voiceStatus: () => request<VoiceStatus>("/api/voice/status"),
     organizations: () => request<OrganizationProfile[]>("/api/writing/organizations"),

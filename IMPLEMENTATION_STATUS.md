@@ -51,7 +51,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 |---|---|---|
 | EzoCore chat, routing, personality, memory | Foundation | alpha |
 | Files, knowledge base, citations; ResearchAgent | Knowledge | alpha |
-| Knowledge OS K1: libraries, learned websites / GitHub / PyPI / npm (read-only; no skills) | Knowledge OS | experimental |
+| Knowledge OS K1–K3: libraries, learned sources, scoped retrieval, capability proposals (read-only; no skills) | Knowledge OS | experimental |
 | Turn-by-turn voice, orb presence states | Voice | alpha |
 | Artifacts with versions and exports | Artifacts | alpha |
 | Story projects (API only) | Artifacts | experimental |
@@ -122,6 +122,44 @@ tests **run** (no LibreOffice skips any more).
 - Live provider tests **not performed** (no provider keys here): the quality of AI-written
   drafts, translations, teaching materials and research plans has only been checked with
   scripted model replies.
+
+## Knowledge OS K3 — Capability Analyzer (2026-10-19) — experimental
+
+Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
+No database migrations required (proposals stored in `LearnedSource.profile["capability_analysis"]`).
+
+### What works
+
+- **CapabilityAnalyzer Domain Service**:
+  Inspects learned libraries and sources to formulate structured capability proposals.
+  Compares proposals against EZO's active tool registry (`EZO_TOOL_PROFILES`) and agent catalog (`EZO_AGENT_PROFILES`).
+- **10-Point Proposal Structure**:
+  1. Source identity and version
+  2. Main purpose
+  3. Described capabilities
+  4. Existing EZO equivalents
+  5. Missing functionality
+  6. Domain relevance & rationale (`high`, `medium`, `low`, `irrelevant`)
+  7. Dependencies & permissions (`file_read`, `isolated_sandbox`, `network_outbound`)
+  8. License risk assessment (`safe`, `copyleft`, `review_needed`, `unknown`)
+  9. Future implementation roadmap (K4 Sandbox)
+  10. Multi-level evidence grading (`directly_supported`, `inferred`, `unverified`) & gap analysis
+- **Strict Read-Only Guarantee**:
+  Every proposal carries `status: "proposal"`. Never executes external code, installs packages,
+  creates skills, or touches runtime files.
+- **Cross-Source Deduplication**:
+  Merges overlapping capability proposals across multiple sources in a library with union of dependencies and combined evidence.
+- **Prompt Injection Containment**:
+  External text is scanned with `scan_text()` and treated strictly as passive data. Malicious directives are neutralized and recorded as security flags.
+- **API Endpoints**:
+  - `POST /api/learning/libraries/{id}/analyze`
+  - `GET /api/learning/libraries/{id}/capabilities`
+  - `POST /api/learning/sources/{id}/analyze`
+  - `GET /api/learning/sources/{id}/capabilities`
+  - Full multi-user authorization and audit logging.
+- **Chat & Web UI Integration**:
+  - Natural language triggers (`LearningAgent._analyze`) with full 10-point reporting.
+  - Knowledge page "Imkoniyatlarni tahlil qilish" button, proposal drawer with capability cards, evidence excerpts, and non-installed badges.
 
 ## Knowledge OS K2 — Library-Scoped Retrieval & Chat Integration (2026-10-19) — experimental
 
