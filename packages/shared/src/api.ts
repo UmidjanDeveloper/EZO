@@ -132,7 +132,8 @@ export function createApiClient(options: ApiClientOptions) {
       return baseUrl();
     },
 
-    health: () => request<{ status: string; database: string; version: string }>("/api/health"),
+    /** Public probe; `version` is omitted in production. */
+    health: () => request<{ status: string; database: string; version?: string }>("/api/health"),
     status: () => request<SystemStatus>("/api/status"),
     me: () => request<User>("/api/me"),
     updatePreferences: (prefs: Partial<Preferences>) =>

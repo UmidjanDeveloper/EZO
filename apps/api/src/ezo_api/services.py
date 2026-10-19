@@ -69,6 +69,7 @@ class Services:
     agents: AgentRegistry
     core: EzoCore
     rate_limiter: SlidingWindowRateLimiter
+    daily_limiter: SlidingWindowRateLimiter
     storage: StorageProvider
     embeddings: EmbeddingService
     vectors: VectorStoreResolver
@@ -107,7 +108,8 @@ def build_services(
         raise ConfigurationError(
             "EZO_AUTH_MODE=token requires EZO_API_TOKEN to be set in .env (any long random string)."
         )
-    token = settings.api_token.get_secret_value() if settings.api_token else None
+    # A copied secret often ends with a newline; the header value is stripped too.
+    token = settings.api_token.get_secret_value().strip() if settings.api_token else None
 
     routing = load_routing_config(settings.models_config_path)
     personality = load_personality(settings.personality_config_path)
@@ -160,6 +162,7 @@ def build_services(
         agents=agents,
         core=core,
         rate_limiter=SlidingWindowRateLimiter(),
+        daily_limiter=SlidingWindowRateLimiter(window_seconds=86_400),
         storage=storage,
         embeddings=embeddings,
         vectors=vectors,

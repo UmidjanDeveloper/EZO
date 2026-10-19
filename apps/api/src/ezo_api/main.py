@@ -38,6 +38,7 @@ from ezo_api.api.routes import (
 from ezo_api.auth.base import AuthError
 from ezo_api.deployment import configure_production_logging, validate_production
 from ezo_api.providers.base import ModelProvider
+from ezo_api.security.edge import EdgeGuardMiddleware
 from ezo_api.security.rate_limit import RateLimitExceededError
 from ezo_api.services import Services, build_services
 from ezo_api.settings import Settings, get_settings
@@ -135,6 +136,13 @@ def create_app(
     )
     app.state.services = services
 
+    # Innermost: token and size checks before any route reads the body. CORS stays
+    # outermost so the browser can read 401/413 answers.
+    app.add_middleware(
+        EdgeGuardMiddleware,
+        token=services.auth.required_token,
+        max_body_bytes=settings.max_upload_bytes + 2 * 1024 * 1024,
+    )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,

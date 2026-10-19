@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     # Limits and safety.
     rate_limit_chat_per_minute: int = Field(default=30, alias="EZO_RATE_LIMIT_CHAT")
     rate_limit_default_per_minute: int = Field(default=240, alias="EZO_RATE_LIMIT_DEFAULT")
+    rate_limit_chat_per_day: int = Field(default=1000, alias="EZO_RATE_LIMIT_CHAT_PER_DAY")
+    """Daily cap on calls that may reach a paid AI provider (chat, voice, translation);
+    0 turns it off. Keep provider-side spending limits too."""
     max_message_chars: int = Field(default=16_000, alias="EZO_MAX_MESSAGE_CHARS")
     context_message_limit: int = Field(default=30, alias="EZO_CONTEXT_MESSAGES")
     context_char_budget: int = Field(default=60_000, alias="EZO_CONTEXT_CHARS")

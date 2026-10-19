@@ -9,6 +9,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.db.models import User
+from ezo_api.security.edge import AUTHENTICATED
 from ezo_api.services import Services
 
 
@@ -36,6 +37,11 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def client_key(request: Request) -> str:
+    """Who the limit applies to. With token auth the edge guard has already checked the
+    token, so every request here is the owner's (one shared key: an attacker can neither
+    use up nor dodge it). Without token auth (own computer) the client address is used."""
+    if request.scope.get("state", {}).get(AUTHENTICATED):
+        return "owner"
     return request.client.host if request.client else "unknown"
 
 
@@ -49,6 +55,10 @@ def rate_limit(bucket: str) -> Callable[[Request, Services], Awaitable[None]]:
             if bucket == "chat"
             else settings.rate_limit_default_per_minute
         )
-        services.rate_limiter.check(f"{bucket}:{client_key(request)}", limit)
+        key = f"{bucket}:{client_key(request)}"
+        services.rate_limiter.check(key, limit)
+        if bucket == "chat":
+            # Calls that may reach a paid AI provider also have a daily cap (cost control).
+            services.daily_limiter.check(key, settings.rate_limit_chat_per_day)
 
     return dependency

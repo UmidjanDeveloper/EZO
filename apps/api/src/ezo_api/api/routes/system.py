@@ -28,7 +28,10 @@ from ezo_api.schemas.api import (
 from ezo_api.security.audit import audit
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["system"], dependencies=[Depends(rate_limit("default"))])
+# The health probe is public and never rate limited (a busy limiter must not make the
+# hosting platform restart a healthy service); every other route is limited.
+router = APIRouter(prefix="/api", tags=["system"])
+limited = [Depends(rate_limit("default"))]
 
 
 @router.get("/health")
@@ -40,14 +43,13 @@ async def health(response: Response, services: ServicesDep, session: SessionDep)
         logger.error("Database health check failed")
         database = "unreachable"
         response.status_code = 503
-    return {
-        "status": "ok" if database == "ok" else "degraded",
-        "database": database,
-        "version": __version__,
-    }
+    result = {"status": "ok" if database == "ok" else "degraded", "database": database}
+    if services.settings.environment != "production":
+        result["version"] = __version__  # public probe: no version on the Internet
+    return result
 
 
-@router.get("/status")
+@router.get("/status", dependencies=limited)
 async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> SystemStatus:
     router_ = services.router
     providers = [
@@ -106,12 +108,12 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
     )
 
 
-@router.get("/me")
+@router.get("/me", dependencies=limited)
 async def me(user: CurrentUser) -> UserOut:
     return user_out(user)
 
 
-@router.patch("/me/preferences")
+@router.patch("/me/preferences", dependencies=limited)
 async def update_preferences(
     body: PreferencesUpdate, session: SessionDep, current: CurrentUser
 ) -> UserOut:
@@ -138,7 +140,7 @@ def _require_debug(services: ServicesDep) -> None:
         raise HTTPException(404, detail="Debug traces are disabled (EZO_DEBUG_TRACES=false).")
 
 
-@router.get("/agent-runs", dependencies=[Depends(_require_debug)])
+@router.get("/agent-runs", dependencies=[*limited, Depends(_require_debug)])
 async def list_runs(
     session: SessionDep,
     user: CurrentUser,
@@ -152,7 +154,7 @@ async def list_runs(
     return [AgentRunOut.model_validate(r) for r in (await session.scalars(query)).all()]
 
 
-@router.get("/agent-runs/{run_id}", dependencies=[Depends(_require_debug)])
+@router.get("/agent-runs/{run_id}", dependencies=[*limited, Depends(_require_debug)])
 async def get_run(run_id: uuid.UUID, session: SessionDep, user: CurrentUser) -> AgentRunOut:
     run = await session.get(AgentRun, run_id)
     if run is None or run.user_id != user.id:
