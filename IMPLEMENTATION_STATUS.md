@@ -80,19 +80,19 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #52 (CI), commit `7317af8`, all jobs green
-(https://github.com/UmidjanDeveloper/EZO/actions/runs/39186012850):
+**CI verified** — run #56 (CI), commit `f6f7743`, all jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39192571554):
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 654 | 653 | 0 | 1 | needs PostgreSQL + pgvector |
-| API · PostgreSQL | 654 | 654 | 0 | 0 | — |
-| Web unit (Vitest) | 42 | 42 | 0 | 0 | — |
+| API · SQLite | 665 | 664 | 0 | 1 | needs PostgreSQL + pgvector |
+| API · PostgreSQL | 665 | 665 | 0 | 0 | — |
+| Web unit (Vitest) | 44 | 44 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 27 | 27 | 0 | 0 | — |
+| Playwright e2e | 28 | 28 | 0 | 0 | — |
 
 Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migrations
-up to 0010), ESLint, TypeScript, the web production build, and the Docker job. The
+up to 0011), ESLint, TypeScript, the web production build, and the Docker job. The
 Docker job covers the Compose config, the API and web image builds, Tesseract with `uzb`,
 `uzb_cyrl`, `rus`, `eng` and `osd` in the API image, **the API image converting a Word
 and an Excel file to PDF with LibreOffice**, the API container migrating and answering
@@ -102,10 +102,13 @@ tests **run** (no LibreOffice skips any more).
 
 **Extended local verification** (not in CI):
 
-- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 653
-  passed + 1 skipped (pgvector); PostgreSQL 654 passed.
-- Migrations 0009 and 0010 verified up → check → down → up on SQLite and PostgreSQL.
-- The full Playwright suite passed locally (27).
+- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 664
+  passed + 1 skipped (pgvector); PostgreSQL 665 passed.
+- Migration 0011 verified up → check → down → up on SQLite and PostgreSQL.
+- The full Playwright suite passed locally (28).
+- A letter in an approved template and a document on EZO's letterhead were converted to
+  PDF with LibreOffice and inspected visually (letterhead, header with QORALAMA, logo,
+  placeholders for signature and number).
 - OpenAlex live access **not verified**: the sandbox network blocks it; the client is
   tested with a mock transport and the chat flows with a fake search.
 - The API Docker image could **not** be rebuilt in the sandbox (the sandbox proxy blocks
@@ -113,6 +116,48 @@ tests **run** (no LibreOffice skips any more).
 - Live provider tests **not performed** (no provider keys here): the quality of AI-written
   drafts, translations, teaching materials and research plans has only been checked with
   scripted model replies.
+
+## Stage E1 — Organization profiles (2026-10-19) — alpha
+
+Commits `7182eda` (backend, migration 0011), `a98eefd` (Settings UI, e2e), `f6f7743`
+(docs). CI runs #54–#56 green. Details: [docs/GOVERNMENT_WORK.md](docs/GOVERNMENT_WORK.md).
+E2–E4 (secretary, citizen appeals, reports) are **not built**.
+
+### What works
+
+- **Profile** (`organization/`, migration 0011): standard formatting (font, size, line
+  spacing, indent, A4 margins), logo (re-encoded to PNG), terminology, approved Word
+  templates (`{{matn}}` marker; header, footer, styles and margins kept; macros and
+  external links refused), example documents (style references only), ZIP export,
+  deletion with stored files. Every change audited.
+- **Use**: official letters/acts/minutes are written into the approved template for the
+  document type (else a general one), otherwise on EZO's letterhead with logo and
+  formatting; other documents get the letterhead on request ("tashkilotimiz
+  blankasida"); presentations that mention the organization use its name (cover author),
+  style and terms. Examples are sent only inside `<example>` tags; their numbers are not
+  evidence and are flagged.
+- **Fix**: "blankasida" / "на бланке" no longer means "empty template".
+- **Settings UI**: formatting, terminology, logo with preview, templates per document
+  type, examples, export, delete with confirmation.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| Logo upload (PNG out, SVG refused), template with marker and type, example excerpt, wrong type refused, download headers, ZIP export contents, foreign profile 404, profile deletion removes stored files | `tests/integration/test_organization.py::test_profile_files_export_and_deletion` |
+| "Tashkilotimiz blankasida … xizmat xati": template letterhead and header kept, sample text removed, examples sent as `<example>`, number from the example flagged | `::test_letter_uses_the_approved_template_and_examples_only_as_style` |
+| Uzbek Cyrillic request on the letterhead | `::test_cyrillic_letter_on_the_letterhead` |
+| Other document with letterhead and logo; presentation author = organization, preferred terms in the planner prompt | `::test_other_documents_and_presentations_use_the_profile` |
+| Formatting, template marker, margins, logo, file checks, external-link template refused | `tests/unit/test_organization.py` |
+| "blankasida" is not a template request | `tests/unit/test_writing.py` |
+| Settings: formatting, terms, logo, DOCX template, example, reload, export, letter in chat, delete | e2e `organization.spec.ts` |
+
+### Not done
+
+One default profile only (no switching by name); `.docx` templates only; EZO writes only
+into the main body at the marker; the logo is not placed into approved templates (they keep
+their own); PDF/Markdown/text versions carry the letterhead as text; no import from an
+export ZIP. Quality with a live model was not measured.
 
 ## Stage D — Education, academic research and career (2026-10-19) — alpha
 
@@ -868,8 +913,9 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Stage E — government work mode (organization profiles extended for public bodies, meeting
-minutes from recordings, citizen appeals, reports), then Stage F (official knowledge).
+Knowledge OS & SkillForge (owner prompt of 2026-10-19), starting with K1 — source registry
+and secure ingestion. Government work mode E2–E4 (secretary, citizen appeals, reports)
+remain open after E1.
 Owner decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and
 the LegalResearchAgent visibility
 ([docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md](docs/OFFICIAL_KNOWLEDGE_INTEGRATION_PLAN.md) §6).
