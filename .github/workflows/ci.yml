@@ -27,7 +27,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.11.32"
@@ -70,7 +70,7 @@ jobs:
     name: Web (lint, types, unit tests, build, e2e)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
@@ -101,7 +101,7 @@ jobs:
     name: Docker (API + web images, Compose config, API smoke test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compose file is valid (optional profiles included)
         run: docker compose --profile voice config --quiet
       - name: Build API image
