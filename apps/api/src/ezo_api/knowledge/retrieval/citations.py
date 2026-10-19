@@ -19,6 +19,12 @@ def format_sources_for_prompt(sources: list[SourceRef]) -> str:
         details = [source.source_name]
         if source.url:
             details.append(source.url)
+        if source.version:
+            details.append(f"version {source.version}")
+        if source.license:
+            details.append(f"license {source.license}")
+        if source.freshness_note:
+            details.append(f"freshness: {source.freshness_note}")
         if source.date:
             details.append(f"date {source.date}")
         location = source.location()

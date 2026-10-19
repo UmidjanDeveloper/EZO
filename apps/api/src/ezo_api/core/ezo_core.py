@@ -36,7 +36,15 @@ from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
 from ezo_api.core.text import normalize
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
-from ezo_api.db.models import AgentRun, Conversation, KnowledgeDocument, Message, Project, User
+from ezo_api.db.models import (
+    AgentRun,
+    Conversation,
+    KnowledgeDocument,
+    KnowledgeLibrary,
+    Message,
+    Project,
+    User,
+)
 from ezo_api.db.models.artifacts import ARTIFACT_TYPES
 from ezo_api.documents.pdf.requests import parse_pdf_request
 from ezo_api.education.catalog import wants_education
@@ -87,6 +95,8 @@ class TurnInput:
     text: str
     conversation_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
+    library_id: uuid.UUID | None = None
+    clear_library: bool = False
     forced_agent: str | None = None
     channel: Literal["text", "voice"] = "text"
     speech_seconds: float | None = None
@@ -109,6 +119,7 @@ class PreparedTurn:
     channel: Literal["text", "voice"] = "text"
     speech_seconds: float | None = None
     attachments: tuple[uuid.UUID, ...] = ()
+    library: KnowledgeLibrary | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +135,8 @@ class CoreMeta:
     requested_agent: str
     requested_agent_available: bool
     language: str
+    library_id: uuid.UUID | None = None
+    library_name: str | None = None
     type: Literal["meta"] = "meta"
 
 
@@ -222,7 +235,7 @@ class EzoCore:
 
     async def prepare(self, session: AsyncSession, user: User, turn: TurnInput) -> PreparedTurn:
         tracer = Tracer()
-        conversation, project, created = await self._load_conversation(session, user, turn)
+        conversation, project, library, created = await self._load_conversation(session, user, turn)
 
         preferences = user.preferences or {}
         fixed = preferences.get("response_language")
@@ -370,11 +383,14 @@ class EzoCore:
             channel=turn.channel,
             speech_seconds=turn.speech_seconds,
             attachments=attachments,
+            library=library,
         )
 
     async def _load_conversation(
         self, session: AsyncSession, user: User, turn: TurnInput
-    ) -> tuple[Conversation, Project | None, bool]:
+    ) -> tuple[Conversation, Project | None, KnowledgeLibrary | None, bool]:
+        library: KnowledgeLibrary | None = None
+
         if turn.conversation_id is not None:
             conversation = await session.get(Conversation, turn.conversation_id)
             if conversation is None or conversation.user_id != user.id:
@@ -384,21 +400,51 @@ class EzoCore:
                 if conversation.project_id
                 else None
             )
-            return conversation, project, False
+            if turn.clear_library:
+                conversation.library_id = None
+            elif turn.library_id is not None:
+                lib_check = await session.get(KnowledgeLibrary, turn.library_id)
+                if lib_check is None:
+                    raise TurnError(404, "library_not_found", "Knowledge library not found.")
+                if lib_check.user_id != user.id:
+                    raise TurnError(
+                        403, "library_access_denied", "Knowledge library access denied."
+                    )
+                conversation.library_id = turn.library_id
+            created = False
+        else:
+            project = None
+            if turn.project_id is not None:
+                project = await session.get(Project, turn.project_id)
+                if project is None or project.user_id != user.id:
+                    raise TurnError(404, "project_not_found", "Project not found.")
+            target_lib_id = turn.library_id if not turn.clear_library else None
+            if target_lib_id is not None:
+                lib_check = await session.get(KnowledgeLibrary, target_lib_id)
+                if lib_check is None:
+                    raise TurnError(404, "library_not_found", "Knowledge library not found.")
+                if lib_check.user_id != user.id:
+                    raise TurnError(
+                        403, "library_access_denied", "Knowledge library access denied."
+                    )
+            conversation = Conversation(
+                user_id=user.id,
+                project_id=project.id if project else None,
+                library_id=target_lib_id,
+                title=make_title(turn.text),
+            )
+            session.add(conversation)
+            await session.flush()
+            created = True
 
-        project = None
-        if turn.project_id is not None:
-            project = await session.get(Project, turn.project_id)
-            if project is None or project.user_id != user.id:
-                raise TurnError(404, "project_not_found", "Project not found.")
-        conversation = Conversation(
-            user_id=user.id,
-            project_id=project.id if project else None,
-            title=make_title(turn.text),
-        )
-        session.add(conversation)
-        await session.flush()
-        return conversation, project, True
+        if conversation.library_id is not None:
+            library = await session.get(KnowledgeLibrary, conversation.library_id)
+            if library is None:
+                raise TurnError(404, "library_not_found", "Knowledge library not found.")
+            if library.user_id != user.id:
+                raise TurnError(403, "library_access_denied", "Knowledge library access denied.")
+
+        return conversation, project, library, created
 
     # ------------------------------------------------------------------ execute
 
@@ -418,6 +464,8 @@ class EzoCore:
             requested_agent=selection.requested.key,
             requested_agent_available=selection.requested.available,
             language=prepared.language,
+            library_id=prepared.library.id if prepared.library else None,
+            library_name=prepared.library.name if prepared.library else None,
         )
 
         tracer = prepared.tracer
@@ -586,6 +634,7 @@ class EzoCore:
                         user_id=prepared.user.id,
                         run_id=prepared.run.id,
                         project_scope=prepared.conversation.project_id,
+                        library_scope=prepared.conversation.library_id,
                         conversation_id=prepared.conversation.id,
                         on_activity=on_activity,
                     ),
@@ -628,6 +677,18 @@ class EzoCore:
                 humor_pref if humor_pref in ("off", "light", "normal") else self.personality.humor
             )
             project = prepared.project
+            instructions = plan.instructions
+            if prepared.library is not None:
+                lib_desc = (
+                    f" ({prepared.library.description})" if prepared.library.description else ""
+                )
+                instructions += (
+                    f"\n\nSelected Knowledge Library: '{prepared.library.name}'{lib_desc}.\n"
+                    "The user has scoped this conversation to this knowledge library only. "
+                    "Answer strictly based on the retrieved sources from this library. "
+                    "If the retrieved sources do not contain enough information to answer, "
+                    "clearly and explicitly state that this knowledge library has no relevant info."
+                )
             prompt = build_system_prompt(
                 self.personality,
                 PromptContext(
@@ -642,7 +703,7 @@ class EzoCore:
                         PromptMemory(m.memory.memory_type, m.memory.category, m.memory.content)
                         for m in memories
                     ],
-                    agent_instructions=plan.instructions,
+                    agent_instructions=instructions,
                     sources=(
                         CITATION_RULES + "\n\n" + format_sources_for_prompt(gathered.sources)
                         if gathered.sources

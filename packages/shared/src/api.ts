@@ -144,6 +144,8 @@ export function createApiClient(options: ApiClientOptions) {
     listMessages: (id: string) => request<Message[]>(`/api/conversations/${id}/messages`),
     renameConversation: (id: string, title: string) =>
       request<Conversation>(`/api/conversations/${id}`, { method: "PATCH", ...json({ title }) }),
+    updateConversation: (id: string, changes: { title?: string; project_id?: string | null; library_id?: string | null }) =>
+      request<Conversation>(`/api/conversations/${id}`, { method: "PATCH", ...json(changes) }),
     deleteConversation: (id: string) =>
       request<void>(`/api/conversations/${id}`, { method: "DELETE" }),
 
@@ -175,10 +177,17 @@ export function createApiClient(options: ApiClientOptions) {
     deleteAllMemories: () => request<void>("/api/memories?confirm=true", { method: "DELETE" }),
 
     knowledgeStatus: () => request<KnowledgeOverview>("/api/knowledge/status"),
-    listDocuments: (projectId?: string) =>
-      request<KnowledgeDocument[]>(
-        `/api/knowledge/documents${projectId ? `?project_id=${encodeURIComponent(projectId)}` : ""}`,
-      ),
+    listDocuments: (filter?: string | { projectId?: string; libraryId?: string }) => {
+      const params = new URLSearchParams();
+      if (typeof filter === "string") {
+        if (filter) params.set("project_id", filter);
+      } else if (filter) {
+        if (filter.projectId) params.set("project_id", filter.projectId);
+        if (filter.libraryId) params.set("library_id", filter.libraryId);
+      }
+      const query = params.toString();
+      return request<KnowledgeDocument[]>(`/api/knowledge/documents${query ? `?${query}` : ""}`);
+    },
     getDocument: (id: string) => request<KnowledgeDocumentDetail>(`/api/knowledge/documents/${id}`),
     /** Upload a file to EZO's knowledge base (PDF, DOCX, XLSX, CSV, TXT, Markdown, images). */
     uploadDocument: (file: Blob, filename: string, projectId?: string | null) => {
@@ -195,14 +204,26 @@ export function createApiClient(options: ApiClientOptions) {
     reindexDocument: (id: string) =>
       request<KnowledgeDocument>(`/api/knowledge/documents/${id}/reindex`, { method: "POST" }),
     deleteDocument: (id: string) => request<void>(`/api/knowledge/documents/${id}`, { method: "DELETE" }),
-    searchKnowledge: (query: string, projectId?: string | null) =>
-      request<KnowledgeSearchResult>("/api/knowledge/search", {
+    searchKnowledge: (
+      query: string,
+      options?: { projectId?: string | null; libraryId?: string | null } | string | null,
+    ) => {
+      const payload: { query: string; project_id?: string | null; library_id?: string | null } = { query };
+      if (typeof options === "string") {
+        payload.project_id = options;
+      } else if (options) {
+        if (options.projectId !== undefined) payload.project_id = options.projectId;
+        if (options.libraryId !== undefined) payload.library_id = options.libraryId;
+      }
+      return request<KnowledgeSearchResult>("/api/knowledge/search", {
         method: "POST",
-        ...json({ query, project_id: projectId ?? null }),
-      }),
+        ...json(payload),
+      });
+    },
 
     /** Knowledge OS: libraries and learned sources (websites, GitHub, PyPI, npm). */
     knowledgeLibraries: () => request<KnowledgeLibrary[]>("/api/learning/libraries"),
+    knowledgeLibrary: (id: string) => request<KnowledgeLibrary>(`/api/learning/libraries/${id}`),
     createKnowledgeLibrary: (name: string, description = "") =>
       request<KnowledgeLibrary>("/api/learning/libraries", { method: "POST", ...json({ name, description }) }),
     deleteKnowledgeLibrary: (id: string) => request<void>(`/api/learning/libraries/${id}`, { method: "DELETE" }),

@@ -3,7 +3,7 @@
 import type { KnowledgeLibrary, LearnedSource, LearnedSourceDetail, LearnedSourceStatus } from "@ezo/shared";
 import { ApiError } from "@ezo/shared";
 import { Badge, Button, Card, Spinner } from "@ezo/ui";
-import { BookOpen, ChevronDown, Loader2, RotateCw, ShieldAlert, Trash2 } from "lucide-react";
+import { BookOpen, ChevronDown, Loader2, RotateCw, Search, ShieldAlert, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
 import { formatBytes } from "@/lib/download";
@@ -157,24 +157,24 @@ export function LearnedSources() {
         ) : (
           // Every library is shown, also an empty one, so it can be removed.
           libraries.map((library) => (
-              <LibraryGroup
-                key={library.id}
-                library={library}
-                sources={byLibrary.get(library.id) ?? []}
-                openId={openId}
-                busy={busy}
-                onToggle={(id) => setOpenId(openId === id ? null : id)}
-                onRefresh={(source) => void act(async () => void (await api.refreshLearnedSource(source.id)))}
-                onDelete={(source) => {
-                  if (!window.confirm(f(t.confirmDelete, { name: source.title }))) return;
-                  void act(() => api.deleteLearnedSource(source.id));
-                }}
-                onDeleteLibrary={() => {
-                  if (!window.confirm(f(t.confirmDeleteLibrary, { name: library.name }))) return;
-                  void act(() => api.deleteKnowledgeLibrary(library.id));
-                }}
-              />
-            ))
+            <LibraryGroup
+              key={library.id}
+              library={library}
+              sources={byLibrary.get(library.id) ?? []}
+              openId={openId}
+              busy={busy}
+              onToggle={(id) => setOpenId(openId === id ? null : id)}
+              onRefresh={(source) => void act(async () => void (await api.refreshLearnedSource(source.id)))}
+              onDelete={(source) => {
+                if (!window.confirm(f(t.confirmDelete, { name: source.title }))) return;
+                void act(() => api.deleteLearnedSource(source.id));
+              }}
+              onDeleteLibrary={() => {
+                if (!window.confirm(f(t.confirmDeleteLibrary, { name: library.name }))) return;
+                void act(() => api.deleteKnowledgeLibrary(library.id));
+              }}
+            />
+          ))
         )}
       </div>
     </section>
@@ -200,10 +200,34 @@ function LibraryGroup({
   onDelete: (source: LearnedSource) => void;
   onDeleteLibrary: () => void;
 }) {
-  const { m } = useI18n();
+  const { m, f } = useI18n();
+  const t = m.learning;
   const running = sources.some((source) => RUNNING.includes(source.status));
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Array<{ title: string; excerpt: string; url?: string | null }> | null>(null);
+
+  async function handleSearch(e: FormEvent) {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    try {
+      const res = await api.searchKnowledge(searchQuery.trim(), { libraryId: library.id });
+      setSearchResults((res.results || []) as Array<{ title: string; excerpt: string; url?: string | null }>);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function clearSearch() {
+    setSearchQuery("");
+    setSearchResults(null);
+  }
+
   return (
-    <div data-testid="learned-library">
+    <div data-testid="learned-library" className="rounded-xl border border-line bg-surface/50 p-3">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-medium">{library.name}</h3>
         <span className="text-xs text-ink-faint">{sources.length}</span>
@@ -218,6 +242,64 @@ function LibraryGroup({
           <Trash2 size={14} />
         </Button>
       </div>
+
+      {/* Library-Scoped Search */}
+      <form onSubmit={handleSearch} className="mb-3 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t.searchPlaceholder}
+            className="h-8 w-full rounded-lg border border-line bg-surface pl-8 pr-7 text-xs focus:border-accent/60 focus:outline-none"
+            data-testid={`library-search-input-${library.id}`}
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink"
+            >
+              <X size={12} />
+            </button>
+          ) : null}
+        </div>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="sm"
+          disabled={searching || !searchQuery.trim()}
+          className="h-8 text-xs"
+          data-testid={`library-search-btn-${library.id}`}
+        >
+          {searching ? <Loader2 size={12} className="animate-spin" /> : t.searchButton}
+        </Button>
+      </form>
+
+      {/* Search results */}
+      {searchResults !== null ? (
+        <div className="mb-3 rounded-lg border border-accent/20 bg-accent/5 p-2.5" data-testid="library-search-results">
+          <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-accent">
+            <span>{f(t.searchResults, { n: searchResults.length })}</span>
+            <button type="button" onClick={clearSearch} className="text-[11px] text-ink-muted hover:text-ink underline">
+              {t.allDocuments}
+            </button>
+          </div>
+          {searchResults.length === 0 ? (
+            <p className="py-2 text-center text-xs text-ink-muted">{t.noResults}</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {searchResults.map((res, i) => (
+                <div key={i} className="rounded border border-line bg-surface p-2 text-xs">
+                  <div className="font-medium text-ink">{res.title}</div>
+                  <p className="mt-0.5 text-ink-muted line-clamp-2">{res.excerpt}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         {sources.map((source) => (
           <SourceRow

@@ -168,6 +168,26 @@ class ResearchAgent(Agent):
         gathered = Gathered()
         tools = ctx.tools
         text = ctx.turn.text
+
+        if tools.library_scope is not None:
+            knowledge = await run_tool(
+                gathered,
+                tools,
+                "knowledge_search",
+                {
+                    "query": text[:500],
+                    "limit": 5,
+                    "library_id": str(tools.library_scope),
+                },
+            )
+            gathered.sources = knowledge
+            if not knowledge:
+                gathered.notes.append(
+                    "The selected knowledge library does not contain relevant information for "
+                    "this query. Inform the user clearly that no relevant information was found."
+                )
+            return gathered
+
         plan = await self._plan_queries(tools, text, ctx.history_hint)
         gathered.tool_calls.append(
             {

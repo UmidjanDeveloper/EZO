@@ -173,6 +173,23 @@ async def create_library(body: LibraryIn, session: SessionDep, user: CurrentUser
     )
 
 
+@router.get("/libraries/{library_id}")
+async def get_library_endpoint(
+    library_id: uuid.UUID, session: SessionDep, user: CurrentUser
+) -> LibraryOut:
+    library = await _owned_library(session, user.id, library_id)
+    count = await session.scalar(
+        select(func.count(LearnedSource.id)).where(LearnedSource.library_id == library.id)
+    )
+    return LibraryOut(
+        id=library.id,
+        name=library.name,
+        description=library.description,
+        sources=int(count or 0),
+        created_at=library.created_at,
+    )
+
+
 @router.delete("/libraries/{library_id}", status_code=204)
 async def delete_library(
     library_id: uuid.UUID, session: SessionDep, services: ServicesDep, user: CurrentUser

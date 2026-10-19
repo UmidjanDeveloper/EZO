@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, SessionDep, rate_limit
 from ezo_api.api.serializers import message_out
-from ezo_api.db.models import Conversation, Message, Project
+from ezo_api.db.models import Conversation, KnowledgeLibrary, Message, Project
 from ezo_api.schemas.api import ConversationOut, ConversationUpdate, MessageOut
 from ezo_api.security.audit import audit
 
@@ -34,11 +34,14 @@ async def list_conversations(
     session: SessionDep,
     user: CurrentUser,
     project_id: uuid.UUID | None = None,
+    library_id: uuid.UUID | None = None,
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[ConversationOut]:
     query = select(Conversation).where(Conversation.user_id == user.id)
     if project_id is not None:
         query = query.where(Conversation.project_id == project_id)
+    if library_id is not None:
+        query = query.where(Conversation.library_id == library_id)
     query = query.order_by(Conversation.updated_at.desc()).limit(limit)
     rows = (await session.scalars(query)).all()
     return [ConversationOut.model_validate(row) for row in rows]
@@ -83,6 +86,14 @@ async def update_conversation(
             if project is None or project.user_id != user.id:
                 raise HTTPException(404, detail="Project not found.")
         conversation.project_id = body.project_id
+    if "library_id" in body.model_fields_set:
+        if body.library_id is not None:
+            library = await session.get(KnowledgeLibrary, body.library_id)
+            if library is None:
+                raise HTTPException(404, detail="Library not found.")
+            if library.user_id != user.id:
+                raise HTTPException(403, detail="Forbidden.")
+        conversation.library_id = body.library_id
     await session.commit()
     return ConversationOut.model_validate(conversation)
 

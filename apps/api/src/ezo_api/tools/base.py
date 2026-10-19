@@ -27,6 +27,7 @@ class ToolContext:
     user_id: uuid.UUID
     run_id: uuid.UUID | None = None
     project_scope: uuid.UUID | None = None
+    library_scope: uuid.UUID | None = None
     conversation_id: uuid.UUID | None = None
     """Conversation of the turn (artifacts created by tools are linked to it)."""
     allow_dangerous: bool = False

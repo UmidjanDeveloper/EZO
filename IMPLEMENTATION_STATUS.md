@@ -123,11 +123,52 @@ tests **run** (no LibreOffice skips any more).
   drafts, translations, teaching materials and research plans has only been checked with
   scripted model replies.
 
+## Knowledge OS K2 — Library-Scoped Retrieval & Chat Integration (2026-10-19) — experimental
+
+Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
+Migration 0013 (`conversation.library_id`).
+
+### What works
+
+- **Library-scoped retrieval in Chat & Knowledge search**:
+  Resolves the selected library into authorized document IDs (`LearnedSource.library_id == library_id`)
+  and filters through the existing retrieval pipeline (`Retriever.retrieve()`, keyword search, vector filter).
+  Empty or non-matching libraries return 0 results with an explicit clear message in chat ("The selected knowledge library does not contain relevant information for this query"), never silently falling back to global search.
+- **Strict multi-user & cross-library isolation**:
+  Users can only query or select libraries they own (403 Forbidden / 404 Not Found). Documents from Library A are never returned when querying Library B.
+- **Source provenance and freshness indicators**:
+  SourceRef and SourceCitation expose title, external URL, version (e.g. `v0.115.0`), license (e.g. `MIT`), last_checked_at, and freshness status:
+  - `current`: last checked within 30 days and unchanged.
+  - `changed`: checked and content changed.
+  - `not_recently_checked`: not checked in >30 days (cached data warning without claiming content changed).
+- **Conversation turn continuity, switching and clearing**:
+  `conversation.library_id` preserves library scope across turns. Users can switch libraries or clear scope (`clear_library: true`) at any point.
+- **Frontend & Multi-lingual**:
+  Chat UI library dropdown selector, scoping banner with clear button, library-specific search in Knowledge page; fully translated in Uzbek (`uz`), English (`en`), and Russian (`ru`).
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| Cross-library and cross-user isolation: User A cannot access User B's library (403), Library A does not return Library B docs, empty library returns empty frozenset | `tests/unit/test_library_retrieval.py::test_resolve_library_documents_cross_user_and_isolation` |
+| Retriever short-circuits on empty library document_ids without global fallback; unscoped retrieval remains backward compatible | `::test_retriever_empty_document_ids_short_circuit` |
+| Provenance (version, license, last_checked_at) and freshness status calculation (current, changed, not_recently_checked > 30 days) | `::test_provenance_and_freshness_logic` |
+| KnowledgeSearchTool honors ToolContext library_scope and rejects unauthorized library_id | `::test_knowledge_search_tool_library_scoping` |
+| Chat stream with library selection: conversation library_id persistence, turn continuity, library switching, clearing via clear_library | `tests/integration/test_library_chat.py::test_chat_stream_with_library_selection` |
+| Non-streaming chat with library_id | `::test_non_streaming_chat_with_library` |
+| Cross-user library rejection in stream and non-stream chat (403/404) | `::test_cross_user_library_rejection_in_chat` |
+| Conversation PATCH update library authorization (own lib 200, other lib 403, clear 200) | `::test_conversation_update_library_authorization` |
+| Web Sources component renders version, license, and freshness badges in Uzbek | `apps/web/components/chat/Sources.test.tsx::renders provenance metadata and freshness badges` |
+
+### Not done
+
+K3–K7 and SkillForge; scheduled change detection; automated external source re-checks (K7).
+
 ## Knowledge OS K1 — Source registry and secure reading (2026-10-19) — experimental
 
 Commits `943c7c9` (backend, migration 0012), `56b2590` (package init), `96332e2` (Knowledge
 page, e2e), `98db78a` (docs). CI runs #58–#61 green. Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
-K2–K7 and SkillForge are **not built**; EZO cannot create, install or run skills.
+K3–K7 and SkillForge are **not built**; EZO cannot create, install or run skills.
 
 ### What works
 

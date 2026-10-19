@@ -42,6 +42,8 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
   const [conversationId, setConversationId] = useState<string | undefined>(initialId);
   const [title, setTitle] = useState("");
   const [project, setProject] = useState<Project | null>(null);
+  const [libraryId, setLibraryId] = useState<string | null>(null);
+  const [libraryName, setLibraryName] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [loading, setLoading] = useState(Boolean(initialId));
   const [loadError, setLoadError] = useState<UiMessage["error"] | null>(null);
@@ -71,6 +73,16 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
         if (conversation.project_id) {
           api.getProject(conversation.project_id).then(setProject).catch(() => setProject(null));
         }
+        if (conversation.library_id) {
+          setLibraryId(conversation.library_id);
+          api
+            .knowledgeLibrary(conversation.library_id)
+            .then((lib) => setLibraryName(lib.name))
+            .catch(() => setLibraryName(null));
+        } else {
+          setLibraryId(null);
+          setLibraryName(null);
+        }
       })
       .catch((error: unknown) => !cancelled && setLoadError(errorOf(error)))
       .finally(() => !cancelled && setLoading(false));
@@ -95,8 +107,34 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       setConversationId(undefined);
       setMessages([]);
       setTitle("");
+      setLibraryId(null);
+      setLibraryName(null);
     }
   }
+
+  const selectLibrary = useCallback(
+    async (id: string, name: string) => {
+      setLibraryId(id);
+      setLibraryName(name);
+      if (conversationId) {
+        await api.updateConversation(conversationId, { library_id: id });
+        void refreshConversations();
+      }
+    },
+    [conversationId, refreshConversations],
+  );
+
+  const clearLibrary = useCallback(
+    async () => {
+      setLibraryId(null);
+      setLibraryName(null);
+      if (conversationId) {
+        await api.updateConversation(conversationId, { library_id: null });
+        void refreshConversations();
+      }
+    },
+    [conversationId, refreshConversations],
+  );
 
   const updateLast = useCallback((patch: (message: UiMessage) => UiMessage) => {
     setMessages((current) => {
@@ -145,6 +183,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
             message: text,
             conversation_id: conversationId ?? null,
             project_id: conversationId ? null : projectId,
+            library_id: libraryId,
             channel,
             speech_seconds: channel === "voice" ? (options.speechSeconds ?? null) : null,
             ...(options.attachments?.length ? { attachments: options.attachments.map((a) => a.id) } : {}),
@@ -158,6 +197,10 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
               setConversationId(meta.conversation_id);
               setTitle(meta.conversation_title);
               window.history.replaceState(null, "", `/chat/${meta.conversation_id}`);
+            }
+            if (meta.library_id !== undefined) {
+              setLibraryId(meta.library_id);
+              if (meta.library_name) setLibraryName(meta.library_name);
             }
             updateLast((message) => ({ ...message, agent: meta.agent, runId: meta.run_id, language: meta.language }));
           } else if (event.type === "activity") {
@@ -192,10 +235,25 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       }
       return final;
     },
-    [conversationId, projectId, refreshConversations, signal, streaming, updateLast],
+    [conversationId, libraryId, projectId, refreshConversations, signal, streaming, updateLast],
   );
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
 
-  return { conversationId, title, project, messages, loading, loadError, streaming, presence, send, stop };
+  return {
+    conversationId,
+    title,
+    project,
+    libraryId,
+    libraryName,
+    selectLibrary,
+    clearLibrary,
+    messages,
+    loading,
+    loadError,
+    streaming,
+    presence,
+    send,
+    stop,
+  };
 }

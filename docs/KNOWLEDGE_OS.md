@@ -1,13 +1,14 @@
 # Knowledge OS and SkillForge
 
-Status: **K1 — source registry and secure reading: experimental.** K2–K7 are not built.
+Status: **K1 & K2 completed — source registry, secure reading, library-scoped retrieval & chat integration.**
+K3–K7 are not built.
 SkillForge (turning knowledge into tools) does not exist yet: **EZO cannot create,
 install or run skills.** Reading a source only adds searchable knowledge.
 
 | Phase | What | State |
 | --- | --- | --- |
-| K1 | Libraries, learned sources, secure reading of websites / GitHub / PyPI / npm | experimental (this page) |
-| K2 | Library-scoped retrieval in chat, citations, versions, stale-source warnings | not built |
+| K1 | Libraries, learned sources, secure reading of websites / GitHub / PyPI / npm | done |
+| K2 | Library-scoped retrieval in chat, citations, versions, stale-source warnings | done (2026-10-19) |
 | K3 | Capability analysis, comparison with existing EZO tools, skill proposals | not built |
 | K4 | Secure sandbox (isolated container, no secrets, no network by default) | not built — required before any generated code runs |
 | K5 | Skill builder and verification | not built |
@@ -80,13 +81,29 @@ an unreachable documentation site, or the GitHub fallback. The reason is shown.
 | --- | --- | --- |
 | GET / POST | `/api/learning/libraries` | list (with source counts) / create `{name, description}` (409 for a duplicate name) |
 | DELETE | `/api/learning/libraries/{id}` | removes its sources and their documents (409 while one is being read) |
+| GET | `/api/learning/libraries/{id}` | get library details with source counts |
 | GET | `/api/learning/sources?library_id=` | sources with status, version, licence, stats, flags |
 | POST | `/api/learning/sources` | `{target, kind?, library_id? \| library_name?, limits?}` → 202 and reading starts; an existing source in that library → 200 with `created: false`; private addresses → 422 `blocked` |
 | GET | `/api/learning/sources/{id}` | plus the documents read |
 | POST | `/api/learning/sources/{id}/refresh` | read again (unchanged documents are not re-indexed; `stats.content_changed`) |
 | DELETE | `/api/learning/sources/{id}` | source, documents, chunks, vectors, stored files |
 
-`GET /api/knowledge/documents` leaves learned pages out unless `include_learned=true`.
+`GET /api/knowledge/documents` leaves learned pages out unless `include_learned=true`, and accepts `library_id` to scope listing.
+`POST /api/knowledge/search` accepts `library_id` to strictly scope search to documents in that library.
+
+## K2 — Library-Scoped Retrieval & Chat Integration (what works)
+
+- **Chat Library Selection**: In Chat UI, select any saved library from the library dropdown.
+- **Strict Library Scoping**: When a library is selected, all retrieval (`Retriever.retrieve()`, keyword search, vector filter) resolves strictly to that library's authorized document IDs.
+- **Ownership & Isolation**: User A cannot access User B's libraries (403 Forbidden). Library A never leaks into Library B. Non-existent libraries return 404.
+- **No Silently Falling Back**: If a library has no relevant documents or is empty, EZO explicitly states that no relevant information was found in that library. It never silently falls back to global search.
+- **Source Provenance & Freshness Badges**: Citations display title, external URL, version (e.g. `v0.115.0`), license (e.g. `MIT`), and last checked timestamp. Freshness status badges show:
+  - `current` (Joriy / Dolzarb): Checked within the last 30 days and unchanged.
+  - `changed` (Manba o'zgargan): External source was checked and content changed.
+  - `not_recently_checked` (30 kundan ortiq tekshirilmagan): Source has not been re-checked in the last 30 days (served from cache without falsely claiming content changed).
+- **Turn Continuity & Switching**: Library scope persists across chat turns in the conversation. Users can switch libraries or clear the scope (`clear_library: true`) to return to normal global retrieval.
+- **Knowledge Page Search**: Filter and search within a specific library directly on the Knowledge page.
+- **Multi-lingual**: Fully localized in Uzbek, Russian, and English.
 
 ### Configuration
 
@@ -100,9 +117,7 @@ an unreachable documentation site, or the GitHub fallback. The reason is shown.
 
 ## Limits (honest)
 
-- Chat answers use learned sources through the general file search; there is no
-  "answer only from this library" yet (K2).
-- No scheduled re-checks or change notifications; "refresh" is manual (K7).
+- Re-checking is manual via the "refresh" action (`/refresh`); automated scheduled re-checks are planned for K7.
 - JavaScript-rendered documentation sites are read as served HTML only.
 - GitHub without a token allows about 60 API requests per hour.
 - Live access verified from the development sandbox: **PyPI, the npm registry and

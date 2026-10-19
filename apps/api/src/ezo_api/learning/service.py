@@ -21,6 +21,7 @@ import time
 import uuid
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -28,6 +29,7 @@ from ezo_api.db.base import utcnow
 from ezo_api.db.models import KnowledgeDocument, KnowledgeLibrary, KnowledgeSource, LearnedSource
 from ezo_api.knowledge.fetch import SafeFetcher
 from ezo_api.knowledge.ingestion.service import KnowledgeService
+from ezo_api.knowledge.retrieval.keyword import SEARCHABLE_STATUSES
 from ezo_api.learning.base import Budget, Inspection, Limits
 from ezo_api.learning.crawler import crawl
 from ezo_api.learning.github import GitHubReader
@@ -67,6 +69,31 @@ async def get_library(
     return library
 
 
+async def resolve_library_documents(
+    session: AsyncSession, *, user_id: uuid.UUID, library_id: uuid.UUID
+) -> tuple[KnowledgeLibrary, frozenset[uuid.UUID]]:
+    """Verify user owns library_id and resolve all authorized searchable document IDs."""
+    library = await session.get(KnowledgeLibrary, library_id)
+    if library is None:
+        raise HTTPException(status_code=404, detail="Library not found.")
+    if library.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden.")
+    statement = (
+        select(KnowledgeDocument.id)
+        .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
+        .join(LearnedSource, LearnedSource.knowledge_source_id == KnowledgeSource.id)
+        .where(
+            LearnedSource.library_id == library_id,
+            LearnedSource.user_id == user_id,
+            KnowledgeDocument.user_id == user_id,
+            KnowledgeDocument.status.in_(SEARCHABLE_STATUSES),
+            KnowledgeDocument.current_revision_id.is_not(None),
+        )
+    )
+    doc_ids = frozenset((await session.scalars(statement)).all())
+    return library, doc_ids
+
+
 class LearningService:
     def __init__(
         self,
@@ -82,6 +109,14 @@ class LearningService:
         self.sessionmaker = sessionmaker
         self.github_token = github_token
         self.enabled = enabled
+
+    # ------------------------------------------------------------------ library documents
+
+    async def resolve_library_documents(
+        self, session: AsyncSession, user_id: uuid.UUID, library_id: uuid.UUID
+    ) -> tuple[KnowledgeLibrary, frozenset[uuid.UUID]]:
+        """Verify user owns library_id and resolve all authorized searchable document IDs."""
+        return await resolve_library_documents(session, user_id=user_id, library_id=library_id)
 
     # ------------------------------------------------------------------ registry
 

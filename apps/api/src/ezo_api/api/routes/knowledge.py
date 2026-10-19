@@ -143,13 +143,23 @@ async def list_documents(
     session: SessionDep,
     user: CurrentUser,
     project_id: uuid.UUID | None = None,
+    library_id: uuid.UUID | None = None,
     limit: int = Query(default=200, ge=1, le=1000),
     include_learned: bool = False,
 ) -> list[KnowledgeDocumentOut]:
     """The user's files and pages. Pages of learned sources (Knowledge OS) are listed under
     their source (/api/learning/sources/{id}) unless `include_learned` is set."""
     statement = select(KnowledgeDocument).where(KnowledgeDocument.user_id == user.id)
-    if not include_learned:
+    if library_id is not None:
+        from ezo_api.learning.service import resolve_library_documents
+
+        _lib, doc_ids = await resolve_library_documents(
+            session, user_id=user.id, library_id=library_id
+        )
+        if not doc_ids:
+            return []
+        statement = statement.where(KnowledgeDocument.id.in_(doc_ids))
+    elif not include_learned:
         learned = select(KnowledgeSource.id).where(
             KnowledgeSource.user_id == user.id, KnowledgeSource.source_type == "learned"
         )
@@ -378,8 +388,22 @@ async def search(
     body: SearchIn, session: SessionDep, user: CurrentUser, services: ServicesDep
 ) -> SearchOut:
     await _check_project(session, user.id, body.project_id)
+    document_ids: frozenset[uuid.UUID] | None = None
+    if body.library_id is not None:
+        from ezo_api.learning.service import resolve_library_documents
+
+        _lib, doc_ids = await resolve_library_documents(
+            session, user_id=user.id, library_id=body.library_id
+        )
+        document_ids = doc_ids
+
     result = await services.retriever.retrieve(
-        session, user.id, body.query, body.project_id, limit=body.limit
+        session,
+        user.id,
+        body.query,
+        body.project_id,
+        document_ids=document_ids,
+        limit=body.limit,
     )
     for index, source in enumerate(result.sources, start=1):
         source.n = index

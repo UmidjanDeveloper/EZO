@@ -75,6 +75,25 @@ class GeneralAgent(Agent):
         """Look into the user's files when they may be relevant (no extra tools otherwise)."""
         gathered = Gathered()
         tools = ctx.tools
+        if tools.library_scope is not None:
+            gathered.sources = await run_tool(
+                gathered,
+                tools,
+                "knowledge_search",
+                {
+                    "query": ctx.turn.text[:500],
+                    "limit": 5,
+                    "strict": False,
+                    "library_id": str(tools.library_scope),
+                },
+            )
+            if not gathered.sources:
+                gathered.notes.append(
+                    "The selected knowledge library does not contain relevant information for "
+                    "this query. Inform the user clearly that no relevant information was found."
+                )
+            return gathered
+
         if not await has_searchable_documents(tools.session, tools.user_id, tools.project_scope):
             return gathered
         about_documents = ctx.turn.requested.key == "document"

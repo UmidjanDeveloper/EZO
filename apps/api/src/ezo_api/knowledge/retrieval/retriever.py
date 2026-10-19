@@ -11,7 +11,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ezo_api.db.models import DocumentRevision, KnowledgeChunk, KnowledgeDocument, KnowledgeSource
+from ezo_api.db.base import utcnow
+from ezo_api.db.models import (
+    DocumentRevision,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    KnowledgeSource,
+    LearnedSource,
+)
 from ezo_api.knowledge.embeddings.service import EmbeddingError, EmbeddingService
 from ezo_api.knowledge.retrieval.keyword import SEARCHABLE_STATUSES, keyword_search
 from ezo_api.knowledge.retrieval.rerank import PassthroughReranker, Reranker
@@ -72,7 +79,7 @@ class Retriever:
     ) -> RetrievalResult:
         query = query.strip()
         diagnostics: dict[str, Any] = {"query_terms": len(stems(query))}
-        if not query:
+        if not query or (document_ids is not None and not document_ids):
             return RetrievalResult([], "none", diagnostics)
 
         candidates: dict[uuid.UUID, _Candidate] = {}
@@ -149,7 +156,7 @@ class Retriever:
         seen_text: set[str] = set()
         budget = CONTEXT_CHAR_BUDGET
         for candidate in ordered:
-            chunk, document, revision, source = rows[candidate.chunk_id]
+            chunk, document, revision, source, learned = rows[candidate.chunk_id]
             if per_document.get(document.id, 0) >= MAX_PER_DOCUMENT:
                 continue
             key = chunk.text.strip()[:200]
@@ -158,7 +165,7 @@ class Retriever:
             seen_text.add(key)
             per_document[document.id] = per_document.get(document.id, 0) + 1
             budget -= len(chunk.text)
-            sources.append(_to_source(chunk, document, revision, source, candidate))
+            sources.append(_to_source(chunk, document, revision, source, learned, candidate))
             if len(sources) >= limit:
                 break
         return RetrievalResult(sources, mode, diagnostics)
@@ -166,14 +173,28 @@ class Retriever:
     async def _load(
         self, session: AsyncSession, chunk_ids: list[uuid.UUID]
     ) -> dict[
-        uuid.UUID, tuple[KnowledgeChunk, KnowledgeDocument, DocumentRevision, KnowledgeSource]
+        uuid.UUID,
+        tuple[
+            KnowledgeChunk,
+            KnowledgeDocument,
+            DocumentRevision,
+            KnowledgeSource,
+            LearnedSource | None,
+        ],
     ]:
         """Load chunks that still belong to the current revision of a searchable document."""
         statement = (
-            select(KnowledgeChunk, KnowledgeDocument, DocumentRevision, KnowledgeSource)
+            select(
+                KnowledgeChunk,
+                KnowledgeDocument,
+                DocumentRevision,
+                KnowledgeSource,
+                LearnedSource,
+            )
             .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.document_id)
             .join(DocumentRevision, DocumentRevision.id == KnowledgeChunk.revision_id)
             .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)
+            .outerjoin(LearnedSource, LearnedSource.knowledge_source_id == KnowledgeSource.id)
             .where(
                 KnowledgeChunk.id.in_(chunk_ids),
                 KnowledgeDocument.current_revision_id == KnowledgeChunk.revision_id,
@@ -181,7 +202,7 @@ class Retriever:
             )
         )
         result = await session.execute(statement)
-        return {row[0].id: (row[0], row[1], row[2], row[3]) for row in result.all()}
+        return {row[0].id: (row[0], row[1], row[2], row[3], row[4]) for row in result.all()}
 
 
 def _to_source(
@@ -189,12 +210,43 @@ def _to_source(
     document: KnowledgeDocument,
     revision: DocumentRevision,
     source: KnowledgeSource,
+    learned: LearnedSource | None,
     candidate: _Candidate,
 ) -> SourceRef:
     meta = chunk.meta or {}
     doc_meta = document.meta or {}
     published = doc_meta.get("date")
     indexed = document.indexed_at or document.updated_at
+
+    version = learned.version if learned else None
+    license_name = learned.license if learned else None
+    last_checked = (
+        learned.last_checked_at.isoformat() if learned and learned.last_checked_at else None
+    )
+
+    freshness_status = None
+    freshness_note = None
+    if learned is not None:
+        if learned.stats and learned.stats.get("content_changed"):
+            freshness_status = "changed"
+            freshness_note = (
+                "Manba oxirgi marta tekshirilganda o'zgarganligi aniqlangan (keshlangan ma'lumot)."
+            )
+        elif learned.last_checked_at:
+            age_seconds = (utcnow() - learned.last_checked_at).total_seconds()
+            if age_seconds > 30 * 86400:
+                freshness_status = "not_recently_checked"
+                freshness_note = (
+                    "Manba 30 kundan ortiq vaqt davomida "
+                    "qayta tekshirilmagan (keshlangan ma'lumot)."
+                )
+            else:
+                freshness_status = "current"
+                freshness_note = "Manba oxirgi tekshiruv bo'yicha dolzarb (keshlangan ma'lumot)."
+        else:
+            freshness_status = "current" if learned.indexed_at else "not_recently_checked"
+            freshness_note = "Keshlangan manba ma'lumotlaridan foydalanildi."
+
     return SourceRef(
         kind="web_page" if document.source_url else "file",
         title=document.title,
@@ -216,9 +268,19 @@ def _to_source(
         heading=meta.get("heading"),
         score=round(candidate.fused, 5),
         reliability=0.8,
+        version=version,
+        license=license_name,
+        last_checked_at=last_checked,
+        freshness_status=freshness_status,
+        freshness_note=freshness_note,
         extra={
             "vector_score": candidate.vector_score,
             "keyword_coverage": round(candidate.coverage, 2),
             **({"ocr": True} if meta.get("ocr") else {}),
+            **({"version": version} if version else {}),
+            **({"license": license_name} if license_name else {}),
+            **({"last_checked_at": last_checked} if last_checked else {}),
+            **({"freshness_status": freshness_status} if freshness_status else {}),
+            **({"freshness_note": freshness_note} if freshness_note else {}),
         },
     )

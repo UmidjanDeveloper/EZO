@@ -32,6 +32,12 @@ class SourceRef:
     primary: bool = False
     n: int = 0
     """Citation number shown to the model and the user ([1], [2], ...)."""
+    version: str | None = None
+    license: str | None = None
+    last_checked_at: str | None = None
+    freshness_status: str | None = None
+    """current | changed | not_recently_checked"""
+    freshness_note: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
     def location(self) -> str:

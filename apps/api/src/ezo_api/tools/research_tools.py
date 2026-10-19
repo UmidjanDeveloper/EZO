@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from typing import ClassVar
 
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from ezo_api.knowledge.fetch import FetchError
 from ezo_api.knowledge.ingestion.normalize import normalize_text
 from ezo_api.knowledge.parsers import ParseError, parse
 from ezo_api.knowledge.retrieval.sources import SourceRef
+from ezo_api.learning.service import resolve_library_documents
 from ezo_api.tools.base import Tool, ToolContext, ToolResult
 from ezo_api.tools.reliability import score_url
 from ezo_api.tools.web_search import WebSearchError
@@ -22,6 +25,10 @@ class KnowledgeSearchArgs(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=5, ge=1, le=10)
     strict: bool = Field(default=False, description="Only clearly relevant passages")
+    library_id: uuid.UUID | None = Field(
+        default=None,
+        description="Optional knowledge library ID to scope retrieval to.",
+    )
 
 
 class KnowledgeSearchTool(Tool[KnowledgeSearchArgs]):
@@ -31,11 +38,31 @@ class KnowledgeSearchTool(Tool[KnowledgeSearchArgs]):
     args_model: ClassVar[type[BaseModel]] = KnowledgeSearchArgs
 
     async def run(self, args: KnowledgeSearchArgs, ctx: ToolContext) -> ToolResult:
+        target_library_id = args.library_id or ctx.library_scope
+        document_ids: frozenset[uuid.UUID] | None = None
+
+        if target_library_id is not None:
+            try:
+                _lib, doc_ids = await resolve_library_documents(
+                    ctx.session,
+                    user_id=ctx.user_id,
+                    library_id=target_library_id,
+                )
+                document_ids = doc_ids
+            except HTTPException as exc:
+                return ToolResult(
+                    ok=False,
+                    summary=f"Library access denied: {exc.detail}",
+                    error=str(exc.detail),
+                    sources=[],
+                )
+
         result = await ctx.services.retriever.retrieve(
             ctx.session,
             ctx.user_id,
             args.query,
             ctx.project_scope,
+            document_ids=document_ids,
             limit=args.limit,
             strict=args.strict,
         )

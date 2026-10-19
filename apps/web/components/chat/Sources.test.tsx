@@ -49,4 +49,34 @@ describe("Sources", () => {
     expect(html).toContain("rasmiy"); // primary source marker (Uzbek default)
     expect(html).toContain('href="/knowledge"'); // files open the knowledge page
   });
+
+  it("renders provenance metadata and freshness badges", () => {
+    const html = render([
+      {
+        ...base,
+        n: 1,
+        version: "v2.4.0",
+        license: "MIT",
+        last_checked_at: "2026-10-15T10:00:00Z",
+        freshness_status: "changed",
+        freshness_note: "Manba o'zgargan",
+      },
+      {
+        ...base,
+        n: 2,
+        freshness_status: "not_recently_checked",
+      },
+      {
+        ...base,
+        n: 3,
+        freshness_status: "current",
+      },
+    ]);
+
+    expect(html).toContain("v2.4.0");
+    expect(html).toContain("MIT");
+    expect(html).toContain("Manba o&#x27;zgargan"); // changed badge in uz
+    expect(html).toContain("30 kundan ortiq tekshirilmagan"); // not_recently_checked badge in uz
+    expect(html).toContain("Joriy"); // current badge in uz
+  });
 });

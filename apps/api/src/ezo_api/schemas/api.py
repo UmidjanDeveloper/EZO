@@ -72,6 +72,7 @@ class ConversationOut(ORMModel):
     id: uuid.UUID
     title: str
     project_id: uuid.UUID | None
+    library_id: uuid.UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -79,6 +80,7 @@ class ConversationOut(ORMModel):
 class ConversationUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     project_id: uuid.UUID | None = None
+    library_id: uuid.UUID | None = None
 
 
 class MessageOut(BaseModel):
@@ -100,6 +102,13 @@ class ChatIn(BaseModel):
     message: str = Field(min_length=1)
     conversation_id: uuid.UUID | None = None
     project_id: uuid.UUID | None = None
+    library_id: uuid.UUID | None = Field(
+        default=None, description="Scope retrieval to this knowledge library"
+    )
+    clear_library: bool = Field(
+        default=False,
+        description="Clear library scope on the conversation and return to normal retrieval",
+    )
     agent: str | None = Field(default=None, max_length=50, description="Manual agent override")
     channel: Literal["text", "voice"] = Field(
         default="text", description="'voice' when the user speaks and hears the reply"
@@ -125,6 +134,8 @@ class ChatOut(BaseModel):
     requested_agent: str
     intent: str
     language: str
+    library_id: uuid.UUID | None = None
+    library_name: str | None = None
 
 
 # --- memory ----------------------------------------------------------------

@@ -43,6 +43,8 @@ def _validate(body: ChatIn, services: Services) -> TurnInput:
         text=text,
         conversation_id=body.conversation_id,
         project_id=body.project_id,
+        library_id=body.library_id,
+        clear_library=body.clear_library,
         forced_agent=body.agent,
         channel=body.channel,
         speech_seconds=body.speech_seconds if body.channel == "voice" else None,
@@ -76,6 +78,8 @@ def _event_payload(event: CoreEvent) -> dict[str, Any]:
             "requested_agent": event.requested_agent,
             "requested_agent_available": event.requested_agent_available,
             "language": event.language,
+            "library_id": str(event.library_id) if event.library_id else None,
+            "library_name": event.library_name,
         }
     if isinstance(event, CoreDelta):
         return {"text": event.text}
@@ -164,5 +168,7 @@ async def chat(body: ChatIn, services: ServicesDep, current: CurrentUser) -> Cha
                     requested_agent=meta.requested_agent,
                     intent=meta.intent,
                     language=meta.language,
+                    library_id=meta.library_id,
+                    library_name=meta.library_name,
                 )
     raise HTTPException(500, detail="The chat pipeline ended without a reply.")

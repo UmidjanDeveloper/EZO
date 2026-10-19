@@ -65,6 +65,7 @@ class UrlIn(BaseModel):
 class SearchIn(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     project_id: uuid.UUID | None = None
+    library_id: uuid.UUID | None = None
     limit: int = Field(default=6, ge=1, le=20)
 
 

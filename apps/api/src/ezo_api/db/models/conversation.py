@@ -20,6 +20,9 @@ class Conversation(UUIDPrimaryKey, Timestamps, Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), index=True, nullable=True
     )
+    library_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("knowledge_libraries.id", ondelete="SET NULL"), index=True, nullable=True
+    )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
 
 

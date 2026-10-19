@@ -34,8 +34,15 @@ export interface Conversation {
   id: string;
   title: string;
   project_id: string | null;
+  library_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ConversationUpdate {
+  title?: string;
+  project_id?: string | null;
+  library_id?: string | null;
 }
 
 export type ChatChannel = "text" | "voice";
@@ -70,6 +77,11 @@ export interface SourceCitation {
   source_name: string;
   url: string | null;
   date: string | null;
+  version?: string | null;
+  license?: string | null;
+  last_checked_at?: string | null;
+  freshness_status?: "current" | "changed" | "not_recently_checked" | null;
+  freshness_note?: string | null;
   document_id: string | null;
   revision_number: number | null;
   chunk_index: number | null;
@@ -282,6 +294,8 @@ export interface ChatMetaEvent {
   requested_agent: string;
   requested_agent_available: boolean;
   language: LanguageCode;
+  library_id?: string | null;
+  library_name?: string | null;
 }
 
 export interface ChatDeltaEvent {
@@ -324,6 +338,8 @@ export interface ChatRequestBody {
   message: string;
   conversation_id?: string | null;
   project_id?: string | null;
+  library_id?: string | null;
+  clear_library?: boolean;
   agent?: string | null;
   /** "voice" asks EZO for short, spoken-style replies. */
   channel?: ChatChannel;
