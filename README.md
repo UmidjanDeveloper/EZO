@@ -285,6 +285,18 @@ approves them, and EZO never adds signatures or seals. Details:
 The **Tarjima** page has text translation, the Latin ↔ Cyrillic buttons and the glossary.
 Voice interpretation is turn-based (API only). Details: [docs/TRANSLATION.md](docs/TRANSLATION.md).
 
+## Education, research and career (Ta'lim, ilmiy ish, karyera)
+
+| Try | What happens |
+|---|---|
+| “7-sinf uchun 45 daqiqalik dars ishlanmasi tayyorla” | Lesson package: **Word + Excel + slides** with timing, quiz, answer key and rubric checked by EZO |
+| Attach notes: “Shu ma'ruzadan 10 ta test tuz” | Quiz from your file, answer key built by EZO |
+| “Sillabus / baholash mezonlari / 6 haftalik tayyorgarlik rejasi tuz” | Syllabus, rubric, study plan (templates work **without an AI key**) |
+| “… ilmiy manbalarni top, tadqiqot rejasini tuz” | Real works from OpenAlex, a plan that cites only them, a reference list written by EZO (APA, MLA, Chicago, Harvard, IEEE, GOST) |
+| “Menga CV tayyorla” | CV built **exactly** from Settings → Karyera profili, no model |
+
+Details: [docs/EDUCATION_CAREER.md](docs/EDUCATION_CAREER.md).
+
 ## Language practice (Til mashg'ulotlari)
 
 Practise English by simply talking to EZO, by typing or by voice:

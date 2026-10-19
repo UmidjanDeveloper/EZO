@@ -102,6 +102,17 @@ images) plus the extended local checks listed for that phase.
 - Turn-based voice interpretation API (speech → text → translation → speech); simultaneous
   interpretation is not built (interface only)
 
+### Phase 4 — Education, academic research and career — alpha (2026-10-19, Stage D)
+- Teaching and study materials: lesson packages (Word + Excel + slides), quizzes with an
+  EZO-built answer key, syllabi, rubrics, study plans, defense and interview questions;
+  checks for answers, timing, weights and points; templates without a model
+- Academic: OpenAlex literature search, research plans that cite only found works,
+  reference lists by EZO in APA, MLA, Chicago, Harvard, IEEE and GOST; pasted reference
+  lists formatted with every field verified against the text
+- Career: career profile (migration 0010) in Settings, CV built exactly from it, letters
+  and interview questions grounded in it
+- Not yet: grade books, online tests, profile translation, live OpenAlex verification
+
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic
   complexity routing, approval gates, Ruflo security boundary and audit
@@ -111,7 +122,7 @@ images) plus the extended local checks listed for that phase.
 
 The owner's master prompt orders work as stages; they map onto this roadmap:
 A Office completion → Phase 3 (done) · B Professional writing (done, alpha) ·
-C Translation (done, alpha) · D Education & career → Phase 4 · E Government work mode (organization
+C Translation (done, alpha) · D Education & career → Phase 4 (done, alpha) · E Government work mode (organization
 profiles started in B) · F Official knowledge → Phase 7 · G Press secretary / Telegram ·
 H Durable missions → Phases 5–6 · I Advanced (voice, browser, developer, data, video,
 business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the owner approves).
@@ -136,14 +147,6 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   and CI), export regression fixtures, conversion limits
 - **Not yet:** editing Word footnotes/comments/charts, handwriting OCR, an LLM planner for
   sheet operations, a document-viewer UI with page thumbnails beyond the first page
-
-### Phase 4 — Education, academic research and career
-- EducationAgent: lesson packages (plan, timing, lecture notes, PPTX, quiz, homework,
-  rubric, handout), syllabus and assessment tools, level adaptation
-- AcademicResearchAgent: research questions, literature, methodology, citations (APA, MLA,
-  Chicago, Harvard, IEEE) without invented sources or data; academic-integrity rules
-- CareerAgent: reusable master profile, CV, cover and motivation letters, interview practice;
-  never invents achievements
 
 ### Phase 5 — Durable tasks, jobs and worker
 - Persistent Task / Job / JobEvent / JobArtifact / JobApproval, `services/worker` with a real

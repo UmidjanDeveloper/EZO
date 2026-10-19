@@ -180,6 +180,14 @@ quality checks run locally. Voice interpretation keeps audio in memory only, lik
 `/api/voice`. Users are told not to send confidential government or personal documents to
 an external provider without authorization (docs/TRANSLATION.md → Privacy).
 
+Education, research and career: the career profile is per user and only sent to the AI
+provider inside that user's own CV/letter/interview requests, as data. Literature search
+calls OpenAlex (api.openalex.org) through `SafeFetcher.fetch_json`: same SSRF checks,
+no redirects to private networks, JSON content type only, 2 MB limit; turn it off with
+`EZO_SCHOLAR_PROVIDER=none`. Search queries contain the user's topic, so a confidential
+topic should not be searched. References are never taken from model text: EZO builds them
+from search metadata or from values verified to appear in the user's own text.
+
 Known residual risks:
 
 - PDF parsing and rendering run in a worker thread. A tool timeout stops waiting for it,

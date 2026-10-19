@@ -311,6 +311,22 @@ DOCX-fidelity editor (`transform_docx(review=…)`). EzoCore routes explicit tra
 requests (`translation/requests.py`) to DocumentAgent unless a language practice session
 is active. Terms live in `glossary_terms` (migration 0009); API under `/api/translation`.
 
+### Education, academic research and career (Phase 4)
+
+`education/` recognises requests and options (`catalog.py`: lesson, syllabus, rubric,
+study plan, quiz, defense, interview), defines the JSON the model writes and EZO's checks
+(`models.py`: answer key, timing, weights, points, counts) and renders Word Markdown,
+Excel sheets and a DeckSpec (`render.py`). `agents/education_office.py` makes one model
+call (or a template) and saves through the existing `create_document`,
+`create_spreadsheet` and `create_presentation` tools. `academic/` has the citation styles
+(`citations.py`), the OpenAlex client (`scholar.py`, through `SafeFetcher.fetch_json`),
+the research-plan contract and checks (`plan.py`) and request recognition;
+`agents/academic_office.py` runs search → plan → checks → reference list, and reference
+formatting with field verification. `career/profile.py` is the career profile schema
+(`career_profiles`, migration 0010), the facts block for prompts and the deterministic CV;
+`agents/writing_office.py` uses it for CVs and letters. All of it runs inside
+DocumentAgent; EzoCore routes these requests there. APIs: `/api/academic`, `/api/career`.
+
 ### Language Coach (Phase 1)
 
 `agents/language_coach.py` keeps real session state (`db/models/language.py`, migration 0004).
