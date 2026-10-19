@@ -74,6 +74,10 @@ from ezo_api.writing.catalog import wants_writing
 if TYPE_CHECKING:
     from ezo_api.services import Services
 
+# Agents whose answers come from retrieval: in a library-scoped conversation they answer
+# only from that library's sources.
+LIBRARY_ANSWER_AGENTS = frozenset({"general", "research", "knowledge_os"})
+
 logger = logging.getLogger(__name__)
 
 TITLE_MAX_CHARS = 60
@@ -259,7 +263,11 @@ class EzoCore:
                 intent = IntentResult(
                     Intent.LANGUAGE_COACH, 1.0, ("active_language_session",), intent.scores
                 )
-            elif turn.forced_agent is None and wants_learning(turn.text):
+            elif (
+                turn.forced_agent is None
+                and not turn.attachments
+                and wants_learning(turn.text, intent.intent)
+            ):
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
@@ -407,9 +415,7 @@ class EzoCore:
                 if lib_check is None:
                     raise TurnError(404, "library_not_found", "Knowledge library not found.")
                 if lib_check.user_id != user.id:
-                    raise TurnError(
-                        403, "library_access_denied", "Knowledge library access denied."
-                    )
+                    raise TurnError(404, "library_not_found", "Knowledge library not found.")
                 conversation.library_id = turn.library_id
             created = False
         else:
@@ -424,9 +430,7 @@ class EzoCore:
                 if lib_check is None:
                     raise TurnError(404, "library_not_found", "Knowledge library not found.")
                 if lib_check.user_id != user.id:
-                    raise TurnError(
-                        403, "library_access_denied", "Knowledge library access denied."
-                    )
+                    raise TurnError(404, "library_not_found", "Knowledge library not found.")
             conversation = Conversation(
                 user_id=user.id,
                 project_id=project.id if project else None,
@@ -442,7 +446,7 @@ class EzoCore:
             if library is None:
                 raise TurnError(404, "library_not_found", "Knowledge library not found.")
             if library.user_id != user.id:
-                raise TurnError(403, "library_access_denied", "Knowledge library access denied.")
+                raise TurnError(404, "library_not_found", "Knowledge library not found.")
 
         return conversation, project, library, created
 
@@ -682,13 +686,23 @@ class EzoCore:
                 lib_desc = (
                     f" ({prepared.library.description})" if prepared.library.description else ""
                 )
-                instructions += (
-                    f"\n\nSelected Knowledge Library: '{prepared.library.name}'{lib_desc}.\n"
-                    "The user has scoped this conversation to this knowledge library only. "
-                    "Answer strictly based on the retrieved sources from this library. "
-                    "If the retrieved sources do not contain enough information to answer, "
-                    "clearly and explicitly state that this knowledge library has no relevant info."
-                )
+                if prepared.selection.agent.spec.key in LIBRARY_ANSWER_AGENTS:
+                    instructions += (
+                        f"\n\nSelected Knowledge Library: '{prepared.library.name}'{lib_desc}.\n"
+                        "The user has scoped this conversation to this knowledge library only. "
+                        "Answer strictly based on the retrieved sources from this library. "
+                        "If the retrieved sources do not contain enough information to answer, "
+                        "clearly and explicitly state that this knowledge library has no "
+                        "relevant info."
+                    )
+                else:
+                    # Translation, writing, practice, slides…: the task decides; the library
+                    # is context, and only sources marked as from it may be called so.
+                    instructions += (
+                        f"\n\nThis conversation is linked to the knowledge library "
+                        f"'{prepared.library.name}'. Do the requested task normally; call "
+                        "something 'from this library' only when its source says so."
+                    )
             prompt = build_system_prompt(
                 self.personality,
                 PromptContext(

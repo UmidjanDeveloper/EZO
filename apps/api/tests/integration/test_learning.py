@@ -116,7 +116,8 @@ async def test_github_repository_via_api_without_running_anything(
     source = await learn(api, "https://github.com/acme/widget/tree/main")
     assert source["kind"] == "github" and source["target"] == "github:acme/widget"
     assert source["status"] == "indexed", source
-    assert source["version"] == "v1.4.0" and source["license"] == "mit"
+    assert source["version"] == "a" * 12 and source["license"] == "mit"  # the commit read
+    assert source["profile"]["latest_release"] == "v1.4.0"
     assert source["profile"]["commit"] == "a" * 40
     assert source["profile"]["license_review"]["needs_review"] is False
     paths = [d["url"].split("/blob/" + "a" * 40 + "/")[1] for d in source["documents"]]
@@ -245,7 +246,7 @@ async def test_chat_learns_a_source_and_lists_what_it_learned(
     fake_anthropic.replies = ["Mana ro'yxat."]
     await stream_chat(api, message="O'rgangan manbalaringni ko'rsat")
     system = fake_anthropic.requests[-1].system or ""
-    assert "[Asosiy kutubxona] “widget”" in system
+    assert "[Asosiy kutubxona] «widget»" in system  # titles reach the notes quoted
 
     fake_anthropic.replies = ["Bloklandi."]
     await stream_chat(api, message="Shu website'ni o'rgan: http://internal.corp/wiki")
@@ -263,3 +264,33 @@ async def test_an_unreachable_documentation_site_makes_the_package_partial(
     assert "documentation website" in source["error"]
     assert source["profile"]["docs_site"]["pages_read"] == 0
     assert len(source["documents"]) == 2  # facts + README are still usable
+
+
+async def test_library_scoped_search_excludes_other_files_on_both_search_paths(
+    api: AsyncClient, web: FakeWeb, learning_app: FastAPI
+) -> None:
+    """Keyword and vector search (the fake OpenAI provider makes embeddings) both honour
+    the library: the user's own file with the same words stays out of a scoped search."""
+    docs_site(web)
+    source = await learn(api, f"{DOCS}/guide/", library_name="Widget docs")
+    upload = await api.post(
+        "/api/knowledge/documents",
+        files={"file": ("notes.txt", b"My private notes: widget.connect token session.")},
+    )
+    assert upload.status_code == 201
+    query = {"query": "widget.connect token session"}
+    everything = (await api.post("/api/knowledge/search", json=query)).json()
+    assert everything["mode"] == "hybrid"  # keyword + vector
+    urls = {hit.get("url") for hit in everything["results"]}
+    assert any(u and u.startswith(DOCS) for u in urls) and None in urls  # both kinds found
+
+    scoped = await api.post(
+        "/api/knowledge/search", json={**query, "library_id": source["library_id"]}
+    )
+    hits = scoped.json()["results"]
+    assert hits and all((hit.get("url") or "").startswith(DOCS) for hit in hits)
+
+    stranger = await api.post(
+        "/api/knowledge/search", json={**query, "library_id": str(uuid.uuid4())}
+    )
+    assert stranger.status_code == 404

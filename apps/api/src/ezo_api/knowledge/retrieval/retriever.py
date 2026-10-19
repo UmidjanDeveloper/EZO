@@ -27,6 +27,7 @@ from ezo_api.knowledge.vectorstores import VectorFilter, VectorStoreResolver
 from ezo_api.memory.scoring import stems
 
 logger = logging.getLogger(__name__)
+STALE_AFTER_DAYS = 30
 
 RRF_K = 60
 CANDIDATES = 20
@@ -224,28 +225,31 @@ def _to_source(
         learned.last_checked_at.isoformat() if learned and learned.last_checked_at else None
     )
 
+    # Freshness for the model (English like the rest of the prompt; the reply follows the
+    # user's language). Age wins: an old check is stale whatever it found then. "changed"
+    # means EZO found new content at its last check and re-read it: the text is the new one.
     freshness_status = None
     freshness_note = None
     if learned is not None:
-        if learned.stats and learned.stats.get("content_changed"):
+        checked = learned.last_checked_at
+        day = checked.date().isoformat() if checked else None
+        if checked is None:
+            freshness_status = "not_recently_checked"
+            freshness_note = "EZO's stored copy; when it was last checked is unknown."
+        elif (utcnow() - checked).total_seconds() > STALE_AFTER_DAYS * 86400:
+            freshness_status = "not_recently_checked"
+            freshness_note = (
+                f"EZO's copy was last checked on {day}, more than {STALE_AFTER_DAYS} days ago: "
+                "the source may have changed since."
+            )
+        elif learned.stats and learned.stats.get("content_changed"):
             freshness_status = "changed"
             freshness_note = (
-                "Manba oxirgi marta tekshirilganda o'zgarganligi aniqlangan (keshlangan ma'lumot)."
+                f"The source had changed when EZO checked it on {day}; this is the updated text."
             )
-        elif learned.last_checked_at:
-            age_seconds = (utcnow() - learned.last_checked_at).total_seconds()
-            if age_seconds > 30 * 86400:
-                freshness_status = "not_recently_checked"
-                freshness_note = (
-                    "Manba 30 kundan ortiq vaqt davomida "
-                    "qayta tekshirilmagan (keshlangan ma'lumot)."
-                )
-            else:
-                freshness_status = "current"
-                freshness_note = "Manba oxirgi tekshiruv bo'yicha dolzarb (keshlangan ma'lumot)."
         else:
-            freshness_status = "current" if learned.indexed_at else "not_recently_checked"
-            freshness_note = "Keshlangan manba ma'lumotlaridan foydalanildi."
+            freshness_status = "current"
+            freshness_note = f"Unchanged when EZO last checked it on {day}."
 
     return SourceRef(
         kind="web_page" if document.source_url else "file",

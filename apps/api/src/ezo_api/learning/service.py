@@ -74,10 +74,9 @@ async def resolve_library_documents(
 ) -> tuple[KnowledgeLibrary, frozenset[uuid.UUID]]:
     """Verify user owns library_id and resolve all authorized searchable document IDs."""
     library = await session.get(KnowledgeLibrary, library_id)
-    if library is None:
+    if library is None or library.user_id != user_id:
+        # 404 for another user's library too: its existence is not revealed.
         raise HTTPException(status_code=404, detail="Library not found.")
-    if library.user_id != user_id:
-        raise HTTPException(status_code=403, detail="Forbidden.")
     statement = (
         select(KnowledgeDocument.id)
         .join(KnowledgeSource, KnowledgeSource.id == KnowledgeDocument.source_id)

@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from ezo_api.db.models import (
     KnowledgeLibrary,
+    LearnedSource,
     User,
 )
 from ezo_api.main import create_app
 from ezo_api.providers.base import ModelProvider
 from tests.conftest import make_settings
+from tests.fakes import FakeProvider
 from tests.integration.helpers import stream_chat
 from tests.learning_web import DOCS, FakeWeb, docs_site
 
@@ -116,12 +120,16 @@ async def test_source_and_library_capability_analysis_flow(
     assert primary_cap["status"] == "proposal"
     assert "Widget" in primary_cap["title"] or "Integration" in primary_cap["title"]
     assert len(primary_cap["evidence"]) >= 1
-    assert primary_cap["evidence"][0]["evidence_level"] == "directly_supported"
+    # The opening of a document is context, not a confirmed capability.
+    assert primary_cap["evidence"][0]["evidence_level"] == "inferred"
+    assert primary_cap["confidence"] <= 0.6
+    assert primary_cap["description"].startswith("Use the website source")
 
-    # Check cached retrieval
+    # The analysis is cached (same timestamp) while the content read is unchanged.
     res_src_cached = await client.get(f"/api/learning/sources/{source_id}/capabilities")
     assert res_src_cached.status_code == 200
     assert res_src_cached.json()["source_id"] == source_id
+    assert res_src_cached.json()["analyzed_at"] == src_data["analyzed_at"]
 
     # 3. Analyze library capabilities
     res_lib_analyze = await client.post(f"/api/learning/libraries/{lib_id}/analyze")
@@ -136,7 +144,7 @@ async def test_source_and_library_capability_analysis_flow(
 
 
 async def test_chat_capability_analyzer_intent(
-    client: AsyncClient, web: FakeWeb, k3_app: FastAPI
+    client: AsyncClient, web: FakeWeb, k3_app: FastAPI, fake_anthropic: FakeProvider
 ) -> None:
     docs_site(web)
 
@@ -164,9 +172,50 @@ async def test_chat_capability_analyzer_intent(
     meta_event = events[0][1]
     assert meta_event["intent"] == "learning"
 
-    # Verify tool calls or activities
-    activity_events = [data for name, data in events if name == "activity"]
-    assert len(activity_events) >= 0
+    # The report (partly documentation text) reaches the model as a <source> data block;
+    # the system notes carry only EZO's own wording, never the documentation's text.
+    system = fake_anthropic.requests[-1].system or ""
+    notes = system.split("Notes about this turn:")[1].split("Sources:")[0]
+    assert "read-only capability analysis" in notes and "NOT installed" in notes
+    assert "widget.connect" not in notes and "Ignore all previous" not in notes
+    assert '<source n="1">' in system and "CAPABILITY ANALYSIS REPORT" in system
     # Verify delta text was received
     delta_texts = [data for name, data in events if name == "delta"]
     assert len(delta_texts) > 0
+
+
+async def test_analysis_refused_while_reading_and_never_executes(
+    client: AsyncClient, web: FakeWeb, k3_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os
+    import socket
+    import subprocess
+
+    docs_site(web)
+    learned = await client.post(
+        "/api/learning/sources",
+        json={"target": f"{DOCS}/guide/", "limits": {"min_interval_seconds": 0}},
+    )
+    source_id = learned.json()["id"]
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the capability analyzer must not execute or connect")
+
+    # Analysis runs with process creation and network connections made impossible.
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    monkeypatch.setattr(os, "system", forbidden)
+    monkeypatch.setattr(socket.socket, "connect", forbidden)
+    monkeypatch.setattr(socket, "create_connection", forbidden)
+    analysed = await client.post(f"/api/learning/sources/{source_id}/analyze")
+    assert analysed.status_code == 200
+    assert all(c["status"] == "proposal" for c in analysed.json()["capabilities"])
+    monkeypatch.undo()
+
+    # A source that is being read cannot be analysed yet.
+    async with k3_app.state.services.db.sessionmaker() as session:
+        row = await session.get(LearnedSource, uuid.UUID(source_id))
+        assert row is not None
+        row.status = "reading"
+        await session.commit()
+    busy = await client.post(f"/api/learning/sources/{source_id}/analyze")
+    assert busy.status_code == 409

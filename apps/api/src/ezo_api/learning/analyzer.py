@@ -29,7 +29,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.db.base import utcnow
@@ -40,6 +40,15 @@ EvidenceLevel = Literal["directly_supported", "inferred", "unverified"]
 RelevanceLevel = Literal["high", "medium", "low", "irrelevant"]
 CoverageLevel = Literal["full", "partial", "none"]
 LicenseRisk = Literal["safe", "review_needed", "copyleft", "unknown"]
+
+READING = ("queued", "inspecting", "reading", "indexing")
+ANALYZER_VERSION = 2
+"""Bumped when the analysis logic changes, so cached analyses are recomputed."""
+MAX_DOCUMENTS = 50
+MAX_CHARS_PER_DOCUMENT = 20_000
+# Keyword hits suggest a capability; they never prove it.
+INFERRED_CONFIDENCE = 0.55
+WEAK_COPYLEFT_PREFIXES = ("lgpl", "mpl", "epl", "cddl")
 
 
 # -----------------------------------------------------------------------------
@@ -243,7 +252,7 @@ EZO_TOOL_PROFILES: dict[str, dict[str, Any]] = {
         "description": "Renders vector graphics, diagrams, flowcharts, and SVG charts.",
         "keywords": ["diagram", "svg", "chart", "graph", "flowchart", "infographic"],
     },
-    "pdf": {
+    "pdf_tool": {
         "title": "PDF Processor",
         "category": "document",
         "description": "Extracts page ranges, text, and renders page previews from PDF files.",
@@ -255,7 +264,7 @@ EZO_TOOL_PROFILES: dict[str, dict[str, Any]] = {
         "description": "Converts DOCX, PPTX, and XLSX files to PDF format via LibreOffice.",
         "keywords": ["convert to pdf", "office pdf", "libreoffice", "export pdf"],
     },
-    "ocr": {
+    "ocr_tool": {
         "title": "Optical Character Recognition",
         "category": "document",
         "description": "Extracts text from images and scanned documents using Tesseract OCR.",
@@ -295,23 +304,23 @@ EZO_TOOL_PROFILES: dict[str, dict[str, Any]] = {
     },
 }
 
-# Ground truth of existing agents from AGENTS catalog
+# Domains of EZO's agents; availability is read from the live agent catalog (AGENTS), so
+# a planned agent is never reported as existing.
 EZO_AGENT_PROFILES: dict[str, dict[str, Any]] = {
-    "general": {"title": "General Companion", "available": True, "domain": "conversation"},
-    "language_coach": {"title": "Language Coach", "available": True, "domain": "education"},
-    "presentation": {"title": "Presentation Agent", "available": True, "domain": "presentation"},
+    "general": {"title": "General Companion", "domain": "conversation"},
+    "language_coach": {"title": "Language Coach", "domain": "education"},
+    "presentation": {"title": "Presentation Agent", "domain": "presentation"},
     "developer": {
         "title": "Developer Agent",
-        "available": False,  # planned for Phase 9
         "domain": "coding",
         "note": "Planned: repository access, running tests, git operations.",
     },
-    "legal_research": {"title": "Legal Research Agent", "available": True, "domain": "legal"},
-    "research": {"title": "Research Agent", "available": True, "domain": "research"},
-    "document": {"title": "Document Agent", "available": True, "domain": "document"},
-    "business": {"title": "Business Agent", "available": False, "domain": "business"},
-    "visual": {"title": "Visual Agent", "available": True, "domain": "media"},
-    "knowledge_os": {"title": "Knowledge OS", "available": True, "domain": "learning"},
+    "legal_research": {"title": "Legal Research Agent", "domain": "legal"},
+    "research": {"title": "Research Agent", "domain": "research"},
+    "document": {"title": "Document Agent", "domain": "document"},
+    "business": {"title": "Business Agent", "domain": "business"},
+    "visual": {"title": "Visual Agent", "domain": "media"},
+    "knowledge_os": {"title": "Knowledge OS", "domain": "learning"},
 }
 
 
@@ -320,15 +329,29 @@ EZO_AGENT_PROFILES: dict[str, dict[str, Any]] = {
 # -----------------------------------------------------------------------------
 
 
+def _agent_available(key: str) -> bool:
+    from ezo_api.agents.catalog import AGENTS
+
+    return any(spec.key == key and spec.available for spec in AGENTS.values())
+
+
 def _match_ezo_equivalents(
-    name: str, description: str, keywords: list[str]
+    name: str,
+    description: str,
+    keywords: list[str],
+    registered_tools: list[str] | None = None,
 ) -> list[ExistingEquivalent]:
-    """Compare a proposed capability against active EZO tools and agents."""
-    search_text = f"{name} {description} {' '.join(keywords)}".lower()
+    """Compare a proposed capability against the tools registered in this EZO instance and
+    its agents (whole-word matches only). A domain match with an agent is "partial": the
+    agent works in that area, which does not mean it has this capability."""
+    search_text = f"{name} {description} {' '.join(keywords)}".lower().replace("_", " ")
     matches: list[ExistingEquivalent] = []
+    available_tools = set(registered_tools) if registered_tools is not None else None
 
     # Check tools
     for tool_name, profile in EZO_TOOL_PROFILES.items():
+        if available_tools is not None and tool_name not in available_tools:
+            continue
         hits = 0
         for kw in profile["keywords"]:
             if re.search(r"\b" + re.escape(kw) + r"\b", search_text):
@@ -347,11 +370,12 @@ def _match_ezo_equivalents(
     # Check agents
     for agent_key, agent_profile in EZO_AGENT_PROFILES.items():
         domain = agent_profile["domain"]
-        if domain in search_text or agent_key in search_text:
-            agent_coverage: CoverageLevel = "full" if agent_profile["available"] else "partial"
+        if re.search(rf"\b{re.escape(domain)}\b", search_text):
+            available = _agent_available(agent_key)
+            agent_coverage: CoverageLevel = "partial" if available else "none"
             note_str = (
-                f"Covered by `{agent_key}` agent."
-                if agent_profile["available"]
+                f"The `{agent_key}` agent works in this area ({domain})."
+                if available
                 else (
                     f"Part of `{agent_key}` agent "
                     "(status: planned, not currently active in runtime)."
@@ -384,6 +408,10 @@ def _assess_license_risk(
     if not category and license_name:
         assessment = assess_license(license_name)
         category = assessment.get("category")
+    if category == "copyleft_or_restricted":
+        # safety.assess_license's category for GPL, AGPL, LGPL, MPL, SSPL, BUSL…
+        name = str(license_name or review.get("license") or "").lower()
+        category = "weak_copyleft" if name.startswith(WEAK_COPYLEFT_PREFIXES) else "copyleft"
 
     if category == "permissive":
         return (
@@ -406,13 +434,34 @@ def _assess_license_risk(
                 "Dynamic linking or service isolation required."
             ),
         )
+    if category == "other":
+        return (
+            "review_needed",
+            f"Unrecognised licence ({license_name}). Legal review needed before reusing code.",
+        )
     return "unknown", f"License '{license_name or 'unknown'}' needs legal and architecture review."
 
 
 def _sanitize_untrusted_text(text: str, max_chars: int = 400) -> str:
-    """Normalize and truncate documentation text for safe passive storage."""
+    """Normalize and truncate documentation text for passive storage. It stays untrusted:
+    callers show it only as quoted data, never as instructions."""
     clean = re.sub(r"\s+", " ", text).strip()
     return clean[:max_chars]
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")[:80] or "source"
+
+
+def _unique_flags(flags: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[dict[str, Any]] = []
+    for flag in flags:
+        key = (str(flag.get("kind")), str(flag.get("location")), str(flag.get("excerpt")))
+        if key not in seen:
+            seen.add(key)
+            unique.append(dict(flag))
+    return unique
 
 
 # -----------------------------------------------------------------------------
@@ -437,13 +486,17 @@ class CapabilityAnalyzer:
         """Inspect one LearnedSource and its documents to formulate capability proposals."""
         # 1. Gather documents and revisions
         stmt = (
-            select(KnowledgeDocument, DocumentRevision.raw_text)
+            select(
+                KnowledgeDocument,
+                func.substr(DocumentRevision.raw_text, 1, MAX_CHARS_PER_DOCUMENT),
+            )
             .outerjoin(
                 DocumentRevision,
                 DocumentRevision.id == KnowledgeDocument.current_revision_id,
             )
             .where(KnowledgeDocument.source_id == source.knowledge_source_id)
             .order_by(KnowledgeDocument.created_at)
+            .limit(MAX_DOCUMENTS)
         )
         results = (await session.execute(stmt)).all()
 
@@ -452,8 +505,9 @@ class CapabilityAnalyzer:
         license_review = profile.get("license_review")
         lic_risk, lic_notes = _assess_license_risk(license_name, license_review)
 
-        # 2. Check for security flags and prompt injection
-        sec_flags = source.security_flags or []
+        # 2. Check for security flags and prompt injection (a copy: the stored K1 list is
+        # never changed here, and a passage K1 already flagged is not counted twice).
+        sec_flags = [dict(flag) for flag in source.security_flags or []]
         doc_texts: list[tuple[str, str, str | None, str]] = []  # (doc_id, title, url, text)
 
         for doc, raw_text in results:
@@ -463,6 +517,7 @@ class CapabilityAnalyzer:
             injections = scan_text(text, doc.source_url or doc.title)
             for inj in injections:
                 sec_flags.append(inj.as_dict())
+        sec_flags = _unique_flags(sec_flags)
 
         # 3. Main purpose extraction
         main_purpose = (
@@ -521,9 +576,16 @@ class CapabilityAnalyzer:
             status="proposal",
         )
 
-        # Persist analysis snapshot into source.profile for fast reuse
-        profile["capability_analysis"] = analysis.model_dump(mode="json")
-        source.profile = dict(profile)
+        # Cache for reuse: a new dict (an in-place change of the JSON column would not be
+        # saved), tied to the content read and the analyzer version.
+        source.profile = {
+            **profile,
+            "capability_analysis": {
+                **analysis.model_dump(mode="json"),
+                "content_hash": source.content_hash,
+                "analyzer_version": ANALYZER_VERSION,
+            },
+        }
         session.add(source)
 
         return analysis
@@ -571,6 +633,11 @@ class CapabilityAnalyzer:
         analyzed_count = 0
 
         for src in sources:
+            if src.status in READING:
+                evidence_limitations.append(
+                    f"Source '{src.title}' is still being read; analyse it again when it is done."
+                )
+                continue
             source_analysis = await self.analyze_source(session, src)
             analyzed_count += 1
             all_proposals.extend(source_analysis.capabilities)
@@ -672,8 +739,11 @@ class CapabilityAnalyzer:
         sec_flags: list[dict[str, Any]],
     ) -> ProposedCapability:
         """Construct the central capability proposal for the learned package/repo."""
-        slug_name = re.sub(r"[^a-z0-9]+", "_", source.title.lower()).strip("_")
-        clean_title = source.title.replace("_", " ").replace("-", " ").title()
+        slug_name = _slug(source.title)
+        clean_title = _sanitize_untrusted_text(
+            source.title.replace("_", " ").replace("-", " "), 80
+        ).title()
+        registry_summary = bool((source.profile or {}).get("description"))
 
         # Build evidence
         evidence_list: list[SourceEvidence] = []
@@ -686,7 +756,8 @@ class CapabilityAnalyzer:
                     title=first_doc[1],
                     url=first_doc[2],
                     excerpt=excerpt,
-                    evidence_level="directly_supported",
+                    # The opening of a document is context, not a stated capability.
+                    evidence_level="inferred",
                     outdated_warning="Source version may differ from current release"
                     if not source.version
                     else None,
@@ -715,9 +786,11 @@ class CapabilityAnalyzer:
         raw_classifiers = profile.get("classifiers")
         if isinstance(raw_classifiers, list):
             keywords.extend(str(c) for c in raw_classifiers)
-        equivalents = _match_ezo_equivalents(slug_name, main_purpose, keywords)
+        equivalents = _match_ezo_equivalents(
+            slug_name, main_purpose, keywords, self.registered_tools
+        )
 
-        is_already_covered = any(e.coverage == "full" for e in equivalents)
+        is_already_covered = any(e.kind == "tool" and e.coverage == "full" for e in equivalents)
 
         # Determine relevance and domain
         category = self._detect_category(combined_text, source.kind)
@@ -751,7 +824,13 @@ class CapabilityAnalyzer:
             id=str(uuid.uuid4()),
             name=f"{slug_name}_integration",
             title=f"{clean_title} Integration",
-            description=f"Provide EZO with capabilities to {main_purpose.lower()}.",
+            # Written from a template: documentation text never becomes the description
+            # (it may contain instructions); the purpose is in the evidence excerpt.
+            description=(
+                f"Use the {source.kind} source “{clean_title}” in EZO. What it does is "
+                "described in its documentation (see the evidence excerpt); EZO has not "
+                "verified it."
+            ),
             category=category,
             relevance=relevance,
             relevance_reason=relevance_reason,
@@ -767,7 +846,7 @@ class CapabilityAnalyzer:
             security_notes="; ".join(sec_notes_parts),
             licensing_notes=lic_notes,
             evidence=evidence_list,
-            confidence=0.85 if doc_texts else 0.50,
+            confidence=(0.6 if registry_summary else INFERRED_CONFIDENCE) if doc_texts else 0.45,
             evidence_gaps=[]
             if doc_texts
             else ["Full documentation not indexed; proposal based on package summary."],
@@ -800,7 +879,7 @@ class CapabilityAnalyzer:
                     "and decrypt password-protected files."
                 ),
                 (
-                    "EZO's current `pdf` and `office_pdf` tools extract pages and text, "
+                    "EZO's current `pdf_tool` and `office_pdf` tools extract pages and text, "
                     "but lack interactive form filling and signature verification."
                 ),
             ),
@@ -877,9 +956,11 @@ class CapabilityAnalyzer:
             if re.search(pattern, combined_text, re.IGNORECASE):
                 # Search for supporting doc snippet
                 evidence_items: list[SourceEvidence] = []
+                term = ""
                 for doc_id, doc_title, url, text in doc_texts:
                     match = re.search(pattern, text, re.IGNORECASE)
                     if match:
+                        term = match.group(0).lower()
                         start = max(0, match.start() - 60)
                         end = min(len(text), match.end() + 150)
                         snippet = _sanitize_untrusted_text(text[start:end], 250)
@@ -889,7 +970,9 @@ class CapabilityAnalyzer:
                                 title=doc_title,
                                 url=url,
                                 excerpt=snippet,
-                                evidence_level="directly_supported",
+                                # A keyword in the text suggests the feature; a person must
+                                # confirm it from the documentation.
+                                evidence_level="inferred",
                             )
                         )
                         break
@@ -905,15 +988,23 @@ class CapabilityAnalyzer:
                         )
                     )
 
-                equivs = _match_ezo_equivalents(name, description, [category])
-                is_supported = any(e.coverage == "full" for e in equivs)
+                equivs = _match_ezo_equivalents(name, description, [], self.registered_tools)
+                is_supported = any(e.kind == "tool" and e.coverage == "full" for e in equivs)
+                mentioned = f" (the documentation mentions “{term}”)" if term else ""
+                security = lic_notes
+                if sec_flags:
+                    security += (
+                        f"; ATTENTION: the source contains {len(sec_flags)} passage(s) that "
+                        "try to instruct an AI; treated as data."
+                    )
 
                 sub_caps.append(
                     ProposedCapability(
                         id=str(uuid.uuid4()),
-                        name=f"{source.title.lower()}_{name}",
+                        name=f"{_slug(source.title)}_{name}",
                         title=title,
-                        description=description,
+                        description=f"Possible capability{mentioned}: {description} "
+                        "Not verified: confirm it in the documentation.",
                         category=category,
                         relevance="high"
                         if category in ("document", "developer", "media")
@@ -930,13 +1021,13 @@ class CapabilityAnalyzer:
                         compatibility_notes=(
                             "Requires isolated execution environment with strict memory/CPU quotas."
                         ),
-                        security_notes=lic_notes,
+                        security_notes=security,
                         licensing_notes=lic_notes,
                         evidence=evidence_items,
-                        confidence=0.80
-                        if evidence_items[0].evidence_level == "directly_supported"
-                        else 0.55,
-                        evidence_gaps=[],
+                        confidence=INFERRED_CONFIDENCE if term else 0.4,
+                        evidence_gaps=[
+                            "Inferred from a keyword; the exact feature is not confirmed."
+                        ],
                         recommended_next_step="Evaluate as an optional plugin in Phase K4.",
                         status="proposal",
                     )
@@ -962,6 +1053,10 @@ class CapabilityAnalyzer:
                 # Union dependencies
                 merged_deps = set(existing.required_dependencies) | set(p.required_dependencies)
                 existing.required_dependencies = sorted(merged_deps)
+                # Keep every source's security and licensing warnings.
+                for attr in ("security_notes", "licensing_notes"):
+                    notes = [n for n in (getattr(existing, attr), getattr(p, attr)) if n]
+                    setattr(existing, attr, "; ".join(dict.fromkeys(notes)))
             else:
                 deduped[norm_key] = p
 
@@ -972,19 +1067,22 @@ class CapabilityAnalyzer:
     # -------------------------------------------------------------------------
 
     def _detect_category(self, text: str, kind: str) -> str:
-        if any(w in text for w in ("pdf", "docx", "document", "xlsx", "table", "csv", "office")):
+        """Whole words only ("stable" is not "table", "rapid" is not "api")."""
+
+        def has(*words: str) -> bool:
+            return any(re.search(rf"\b{re.escape(w)}s?\b", text) for w in words)
+
+        if has("pdf", "docx", "document", "xlsx", "table", "csv", "office"):
             return "document"
-        if any(w in text for w in ("http", "api", "request", "crawl", "web", "socket", "network")):
+        if has("http", "api", "request", "crawl", "web", "socket", "network"):
             return "networking"
-        if any(
-            w in text for w in ("image", "photo", "chart", "diagram", "video", "audio", "media")
-        ):
+        if has("image", "photo", "chart", "diagram", "video", "audio", "media"):
             return "media"
-        if any(w in text for w in ("security", "crypto", "auth", "certificate", "token", "hash")):
+        if has("security", "crypto", "auth", "certificate", "token", "hash"):
             return "security"
-        if any(w in text for w in ("ast", "compiler", "git", "repo", "test", "lint", "code")):
+        if has("ast", "compiler", "git", "repo", "test", "lint", "code"):
             return "developer"
-        if any(w in text for w in ("law", "legal", "official", "lex", "legislation")):
+        if has("law", "legal", "official", "lex", "legislation"):
             return "official"
         return "data_processing"
 
@@ -1057,3 +1155,16 @@ class CapabilityAnalyzer:
         if category == "networking" or "network" in text or "http" in text:
             perms.append("network_outbound")
         return sorted(set(perms))
+
+
+def cached_analysis(source: LearnedSource) -> SourceCapabilityAnalysis | None:
+    """The stored analysis when it still matches the source's content and this analyzer."""
+    cached = (source.profile or {}).get("capability_analysis")
+    if (
+        not isinstance(cached, dict)
+        or cached.get("analyzer_version") != ANALYZER_VERSION
+        or cached.get("content_hash") != source.content_hash
+    ):
+        return None
+    data = {k: v for k, v in cached.items() if k not in ("content_hash", "analyzer_version")}
+    return SourceCapabilityAnalysis.model_validate(data)

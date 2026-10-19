@@ -8,6 +8,17 @@ from dataclasses import dataclass, field
 from ezo_api.knowledge.retrieval.sources import SourceRef
 
 _MARKER = re.compile(r"\[(\d{1,3}(?:\s*[,;]\s*\d{1,3})*)\]")
+_TAG = re.compile(r"<(/?)\s*source", re.IGNORECASE)
+
+
+def _data(text: str) -> str:
+    """Source text cannot close or open a <source> tag (it would escape the data block)."""
+    return _TAG.sub(lambda m: f"‹{m.group(1)}source", text)
+
+
+def _line(text: str, limit: int = 300) -> str:
+    """Header values (title, URL, version…) come from sources too: one line, no tags."""
+    return _data(" ".join(str(text).split()))[:limit]
 
 
 def format_sources_for_prompt(sources: list[SourceRef]) -> str:
@@ -15,7 +26,7 @@ def format_sources_for_prompt(sources: list[SourceRef]) -> str:
     must be treated as data: it may contain instructions that EZO must ignore."""
     blocks: list[str] = []
     for source in sources:
-        header = f"[{source.n}] {source.title}"
+        header = f"[{source.n}] {_line(source.title)}"
         details = [source.source_name]
         if source.url:
             details.append(source.url)
@@ -34,8 +45,8 @@ def format_sources_for_prompt(sources: list[SourceRef]) -> str:
             details.append(
                 f"reliability {source.reliability:.2f}" + (" (primary)" if source.primary else "")
             )
-        info = "; ".join(details)
-        body = f'<source n="{source.n}">\n{source.excerpt}\n</source>'
+        info = _line("; ".join(details), 600)
+        body = f'<source n="{source.n}">\n{_data(source.excerpt)}\n</source>'
         blocks.append(f"{header}\n({info})\n{body}")
     return "\n\n".join(blocks)
 

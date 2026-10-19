@@ -59,7 +59,7 @@ describe("Sources", () => {
         license: "MIT",
         last_checked_at: "2026-10-15T10:00:00Z",
         freshness_status: "changed",
-        freshness_note: "Manba o'zgargan",
+        freshness_note: "The source had changed when EZO checked it; this is the updated text.",
       },
       {
         ...base,
@@ -75,7 +75,7 @@ describe("Sources", () => {
 
     expect(html).toContain("v2.4.0");
     expect(html).toContain("MIT");
-    expect(html).toContain("Manba o&#x27;zgargan"); // changed badge in uz
+    expect(html).toContain("Manba yangilangan"); // changed badge in uz: EZO has the new text
     expect(html).toContain("30 kundan ortiq tekshirilmagan"); // not_recently_checked badge in uz
     expect(html).toContain("Joriy"); // current badge in uz
   });

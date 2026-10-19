@@ -16,12 +16,19 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
-from ezo_api.db.models import KnowledgeDocument, KnowledgeLibrary, LearnedSource
+from ezo_api.db.models import (
+    Conversation,
+    KnowledgeDocument,
+    KnowledgeLibrary,
+    LearnedSource,
+    Message,
+)
 from ezo_api.knowledge.fetch import FetchError
 from ezo_api.learning.analyzer import (
     CapabilityAnalyzer,
     LibraryCapabilityReport,
     SourceCapabilityAnalysis,
+    cached_analysis,
 )
 from ezo_api.learning.base import Limits
 from ezo_api.learning.service import (
@@ -209,6 +216,30 @@ async def delete_library(
         )
     for source in sources:
         await _service(services).delete(session, source)
+    # Conversations scoped to this library fall back to all of the user's files: say so in
+    # each of them, visibly, instead of silently widening what answers draw on.
+    linked = (
+        await session.scalars(
+            select(Conversation).where(
+                Conversation.library_id == library.id, Conversation.user_id == user.id
+            )
+        )
+    ).all()
+    for conversation in linked:
+        conversation.library_id = None
+        session.add(
+            Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                content=(
+                    f"«{library.name}» bilim kutubxonasi o'chirildi. Bu suhbatdagi keyingi "
+                    "javoblar endi barcha fayllaringizdan foydalanadi."
+                ),
+                language="uz",
+                agent="knowledge_os",
+                meta={"notice": "library_deleted", "library": library.name},
+            )
+        )
     audit(
         session,
         user.id,
@@ -378,6 +409,14 @@ async def delete_source(
     return Response(status_code=204)
 
 
+def _not_while_reading(source: LearnedSource) -> None:
+    if source.status in RUNNING:
+        raise HTTPException(
+            409,
+            detail={"code": "busy", "message": "The source is still being read; try again later."},
+        )
+
+
 @router.post("/sources/{source_id}/analyze", status_code=200)
 async def analyze_source_capabilities(
     source_id: uuid.UUID,
@@ -387,6 +426,7 @@ async def analyze_source_capabilities(
 ) -> SourceCapabilityAnalysis:
     """Analyze a single learned source and formulate capability proposals."""
     source = await _owned_source(session, user.id, source_id)
+    _not_while_reading(source)
     analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
     analysis = await analyzer.analyze_source(session, source)
     audit(
@@ -408,12 +448,14 @@ async def get_source_capabilities(
     services: ServicesDep,
     user: CurrentUser,
 ) -> SourceCapabilityAnalysis:
-    """Retrieve capability analysis for a single learned source."""
+    """The stored analysis while it matches the content read; otherwise a fresh one, which
+    a GET does not save (use POST …/analyze for that)."""
     source = await _owned_source(session, user.id, source_id)
-    cached = (source.profile or {}).get("capability_analysis")
-    if cached:
-        return SourceCapabilityAnalysis.model_validate(cached)
+    cached = cached_analysis(source)
+    if cached is not None:
+        return cached
+    _not_while_reading(source)
     analyzer = CapabilityAnalyzer(registered_tools=services.tools.names())
     analysis = await analyzer.analyze_source(session, source)
-    await session.commit()
+    await session.rollback()  # read-only request: nothing is written
     return analysis

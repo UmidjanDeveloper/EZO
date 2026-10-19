@@ -89,10 +89,8 @@ async def update_conversation(
     if "library_id" in body.model_fields_set:
         if body.library_id is not None:
             library = await session.get(KnowledgeLibrary, body.library_id)
-            if library is None:
+            if library is None or library.user_id != user.id:
                 raise HTTPException(404, detail="Library not found.")
-            if library.user_id != user.id:
-                raise HTTPException(403, detail="Forbidden.")
         conversation.library_id = body.library_id
     await session.commit()
     return ConversationOut.model_validate(conversation)

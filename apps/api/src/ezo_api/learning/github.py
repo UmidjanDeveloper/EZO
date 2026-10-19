@@ -167,9 +167,9 @@ class GitHubReader:
             inspection.profile["latest_release"] = release.get("tag_name")
         except FetchError:
             inspection.profile["latest_release"] = None
-        inspection.version = inspection.profile.get("latest_release") or (
-            sha[:12] if sha != branch else None
-        )
+        # The files are read at this commit, so the commit is the version; the latest
+        # release tag (which may be older than the branch) stays in the profile.
+        inspection.version = sha[:12] if sha != branch else None
 
         try:
             tree = await self._api(f"{base}/git/trees/{quote(sha)}?recursive=1", 8_000_000)

@@ -66,22 +66,28 @@ def refers_to_a_file(text: str) -> bool:
 
 
 async def recent_documents(
-    session: AsyncSession, user_id: uuid.UUID, project_scope: uuid.UUID | None
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    project_scope: uuid.UUID | None,
+    document_ids: frozenset[uuid.UUID] | None = None,
 ) -> list[KnowledgeDocument]:
+    """The newest searchable documents; only `document_ids` when given (a library scope)."""
+    statement = select(KnowledgeDocument).where(
+        KnowledgeDocument.user_id == user_id,
+        KnowledgeDocument.status.in_(SEARCHABLE_STATUSES),
+        or_(
+            KnowledgeDocument.project_id.is_(None),
+            KnowledgeDocument.project_id == project_scope,
+        ),
+    )
+    if document_ids is not None:
+        if not document_ids:
+            return []
+        statement = statement.where(KnowledgeDocument.id.in_(document_ids))
     return list(
         (
             await session.scalars(
-                select(KnowledgeDocument)
-                .where(
-                    KnowledgeDocument.user_id == user_id,
-                    KnowledgeDocument.status.in_(SEARCHABLE_STATUSES),
-                    or_(
-                        KnowledgeDocument.project_id.is_(None),
-                        KnowledgeDocument.project_id == project_scope,
-                    ),
-                )
-                .order_by(KnowledgeDocument.created_at.desc())
-                .limit(RECENT_DOCUMENTS)
+                statement.order_by(KnowledgeDocument.created_at.desc()).limit(RECENT_DOCUMENTS)
             )
         ).all()
     )
@@ -94,9 +100,11 @@ async def find_documents(
     text: str,
     *,
     limit: int = 1,
+    document_ids: frozenset[uuid.UUID] | None = None,
 ) -> list[DocumentRef]:
-    """Documents the request names, else (for "this file" style requests) the latest uploads."""
-    documents = await recent_documents(session, user_id, project_scope)
+    """Documents the request names, else (for "this file" style requests) the latest uploads.
+    With `document_ids` (a library-scoped conversation) only those documents qualify."""
+    documents = await recent_documents(session, user_id, project_scope, document_ids)
     if not documents:
         return []
     norm = normalize(text.replace("_", " ").replace("-", " "))

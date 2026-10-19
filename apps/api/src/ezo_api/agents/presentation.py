@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -51,6 +52,7 @@ from ezo_api.documents.render.spec import DeckSpec, SlideSpec
 from ezo_api.documents.render.theme import THEMES
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
+from ezo_api.learning.service import resolve_library_documents
 from ezo_api.organization.letterhead import mentions_organization
 from ezo_api.organization.service import load_facts
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
@@ -290,9 +292,14 @@ class PresentationAgent(Agent):
         tools = ctx.tools
         text = ctx.turn.text
         sources: list[SourceRef] = []
+        scope: frozenset[uuid.UUID] | None = None
+        if tools.library_scope is not None:
+            _, scope = await resolve_library_documents(
+                tools.session, user_id=tools.user_id, library_id=tools.library_scope
+            )
         if await has_searchable_documents(tools.session, tools.user_id, tools.project_scope):
             for ref in await find_documents(
-                tools.session, tools.user_id, tools.project_scope, text
+                tools.session, tools.user_id, tools.project_scope, text, document_ids=scope
             ):
                 read = await call_tool(
                     gathered,

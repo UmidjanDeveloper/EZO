@@ -431,7 +431,7 @@ const uz = {
     lastChecked: "Oxirgi tekshirish: {d}",
     freshness: {
       current: "Joriy",
-      changed: "Manba o'zgargan",
+      changed: "Manba yangilangan",
       notRecentlyChecked: "30 kundan ortiq tekshirilmagan",
     },
   },
@@ -933,7 +933,7 @@ const en: Messages = {
     lastChecked: "Last checked: {d}",
     freshness: {
       current: "Current",
-      changed: "Source changed",
+      changed: "Source updated",
       notRecentlyChecked: "Not checked in 30+ days",
     },
   },
@@ -1433,7 +1433,7 @@ const ru: Messages = {
     lastChecked: "Последняя проверка: {d}",
     freshness: {
       current: "Актуально",
-      changed: "Источник изменился",
+      changed: "Источник обновлён",
       notRecentlyChecked: "Не проверялся более 30 дней",
     },
   },

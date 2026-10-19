@@ -146,10 +146,10 @@ async def test_resolve_library_documents_cross_user_and_isolation(database_url: 
         assert lib2.id == lib_a2.id
         assert doc_ids2 == frozenset()
 
-        # 3. User A attempts to access User B's Library B -> 403 Forbidden
+        # 3. User A attempts to access User B's Library B -> 404 (existence is not revealed)
         with pytest.raises(HTTPException) as exc_info:
             await resolve_library_documents(session, user_id=user_a.id, library_id=lib_b.id)
-        assert exc_info.value.status_code == 403
+        assert exc_info.value.status_code == 404
 
         # 4. Accessing non-existent library -> 404 Not Found
         with pytest.raises(HTTPException) as exc_info404:
@@ -405,7 +405,7 @@ async def test_provenance_and_freshness_logic(database_url: str) -> None:
         assert len(res2.sources) == 1
         s2 = res2.sources[0]
         assert s2.freshness_status == "changed"
-        assert "o'zgarganligi aniqlangan" in (s2.freshness_note or "")
+        assert "this is the updated text" in (s2.freshness_note or "")
 
         # Retrieve Legacy -> check freshness_status == "not_recently_checked"
         res3 = await retriever.retrieve(
@@ -414,7 +414,7 @@ async def test_provenance_and_freshness_logic(database_url: str) -> None:
         assert len(res3.sources) == 1
         s3 = res3.sources[0]
         assert s3.freshness_status == "not_recently_checked"
-        assert "30 kundan ortiq" in (s3.freshness_note or "")
+        assert "more than 30 days ago" in (s3.freshness_note or "")
 
     await engine.dispose()
 
@@ -511,6 +511,6 @@ async def test_knowledge_search_tool_library_scoping(database_url: str) -> None:
         )
         assert res_unauth.ok is False
         assert len(res_unauth.sources) == 0
-        assert "Forbidden" in (res_unauth.error or "")
+        assert "not found" in (res_unauth.error or "")
 
     await engine.dispose()

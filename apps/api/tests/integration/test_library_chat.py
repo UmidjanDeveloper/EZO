@@ -95,17 +95,17 @@ async def test_cross_user_library_rejection_in_chat(client: AsyncClient, app: An
         await session.commit()
         other_lib_id = str(other_lib.id)
 
-    # Authenticated test client attempts to stream chat with other user's library -> 403 Forbidden
+    # Streaming chat with another user's library -> 404 (its existence is not revealed)
     res = await client.post(
         "/api/chat/stream", json={"message": "Hack", "library_id": other_lib_id}
     )
-    assert res.status_code == 403
+    assert res.status_code == 404
 
-    # Authenticated test client attempts non-streaming chat with other user's library -> 403
+    # Authenticated test client attempts non-streaming chat with other user's library -> 404
     res_non_stream = await client.post(
         "/api/chat", json={"message": "Hack", "library_id": other_lib_id}
     )
-    assert res_non_stream.status_code == 403
+    assert res_non_stream.status_code == 404
 
     # Non-existent library -> 404 Not Found
     random_id = str(uuid.uuid4())
@@ -139,13 +139,36 @@ async def test_conversation_update_library_authorization(client: AsyncClient, ap
         await session.commit()
         victim_lib_id = str(other_lib.id)
 
-    # Patch conversation with other user's library -> 403 Forbidden
+    # Patch conversation with other user's library -> 404 (existence is not revealed)
     res_forbidden = await client.patch(
         f"/api/conversations/{conv_id}", json={"library_id": victim_lib_id}
     )
-    assert res_forbidden.status_code == 403
+    assert res_forbidden.status_code == 404
 
     # Clear library via patch (set None) -> 200
     res_clear = await client.patch(f"/api/conversations/{conv_id}", json={"library_id": None})
     assert res_clear.status_code == 200
     assert res_clear.json()["library_id"] is None
+
+
+async def test_deleting_a_library_tells_its_conversations(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    lib = await create_library(client, name="Eskirgan kutubxona")
+    events = await stream_chat(client, message="Salom", library_id=lib["id"])
+    conv_id = events[0][1]["conversation_id"]
+    assert (await client.delete(f"/api/learning/libraries/{lib['id']}")).status_code == 204
+    conv = (await client.get(f"/api/conversations/{conv_id}")).json()
+    assert conv["library_id"] is None
+    messages = (await client.get(f"/api/conversations/{conv_id}/messages")).json()
+    notice = messages[-1]
+    assert notice["role"] == "assistant" and "«Eskirgan kutubxona»" in notice["content"]
+    assert "barcha fayllaringizdan" in notice["content"]
+
+
+async def test_capability_wording_inside_other_tasks_keeps_its_agent(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    fake_anthropic.replies = ["Javob."]
+    events = await stream_chat(client, message="Toshkentda yoshlar uchun qanday imkoniyatlar bor?")
+    assert events[0][1]["agent"] != "knowledge_os"
