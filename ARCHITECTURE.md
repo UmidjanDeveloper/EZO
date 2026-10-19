@@ -194,6 +194,19 @@ link-local and CGNAT addresses on every redirect hop, checks `robots.txt`, limit
 content type and time. `tools/reliability.py` scores domains (official `gov.uz`/`.gov` 0.95,
 academic 0.85, established news 0.7 … social 0.35).
 
+Knowledge OS (K1, `learning/`): `targets.py` recognises websites, `github:owner/repo`,
+`pypi:` and `npm:` targets; `crawler.py` (one host and folder, robots.txt + Crawl-delay,
+per-host pacing, budgets), `github.py` (REST API metadata and tree, prioritised text
+files from raw.githubusercontent.com at the commit, raw fallback) and `packages.py`
+(PyPI / npm registry facts, README, linked docs site) produce `ReadDocument`s;
+`safety.py` flags prompt-injection passages and assesses licences; `service.py`
+(`LearningService`, `LearningRunner`) registers a `LearnedSource` in a `KnowledgeLibrary`
+(migration 0012), stores each document through `KnowledgeService.add_source_document`
+under one `KnowledgeSource` (type `learned`) and runs the normal ingestion pipeline, so
+retrieval, citations and deletion are shared. Status is persisted at every step; jobs
+resume after a restart. API: `/api/learning`; chat: `agents/learning.py` (EzoCore
+override when a source and a "learn" verb are present). Docs: `docs/KNOWLEDGE_OS.md`.
+
 Every tool call goes through `ToolRegistry.execute`: Pydantic argument validation, unknown and
 dangerous tools denied (dangerous ones need explicit confirmation), timeout, and
 a `tool_calls` row with redacted arguments.

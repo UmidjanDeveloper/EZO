@@ -180,6 +180,17 @@ shows which providers are connected and which model each route uses.
 | `EZO_VECTOR_STORE` | `auto`, `pgvector` or `local` | `auto` |
 | `EZO_INGESTION_MODE` | `background` (don’t wait) or `inline` | `background` |
 
+### Learning sources (Bilim kutubxonalari) — experimental
+
+“Ezo, shu website'ni o'rgan: https://…”, “github:owner/repo ni o'rgan”, “pypi:requests ni
+o'rgan”, “O'rgangan manbalaringni ko'rsat”, or **Files → Bilim kutubxonalari**. EZO reads
+documentation websites (one site and folder, robots.txt respected), GitHub repositories
+and PyPI / npm packages into named knowledge libraries, records version and licence (with
+a commercial-use review flag), flags prompt-injection attempts, and uses what it read in
+later answers. **Nothing from a source is run or installed, and EZO does not gain new
+skills from it** — skills (SkillForge) are a later phase. `EZO_GITHUB_TOKEN` is optional.
+Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
+
 ### Voice mode notes
 
 Voice works in three ways, and EZO picks the best one automatically:

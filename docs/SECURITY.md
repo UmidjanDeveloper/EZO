@@ -92,6 +92,15 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   been reviewed cannot be enabled. See `docs/OFFICIAL_SOURCES.md`.
 - OpenCode is evaluated only (not installed). The isolation rules a future integration must
   follow are in `docs/OPENCODE_INTEGRATION_PLAN.md`.
+- **Knowledge OS (learning sources, K1)**: every request goes through `SafeFetcher`, which
+  since K1 also re-checks the address actually connected to (DNS rebinding; direct
+  connections) and sends extra headers (the optional `EZO_GITHUB_TOKEN`) only to the
+  original host, never across a redirect. Website reading stays on one host and folder,
+  obeys robots.txt and Crawl-delay, paces requests per host and has page, depth, size and
+  time budgets; archives, binaries and scripts are never requested. Read text is data:
+  injection-like passages are flagged, shown and audit-logged, never acted on. **Nothing
+  from a source is executed, installed or cloned.** Generated code will not run before a
+  real isolated sandbox exists (K4); until then SkillForge does not exist.
 
 ### Optional external services
 

@@ -51,6 +51,7 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 |---|---|---|
 | EzoCore chat, routing, personality, memory | Foundation | alpha |
 | Files, knowledge base, citations; ResearchAgent | Knowledge | alpha |
+| Knowledge OS K1: libraries, learned websites / GitHub / PyPI / npm (read-only; no skills) | Knowledge OS | experimental |
 | Turn-by-turn voice, orb presence states | Voice | alpha |
 | Artifacts with versions and exports | Artifacts | alpha |
 | Story projects (API only) | Artifacts | experimental |
@@ -104,7 +105,12 @@ tests **run** (no LibreOffice skips any more).
 
 - Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 664
   passed + 1 skipped (pgvector); PostgreSQL 665 passed.
-- Migration 0011 verified up → check → down → up on SQLite and PostgreSQL.
+- Migrations 0011 and 0012 verified up → check → down → up on a fresh SQLite file
+  (0001 → 0012) and on PostgreSQL; an existing organization row gets `formatting = '{}'`.
+  **Correction:** the earlier local "SQLite" migration check for 0011 set
+  `EZO_DATABASE_URL`, which the settings do not read (`DATABASE_URL` is the variable), so
+  it ran against the default local PostgreSQL database only. It was redone correctly on
+  2026-10-19 with the result above.
 - The full Playwright suite passed locally (28).
 - A letter in an approved template and a document on EZO's letterhead were converted to
   PDF with LibreOffice and inspected visually (letterhead, header with QORALAMA, logo,
@@ -116,6 +122,57 @@ tests **run** (no LibreOffice skips any more).
 - Live provider tests **not performed** (no provider keys here): the quality of AI-written
   drafts, translations, teaching materials and research plans has only been checked with
   scripted model replies.
+
+## Knowledge OS K1 — Source registry and secure reading (2026-10-19) — experimental
+
+Commits `943c7c9` (backend, migration 0012), `56b2590` (package init), `96332e2` (Knowledge
+page, e2e), docs commit after it. Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
+K2–K7 and SkillForge are **not built**; EZO cannot create, install or run skills.
+
+### What works
+
+- **Libraries and learned sources** (`learning/`, migration 0012): websites (one host and
+  folder; robots.txt and Crawl-delay; per-host pacing; page, depth, size and time
+  budgets), GitHub (API metadata, licence, commit, release, file map; prioritised text
+  files at the commit; raw fallback marked partial), PyPI and npm (registry facts,
+  README, linked documentation site). Documents go through the normal ingestion pipeline,
+  so search, citations and deletion are shared; they persist across restarts.
+- **Safety**: nothing from a source is executed, installed or cloned; archives, binaries
+  and scripts are never requested; prompt-injection passages are flagged, shown and
+  audit-logged; licences assessed (permissive / needs review); SafeFetcher re-checks the
+  connected peer (DNS rebinding) and never sends extra headers across a redirect.
+- **Status** persisted at every step (queued → inspecting → reading → indexing →
+  indexed / partial / failed) with reasons; background runner resumes after restart.
+- **Chat**: "… ni o'rgan" (website, GitHub, `pypi:`, `npm:`, into a named library),
+  "O'rgangan manbalaringni ko'rsat"; the reply states the stored status and never claims
+  a skill. **Knowledge page**: learn form, live status, details, refresh, delete.
+
+### Acceptance scenarios (tests)
+
+| Scenario | Test |
+|---|---|
+| Website: folder scope, robots.txt, depth limit, other hosts and archives never requested, injection flagged and audit-logged, page limit → partial | `tests/integration/test_learning.py::test_website_is_read_within_its_folder_rules_and_limits` |
+| Knowledge persists across a restart and is searchable with page URLs (A) | `::test_knowledge_survives_a_restart_and_is_searchable` |
+| GitHub via API: metadata, licence, release, commit, README first, code as text, no node_modules / binaries / shell scripts / oversized files, no token sent (B) | `::test_github_repository_via_api_without_running_anything` |
+| GitHub API refused → raw fallback, licence from the LICENSE text, marked partial (H) | `::test_github_falls_back_to_raw_files_when_the_api_is_refused` |
+| PyPI with its docs site; npm GPL flagged for review; unknown package → failed with a reason (H) | `::test_packages_from_pypi_and_npm`, `::test_an_unreachable_documentation_site_makes_the_package_partial` |
+| Libraries, duplicates, refresh without re-indexing, private/loopback addresses refused, privacy, deletion removes documents and stored files | `::test_registry_privacy_refresh_and_deletion` |
+| Chat: learn, list, refused private address; no skill claimed | `::test_chat_learns_a_source_and_lists_what_it_learned` |
+| Targets, scope, priorities, injection patterns (uz/ru/en), licences, header and rebinding protections (F) | `tests/unit/test_learning.py` |
+| Real browser against a real local docs site: status, flags, licence warning, robots, scope, delete | e2e `learning.spec.ts` |
+
+**Live (local, not in CI)**: through the full app, `pypi:httpx` (0.28.1, BSD-3-Clause,
+README + facts; its docs site unreachable from the sandbox → recorded), `npm:left-pad`
+(1.3.0, WTFPL → needs review) and `github:psf/requests` (API 403 in the sandbox → raw
+fallback: README, LICENSE recognised as Apache-2.0, pyproject.toml) were read and indexed.
+**Not verified live**: the GitHub REST API and general documentation websites (blocked by
+the sandbox network).
+
+### Not done
+
+K2 (library-scoped answers, stale warnings, contradiction checks), K3–K7 and SkillForge;
+scheduled change detection; JavaScript-rendered sites; no per-source token budget for
+model calls (K1 makes no model calls).
 
 ## Stage E1 — Organization profiles (2026-10-19) — alpha
 
@@ -913,8 +970,9 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Knowledge OS & SkillForge (owner prompt of 2026-10-19), starting with K1 — source registry
-and secure ingestion. Government work mode E2–E4 (secretary, citizen appeals, reports)
+Knowledge OS K2 — library-scoped retrieval in chat, citations, source versions and
+stale-source warnings. Then K3 (capability analysis) and K4 (secure sandbox, required before
+any generated code runs). Government work mode E2–E4 (secretary, citizen appeals, reports)
 remain open after E1.
 Owner decisions still open: a licence, a protected `main` branch, the Dependabot PRs, and
 the LegalResearchAgent visibility
