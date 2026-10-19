@@ -70,7 +70,7 @@ providers/         ModelProvider interface, adapters, router with fallback, offl
 memory/            extraction + importance scoring, sensitivity filter, retrieval
 personality/       personality profile (TOML) and system-prompt composition
 auth/              AuthBackend abstraction, single-owner implementation
-security/          rate limiter, audit log
+security/          edge guard (token + body size before reading), rate limiter, audit log
 db/                SQLAlchemy models, async session, portable column types
 schemas/           Pydantic request/response models (mirrored in packages/shared)
 ```
@@ -487,10 +487,17 @@ them, each with its own migration.
 - Secrets only from environment variables; `.env` is git-ignored.
 - `AuthBackend` abstraction; `LocalOwnerAuth` supports `local` (single owner, no login) and
   `token` (Bearer token, constant-time comparison) modes.
-- Sliding-window rate limiting per client (chat and general buckets).
+- Edge guard (`security/edge.py`, innermost ASGI layer): token checked before any body is
+  read; declared and streamed bodies above the upload limit refused with 413.
+- Sliding-window rate limiting of the owner's authenticated requests (chat, general and a
+  daily AI-call bucket); failed token attempts share one global budget.
+- Startup preflight (`ezo_api.deployment`): hosting markers require production policy;
+  production needs mounted storage, a session (not 6543) database connection, and after
+  migrations the pgvector table and no Supabase Data API grants.
 - Input validation with Pydantic; message length limit; ownership checks on every resource.
 - SQLAlchemy ORM only (parameterized queries).
-- Security headers on every response (pure ASGI middleware, safe for streaming).
+- Security headers on every response (pure ASGI middleware, safe for streaming); the web app
+  adds a per-request nonce Content-Security-Policy in `apps/web/proxy.ts`.
 - Audit log for important operations.
 - Markdown from models is rendered without raw HTML; links open with `noopener`.
 - Uploads: extension allow-list plus content sniffing, size limit, zip-bomb limits for

@@ -38,6 +38,13 @@ embeddings and AI providers were not tested.
 
 ## Known failing check: release gate remains open
 
+**Resolved 2026-10-19 (commit `ac41368`).** The assertion relied on text serialization
+order. It now reads each page's bottom tenth by coordinates and requires exactly `1` and
+`2` there (and the letterhead in the header band) — stricter than before, not weaker.
+CI runs `test_office_convert.py` and `test_office_pdf.py` inside the built production
+API image with `EZO_REQUIRE_OFFICE=1` (job *Docker*, step "Office tests pass with the
+image's own LibreOffice version"); it passed in CI run #82. The original record follows.
+
 `apps/api/tests/unit/test_office_convert.py::test_official_letter_keeps_pages_header_footer_table_and_scripts`
 fails at line 52. It asserts that serialized PDF text ends with the page number. The
 same failure was observed before this task, in both complete database suites, and

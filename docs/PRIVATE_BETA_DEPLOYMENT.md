@@ -87,12 +87,15 @@ access. A public UI by itself grants no API access.
    Ensure the connection role's search path can resolve the extension and has DDL rights
    for EZO's public tables. EZO does not use Supabase Auth/PostgREST; its tables must not
    be exposed through Supabase's Data API. Disable the Data API for this dedicated
-   project or explicitly revoke `anon`/`authenticated` access to EZO tables. Do not use
+   project. As a second layer, migration 0014 revokes every privilege of the `anon` and
+   `authenticated` roles on EZO's tables, sequences and functions (also future ones),
+   and the post-migration check refuses to start while any such grant exists. Do not use
    this database as a public client API.
 3. Copy **Connect → Session pooler** (port 5432; usable from IPv4 hosts), or a reachable
    direct PostgreSQL endpoint. Use the documented `postgres.PROJECT` username for the
    pooler and percent-encode password special characters. Do not use transaction pooling
    on port 6543: psycopg prepared statements and schema management expect sessions.
+   Production startup refuses a `DATABASE_URL` on port 6543.
    Set `sslmode=verify-full&sslrootcert=system&connect_timeout=10`. If the endpoint's CA
    is not in system roots, download its trusted CA from Supabase settings, mount it on
    the API host, and set `sslrootcert=/path/to/ca.crt` instead. Never disable verification.
@@ -107,14 +110,22 @@ access. A public UI by itself grants no API access.
    the actual host disk attachment in settings. All retained uploads, generated files,
    knowledge source snapshots and versions must be under that path. Do not substitute
    ephemeral container storage. Never attach an empty disk over an existing installation
-   without copying and checking its stored objects first.
+   without copying and checking its stored objects first. Production startup refuses a
+   storage directory that is not a mount point; where the host's disk does not show up
+   as one, create the empty file `/app/storage/.ezo-volume` on the persistent disk after
+   verifying the attachment yourself.
 6. Create the Vercel Next.js project with root **`apps/web`**, enable inclusion of files
    outside the root directory, use the pinned pnpm version from root `package.json`,
    and set `EZO_API_URL` to the actual Render HTTPS origin. The local `vercel.json`
    installs from the workspace root and builds the app. Keep production and preview
    variables separate. No API secret belongs here.
 7. Manually release the reviewed commit to Render. Startup validates production policy
-   and writable storage, runs `alembic upgrade head`, then `exec`s Uvicorn on `PORT`
+   and writable storage (a hosting marker such as `RENDER`, `K_SERVICE`, `FLY_APP_NAME`,
+   `RAILWAY_ENVIRONMENT` or `DYNO` without `EZO_ENV=production` is refused, so a missing
+   variable can never start local owner mode on the internet), runs `alembic upgrade
+   head` under a PostgreSQL advisory lock, checks that `pgvector_entries` exists (when
+   `EZO_VECTOR_STORE=pgvector`) and that `anon`/`authenticated` hold no grants, then
+   `exec`s Uvicorn on `PORT`
    (default 8000; blueprint 10000). A preflight/migration error exits nonzero and never
    opens HTTP. Keep one service instance and one worker. Do not use a pre-deploy command
    that needs the persistent disk; the disk is attached to the service itself.
@@ -135,9 +146,18 @@ access. A public UI by itself grants no API access.
   same uploaded file and artifact bytes remain available.
 - Confirm `vector` is installed and run migration/schema checks before inviting use.
   No provider key means live AI/embeddings remain unverified even when health passes.
+- Requests without the correct token get 401 before their body is read, and bodies
+  above the upload limit get 413 before they are stored (edge guard). Failed token
+  attempts share one global budget (30/minute, then 429); rate limits count only the
+  owner's authenticated requests, so strangers cannot use them up, and `/api/health`
+  is never limited. Calls that may reach a paid AI provider are capped per day
+  (`EZO_RATE_LIMIT_CHAT_PER_DAY`, default 1000).
+- The web app sends a nonce Content-Security-Policy (scripts only with the request's
+  nonce, connections only to itself and the API origin, no framing). Check the browser
+  console for CSP violations after the first deployment.
 - Watch RSS, CPU, disk free space, 401/429/5xx rates and provider budgets. Configure
   host alerts and independent HTTPS health monitoring. Keep provider account spend
-  caps; per-IP in-memory limits are secondary and reset on restart.
+  caps; the in-memory limits are secondary and reset on restart.
 
 The API intentionally runs as one always-on process. Do not scale replicas/workers:
 the rate limiter and background tasks are process-local and the file store is tied to
@@ -147,8 +167,8 @@ while the owner is uploading, generating or synchronizing. Long requests can sti
 hit host/browser/provider limits; keep beta documents bounded and retry interrupted
 foreground work manually. There is no new durable queue or exactly-once claim.
 
-Default trusted forwarded headers are loopback only. If the host reports a shared
-proxy IP, limits may be shared by all requests; this is conservative for one owner.
+Default trusted forwarded headers are loopback only. Authenticated requests are
+limited per owner, not per IP, so a shared proxy IP does not matter for the owner.
 Do not set `FORWARDED_ALLOW_IPS=*` without verifying that every ingress overwrites
 untrusted client forwarding headers. Never trust headers as owner authentication.
 

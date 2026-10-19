@@ -79,6 +79,49 @@ Source of truth: `apps/api/src/ezo_api/maturity.py` and the agent catalog (also 
 Planned agents are never shown as working: the GeneralAgent answers and states the
 limitation.
 
+## Security & readiness review fixes (2026-10-19)
+
+The read-only review of `197546d` (verdict *ready after specific fixes*) found 4 high,
+10 medium and several low findings. Fixed on this branch:
+
+| Finding | Fix | Commit |
+|---|---|---|
+| H1 body read before auth, no size limit | `EdgeGuardMiddleware`: token before any body read, 413 for declared/streamed bodies over the limit | `7c935d4` |
+| H2 IP-keyed limits before auth; health limited | owner-keyed limits after auth, global failed-auth budget, health exempt, daily AI cap, health hides version in production | `7c935d4` |
+| H3 learning routing hijacked other agents | explicit imperative + source anchor; presentation/visual/coach intents, attachments and forced agents keep their agent | `cf4689b` |
+| H4 untrusted text in system notes | analysis report as quoted `<source>`; titles quoted; `<source` escaped in citations | `cf4689b` |
+| M1 missing `EZO_ENV` on a host | hosting markers require production policy | `c3dae11` |
+| M2 disk not verified | production needs a mount point or `.ezo-volume` sentinel | `c3dae11` |
+| M3 Supabase Data API | migration 0014 revokes anon/authenticated; post-migration check | `c3dae11` |
+| M4 silent fallback without pgvector table | 0014 repairs the table; startup refuses when it is missing | `c3dae11` |
+| M5 no web CSP | nonce CSP, `frame-ancestors 'none'`, `X-Frame-Options`, no referrer; Playwright checks every page | `d68e720` |
+| M6 copyleft not detected | copyleft mapping, tested with real `assess_license()` | `cf4689b` |
+| M7 inflated K3 evidence | keyword-derived proposals are `inferred`, confidence ≤ 0.6, evidence gaps listed | `cf4689b` |
+| M8 library instruction for every agent; presentations unscoped | strict rule only for document-answering agents; presentations use the library scope | `cf4689b` |
+| M9 LibreOffice 25.2 untested | positional footer assertion; Office tests run inside the production image in CI | `ac41368` |
+| M10 merges before CI | **owner setting** (branch protection + required checks); not fixable in code | — |
+| Lows: pooler 6543, token whitespace, migration lock, Alembic log redaction, render.yaml secrets, health version, AI budget | refused / stripped / advisory lock / redacted / `sync: false` / hidden / daily cap | `7c935d4`, `c3dae11` |
+| Lows: K3 registry names, cache, flag dedupe, substring categories, unbounded text | live registry, content-hash cache, dedupe, whole words, 50 docs × 20,000 chars, 409 while reading | `cf4689b` |
+| Lows: K2 GitHub version, Uzbek-only notes, silent library deletion, 403 vs 404 | commit as version, English notes, deletion notice, 404 | `cf4689b` |
+| Lows: CI supply chain | gitleaks over full history, pinned pip-audit, digest-pinned base images, Trivy image scan | `5a8ae26`, `105084f` |
+| Lows: weak tests | cache, vector-path scope, non-execution (subprocess/socket patched) and copyleft tests | `cf4689b` |
+
+Left as is, deliberately: the SQLite `IN (subquery)` library filter (fine at private-beta
+size); GitHub Actions pinned by major tag rather than SHA (Dependabot updates them).
+
+**CI verified** — run #83 (CI), commit `105084f`, all four jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39232409656): API · SQLite 769
+collected, 767 passed, 2 skipped (needs PostgreSQL; needs pgvector); API · PostgreSQL 769
+passed; web unit 55, shared 10, Playwright 31; `alembic check` clean; secret scan clean;
+Docker job including the Office tests inside the production image. Security run #10:
+pip-audit, pnpm audit and Trivy green.
+
+Local verification after the fixes (LibreOffice 24.2.7, `EZO_REQUIRE_*` set): SQLite 767
+passed + 2 skipped (pgvector, PostgreSQL-only migration test); PostgreSQL 769 passed; web
+unit 55, shared 10, Playwright 31. Migration 0014 up → check → down → up on SQLite and
+PostgreSQL (`DATABASE_URL`). The production API image could not be built in the sandbox
+(deb.debian.org is blocked); CI builds it and runs the Office tests in it.
+
 ## Latest verified baseline
 
 **CI verified** — run #61 (CI), commit `98db78a`, all jobs green

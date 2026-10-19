@@ -24,7 +24,12 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
-RUN addgroup -S ezo && adduser -S ezo -G ezo
+# The server needs only node: npm, corepack and yarn (and their vulnerable bundled
+# packages) are removed from the runtime image.
+RUN addgroup -S ezo && adduser -S ezo -G ezo \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+        /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+        /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 COPY --from=build --chown=ezo:ezo /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=ezo:ezo /repo/apps/web/.next/static ./apps/web/.next/static
 USER ezo

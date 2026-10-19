@@ -15,13 +15,30 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   refuses to start in token mode without a token.
 - Every query is scoped to the owner's user id. Other users' or other projects' records answer
   `404`, never `403`, so their existence is not revealed.
+- **Edge guard** (`security/edge.py`, innermost ASGI layer): in token mode the Bearer token
+  is checked in constant time *before* any request body is read; a missing or wrong token
+  gets `401` at once, and all failed attempts share one global budget (30/min, then `429`,
+  no client IP trusted). A declared `Content-Length` above the upload limit gets `413` before
+  anything is stored; bodies without a length are counted and refused past the limit.
+  `/api/health` is the only public path and is never rate limited; it hides the version in
+  production.
+- A hosting platform marker (`RENDER`, `K_SERVICE`, `FLY_APP_NAME`, `RAILWAY_ENVIRONMENT`,
+  `DYNO`) without `EZO_ENV=production` refuses to start, so local owner mode never runs on a
+  public host by accident (`ezo_api.deployment`, also the post-migration checks).
 - CORS allows only the origins in `EZO_CORS_ORIGINS`.
+- The web app sends a per-request nonce **Content-Security-Policy** (`apps/web/proxy.ts`):
+  only scripts with the nonce run (`strict-dynamic`), the page connects only to itself and
+  the API origin, loads no third-party resources, cannot be framed (`frame-ancestors 'none'`,
+  `X-Frame-Options: DENY`) and sends no referrer. This limits what an injected script could
+  do with the owner token kept in the browser's storage. Playwright fails on any violation.
 - Security headers are set on every response. Downloads use `Content-Disposition`
   (`attachment`, or `inline` for PNG previews only), `X-Content-Type-Options: nosniff` and
   `Content-Security-Policy: sandbox`, so uploaded or generated HTML/SVG never runs in the API's
   origin.
-- Rate limits (in memory, per process): chat and voice `EZO_RATE_LIMIT_CHAT` (30/min),
-  everything else `EZO_RATE_LIMIT_DEFAULT` (240/min). A Redis-backed limiter arrives with the
+- Rate limits (in memory, per process) count the owner's authenticated requests (one owner
+  key, so strangers cannot use them up): chat and voice `EZO_RATE_LIMIT_CHAT` (30/min),
+  everything else `EZO_RATE_LIMIT_DEFAULT` (240/min), plus a daily cap on calls that may reach
+  a paid AI provider, `EZO_RATE_LIMIT_CHAT_PER_DAY` (1000). A Redis-backed limiter arrives with the
   worker (ROADMAP *Infrastructure*).
 - Write actions (deletes, artifact changes, uploads, settings) are written to the audit log.
 
@@ -124,7 +141,15 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
 - **Audits** (`.github/workflows/security.yml`): `pip-audit` on the exported runtime lock and
   `pnpm audit --prod --audit-level high`. They run weekly, on every dependency change and on
   demand. They are kept separate from CI so a newly published advisory does not block
-  unrelated work, but the run turns red.
+  unrelated work, but the run turns red. `pip-audit` is pinned.
+- **Secret scan:** the CI job *Secret scan* runs gitleaks (pinned v8.21.2) over the full git
+  history on every push and pull request. `.gitleaksignore` lists reviewed fixtures by
+  fingerprint (today only the fake token the redaction test feeds in).
+- **Container images:** the API and web base images are pinned by digest (Dependabot proposes
+  rebuilt digests weekly). The *Security* workflow builds both images and scans them with
+  Trivy (pinned 0.56.2): a critical vulnerability that has a fix fails the run; high and
+  critical findings are listed in full. Python code is also checked by ruff's bandit (`S`)
+  rules in CI.
 - **Updates:** Dependabot (`.github/dependabot.yml`) only *opens* pull requests, grouped for
   minor and patch versions. **Major versions are ignored** and upgraded deliberately by hand,
   with the changelog read, all tests passing and Docker images rebuilt. Nothing is merged
@@ -151,7 +176,15 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
 ## 9. Known gaps (honest list)
 
 - Single-owner authentication only; no user accounts, roles or 2FA.
-- In-memory rate limiter (one process).
+- In-memory rate limiter (one process; resets on restart).
+- First Trivy run (2026-10-19, Security run #10): no critical vulnerability with a fix in
+  either image. The API image (Debian 13) lists 79 high and 1 critical OS findings that
+  Debian has **not** fixed yet (e.g. util-linux, libxml2); they are picked up by the weekly
+  scan and digest updates once fixes ship. The web image's 11 high findings were in the
+  npm CLI bundled with the Node base image; npm, corepack and yarn are now removed from the
+  runtime image (the server needs only `node`).
+- GitHub Actions are pinned by major version tag, not by commit SHA (Dependabot proposes
+  updates); the Compose images (`pgvector/pgvector:pg16`, VoiceStudio) are pinned by tag. `main` branch protection is a repository setting the owner must enable.
 - No malware scanning of uploads (only type and size checks).
 - No encryption at rest inside EZO.
 - No security review by a third party yet.
