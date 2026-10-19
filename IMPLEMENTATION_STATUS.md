@@ -81,19 +81,19 @@ limitation.
 
 ## Latest verified baseline
 
-**CI verified** — run #56 (CI), commit `f6f7743`, all jobs green
-(https://github.com/UmidjanDeveloper/EZO/actions/runs/39192571554):
+**CI verified** — run #61 (CI), commit `98db78a`, all jobs green
+(https://github.com/UmidjanDeveloper/EZO/actions/runs/39196170053):
 
 | Suite | Collected | Passed | Failed | Skipped | Skip reasons |
 |---|---:|---:|---:|---:|---|
-| API · SQLite | 665 | 664 | 0 | 1 | needs PostgreSQL + pgvector |
-| API · PostgreSQL | 665 | 665 | 0 | 0 | — |
+| API · SQLite | 688 | 687 | 0 | 1 | needs PostgreSQL + pgvector |
+| API · PostgreSQL | 688 | 688 | 0 | 0 | — |
 | Web unit (Vitest) | 44 | 44 | 0 | 0 | — |
 | Shared unit (Vitest) | 10 | 10 | 0 | 0 | — |
-| Playwright e2e | 28 | 28 | 0 | 0 | — |
+| Playwright e2e | 29 | 29 | 0 | 0 | — |
 
 Also green in that run: ruff, format check, mypy, `alembic check` on PostgreSQL (migrations
-up to 0011), ESLint, TypeScript, the web production build, and the Docker job. The
+up to 0012), ESLint, TypeScript, the web production build, and the Docker job. The
 Docker job covers the Compose config, the API and web image builds, Tesseract with `uzb`,
 `uzb_cyrl`, `rus`, `eng` and `osd` in the API image, **the API image converting a Word
 and an Excel file to PDF with LibreOffice**, the API container migrating and answering
@@ -103,15 +103,15 @@ tests **run** (no LibreOffice skips any more).
 
 **Extended local verification** (not in CI):
 
-- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 664
-  passed + 1 skipped (pgvector); PostgreSQL 665 passed.
+- Same code, with LibreOffice and Tesseract 5.3.4 and `EZO_REQUIRE_*` set: SQLite 687
+  passed + 1 skipped (pgvector); PostgreSQL 688 passed.
 - Migrations 0011 and 0012 verified up → check → down → up on a fresh SQLite file
   (0001 → 0012) and on PostgreSQL; an existing organization row gets `formatting = '{}'`.
   **Correction:** the earlier local "SQLite" migration check for 0011 set
   `EZO_DATABASE_URL`, which the settings do not read (`DATABASE_URL` is the variable), so
   it ran against the default local PostgreSQL database only. It was redone correctly on
   2026-10-19 with the result above.
-- The full Playwright suite passed locally (28).
+- The full Playwright suite passed locally (29).
 - A letter in an approved template and a document on EZO's letterhead were converted to
   PDF with LibreOffice and inspected visually (letterhead, header with QORALAMA, logo,
   placeholders for signature and number).
@@ -126,7 +126,7 @@ tests **run** (no LibreOffice skips any more).
 ## Knowledge OS K1 — Source registry and secure reading (2026-10-19) — experimental
 
 Commits `943c7c9` (backend, migration 0012), `56b2590` (package init), `96332e2` (Knowledge
-page, e2e), docs commit after it. Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
+page, e2e), `98db78a` (docs). CI runs #58–#61 green. Details: [docs/KNOWLEDGE_OS.md](docs/KNOWLEDGE_OS.md).
 K2–K7 and SkillForge are **not built**; EZO cannot create, install or run skills.
 
 ### What works
