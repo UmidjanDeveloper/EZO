@@ -28,7 +28,7 @@ jobs:
         working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.11.32"
       - name: Tesseract OCR (uzb, uzb_cyrl, rus, eng) and LibreOffice (real OCR and PDF tests)
@@ -76,7 +76,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: "0.11.32"
       - run: pnpm install --frozen-lockfile
