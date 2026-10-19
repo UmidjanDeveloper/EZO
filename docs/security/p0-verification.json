@@ -1,0 +1,54 @@
+{
+  "code_commit": "86f8020e7e6e727f285dadc05ca840edf548f28c",
+  "base_commit": "c09e94ce9dc29b2e2a9ec467bbaee3c4d902d9b1",
+  "kind": "local cloud workspace execution, not hosted CI",
+  "test_results": {
+    "sqlite": {
+      "collected": 793,
+      "passed": 788,
+      "failed": 0,
+      "skipped": 5
+    },
+    "postgres": {
+      "collected": 793,
+      "passed": 793,
+      "failed": 0,
+      "skipped": 0
+    },
+    "web_unit": {
+      "collected": 55,
+      "passed": 55,
+      "failed": 0,
+      "skipped": 0
+    },
+    "shared_unit": {
+      "collected": 10,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    "playwright": {
+      "collected": 31,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "image_native": {
+    "passed": 34,
+    "failed": 0,
+    "skipped": 0,
+    "uid": 10001
+  },
+  "k3_final_target": {
+    "passed": 5,
+    "failed": 0
+  },
+  "ruff_files": 390,
+  "mypy_files": 269,
+  "migrations": "fresh upgrade/check and 0015 downgrade/upgrade/check passed",
+  "production_smoke": "local verified TLS, auth, CORS, UID/PID1, retained-volume recreation/reindex, web nonce CSP passed",
+  "live_paid_provider_calls": false,
+  "deployed": false,
+  "evidence_directory": "/workspace/p0-evidence"
+}

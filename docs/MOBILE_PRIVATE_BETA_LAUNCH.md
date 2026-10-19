@@ -1,5 +1,9 @@
 # EZO private beta: telefon orqali ishga tushirish
 
+**Hozir deploy qilinmaydi.** Bu qo‘llanma kelajakdagi alohida tasdiqlangan launch uchun.
+Joriy P0/P1 vazifasi: [P0 hisobot](P0_HARDENING_REPORT.md),
+[GitHub himoyasi](GITHUB_P0_PROTECTION.md) va [Student reja](P1_EZO_STUDENT_V1_PLAN.md).
+
 Android yoki iPhone brauzeri yetarli. Kompyuter, terminal ilovasi va dastur kodini
 qo‘lda yozish shart emas. Tayyor SQL faylni Supabase muharririga ko‘chirish mumkin;
 maxfiy qiymatlar faqat xizmatlarning himoyalangan sozlamalariga kiritiladi.

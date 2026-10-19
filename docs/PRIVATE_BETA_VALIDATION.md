@@ -1,5 +1,9 @@
 # Private beta hardening: validation and release checklist
 
+**Historical PR #8 record.** Current P0 verification and non-deployment verdict are
+in [P0_HARDENING_REPORT.md](P0_HARDENING_REPORT.md). Its newer counts supersede this
+record for the current engineering branch; the results below describe the earlier run.
+
 Date: 2026-10-19. Verified base: 422beabca8d9d6f96118cd5adc8b0cc2550a781e.
 Branch: fix/final-private-beta-hardening, targeting claude/gifted-goodall-bpf01s.
 No live production credentials, provider calls or paid resources were used.
