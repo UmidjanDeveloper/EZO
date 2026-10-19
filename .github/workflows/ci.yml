@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness"]
   pull_request:
 
 permissions:
@@ -147,6 +147,7 @@ jobs:
             "python -m pytest -q -p no:cacheprovider \
               tests/unit/test_office_convert.py tests/unit/test_office_safety.py \
               tests/unit/test_process_limits.py tests/unit/test_ocr.py \
+              tests/unit/test_native_execution.py \
               tests/integration/test_office_pdf.py"
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .

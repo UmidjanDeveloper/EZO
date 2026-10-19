@@ -38,7 +38,7 @@ from ezo_api.documents.ocr.model import (
     OCRResult,
 )
 from ezo_api.documents.ocr.preprocess import prepare, rotate_clockwise
-from ezo_api.documents.process_limits import NATIVE_PROCESS_LOCK, limited_command
+from ezo_api.documents.process_limits import NativeOutputLimit, run_native
 
 KNOWN_LANGUAGES: dict[str, str] = {
     "uzb": "Uzbek (Latin)",
@@ -372,15 +372,17 @@ def _run(args: list[str], stdin: bytes, timeout: float) -> bytes:
     if os.environ.get("TESSDATA_PREFIX"):
         env["TESSDATA_PREFIX"] = os.environ["TESSDATA_PREFIX"]
     try:
-        with NATIVE_PROCESS_LOCK:
-            completed = subprocess.run(  # noqa: S603 - fixed binary from server config, no shell
-                limited_command(args, timeout, MAX_OUTPUT_BYTES),
-                input=stdin,
-                capture_output=True,
-                timeout=timeout,
-                check=False,
-                env=env,
-            )
+        completed = run_native(
+            args,
+            input=stdin,
+            timeout=timeout,
+            file_limit=MAX_OUTPUT_BYTES,
+            stdout_limit=MAX_OUTPUT_BYTES,
+            stderr_limit=MAX_OUTPUT_BYTES,
+            env=env,
+        )
+    except NativeOutputLimit as exc:
+        raise OCRError("The OCR output was unexpectedly large.", "output_limit") from exc
     except subprocess.TimeoutExpired as exc:
         raise OCRError(
             f"OCR took longer than {timeout:.0f} seconds and was stopped.", "timeout"

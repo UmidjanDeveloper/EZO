@@ -3,7 +3,32 @@
 What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
 working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
 
-## Private beta hardening — current verification, 2026-10-19
+## P0 final hardening / P1 planning — current verification, 2026-10-19
+
+Base: c09e94ce9dc29b2e2a9ec467bbaee3c4d902d9b1, merged PR #8;
+branch: fix/p0-final-hardening-p1-readiness. Baseline hosted CI #86 and Security #14
+are successful. They do not validate the new branch's final commit.
+
+Confirmed defects fixed: parent-memory capture of native output, descendant cleanup,
+unbounded native queue wait, and mixed-location K2 citation/overlap. Eight new regression
+cases fail before the corresponding fixes. K3 still only proposes capabilities; its
+negative test also forbids filesystem writes. No K4–K7 or Student feature was implemented.
+
+Final local verification: SQLite **788 passed / 5 PostgreSQL-only skips**;
+PostgreSQL **793 passed**; JavaScript **65 passed**; desktop/mobile Playwright
+**31 passed**; non-root image-native OCR/Office/security **34 passed**. Lint/types,
+both Docker builds, production-mode local TLS/auth/persistence smoke and migrations pass.
+API scan remains **79 HIGH / 1 CRITICAL**, 0 fixable HIGH/CRITICAL; web has one
+fixable MEDIUM; development-only braces has one HIGH. No finding was suppressed.
+
+Verdict: **P0 BLOCKED** — native library/in-process parser containment and effective
+owner-reviewed GitHub protection remain unresolved. No deployment is planned here.
+See [P0 report](docs/P0_HARDENING_REPORT.md),
+[owner protection checklist](docs/GITHUB_P0_PROTECTION.md) and
+[P1 Student plan](docs/P1_EZO_STUDENT_V1_PLAN.md). The first P1 milestone is only a
+versioned DOCX reading manifest/read-only API; later format/worker/UI work is separate.
+
+## PR #8 private beta hardening — historical verification, 2026-10-19
 
 Verified integration base: 422beabca8d9d6f96118cd5adc8b0cc2550a781e;
 branch: fix/final-private-beta-hardening. K1, K2 and K3 are already merged. This
@@ -131,8 +156,9 @@ The read-only review of `197546d` (verdict *ready after specific fixes*) found 4
 | Lows: CI supply chain | gitleaks over full history, pinned pip-audit, digest-pinned base images, Trivy image scan | `5a8ae26`, `105084f` |
 | Lows: weak tests | cache, vector-path scope, non-execution (subprocess/socket patched) and copyleft tests | `cf4689b` |
 
-Left as is, deliberately: the SQLite `IN (subquery)` library filter (fine at private-beta
-size); GitHub Actions pinned by major tag rather than SHA (Dependabot updates them).
+Historical note for that review: the SQLite `IN (subquery)` library filter was retained
+for the single-owner scale. PR #8 subsequently pinned GitHub Actions by immutable SHA;
+the current workflows no longer use the old major-tag policy.
 
 **CI verified** — run #83 (CI), commit `105084f`, all four jobs green
 (https://github.com/UmidjanDeveloper/EZO/actions/runs/39232409656): API · SQLite 769
@@ -1117,9 +1143,10 @@ initialised anywhere, and no plugins or mods were enabled. No Ruflo code was cop
 
 ## Next step
 
-Knowledge OS K1–K3 are present; finish the private-beta release gates above before
-starting K4 (secure sandbox, required before generated code runs). Government work
-mode E2–E4 (secretary, citizen appeals, reports) remains open after E1.
+Knowledge OS K1–K3 are present. Complete the current P0 gates, then review the small
+P1.1 Student reading-manifest milestone before starting its implementation. K4–K7
+are outside this milestone; a secure sandbox is still required before generated code
+ever runs. Government work mode E2–E4 remains a separate future roadmap item.
 Owner decisions still open: a licence/visibility choice, effective protection of
 `claude/gifted-goodall-bpf01s`, the Dependabot PRs, and
 the LegalResearchAgent visibility

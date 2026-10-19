@@ -7,6 +7,10 @@ document is stale: open an issue.
 **Reporting a vulnerability:** do not open a public issue. Contact the repository owner
 privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
 
+Current P0 assessment: [verified defects, fixes and open blockers](P0_HARDENING_REPORT.md).
+This mission does not authorize deployment. Native/parser isolation remains incomplete;
+green dependency/CI gates do not establish production readiness.
+
 ## 1. Deployment model and authentication
 
 - EZO is a **single-owner** assistant. `EZO_AUTH_MODE=local` (default) has no login and is
@@ -105,6 +109,10 @@ privately (GitHub profile of `UmidjanDeveloper`) with steps to reproduce.
   environments and deadlines. Linux children receive CPU/address-space/file limits,
   zero core dumps and a libseccomp new-IPv4/IPv6-socket filter. Local IPC remains
   available. This is not a complete filesystem sandbox or a K4 user-code executor.
+  The shared native runner uses anonymous temporary-file capture with bounded parent
+  reads, one queue/execution deadline and process-group cleanup on success and failure.
+  Per-file/virtual-address limits are not aggregate RSS/pid/temporary-disk containment;
+  API-thread PDF/XML/image parsers still need a separately constrained worker boundary.
 - Future DeveloperAgent tools (ROADMAP Phase 9) must stay inside an approved workspace. Path
   escape, system directories and secret files are blocked; push, deploy and destructive
   actions need approval.
@@ -201,6 +209,8 @@ waits in `waiting_for_user`). A confirmed delete in the UI is an explicit approv
   The actual default branch is `claude/gifted-goodall-bpf01s`. Its enabled but untargeted
   Status ruleset supplies no effective PR/required-check protection. Owner setup is
   documented in the [phone guide](MOBILE_PRIVATE_BETA_LAUNCH.md); settings were not changed.
+  The current [P0 owner checklist](GITHUB_P0_PROTECTION.md) lists all seven observed
+  CI/Security checks and explains independent-review versus owner merge authority.
 - No malware scanning of uploads (only type and size checks).
 - No encryption at rest inside EZO.
 - No security review by a third party yet.

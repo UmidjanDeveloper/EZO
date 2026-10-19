@@ -1,5 +1,9 @@
 # EZO single-owner private beta
 
+The current P0/P1 engineering mission explicitly excludes deployment/provisioning.
+This runbook is for a future separately approved release. See the
+[current P0 verdict](P0_HARDENING_REPORT.md) before following deployment steps.
+
 This is a deployment preparation, not evidence of a live deployment. Provisioning,
 production credentials and the first release require the owner's approval. Never
 connect this runbook to production automatically from a pull request.

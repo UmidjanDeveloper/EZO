@@ -21,7 +21,6 @@ import asyncio
 import io
 import os
 import shutil
-import signal
 import subprocess
 import tempfile
 import zipfile
@@ -35,7 +34,7 @@ from defusedxml.ElementTree import fromstring
 
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
-from ezo_api.documents.process_limits import NATIVE_PROCESS_LOCK, limited_command
+from ezo_api.documents.process_limits import MAX_DIAGNOSTIC_BYTES, NativeOutputLimit, run_native
 
 SourceKind = Literal["docx", "xlsx"]
 MAX_INPUT_BYTES = 50 * 1024 * 1024
@@ -145,7 +144,7 @@ class OfficeConverter:
                 "external_links",
             )
         started = time.monotonic()
-        with NATIVE_PROCESS_LOCK, tempfile.TemporaryDirectory(prefix="ezo-office-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="ezo-office-") as tmp:
             work = Path(tmp)
             source = work / f"input.{kind}"
             source.write_bytes(data)
@@ -164,26 +163,32 @@ class OfficeConverter:
                 str(work / "out"),
                 str(source),
             ]
-            process = subprocess.Popen(  # noqa: S603 - fixed binary, temporary paths only
-                limited_command(args, self.timeout_seconds, MAX_OUTPUT_BYTES),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=work,
-                env=_env(tmp),
-                start_new_session=True,
-            )
             try:
-                _, stderr = process.communicate(timeout=self.timeout_seconds)
+                completed = run_native(
+                    args,
+                    timeout=self.timeout_seconds,
+                    file_limit=MAX_OUTPUT_BYTES,
+                    stdout_limit=MAX_DIAGNOSTIC_BYTES,
+                    cwd=work,
+                    env=_env(tmp),
+                )
+            except NativeOutputLimit as exc:
+                raise OfficeConvertError(
+                    "The converter output was unexpectedly large.", "output_limit"
+                ) from exc
             except subprocess.TimeoutExpired as exc:
-                _kill(process)
                 raise OfficeConvertError(
                     f"Converting took longer than {self.timeout_seconds:.0f} seconds and was "
                     "stopped.",
                     "timeout",
                 ) from exc
+            except OSError as exc:
+                raise OfficeConvertError(
+                    "The Office converter could not be started.", "unavailable"
+                ) from exc
             output = work / "out" / "input.pdf"
-            if process.returncode != 0 or not output.exists():
-                detail = stderr.decode("utf-8", "replace").strip().splitlines()
+            if completed.returncode != 0 or not output.exists():
+                detail = completed.stderr.decode("utf-8", "replace").strip().splitlines()
                 raise OfficeConvertError(
                     "LibreOffice could not convert the file"
                     + (f": {detail[-1][:160]}" if detail else "."),
@@ -212,14 +217,6 @@ def _env(home: str) -> dict[str, str]:
         "MAX_CONCURRENCY": "2",  # LibreOffice's supported thread-pool limit
         "MALLOC_ARENA_MAX": "2",
     }
-
-
-def _kill(process: subprocess.Popen[bytes]) -> None:
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
-        process.kill()
-    process.wait(timeout=10)
 
 
 def build_office_converter(

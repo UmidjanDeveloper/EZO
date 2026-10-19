@@ -1,5 +1,10 @@
 # Private beta security risk register
 
+This is the PR #8 assessment. For the current P0 branch, refreshed scans, detailed
+advisory reachability and additional confirmed fixes, see
+[P0_HARDENING_REPORT.md](P0_HARDENING_REPORT.md) and
+[p0-vulnerabilities.json](security/p0-vulnerabilities.json).
+
 Assessment baseline: 422beabca8d9d6f96118cd5adc8b0cc2550a781e.
 Working branch: fix/final-private-beta-hardening. Date: 2026-10-19.
 Scope: one owner, Vercel UI, one Render API/disk, Supabase PostgreSQL. No live

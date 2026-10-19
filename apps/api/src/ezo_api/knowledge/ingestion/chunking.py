@@ -86,9 +86,10 @@ def chunk_sections(
     chunks: list[Chunk] = []
     buffer: list[_Piece] = []
     size = 0
+    previous_location: tuple[int | None, str | None] | None = None
 
     def emit() -> None:
-        nonlocal buffer, size
+        nonlocal buffer, size, previous_location
         if not buffer:
             return
         body = "\n\n".join(piece.text for piece in buffer)
@@ -99,13 +100,19 @@ def chunk_sections(
             metadata["page_start"], metadata["page_end"] = min(pages), max(pages)
         if headings:
             metadata["heading"] = headings[-1]
-        if chunks and overlap_chars:
+        location = (buffer[0].page, buffer[0].heading)
+        if chunks and overlap_chars and location == previous_location:
             body = _tail(chunks[-1].text, overlap_chars) + "\n\n" + body
             metadata["overlap"] = True
         chunks.append(Chunk(index=len(chunks), text=body, metadata=metadata))
+        previous_location = location
         buffer, size = [], 0
 
     for piece in _pieces(sections, max_chars - overlap_chars - 2):
+        # A citation must not label another page/section's text (including overlap)
+        # with the current location. Keep overlap only within the same location.
+        if buffer and (piece.page, piece.heading) != (buffer[-1].page, buffer[-1].heading):
+            emit()
         if buffer and size + len(piece.text) > target_chars:
             emit()
         buffer.append(piece)

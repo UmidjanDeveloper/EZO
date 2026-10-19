@@ -7,11 +7,116 @@ import errno
 import math
 import os
 import socket
+import subprocess
 import sys
+import tempfile
 import threading
+import time
+from collections.abc import Mapping
+from contextlib import suppress
+from pathlib import Path
 
 NATIVE_PROCESS_LOCK = threading.Lock()
 MAX_ADDRESS_SPACE = 4 * 1024 * 1024 * 1024
+MAX_DIAGNOSTIC_BYTES = 64 * 1024
+
+
+class NativeOutputLimit(Exception):
+    """A fixed native command exceeded a capture or regular-file budget."""
+
+
+def _kill_group(process: subprocess.Popen[bytes]) -> None:
+    # Also clean descendants after a successful leader exits. A child keeping a pipe
+    # open must never extend the deadline or survive a completed native operation.
+    if os.name == "posix":
+        import signal
+
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+    elif process.poll() is None:
+        process.kill()
+    process.wait(timeout=5)
+
+
+def run_native(
+    args: list[str],
+    *,
+    timeout: float,
+    file_limit: int,
+    stdout_limit: int,
+    stderr_limit: int = MAX_DIAGNOSTIC_BYTES,
+    input: bytes | None = None,
+    env: Mapping[str, str] | None = None,
+    cwd: Path | None = None,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run only server-selected OCR/Office commands, with bounded parent memory.
+
+    Anonymous temporary regular files avoid communicate()/capture_output buffering
+    attacker-influenced output into API RAM. The Linux launcher enforces RLIMIT_FSIZE
+    on each file; polling enforces the smaller diagnostic budgets. Input also uses a
+    file, so a child refusing stdin cannot block the caller on a pipe write.
+    Queue wait and execution share one wall-clock deadline. These are containment
+    controls, not a filesystem sandbox or a user-code execution interface.
+    """
+    deadline = time.monotonic() + timeout
+    if not NATIVE_PROCESS_LOCK.acquire(timeout=max(0, timeout)):
+        raise subprocess.TimeoutExpired(args, timeout)
+    try:
+        with (
+            tempfile.TemporaryFile() as stdin,
+            tempfile.TemporaryFile() as stdout,
+            tempfile.TemporaryFile() as stderr,
+        ):
+            if input:
+                stdin.write(input)
+            stdin.seek(0)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(args, timeout)
+            process = subprocess.Popen(  # noqa: S603 - fixed server-selected native command
+                limited_command(args, remaining, file_limit),
+                stdin=stdin,
+                stdout=stdout,
+                stderr=stderr,
+                cwd=cwd,
+                env=env,
+                start_new_session=os.name == "posix",
+            )
+            try:
+                while True:
+                    if (
+                        os.fstat(stdout.fileno()).st_size > stdout_limit
+                        or os.fstat(stderr.fileno()).st_size > stderr_limit
+                    ):
+                        raise NativeOutputLimit
+                    returncode = process.poll()
+                    if returncode is not None:
+                        if returncode != 0 and (
+                            os.fstat(stdout.fileno()).st_size >= file_limit
+                            or os.fstat(stderr.fileno()).st_size >= file_limit
+                        ):
+                            raise NativeOutputLimit
+                        if os.name == "posix":
+                            import signal
+
+                            if returncode == -signal.SIGXFSZ:
+                                raise NativeOutputLimit
+                        break
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(args, timeout)
+                    with suppress(subprocess.TimeoutExpired):
+                        process.wait(timeout=min(remaining, 0.05))
+            finally:
+                _kill_group(process)
+            stdout.seek(0)
+            stderr.seek(0)
+            out, err = stdout.read(stdout_limit + 1), stderr.read(stderr_limit + 1)
+            if len(out) > stdout_limit or len(err) > stderr_limit:
+                raise NativeOutputLimit
+            return subprocess.CompletedProcess(args, returncode, out, err)
+    finally:
+        NATIVE_PROCESS_LOCK.release()
 
 
 def deny_network() -> None:

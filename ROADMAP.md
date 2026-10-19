@@ -16,6 +16,17 @@ A phase is done only when the checks in [Verification](IMPLEMENTATION_STATUS.md#
 pass: CI (lint, types, SQLite and PostgreSQL tests, migrations, web build, Playwright, Docker
 images) plus the extended local checks listed for that phase.
 
+## Current engineering priority — P0 review, then P1 Student
+
+- Current P0 verdict: **P0 BLOCKED**. Native libxml2/parser containment risks and
+  effective owner-controlled GitHub protection remain open despite green tests.
+  See [verified P0 assessment](docs/P0_HARDENING_REPORT.md) and
+  [exact GitHub owner actions](docs/GITHUB_P0_PROTECTION.md).
+- The [P1 Student implementation plan](docs/P1_EZO_STUDENT_V1_PLAN.md) starts with
+  one independently reviewable DOCX section-manifest/read-only API milestone. No
+  P1 code, EPUB reader, Student UI, durable worker or K4–K7 is implemented by that plan.
+- No deployment, paid infrastructure or real provider use is part of this mission.
+
 ## Done
 
 ### Foundation — alpha
@@ -178,7 +189,10 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 
 ### Phase 5 — Durable tasks, jobs and worker
 - Persistent Task / Job / JobEvent / JobArtifact / JobApproval, `services/worker` with a real
-  queue (Redis), recovery after restarts; chat never depends on the worker being up
+  durable queue, recovery after restarts; chat never depends on the worker being up.
+  Student P1 proposes PostgreSQL leases/fencing first to avoid a mandatory new Redis
+  service; record/review the queue ADR before implementation. Redis remains an option
+  when measured requirements justify it, rather than existing functionality
 - Real schedules for personal automations; `S3StorageProvider`, backups and restore
 
 ### Phase 6 — Persistent native missions
@@ -229,7 +243,8 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 - Intent and language detection are rule-based (transparent, can misread unusual phrasing).
 - Semantic search and semantic memory need an OpenAI or Gemini key for embeddings; without one
   EZO uses keyword search and says so.
-- Images and scanned PDFs are stored but not read (no OCR yet).
+- Images and scanned PDFs use installed Tesseract OCR; without the engine the API
+  reports that OCR is unavailable. OCR confidence is an engine score, not calibrated accuracy.
 - Image generation needs an OpenAI or Gemini key; EZO-drawn diagrams work without one.
 - Ingestion runs in the API process (resumed at startup); no separate worker yet.
 - Voice is turn-by-turn; realtime voice is Phase 8.
