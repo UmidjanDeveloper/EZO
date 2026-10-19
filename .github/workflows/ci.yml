@@ -132,6 +132,12 @@ jobs:
             echo "Unsafe production configuration was accepted"
             exit 1
           fi
+      - name: A hosting platform without EZO_ENV=production is refused
+        run: |
+          if docker run --rm -e RENDER=true ezo-api:ci; then
+            echo "API started on a hosting platform without the production policy"
+            exit 1
+          fi
       - name: Migration failure prevents HTTP startup
         run: |
           if docker run --rm -e EZO_ENV=test -e DATABASE_URL=sqlite:////proc/ezo-unwritable.db ezo-api:ci; then

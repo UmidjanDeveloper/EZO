@@ -5,6 +5,7 @@ services:
     runtime: docker
     plan: standard
     region: frankfurt
+    # Deploy only a reviewed commit with green CI (manual deploys take the branch tip).
     branch: claude/gifted-goodall-bpf01s
     rootDir: apps/api
     dockerfilePath: ./Dockerfile
@@ -38,4 +39,14 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: EZO_CORS_ORIGINS
+        sync: false
+      # Daily cap on calls that may reach a paid AI provider; set provider limits too.
+      - key: EZO_RATE_LIMIT_CHAT_PER_DAY
+        value: "1000"
+      # AI provider keys: entered in the Render dashboard, never committed.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
         sync: false

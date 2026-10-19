@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import logging
+import os
+import sys
 import tempfile
+from collections.abc import Mapping, Sequence
 from types import TracebackType
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from pydantic import SecretStr
 
 from ezo_api.settings import Settings
+
+# Variables hosting platforms set inside their containers. Where one is present the API is
+# on the Internet, so the safe production policy must be on.
+HOSTING_MARKERS = ("RENDER", "K_SERVICE", "FLY_APP_NAME", "RAILWAY_ENVIRONMENT", "DYNO")
+VOLUME_SENTINEL = ".ezo-volume"
+TRANSACTION_POOLER_PORT = 6543
 
 
 class DeploymentError(RuntimeError):
@@ -71,6 +80,11 @@ def validate_production(settings: Settings) -> None:
         raise DeploymentError(
             "Production requires a PostgreSQL DATABASE_URL with sslmode=verify-full."
         )
+    if database.port == TRANSACTION_POOLER_PORT:
+        # Transaction pooling breaks prepared statements and session state.
+        raise DeploymentError(
+            "Use the session connection (port 5432), not the transaction pooler (6543)."
+        )
     if not settings.storage_dir.is_absolute():
         raise DeploymentError("Production EZO_STORAGE_DIR must be an absolute durable-volume path.")
 
@@ -121,17 +135,84 @@ def configure_production_logging(settings: Settings) -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
-def main() -> None:
-    """Preflight before Alembic: bad configuration must not mutate the database."""
-    settings = Settings()
-    validate_production(settings)
+def check_environment(settings: Settings, environ: Mapping[str, str]) -> None:
+    """On a hosting platform a forgotten EZO_ENV must not leave the API open (local
+    owner mode, API docs, debug traces)."""
+    hosted = [name for name in HOSTING_MARKERS if environ.get(name)]
+    if hosted and settings.environment != "production":
+        raise DeploymentError(
+            f"Running on a hosting platform ({hosted[0]} is set): set EZO_ENV=production."
+        )
+
+
+def check_storage(settings: Settings) -> None:
+    """Uploads must land on a durable disk, not in the container's temporary layer."""
+    storage = settings.storage_dir
     try:
-        settings.storage_dir.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryFile(dir=settings.storage_dir):
+        storage.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryFile(dir=storage):
             pass
     except OSError:
         raise DeploymentError("EZO_STORAGE_DIR must be writable by the API user.") from None
+    if settings.environment == "production" and not (
+        os.path.ismount(storage) or (storage / VOLUME_SENTINEL).is_file()
+    ):
+        raise DeploymentError(
+            f"EZO_STORAGE_DIR ({storage}) is not a mounted disk. Attach the persistent "
+            f"disk there, or create {VOLUME_SENTINEL} in it if the volume is mounted above."
+        )
+
+
+def check_database(settings: Settings) -> None:
+    """After migrations: the vector table exists and the public data API cannot read
+    EZO's tables (Supabase anon / authenticated roles)."""
+    if settings.environment != "production":
+        return
+    from sqlalchemy import create_engine, text
+
+    from ezo_api.db.session import to_sync_url
+
+    engine = create_engine(to_sync_url(settings.database_url))
+    try:
+        with engine.connect() as connection:
+            if settings.vector_store == "pgvector" and not connection.scalar(
+                text("SELECT to_regclass('public.pgvector_entries')")
+            ):
+                raise DeploymentError(
+                    "EZO_VECTOR_STORE=pgvector but pgvector_entries is missing: enable the "
+                    "'vector' extension (Supabase: Database → Extensions) and redeploy."
+                )
+            exposed = connection.scalar(
+                text(
+                    "SELECT count(*) FROM information_schema.role_table_grants "
+                    "WHERE table_schema = 'public' AND grantee IN ('anon', 'authenticated')"
+                )
+            )
+            if exposed:
+                raise DeploymentError(
+                    "The public Data API roles (anon/authenticated) still have privileges on "
+                    "EZO tables. Run the migrations again or revoke them."
+                )
+    finally:
+        engine.dispose()
+
+
+def main(argv: Sequence[str] = ()) -> None:
+    """Preflight. Before Alembic: bad configuration must not mutate the database. With
+    --after-migrations: database checks before HTTP starts."""
+    settings = Settings()
+    if "--after-migrations" in argv:
+        check_database(settings)
+        return
+    check_environment(settings, os.environ)
+    validate_production(settings)
+    check_storage(settings)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main(sys.argv[1:])
+    except DeploymentError as exc:
+        # The message never contains secret values; no traceback with settings in it.
+        print(f"EZO startup refused: {exc}", file=sys.stderr)
+        sys.exit(1)

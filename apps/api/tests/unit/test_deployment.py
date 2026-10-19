@@ -82,3 +82,33 @@ def test_production_logs_redact_credentials_and_exception_payloads() -> None:
     assert "db-test-password" not in output
     assert "sensitive document content" not in output
     assert "exception=RuntimeError" in output
+
+
+def test_a_hosting_platform_requires_production_mode() -> None:
+    from ezo_api.deployment import check_environment
+
+    development = Settings(_env_file=None, DATABASE_URL="sqlite:///ezo.db")
+    check_environment(development, {})  # own computer: fine
+    for marker in ("RENDER", "K_SERVICE", "FLY_APP_NAME", "RAILWAY_ENVIRONMENT", "DYNO"):
+        with pytest.raises(DeploymentError, match="EZO_ENV=production"):
+            check_environment(development, {marker: "true"})
+    check_environment(production(), {"RENDER": "true"})
+
+
+def test_transaction_pooler_is_refused() -> None:
+    url = "postgresql://owner:pw@pooler.example.com:6543/ezo?sslmode=verify-full"
+    with pytest.raises(DeploymentError, match="session connection"):
+        validate_production(production(DATABASE_URL=url))
+
+
+def test_production_storage_must_be_a_mounted_disk(tmp_path: object) -> None:
+    from pathlib import Path
+
+    from ezo_api.deployment import VOLUME_SENTINEL, check_storage
+
+    folder = Path(str(tmp_path)) / "storage"
+    check_storage(Settings(_env_file=None, EZO_STORAGE_DIR=str(folder)))  # development: fine
+    with pytest.raises(DeploymentError, match="not a mounted disk"):
+        check_storage(production(EZO_STORAGE_DIR=str(folder)))
+    (folder / VOLUME_SENTINEL).write_text("provisioned")
+    check_storage(production(EZO_STORAGE_DIR=str(folder)))
