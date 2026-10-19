@@ -170,7 +170,7 @@ class ResearchAgent(Agent):
         text = ctx.turn.text
 
         if tools.library_scope is not None:
-            knowledge = await run_tool(
+            scoped_sources = await run_tool(
                 gathered,
                 tools,
                 "knowledge_search",
@@ -180,8 +180,8 @@ class ResearchAgent(Agent):
                     "library_id": str(tools.library_scope),
                 },
             )
-            gathered.sources = knowledge
-            if not knowledge:
+            gathered.sources = scoped_sources
+            if not scoped_sources:
                 gathered.notes.append(
                     "The selected knowledge library does not contain relevant information for "
                     "this query. Inform the user clearly that no relevant information was found."
