@@ -20,6 +20,7 @@ on:
       - "apps/api/uv.lock"
       - "pnpm-lock.yaml"
       - "**/package.json"
+      - ".github/workflows/security.yml"
 
 permissions:
   contents: read
@@ -39,7 +40,7 @@ jobs:
       - name: Export the locked runtime dependencies
         run: uv export --frozen --no-dev --no-hashes --no-emit-project > requirements-audit.txt
       - name: Audit against known vulnerabilities (PyPI advisory database / OSV)
-        run: uvx pip-audit -r requirements-audit.txt --progress-spinner off
+        run: uvx pip-audit==2.10.1 -r requirements-audit.txt --progress-spinner off
 
   node:
     name: Node dependencies (pnpm audit)

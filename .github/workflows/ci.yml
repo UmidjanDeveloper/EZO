@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  secrets:
+    name: Secret scan (gitleaks, full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks (pinned, built from source with the runner's Go)
+        run: GOBIN="$RUNNER_TEMP/bin" go install github.com/zricethezav/gitleaks/v8@v8.21.2
+      - name: No credentials in any commit (.gitleaksignore lists reviewed test fixtures)
+        run: '"$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner .'
+
   api:
     name: API (lint, types, tests on SQLite + PostgreSQL)
     runs-on: ubuntu-latest
