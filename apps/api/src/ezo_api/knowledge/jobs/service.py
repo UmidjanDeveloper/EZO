@@ -160,10 +160,20 @@ class DocumentJobs:
             await self._document(session, user_id, project_id, document_id, lock=True)
             revision = await session.scalar(
                 select(DocumentRevision).where(
-                    DocumentRevision.id == revision_id, DocumentRevision.document_id == document_id
+                    DocumentRevision.id == revision_id,
+                    DocumentRevision.document_id == document_id,
+                    func.length(DocumentRevision.raw_text) <= MAX_TEXT_CHARS,
                 )
             )
             if revision is None:
+                exists = await session.scalar(
+                    select(DocumentRevision.id).where(
+                        DocumentRevision.id == revision_id,
+                        DocumentRevision.document_id == document_id,
+                    )
+                )
+                if exists is not None:
+                    raise JobError("resource_limit", ERRORS["resource_limit"], 422)
                 raise JobError("not_found", "Document or job not found.", 404)
             if len(revision.raw_text) > MAX_TEXT_CHARS:
                 raise JobError("resource_limit", ERRORS["resource_limit"], 422)
@@ -362,7 +372,12 @@ class DocumentJobs:
                         "publication_conflict", "This job already published a different result."
                     )
                 return existing
-            revision = await session.get(DocumentRevision, job.input_revision_id)
+            revision = await session.scalar(
+                select(DocumentRevision).where(
+                    DocumentRevision.id == job.input_revision_id,
+                    func.length(DocumentRevision.raw_text) <= MAX_TEXT_CHARS,
+                )
+            )
             if (
                 revision is None
                 or revision.document_id != job.document_id

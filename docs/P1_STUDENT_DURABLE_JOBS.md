@@ -1,7 +1,16 @@
 # P1.1 / Task 01 — durable document job foundation
 
-2026-10-20. Verified base: `4a233a373d208093e5321d7f251cd6154fdf3509`
-(PR #10). Branch: `feat/p1-student-durable-jobs`.
+2026-10-20. Task baseline: `4a233a373d208093e5321d7f251cd6154fdf3509` (PR #10).
+Initial branch: `feat/p1-student-durable-jobs`.
+
+During verification, GitHub externally merged initial head `4ad6e4f` as PR #11,
+commit `aacabe539cc55bbc3f15d2668f99bfb40035c654`, at 15:22 Asia/Tashkent.
+This agent did not execute a merge. The final source-read guard was not in that merge.
+Active follow-up: `fix/p1-student-job-source-budgets`, based on that latest verified
+integration commit. It contains only the source-budget guard/test, current-head
+security triggers and updated evidence. Its `apps/api` tree is byte-identical to the
+fully tested feature head `9980402dee533a8dac8ff6234671ebee5fddf084`; no backend change
+was made while rebasing the handoff onto the externally merged foundation.
 
 Status: implemented foundation for independent review, **not production readiness**.
 This task's owner instruction supersedes the older Student plan's milestone ordering.
@@ -129,7 +138,8 @@ explicitly design staged K1 ingestion and atomic search activation; this service
 alone does not make the old pipeline fenced.
 
 Limits: 2,000,000 Unicode code points of normalized text, 1,000 ordered nonoverlapping
-spans. Each span satisfies `0 <= start < end <= len(text)`. Offsets address the exact
+spans. SQL length predicates reject oversized legacy revisions before materializing
+source text in the API/worker process, both on enqueue and publication. Each span satisfies `0 <= start < end <= len(text)`. Offsets address the exact
 stored snapshot in **Unicode code points**, not bytes/UTF-16 or separately normalized
 text. Current v1 requires output text equal to the pinned source revision, canonical
 under the existing K1 normalizer, and matching the enqueue-time text SHA-256 and file
@@ -162,19 +172,22 @@ worker CLI, Redis, Celery or external service was added.
 
 ## Verification and review evidence
 
-Final **local** results on the retained code (842 API cases collected per backend):
+Final **local** results on the retained code (843 API cases collected per backend):
 
 | Check | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: |
-| API SQLite, including existing K1/K2/native suites | 836 | 0 | 6 |
-| API PostgreSQL 16 + pgvector | 841 | 0 | 1 |
-| Focused SQLite job contract tests (overlaps full suite) | 35 | 0 | 1 |
+| API SQLite, including existing K1/K2/native suites | 837 | 0 | 6 |
+| API PostgreSQL 16 + pgvector | 842 | 0 | 1 |
+| Focused SQLite job contract tests (overlaps full suite) | 36 | 0 | 1 |
 | Frontend/shared unit tests | 65 | 0 | 0 |
 
 SQLite skips: 2 PostgreSQL role checks, 1 SKIP LOCKED test, migration lock, 2 pgvector
 operator cases. PostgreSQL skips the SQLite-only fallback case. No OCR/Office test
-was skipped in either final full suite. There are **36 new job regression cases**;
+was skipped in either final full suite. There are **37 new job regression cases**;
 counts from overlapping focused/full suites must not be added together.
+
+The oversized-source ORM-load regression failed before the SQL read guard and passes
+after it; rejecting only after loading the full source was insufficient.
 
 The new cases cover API/engine restarts; concurrent claimers; an actual PostgreSQL
 row lock; expired lease recovery; stale/expired/cancelled worker rejection; heartbeat;
@@ -190,7 +203,7 @@ PostgreSQL; no new schema drift. PostgreSQL's existing vector reflection warning
 remains. anon/authenticated have no DML privileges on either new table.
 
 API Docker build passes. Image:
-`sha256:8dfe0d833783cfeb70b5355910987d77a4fcadd33e88ad99e407e94f01993ffb`.
+`sha256:736da3b8e1a7a02e884568ff0edeb724e437b66507f2424546f782eabc2e1add`.
 A real container smoke applies 0016, checks auth 401/200 and tini PID 1, exits a trusted
 one-shot worker after claiming, restarts the API container with that running job,
 fault-expires its lease, then uses a second worker process to reclaim attempt 2 and
@@ -215,10 +228,12 @@ exist. A live heartbeat alone is not a document-wide deadline. Large-document st
 backpressure/operational supervision, native parser identities and shared-workspace
 membership are later approved tasks, not completed Student features.
 
-This branch is for independent Antigravity and ChatGPT review. No merge, auto-merge,
-deployment, ruleset modification, production credentials or paid APIs were used.
+The follow-up is for independent Antigravity and ChatGPT review. The original PR #11
+was merged externally; do not describe the whole foundation as unmerged. This agent
+ran no merge/auto-merge, deployment or ruleset modification, and used no production
+credentials or paid APIs. The source-budget follow-up must remain unmerged for review.
 
-## Changed files
+## Task 01 foundation files (including the externally merged PR #11)
 
 | File | Purpose |
 | --- | --- |
@@ -230,7 +245,20 @@ deployment, ruleset modification, production credentials or paid APIs were used.
 | apps/api/src/ezo_api/schemas/document_jobs.py | Strict owner API and Unicode offset contracts |
 | apps/api/src/ezo_api/api/routes/document_jobs.py | Enqueue/status/cancel/bounded result control plane |
 | apps/api/src/ezo_api/main.py | Register the authenticated router; no worker startup |
-| apps/api/tests/integration/test_document_jobs.py | 36 lifecycle, contention, isolation and integrity cases |
+| apps/api/tests/integration/test_document_jobs.py | 37 lifecycle, contention, isolation and integrity cases |
 | .github/workflows/ci.yml | Narrow push trigger for this branch, preserving all checks |
-| .github/workflows/security.yml | Same narrow branch trigger so API PR access is not needed to run security checks |
+| .github/workflows/security.yml | Same narrow branch trigger and job-source audit paths for current-head security checks |
 | docs/P1_STUDENT_DURABLE_JOBS.md | Architecture, local evidence, limits and review handoff |
+
+
+## Active follow-up diff against aacabe5
+
+- apps/api/src/ezo_api/knowledge/jobs/service.py: apply SQL text-length predicates
+  before materializing a source revision, preserving 404 versus resource-limit errors.
+- apps/api/tests/integration/test_document_jobs.py: oversized revision cannot reach
+  the ORM load boundary; this test failed before the guard.
+- .github/workflows/ci.yml: include only the named follow-up branch in push checks.
+- .github/workflows/security.yml: the same named branch plus affected job-source paths,
+  with all vulnerability gates, job names and immutable Action pins preserved.
+- docs/P1_STUDENT_DURABLE_JOBS.md: corrected counts/image identity and transparent
+  record of the external merge and current review scope.
