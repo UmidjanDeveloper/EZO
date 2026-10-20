@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs"]
   pull_request:
 
 permissions:
