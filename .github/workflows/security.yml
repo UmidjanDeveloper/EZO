@@ -7,10 +7,12 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation"]
     paths:
       - "apps/api/Dockerfile"
-      - "apps/api/src/ezo_api/knowledge/jobs/**"
+      - "docker-compose.yml"
+      - "apps/api/src/**"
+      - "apps/api/tests/**"
       - "apps/web/Dockerfile"
       - "apps/api/pyproject.toml"
       - "apps/api/uv.lock"
@@ -90,6 +92,18 @@ jobs:
               --scanners vuln --format json --output "/reports/$component.trivy.json" \
               --no-progress "ezo-$component:scan"
           done
+      - name: The known web zlib advisory is patched, not suppressed
+        run: |
+          python3 - <<'PYCODE'
+          import json
+          with open("reports/security/web.trivy.json") as source:
+              report = json.load(source)
+          assert not any(
+              finding["VulnerabilityID"] == "CVE-2026-85091"
+              for result in report.get("Results", [])
+              for finding in result.get("Vulnerabilities", [])
+          ), "Known zlib security update was not applied"
+          PYCODE
       - name: Report all findings and enforce the fixable HIGH/CRITICAL gate
         if: always()
         run: python3 scripts/container_vulnerability_gate.py reports/security/api.trivy.json reports/security/web.trivy.json

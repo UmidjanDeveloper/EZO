@@ -348,7 +348,15 @@ def cmd_api(args: argparse.Namespace) -> int:
         )
     migrate(env)
     run(
-        ["uv", "run", "uvicorn", "ezo_api.main:create_app", "--factory", "--port", str(args.port)],
+        [
+            "uv",
+            "run",
+            "uvicorn",
+            "tests.e2e_app:create_fixture_app" if args.e2e else "ezo_api.main:create_app",
+            "--factory",
+            "--port",
+            str(args.port),
+        ],
         cwd=API_DIR,
         env=env,
     )

@@ -16,16 +16,15 @@ A phase is done only when the checks in [Verification](IMPLEMENTATION_STATUS.md#
 pass: CI (lint, types, SQLite and PostgreSQL tests, migrations, web build, Playwright, Docker
 images) plus the extended local checks listed for that phase.
 
-## Current engineering priority — P0 review, then P1 Student
+## Current engineering priority — controlled Student foundation
 
-- Current P0 verdict: **P0 BLOCKED**. Native libxml2/parser containment risks and
-  effective owner-controlled GitHub protection remain open despite green tests.
-  See [verified P0 assessment](docs/P0_HARDENING_REPORT.md) and
-  [exact GitHub owner actions](docs/GITHUB_P0_PROTECTION.md).
-- The [P1 Student implementation plan](docs/P1_EZO_STUDENT_V1_PLAN.md) starts with
-  one independently reviewable DOCX section-manifest/read-only API milestone. No
-  P1 code, EPUB reader, Student UI, durable worker or K4–K7 is implemented by that plan.
-- No deployment, paid infrastructure or real provider use is part of this mission.
+- Native production processing remains **BLOCKED** pending a verified isolated runtime
+  for D4/D6/D7. The coordinated implementation fails closed and removes OCR/Office
+  binaries from production while retaining fixture regression coverage.
+- Durable stored-text jobs, SQL pagination and the controlled Student text-reading API
+  are implemented for independent review; PDF/DOCX/EPUB Student ingestion remains blocked.
+  See [current architecture and gates](docs/P0_P1_CONTROLLED_STUDENT_REVIEW.md).
+- No deployment, paid infrastructure, real provider use or K4–K7 is authorized here.
 
 ## Done
 

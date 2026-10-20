@@ -33,14 +33,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# Keep OCR, Writer and Calc, but ship no package installer or build-tool cache.
-# Upgrade packages from the signed Debian repositories; never hide unfixed findings.
+# No hostile native parser toolchain in the production API. Execution stays disabled
+# until a separately verified isolated executor exists. Keep init and document fonts.
 RUN apt-get update && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends \
-        tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
-        tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
-        libreoffice-writer-nogui libreoffice-calc-nogui \
-        fonts-liberation fonts-dejavu-core libseccomp2 tini \
+    && apt-get install -y --no-install-recommends tini fonts-liberation fonts-dejavu-core \
     && python -m pip uninstall -y pip \
     && rm -rf /var/lib/apt/lists/* /root/.cache /usr/local/lib/python3.13/ensurepip
 WORKDIR /app
@@ -63,9 +59,15 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 # Apply database migrations, then start the API.
 CMD ["/app/entrypoint.sh"]
 
-# Only CI targets this stage. Its native tools are identical to the production stage.
+# Only CI targets this stage. Production intentionally contains no OCR/Office binaries.
 FROM runtime AS office-tests
 USER root
+# Native binaries are retained only for controlled repository regression fixtures.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
+        tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
+        libreoffice-writer-nogui libreoffice-calc-nogui libseccomp2 \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/bin/uv /usr/local/bin/uv
 RUN --mount=type=secret,id=system_ca \
     if [ -f /run/secrets/system_ca ]; then export SSL_CERT_FILE=/run/secrets/system_ca; fi; \

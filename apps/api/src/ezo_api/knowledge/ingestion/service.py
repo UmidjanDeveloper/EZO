@@ -28,6 +28,7 @@ from ezo_api.db.models import (
     KnowledgeSource,
     OcrPage,
 )
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.documents.ocr import NoOCRProvider, OCRError, OCRProvider
 from ezo_api.documents.pdf.engine import PdfError, inspect_pdf
 from ezo_api.knowledge.embeddings.service import EmbeddingError, EmbeddingService
@@ -138,12 +139,17 @@ class KnowledgeService:
     # ------------------------------------------------------------------ adding
 
     async def _duplicate_of(
-        self, session: AsyncSession, user_id: uuid.UUID, content_hash: str
+        self,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        content_hash: str,
+        project_id: uuid.UUID | None,
     ) -> KnowledgeDocument | None:
         return await session.scalar(
             select(KnowledgeDocument).where(
                 KnowledgeDocument.user_id == user_id,
                 KnowledgeDocument.content_hash == content_hash,
+                KnowledgeDocument.project_id.is_not_distinct_from(project_id),
             )
         )
 
@@ -159,14 +165,26 @@ class KnowledgeService:
             limit = self.max_upload_bytes // (1024 * 1024)
             raise UploadRejectedError("too_large", f"The file is larger than {limit} MB.")
         safe_name = sanitize_filename(filename)
+        if not native_fixtures_allowed() and extension_of(safe_name) not in (
+            ".txt",
+            ".md",
+            ".markdown",
+            ".csv",
+        ):
+            raise UploadRejectedError("isolation_unavailable", ISOLATION_MESSAGE)
+        if not native_fixtures_allowed() and len(data) > 2_000_000:
+            raise UploadRejectedError("too_large", "Safe text ingestion is limited to 2 MB.")
         kind = detect_kind(safe_name, data)
         content_hash = sha256_hex(data)
 
-        existing = await self._duplicate_of(session, user_id, content_hash)
+        existing = await self._duplicate_of(session, user_id, content_hash, project_id)
         if existing is not None:
             return AddResult(existing, duplicate=True, new_revision=False)
 
-        key = f"uploads/{user_id}/{content_hash[:2]}/{content_hash}{extension_of(safe_name)}"
+        key = (
+            f"uploads/{user_id}/{project_id or 'inbox'}/"
+            f"{content_hash[:2]}/{content_hash}{extension_of(safe_name)}"
+        )
         await self.storage.put(key, data)
 
         source = await self._source(session, user_id, project_id, "upload", UPLOAD_SOURCE_NAME)
@@ -212,12 +230,12 @@ class KnowledgeService:
             else "text"
         )
         content_hash = sha256_hex(page.data)
-        existing = await self._duplicate_of(session, user_id, content_hash)
+        existing = await self._duplicate_of(session, user_id, content_hash, project_id)
         if existing is not None:
             return AddResult(existing, duplicate=True, new_revision=False)
 
         ext = {"pdf": ".pdf", "html": ".html"}.get(category, ".txt")
-        key = f"web/{user_id}/{content_hash[:2]}/{content_hash}{ext}"
+        key = f"web/{user_id}/{project_id or 'inbox'}/{content_hash[:2]}/{content_hash}{ext}"
         await self.storage.put(key, page.data)
 
         source = await self._source(session, user_id, project_id, "url", URL_SOURCE_NAME)
@@ -390,7 +408,7 @@ class KnowledgeService:
             document.status = "failed"
             document.error = getattr(exc, "message", None) or str(exc)
         except Exception:
-            logger.exception("Ingestion crashed for document %s", document_id)
+            logger.error("Ingestion crashed for document %s", document_id)
             await session.rollback()
             document = await self._reload(session, document_id)
             document.status = "failed"
@@ -411,6 +429,8 @@ class KnowledgeService:
 
         # PARSE (CPU-bound: off the event loop)
         category = str((document.meta or {}).get("category", "text"))
+        if not native_fixtures_allowed() and category not in ("text", "markdown", "csv"):
+            raise ParseError(ISOLATION_MESSAGE, "isolation_unavailable")
         parsed = await asyncio.to_thread(parse, category, data, document.filename or "file")
 
         # OCR: pages without a text layer (scans, photos), when an engine is installed.

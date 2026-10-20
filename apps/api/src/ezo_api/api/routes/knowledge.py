@@ -18,6 +18,7 @@ from ezo_api.db.models import (
     OcrPage,
     Project,
 )
+from ezo_api.documents.isolation import native_fixtures_allowed
 from ezo_api.knowledge.fetch import FetchError
 from ezo_api.knowledge.uploads import ALLOWED_EXTENSIONS, UploadRejectedError
 from ezo_api.schemas.knowledge import (
@@ -131,7 +132,11 @@ async def knowledge_status(
         semantic_search=services.embeddings.available,
         web_search=services.web_search.name if services.web_search else None,
         max_upload_mb=services.settings.max_upload_mb,
-        allowed_extensions=sorted(ALLOWED_EXTENSIONS),
+        allowed_extensions=sorted(
+            ALLOWED_EXTENSIONS
+            if native_fixtures_allowed()
+            else [".txt", ".md", ".markdown", ".csv"]
+        ),
         documents=sum(by_status.values()),
         chunks=int(chunks or 0),
         by_status=by_status,

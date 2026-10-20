@@ -32,6 +32,7 @@ from xml.etree.ElementTree import ParseError
 from defusedxml.common import DefusedXmlException
 from defusedxml.ElementTree import fromstring
 
+from ezo_api.documents.isolation import native_fixtures_allowed
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.documents.process_limits import MAX_DIAGNOSTIC_BYTES, NativeOutputLimit, run_native
@@ -106,6 +107,8 @@ class OfficeConverter:
     def discover(
         cls, command: str = "soffice", timeout_seconds: float = 120.0
     ) -> OfficeConverter | None:
+        if not native_fixtures_allowed():
+            return None
         binary = shutil.which(command) or (
             shutil.which("libreoffice") if command == "soffice" else None
         )

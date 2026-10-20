@@ -17,6 +17,7 @@ from typing import Any
 from docx import Document
 from docx.oxml.ns import qn
 
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.documents.office_convert import OfficeConvertError, external_links
 
 MARKER = re.compile(r"\{\{\s*(matn|text|текст|матн)\s*\}\}", re.IGNORECASE)
@@ -31,6 +32,8 @@ class TemplateError(Exception):
 
 def check_template(data: bytes) -> dict[str, Any]:
     """Validate an uploaded template (Word only, no external links). Returns facts about it."""
+    if not native_fixtures_allowed():
+        raise TemplateError(ISOLATION_MESSAGE)
     if len(data) > MAX_TEMPLATE_BYTES:
         raise TemplateError("The template is larger than 10 MB.")
     try:
@@ -56,6 +59,8 @@ def check_template(data: bytes) -> dict[str, Any]:
 
 def open_template(data: bytes) -> Any:
     """The template as a python-docx Document, with the body from the marker on removed."""
+    if not native_fixtures_allowed():
+        raise TemplateError(ISOLATION_MESSAGE)
     document = Document(io.BytesIO(data))
     body = document.element.body
     children = [child for child in body.iterchildren() if child.tag != qn("w:sectPr")]
