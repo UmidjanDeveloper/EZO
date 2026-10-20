@@ -56,6 +56,9 @@ services:
   student-worker:
     build: ./apps/api
     profiles: [student]
+    # Consumer exits on failure; the API HTTP probe is not a worker health check.
+    healthcheck:
+      disable: true
     command: [python, -m, ezo_api.knowledge.jobs.worker, --worker-id, student-local-1]
     environment:
       DATABASE_URL: postgresql+psycopg://ezo:ezo@db:5432/ezo
