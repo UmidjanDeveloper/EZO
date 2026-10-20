@@ -40,7 +40,7 @@ RUN apt-get update && apt-get upgrade -y \
         tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
         tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
         libreoffice-writer-nogui libreoffice-calc-nogui \
-        fonts-liberation fonts-dejavu-core libseccomp2 \
+        fonts-liberation fonts-dejavu-core libseccomp2 tini \
     && python -m pip uninstall -y pip \
     && rm -rf /var/lib/apt/lists/* /root/.cache /usr/local/lib/python3.13/ensurepip
 WORKDIR /app
@@ -56,6 +56,9 @@ USER ezo
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8000') + '/api/health', timeout=4)"
+
+# PID 1 reaps orphaned native descendants and forwards termination to the entrypoint.
+ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Apply database migrations, then start the API.
 CMD ["/app/entrypoint.sh"]

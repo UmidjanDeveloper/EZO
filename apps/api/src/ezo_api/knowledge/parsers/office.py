@@ -12,6 +12,7 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 
+from ezo_api.documents.ooxml_limits import OfficeInputLimit, validate_ooxml
 from ezo_api.knowledge.parsers.base import MAX_TABLE_ROWS, ParsedDocument, ParseError, Section
 
 
@@ -26,6 +27,7 @@ def _iter_blocks(document: DocxDocument) -> Any:
 
 
 def parse_docx(data: bytes, filename: str) -> ParsedDocument:
+    _preflight(data)
     try:
         document = docx.Document(io.BytesIO(data))
     except (zipfile.BadZipFile, KeyError, ValueError) as exc:
@@ -61,6 +63,7 @@ def parse_docx(data: bytes, filename: str) -> ParsedDocument:
 
 
 def parse_xlsx(data: bytes, filename: str) -> ParsedDocument:
+    _preflight(data)
     try:
         workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     except (zipfile.BadZipFile, KeyError, ValueError, OSError) as exc:
@@ -88,3 +91,10 @@ def parse_xlsx(data: bytes, filename: str) -> ParsedDocument:
         sections=sections,
         metadata={"format": "xlsx", "sheets": sheet_names, "truncated": truncated},
     )
+
+
+def _preflight(data: bytes) -> None:
+    try:
+        validate_ooxml(data)
+    except OfficeInputLimit as exc:
+        raise ParseError(str(exc), code=exc.code) from exc

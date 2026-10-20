@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final"]
   pull_request:
 
 permissions:
@@ -147,8 +147,13 @@ jobs:
             "python -m pytest -q -p no:cacheprovider \
               tests/unit/test_office_convert.py tests/unit/test_office_safety.py \
               tests/unit/test_process_limits.py tests/unit/test_ocr.py \
-              tests/unit/test_native_execution.py \
+              tests/unit/test_native_execution.py tests/unit/test_office_parse_limits.py \
               tests/integration/test_office_pdf.py"
+      - name: Native children are reaped by the production init
+        run: |
+          docker run --rm --memory=1536m --user 10001 \
+            -v "$PWD/apps/api/tests/container_native_reaping.py:/tmp/check-reaping.py:ro" \
+            ezo-api:ci python /tmp/check-reaping.py
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: Unsafe production configuration fails before HTTP startup
