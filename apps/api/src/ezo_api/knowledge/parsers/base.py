@@ -9,7 +9,8 @@ from typing import Any, Protocol
 class ParseError(Exception):
     """The file could not be read. `message` is safe to show to the user."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: str, code: str = "parse_failed") -> None:
+        self.code = code
         self.message = message
         super().__init__(message)
 
