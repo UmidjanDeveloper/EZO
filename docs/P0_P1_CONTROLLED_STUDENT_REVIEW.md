@@ -1,3 +1,6 @@
+> Follow-up: [operator-only per-document executor](PER_DOCUMENT_EXECUTOR_REVIEW.md)
+> adds measured isolation tests. Native API/job activation remains blocked.
+
 # Coordinated P0/P1 — controlled Student foundation
 
 Implementation baseline: `db7b548fb6544c978312d00e971fe1dfa470d35a` (merged PR #13).
