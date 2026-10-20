@@ -104,3 +104,13 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     await app.state.services.db.dispose()
+
+
+@pytest.fixture(autouse=True)
+def controlled_native_regression_fixtures():
+    # Legacy native tests exercise only repository-owned fixtures. This explicit
+    # test exception is never entered by application startup or a worker.
+    from ezo_api.documents.isolation import trusted_native_regression_fixtures
+
+    with trusted_native_regression_fixtures():
+        yield

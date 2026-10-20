@@ -43,6 +43,35 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    memswap_limit: 768m
+    pids_limit: 128
+
+  # Explicit local stored-text consumer; never a native parser worker.
+  student-worker:
+    build: ./apps/api
+    profiles: [student]
+    command: [python, -m, ezo_api.knowledge.jobs.worker, --worker-id, student-local-1]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ezo:ezo@db:5432/ezo
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 64
+    stop_grace_period: 30s
 
   web:
     build:

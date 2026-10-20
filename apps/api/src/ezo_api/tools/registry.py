@@ -11,10 +11,30 @@ from typing import Any
 from pydantic import ValidationError
 
 from ezo_api.db.models import ToolCall
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.tools.base import Tool, ToolContext, ToolResult
 
 logger = logging.getLogger(__name__)
 
+# These tools can parse/render native formats or load uploaded images/spreadsheets.
+ISOLATED_TOOLS = frozenset(
+    {
+        "pdf_tool",
+        "ocr_tool",
+        "ocr_export",
+        "extract_tables",
+        "sheet_ops",
+        "office_pdf",
+        "create_document",
+        "create_spreadsheet",
+        "create_presentation",
+        "create_graphic",
+        "edit_image",
+        "generate_image",
+        "read_document",
+        "verify_official_document",
+    }
+)
 MAX_ARG_CHARS = 500
 MAX_SUMMARY_CHARS = 1_000
 _SECRET_KEYS = ("key", "token", "password", "secret", "authorization", "cookie")
@@ -47,7 +67,9 @@ class ToolRegistry:
         self._tools[tool.name] = tool
 
     def names(self) -> list[str]:
-        return sorted(self._tools)
+        return sorted(
+            name for name in self._tools if native_fixtures_allowed() or name not in ISOLATED_TOOLS
+        )
 
     def get(self, name: str) -> Tool[Any] | None:
         return self._tools.get(name)
@@ -57,6 +79,9 @@ class ToolRegistry:
         tool = self._tools.get(name)
         if tool is None:
             result = ToolResult(ok=False, summary="", error=f"Unknown tool: {name}")
+            status = "denied"
+        elif name in ISOLATED_TOOLS and not native_fixtures_allowed():
+            result = ToolResult(ok=False, summary="", error=ISOLATION_MESSAGE)
             status = "denied"
         elif tool.dangerous and not ctx.allow_dangerous:
             result = ToolResult(ok=False, summary="", error="This action needs your confirmation.")
@@ -77,7 +102,7 @@ class ToolRegistry:
                 result = ToolResult(ok=False, summary="", error="The tool took too long.")
                 status = "error"
             except Exception as exc:
-                logger.exception("Tool %s crashed", name)
+                logger.error("Tool %s crashed (%s)", name, type(exc).__name__)
                 result = ToolResult(
                     ok=False, summary="", error=f"Tool failed: {type(exc).__name__}"
                 )

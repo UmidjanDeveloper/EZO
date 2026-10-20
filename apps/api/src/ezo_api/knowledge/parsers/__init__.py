@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.knowledge.parsers.base import ParsedDocument, ParseError, Parser, Section
 from ezo_api.knowledge.parsers.html import parse_html
 from ezo_api.knowledge.parsers.image import parse_image
@@ -22,6 +23,8 @@ PARSERS: dict[str, Parser] = {
 
 
 def parse(category: str, data: bytes, filename: str) -> ParsedDocument:
+    if category not in ("text", "markdown", "csv") and not native_fixtures_allowed():
+        raise ParseError(ISOLATION_MESSAGE, "isolation_unavailable")
     parser = PARSERS.get(category)
     if parser is None:
         raise ParseError(f"No parser for '{category}' files.")

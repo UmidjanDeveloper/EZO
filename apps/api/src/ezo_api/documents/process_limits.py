@@ -16,6 +16,8 @@ from collections.abc import Mapping
 from contextlib import suppress
 from pathlib import Path
 
+from ezo_api.documents.isolation import require_isolation
+
 NATIVE_PROCESS_LOCK = threading.Lock()
 MAX_ADDRESS_SPACE = 4 * 1024 * 1024 * 1024
 MAX_DIAGNOSTIC_BYTES = 64 * 1024
@@ -58,6 +60,7 @@ def run_native(
     Queue wait and execution share one wall-clock deadline. These are containment
     controls, not a filesystem sandbox or a user-code execution interface.
     """
+    require_isolation()
     deadline = time.monotonic() + timeout
     if not NATIVE_PROCESS_LOCK.acquire(timeout=max(0, timeout)):
         raise subprocess.TimeoutExpired(args, timeout)

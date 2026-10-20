@@ -479,3 +479,22 @@ class DocumentJobs:
                     if offset < end and span["start"] < end and span["end"] > offset
                 ],
             )
+
+    async def read_input(self, lease: Lease) -> str:
+        """Bounded pinned source for the fixed stored-text worker, never a parser."""
+        async with self._transaction() as session:
+            job = await self._leased(session, lease)
+            row = (
+                await session.execute(
+                    select(DocumentRevision.raw_text, DocumentRevision.content_hash).where(
+                        DocumentRevision.id == job.input_revision_id,
+                        DocumentRevision.document_id == job.document_id,
+                        func.length(DocumentRevision.raw_text) <= MAX_TEXT_CHARS,
+                    )
+                )
+            ).one_or_none()
+            if row is None or row.content_hash != job.input_content_hash:
+                raise JobError("revision_conflict", "The pinned input revision has changed.")
+            if hashlib.sha256(row.raw_text.encode()).hexdigest() != job.input_text_sha256:
+                raise JobError("revision_conflict", "The pinned input revision has changed.")
+            return str(row.raw_text)

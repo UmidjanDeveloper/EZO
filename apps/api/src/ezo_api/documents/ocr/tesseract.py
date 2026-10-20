@@ -28,6 +28,7 @@ from typing import Any
 from PIL import Image
 
 from ezo_api.core.language import detect_language
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.documents.ocr.model import (
     LOW_CONFIDENCE,
     NoOCRProvider,
@@ -97,6 +98,8 @@ class TesseractOCRProvider(OCRProvider):
     ) -> TesseractOCRProvider | None:
         """The provider when Tesseract is installed (with at least one usable language
         pack), otherwise None."""
+        if not native_fixtures_allowed():
+            return None
         binary = shutil.which(command)
         if binary is None:
             return None
@@ -475,6 +478,8 @@ def build_ocr_provider(
 ) -> OCRProvider:
     if mode == "none":
         return NoOCRProvider("OCR is turned off (EZO_OCR_PROVIDER=none).")
+    if not native_fixtures_allowed():
+        return NoOCRProvider(ISOLATION_MESSAGE)
     provider = TesseractOCRProvider.discover(
         command, languages, timeout_seconds=timeout_seconds, max_pages=max_pages
     )
