@@ -1,7 +1,16 @@
 # P1.1 / Task 01 — durable document job foundation
 
-2026-10-20. Verified base: `4a233a373d208093e5321d7f251cd6154fdf3509`
-(PR #10). Branch: `feat/p1-student-durable-jobs`.
+2026-10-20. Task baseline: `4a233a373d208093e5321d7f251cd6154fdf3509` (PR #10).
+Initial branch: `feat/p1-student-durable-jobs`.
+
+During verification, GitHub externally merged initial head `4ad6e4f` as PR #11,
+commit `aacabe539cc55bbc3f15d2668f99bfb40035c654`, at 15:22 Asia/Tashkent.
+This agent did not execute a merge. The final source-read guard was not in that merge.
+Active follow-up: `fix/p1-student-job-source-budgets`, based on that latest verified
+integration commit. It contains only the source-budget guard/test, current-head
+security triggers and updated evidence. Its `apps/api` tree is byte-identical to the
+fully tested feature head `9980402dee533a8dac8ff6234671ebee5fddf084`; no backend change
+was made while rebasing the handoff onto the externally merged foundation.
 
 Status: implemented foundation for independent review, **not production readiness**.
 This task's owner instruction supersedes the older Student plan's milestone ordering.
@@ -219,10 +228,12 @@ exist. A live heartbeat alone is not a document-wide deadline. Large-document st
 backpressure/operational supervision, native parser identities and shared-workspace
 membership are later approved tasks, not completed Student features.
 
-This branch is for independent Antigravity and ChatGPT review. No merge, auto-merge,
-deployment, ruleset modification, production credentials or paid APIs were used.
+The follow-up is for independent Antigravity and ChatGPT review. The original PR #11
+was merged externally; do not describe the whole foundation as unmerged. This agent
+ran no merge/auto-merge, deployment or ruleset modification, and used no production
+credentials or paid APIs. The source-budget follow-up must remain unmerged for review.
 
-## Changed files
+## Task 01 foundation files (including the externally merged PR #11)
 
 | File | Purpose |
 | --- | --- |
@@ -238,3 +249,16 @@ deployment, ruleset modification, production credentials or paid APIs were used.
 | .github/workflows/ci.yml | Narrow push trigger for this branch, preserving all checks |
 | .github/workflows/security.yml | Same narrow branch trigger and job-source audit paths for current-head security checks |
 | docs/P1_STUDENT_DURABLE_JOBS.md | Architecture, local evidence, limits and review handoff |
+
+
+## Active follow-up diff against aacabe5
+
+- apps/api/src/ezo_api/knowledge/jobs/service.py: apply SQL text-length predicates
+  before materializing a source revision, preserving 404 versus resource-limit errors.
+- apps/api/tests/integration/test_document_jobs.py: oversized revision cannot reach
+  the ORM load boundary; this test failed before the guard.
+- .github/workflows/ci.yml: include only the named follow-up branch in push checks.
+- .github/workflows/security.yml: the same named branch plus affected job-source paths,
+  with all vulnerability gates, job names and immutable Action pins preserved.
+- docs/P1_STUDENT_DURABLE_JOBS.md: corrected counts/image identity and transparent
+  record of the external merge and current review scope.
