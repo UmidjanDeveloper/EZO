@@ -28,7 +28,7 @@ from ezo_api.db.models import (
 )
 from ezo_api.db.session import Database
 from ezo_api.knowledge.ingestion.normalize import normalize_text
-from ezo_api.schemas.document_jobs import CitationSpan
+from ezo_api.schemas.document_jobs import CitationSpan, PublicationOut
 
 PARSER_VERSION = "stored-normalized-text/v1"
 MAX_TEXT_CHARS = 2_000_000
@@ -248,6 +248,15 @@ class DocumentJobs:
                     .where(
                         DocumentJob.parser_version == PARSER_VERSION,
                         DocumentJob.user_id == KnowledgeDocument.user_id,
+                        or_(
+                            DocumentJob.project_id.is_(None),
+                            select(Project.id)
+                            .where(
+                                Project.id == DocumentJob.project_id,
+                                Project.user_id == DocumentJob.user_id,
+                            )
+                            .exists(),
+                        ),
                         DocumentJob.project_id.is_not_distinct_from(KnowledgeDocument.project_id),
                         or_(
                             and_(DocumentJob.state == "queued", DocumentJob.available_at <= now),
@@ -416,3 +425,57 @@ class DocumentJobs:
             if job.state != "completed" or result is None:
                 raise JobError("result_unavailable", "The job has not published a result.")
             return result
+
+    async def result_page(
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        job_id: uuid.UUID,
+        *,
+        offset: int = 0,
+        limit: int = 4000,
+    ) -> PublicationOut:
+        """Authorized SQL slice; citation offsets remain global and unclipped."""
+        if offset < 0 or not 1 <= limit <= 8000:
+            raise JobError("invalid_page", "Invalid result page bounds.", 422)
+        async with self._transaction(write=False) as session:
+            job = await self._job(session, user_id, project_id, job_id)
+            if job.state != "completed":
+                raise JobError("result_unavailable", "The job has not published a result.")
+            # Valid publications are capped at MAX_TEXT_CHARS and MAX_SPANS by publish.
+            # Clamp only the SQL argument (not the returned offset) so arbitrarily
+            # large out-of-range API offsets never overflow a database integer.
+            row = (
+                await session.execute(
+                    select(
+                        DocumentJobPublication.id,
+                        DocumentJobPublication.input_revision_id,
+                        DocumentJobPublication.parser_version,
+                        DocumentJobPublication.text_sha256,
+                        func.substr(
+                            DocumentJobPublication.normalized_text,
+                            min(offset, MAX_TEXT_CHARS) + 1,
+                            limit,
+                        ).label("text"),
+                        func.length(DocumentJobPublication.normalized_text).label("total_chars"),
+                        DocumentJobPublication.spans,
+                    ).where(DocumentJobPublication.job_id == job.id)
+                )
+            ).one_or_none()
+            if row is None:
+                raise JobError("result_unavailable", "The job has not published a result.")
+            end = offset + len(row.text)
+            return PublicationOut(
+                id=row.id,
+                input_revision_id=row.input_revision_id,
+                parser_version=row.parser_version,
+                text_sha256=row.text_sha256,
+                text=row.text,
+                offset=offset,
+                total_chars=row.total_chars,
+                spans=[
+                    CitationSpan.model_validate(span)
+                    for span in row.spans
+                    if offset < end and span["start"] < end and span["end"] > offset
+                ],
+            )

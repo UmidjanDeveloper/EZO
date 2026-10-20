@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, rate_limit
 from ezo_api.knowledge.jobs.service import DocumentJobs, JobError
-from ezo_api.schemas.document_jobs import CitationSpan, JobCreate, JobOut, PublicationOut
+from ezo_api.schemas.document_jobs import JobCreate, JobOut, PublicationOut
 
 router = APIRouter(
     prefix="/api/knowledge", tags=["document-jobs"], dependencies=[Depends(rate_limit("default"))]
@@ -60,14 +60,8 @@ async def result(
     offset: int = Query(0, ge=0),
     limit: int = Query(4000, ge=1, le=8000),
 ) -> PublicationOut:
-    publication = await _call(DocumentJobs(services.db).result(user.id, project_id, job_id))
-    return PublicationOut(
-        id=publication.id,
-        input_revision_id=publication.input_revision_id,
-        parser_version=publication.parser_version,
-        text_sha256=publication.text_sha256,
-        text=publication.normalized_text[offset : offset + limit],
-        offset=offset,
-        total_chars=len(publication.normalized_text),
-        spans=[CitationSpan.model_validate(s) for s in publication.spans],
+    return await _call(
+        DocumentJobs(services.db).result_page(
+            user.id, project_id, job_id, offset=offset, limit=limit
+        )
     )
