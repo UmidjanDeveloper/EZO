@@ -11,6 +11,7 @@ from ezo_api.db.models.artifacts import (
 )
 from ezo_api.db.models.career import CareerProfile
 from ezo_api.db.models.conversation import Conversation, Message
+from ezo_api.db.models.document_jobs import DocumentJob, DocumentJobPublication
 from ezo_api.db.models.knowledge import (
     DocumentRevision,
     KnowledgeChunk,
@@ -44,6 +45,8 @@ __all__ = [
     "AuditLog",
     "CareerProfile",
     "Conversation",
+    "DocumentJob",
+    "DocumentJobPublication",
     "DocumentRevision",
     "GlossaryTerm",
     "KnowledgeChunk",
