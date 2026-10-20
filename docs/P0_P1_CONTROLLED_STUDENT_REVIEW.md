@@ -168,3 +168,13 @@ of exploitability. Retain the findings and rescan before any production decision
 Image inspection: lxml 6.1.3, linked and compiled libxml2 2.14.6; no Tesseract/soffice
 executables. The old LibreOffice system-libxml2 package is no longer shipped. This
 removes that shipped package/exposure, not a claim that all XML parsing is sandboxed.
+
+
+Direct HTML parsing by the official connector also enforces the same entry-point
+policy; it cannot bypass the generic dispatcher guard. A regression prevents calling
+trafilatura outside controlled fixtures. The local Docker daemon can enforce container
+memory limits (512 MiB and zero swap measured), although the API/worker has no delegated
+per-document executor/controller; container-wide limits do not authorize native parsing.
+The web runtime now applies signed Alpine stable security upgrades rather than retaining
+the known patchable zlib 1.3.2-r0 advisory in the pinned base. Hosted image scans verify
+the resulting image; historical local web scans are explicitly identified as such.

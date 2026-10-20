@@ -26,7 +26,12 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 # The server needs only node: npm, corepack and yarn (and their vulnerable bundled
 # packages) are removed from the runtime image.
-RUN addgroup -S ezo && adduser -S ezo -G ezo \
+# Apply signed stable-repository security fixes (including zlib); retain the package
+# database so scanners still see every installed package and remaining advisory.
+RUN --mount=type=secret,id=system_ca \
+    if [ -f /run/secrets/system_ca ]; then export SSL_CERT_FILE=/run/secrets/system_ca; fi; \
+    apk upgrade --no-cache \
+    && addgroup -S ezo && adduser -S ezo -G ezo \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
