@@ -1,7 +1,7 @@
 # Isolated per-document executor — independent review boundary
 
-This follow-up is based on integration `cd484f7706d89495e37d88248bf3766e24102de5`
-(PR #14). It adds an **operator-only extraction boundary**, not a live native
+The initial boundary was based on PR #14. Admission/recovery hardening is based
+on integration `57bf803457d031c00c847aa0dd213068b5e16b96` (externally merged PR #15). It adds an **operator-only extraction boundary**, not a live native
 Student worker. Production/API native execution remains disabled. No deployment,
 provider call, migration, retry reset, ruleset change or automatic merge is involved.
 
@@ -82,18 +82,46 @@ Hostile fixtures cover setsid/double-fork descendants, multi-process memory
 pressure with observed cgroup `oom_kill`, physical cancellation, output flooding,
 and controller SIGKILL while the parser attempts to SIGSTOP the root watchdog.
 Normal PDF/DOCX/EPUB extraction and fixed private-error responses are also tested.
-A Docker daemon outage cannot be fixed by application code: reconcile only
-containers labelled `ezo.executor=isolated-v1`, validate their `ezo-native-<uuid>`
-names, and remove exact stale IDs. Never globally prune unrelated workloads.
-A crash during `create` may leave a stopped container without document input;
-a crash during execution leaves a container that stops at the independent deadline.
-Automatic reconciliation and host admission control are not implemented here.
+## Atomic admission and bounded crash recovery
+
+Controllers using this protocol share one reserved Docker name,
+`ezo-native-active-v1`. Docker's atomic name reservation admits at most **one native
+workload per daemon**, across processes and controller hosts, without an in-memory
+semaphore or a host-local lock. A concurrent request gets `executor_busy` before
+its input is attached. This does not change database job state or retry budgets.
+Callers must treat busy as backpressure, not terminal document failure.
+
+An active, paused, restarting or freshly created reservation is never removed by
+recovery. Exited/dead reservations are removed **without force**, by immutable ID;
+Docker refuses the operation if the same container starts during recovery. An
+unstarted create abandoned for at least 120 seconds can be reclaimed. That grace
+is a reservation deadline, not a lease that authorizes late execution. Start,
+inspect and cleanup always use the original immutable container ID, so a delayed
+old controller cannot start or delete the replacement occupying the same name.
+A random per-request label also fences cleanup when create times out before its
+ID is returned. A losing creator never cleans up the winner's reservation.
+
+Recovery inspects at most the one exact slot; it does not list/prune unrelated
+containers. Required executor/slot labels must match; a foreign object at the
+reserved name fails closed with `executor_slot_conflict`. Daemon errors are not
+interpreted as evidence that a reservation is absent. A crashed running controller
+leaves capacity occupied until the independent 25-second watchdog stops its
+workload, after which the next request can reconcile it. An unstarted crash is
+recoverable after the 120-second grace, without ever having attached document data.
+No background service or new worker is added.
+
+This is the conservative one-slot policy for a dedicated executor daemon. All
+controllers using that daemon must run this version; mixing older UUID-named
+controllers or unrelated privileged Docker clients is outside this admission
+contract. It does not cap memory used by other host services or the controller's
+callers. Dedicated host/VM resource monitoring remains a production gate.
+A Docker daemon outage still fails closed; no global pruning or hidden fallback.
 
 ## Activation gates that remain open
 
 - Independent review of this controller/image boundary and adversarial evidence.
 - A dedicated executor host/VM, reviewed Docker/seccomp/kernel policy, aggregate
-  admission control across documents, monitoring and bounded stale reconciliation.
+  monitoring and a reviewed deployment of this one-slot admission/recovery policy.
 - An authenticated controller transport **if** it is separated from its trusted
   local operator; no unauthenticated remote Docker endpoint is acceptable.
 - Durable raw-revision storage and processor-version-specific claims; binding the

@@ -14,6 +14,7 @@ import tempfile
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import Literal
 
 from ezo_api.documents.executor.protocol import (
@@ -28,6 +29,8 @@ from ezo_api.documents.executor.protocol import (
 )
 
 DOCKER = shutil.which("docker") or "/usr/bin/docker"
+SLOT_NAME = "ezo-native-active-v1"
+CREATED_GRACE_SECONDS = 120
 
 
 class IsolatedExecutor:
@@ -61,52 +64,68 @@ class IsolatedExecutor:
             raise ExecutorError("input_limit")
         if cancelled is not None and cancelled.is_set():
             raise ExecutorError("cancelled")
-        name = "ezo-native-" + uuid.uuid4().hex
+        request_id = uuid.uuid4().hex
+        self._recover_slot()
+        container_id: str | None = None
         request = ExtractionRequest(format=format, data_base64=base64.b64encode(data).decode())
         process: subprocess.Popen[bytes] | None = None
         try:
-            self._docker(
-                "create",
-                "--pull=never",
-                "--name",
-                name,
-                "--label",
-                "ezo.executor=isolated-v1",
-                "--network=none",
-                "--read-only",
-                "--tmpfs",
-                "/tmp:rw,noexec,nosuid,size=134217728,mode=1777",  # noqa: S108 — private bounded tmpfs
-                "--memory",
-                str(MEMORY_BYTES),
-                "--memory-swap",
-                str(MEMORY_BYTES),
-                "--pids-limit",
-                str(PIDS),
-                "--cpus=1",
-                "--cap-drop=ALL",
-                "--cap-add=SETUID",
-                "--cap-add=SETGID",
-                "--cap-add=KILL",
-                "--cap-add=SETPCAP",
-                "--security-opt=no-new-privileges",
-                "--log-driver=none",
-                "--env=HTTP_PROXY=",
-                "--env=HTTPS_PROXY=",
-                "--env=ALL_PROXY=",
-                "--env=http_proxy=",
-                "--env=https_proxy=",
-                "--env=all_proxy=",
-                "--interactive",
-                self.image,
-            )
-            self._verify(name)
+            try:
+                created = self._docker(
+                    "create",
+                    "--pull=never",
+                    "--name",
+                    SLOT_NAME,
+                    "--label",
+                    "ezo.executor=isolated-v1",
+                    "--label=ezo.executor.slot=single-v1",
+                    "--label=ezo.executor.request=" + request_id,
+                    "--network=none",
+                    "--read-only",
+                    "--tmpfs",
+                    "/tmp:rw,noexec,nosuid,size=134217728,mode=1777",  # noqa: S108 — private bounded tmpfs
+                    "--memory",
+                    str(MEMORY_BYTES),
+                    "--memory-swap",
+                    str(MEMORY_BYTES),
+                    "--pids-limit",
+                    str(PIDS),
+                    "--cpus=1",
+                    "--cap-drop=ALL",
+                    "--cap-add=SETUID",
+                    "--cap-add=SETGID",
+                    "--cap-add=KILL",
+                    "--cap-add=SETPCAP",
+                    "--security-opt=no-new-privileges",
+                    "--log-driver=none",
+                    "--env=HTTP_PROXY=",
+                    "--env=HTTPS_PROXY=",
+                    "--env=ALL_PROXY=",
+                    "--env=http_proxy=",
+                    "--env=https_proxy=",
+                    "--env=all_proxy=",
+                    "--interactive",
+                    self.image,
+                )
+            except ExecutorError as exc:
+                # Docker name reservation is atomic across processes/hosts sharing
+                # this daemon. A losing creator must never remove the winner.
+                occupant = self._slot_id()
+                if occupant is not None and self._owned_id(request_id) is None:
+                    raise ExecutorError("executor_busy") from exc
+                raise
+            container_id = created.decode().strip()
+            if not re.fullmatch(r"[a-f0-9]{64}", container_id):
+                container_id = None
+                raise ExecutorError("invalid_container_identity")
+            self._verify(container_id)
             # Anonymous input leaves no named private file after controller death.
             # Bounded pipe reads avoid persisting arbitrary parser output to disk.
             with tempfile.TemporaryFile() as stdin, selectors.DefaultSelector() as selector:
                 stdin.write(request.model_dump_json().encode())
                 stdin.seek(0)
                 process = subprocess.Popen(  # noqa: S603 — generated name, no shell
-                    [DOCKER, "start", "--attach", "--interactive", name],
+                    [DOCKER, "start", "--attach", "--interactive", container_id],
                     stdin=stdin,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -137,7 +156,7 @@ class IsolatedExecutor:
                     if not selector.get_map() and process.poll() is None:
                         time.sleep(0.025)
                 process.wait(timeout=5)
-                state = json.loads(self._docker("inspect", name))[0]["State"]
+                state = json.loads(self._docker("inspect", container_id))[0]["State"]
                 if state["Running"] or state["ExitCode"] != 0 or process.returncode != 0:
                     raise ExecutorError("processing_failed")
                 try:
@@ -151,10 +170,15 @@ class IsolatedExecutor:
         finally:
             # Terminate the entire namespace, including setsid/double-fork children.
             # A daemon failure is never evidence that workload cleanup succeeded.
+            owned_id: str | None = None
             try:
-                self._docker("rm", "--force", name)
+                owned_id = container_id or self._owned_id(request_id)
+                if owned_id is not None:
+                    self._docker("rm", "--force", owned_id)
             except ExecutorError:
-                ids = self._docker("ps", "--all", "--quiet", "--filter", "name=^/" + name + "$")
+                if owned_id is None:
+                    raise
+                ids = self._docker("ps", "--all", "--quiet", "--filter", "id=" + owned_id)
                 if ids.strip():
                     raise ExecutorError("cleanup_failed") from None
             finally:
@@ -172,6 +196,57 @@ class IsolatedExecutor:
         if cancelled is not None and cancelled.is_set():
             raise ExecutorError("cancelled")
         return result
+
+    def _slot_id(self) -> str | None:
+        value = (
+            self._docker(
+                "ps", "--all", "--quiet", "--no-trunc", "--filter", "name=^/" + SLOT_NAME + "$"
+            )
+            .decode()
+            .strip()
+        )
+        if not value:
+            return None
+        if not re.fullmatch(r"[a-f0-9]{64}", value):
+            raise ExecutorError("invalid_container_identity")
+        return value
+
+    def _owned_id(self, request_id: str) -> str | None:
+        identity = self._slot_id()
+        if identity is None:
+            return None
+        record = json.loads(self._docker("inspect", identity))[0]
+        labels = record["Config"].get("Labels") or {}
+        if labels.get("ezo.executor.request") == request_id:
+            return identity
+        return None
+
+    def _recover_slot(self) -> None:
+        identity = self._slot_id()
+        if identity is None:
+            return
+        record = json.loads(self._docker("inspect", identity))[0]
+        labels = record["Config"].get("Labels") or {}
+        if (
+            labels.get("ezo.executor") != "isolated-v1"
+            or labels.get("ezo.executor.slot") != "single-v1"
+        ):
+            raise ExecutorError("executor_slot_conflict")
+        state = record["State"]
+        created = datetime.fromisoformat(record["Created"].replace("Z", "+00:00"))
+        abandoned_create = (
+            state["Status"] == "created"
+            and (datetime.now(UTC) - created).total_seconds() >= CREATED_GRACE_SECONDS
+        )
+        if state["Running"] or not (state["Status"] in ("exited", "dead") or abandoned_create):
+            raise ExecutorError("executor_busy")
+        # No force: if another operator starts this same ID after inspection,
+        # Docker refuses removal. Never kill a healthy workload during recovery.
+        try:
+            self._docker("rm", identity)
+        except ExecutorError:
+            if self._slot_id() == identity:
+                raise ExecutorError("executor_busy") from None
 
     def _verify(self, name: str) -> None:
         container = json.loads(self._docker("inspect", name))[0]
