@@ -585,3 +585,218 @@ async def test_oversized_source_is_rejected_before_materializing_revision_text(d
         assert error.value.code == "resource_limit"
     finally:
         event.remove(DocumentRevision, "load", no_oversized_load)
+
+
+async def test_claim_skips_project_owner_mismatch_without_poisoning_queue(db):
+    stale, jobs, stale_job = await queued(db)
+    healthy, _, healthy_job = await queued(db)
+    # Individual FKs remain valid: a maintenance/ownership change can leave
+    # legacy document/job ownership inconsistent with the project's current owner.
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(Project).where(Project.id == stale.project).values(user_id=healthy.user)
+        )
+        await session.commit()
+    lease = await jobs.claim("healthy-worker")
+    assert lease is not None and lease.job_id == healthy_job.id
+    assert await jobs.claim("repeat-poll") is None
+    async with db.sessionmaker() as session:
+        untouched = await session.get(DocumentJob, stale_job.id)
+        assert untouched.state == "queued" and untouched.attempts == 0
+    # Repairing ownership makes the original healthy input eligible again.
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(Project).where(Project.id == stale.project).values(user_id=stale.user)
+        )
+        await session.commit()
+    assert (await jobs.claim("after-repair")).job_id == stale_job.id
+
+
+@pytest.mark.parametrize("locked_model", [DocumentJob, KnowledgeDocument], ids=["job", "document"])
+async def test_postgresql_claims_second_job_while_first_row_locked(db, locked_model):
+    if db.engine.dialect.name != "postgresql":
+        pytest.skip("Real PostgreSQL row contention; SQLite cannot emulate SKIP LOCKED")
+    first, jobs, job_a = await queued(db)
+    _, _, job_b = await queued(db)
+    async with db.sessionmaker() as blocker:
+        row_id = job_a.id if locked_model is DocumentJob else first.document
+        await blocker.execute(
+            select(locked_model).where(locked_model.id == row_id).with_for_update()
+        )
+        lease_b = await asyncio.wait_for(jobs.claim("worker-b"), timeout=2)
+        assert lease_b is not None and lease_b.job_id == job_b.id
+        assert await asyncio.wait_for(jobs.claim("still-locked"), timeout=2) is None
+        await blocker.rollback()
+    lease_a = await asyncio.wait_for(jobs.claim("after-unlock"), timeout=2)
+    assert lease_a is not None and lease_a.job_id == job_a.id
+    assert lease_a.attempt == lease_b.attempt == 1
+
+
+async def test_result_api_slices_in_sql_without_loading_publication(client, app):
+    from tests.integration.test_knowledge_api import upload
+
+    value = "🙂Ўé" * 100_000
+    uploaded = (await upload(client, "large.txt", value.encode())).json()["document"]
+    revision = (await client.get("/api/knowledge/documents/" + uploaded["id"])).json()["revisions"][
+        0
+    ]["id"]
+    job = (
+        await client.post(
+            "/api/knowledge/documents/" + uploaded["id"] + "/jobs", json={"revision_id": revision}
+        )
+    ).json()
+    jobs = DocumentJobs(app.state.services.db)
+    lease = await jobs.claim("test-worker")
+    publication = await jobs.publish(
+        lease, value, [CitationSpan(start=1, end=12), CitationSpan(start=20, end=30)]
+    )
+
+    def no_full_load(instance, context):
+        pytest.fail("Paginated result materialized the entire publication")
+
+    statements = []
+
+    def record_sql(conn, cursor, statement, parameters, context, many):
+        if "document_job_publications" in statement:
+            statements.append(statement)
+
+    event.listen(app.state.services.db.engine.sync_engine, "before_cursor_execute", record_sql)
+    event.listen(DocumentJobPublication, "load", no_full_load)
+    try:
+        response = await client.get(
+            "/api/knowledge/document-jobs/" + job["id"] + "/result",
+            params={"offset": 5, "limit": 8},
+        )
+        assert response.status_code == 200, response.text
+        page = response.json()
+        assert page["text"] == value[5:13] and page["total_chars"] == len(value)
+        assert page["spans"] == [{"start": 1, "end": 12}]
+        assert page["text_sha256"] == publication.text_sha256
+        assert len(statements) == 1 and "substr(" in statements[0].lower()
+    finally:
+        event.remove(DocumentJobPublication, "load", no_full_load)
+        event.remove(app.state.services.db.engine.sync_engine, "before_cursor_execute", record_sql)
+
+
+@pytest.mark.parametrize(
+    "offset,limit,expected_spans",
+    [
+        (0, 1, []),
+        (1, 1, [(1, 5)]),
+        (4, 2, [(1, 5), (5, 8)]),
+        (5, 1, [(5, 8)]),
+        (8, 1, []),
+        (9, 8, []),
+        (10**30, 8, []),
+    ],
+)
+async def test_result_page_unicode_boundaries_and_out_of_range(db, offset, limit, expected_spans):
+    scope = await seed(db)
+    value = "🙂ЎéabcXYZ"
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(DocumentRevision)
+            .where(DocumentRevision.id == scope.revision)
+            .values(raw_text=value)
+        )
+        await session.commit()
+    jobs = DocumentJobs(db)
+    job = await jobs.enqueue(scope.user, scope.project, scope.document, scope.revision)
+    publication = await jobs.publish(
+        await jobs.claim("worker"),
+        value,
+        [CitationSpan(start=1, end=5), CitationSpan(start=5, end=8)],
+    )
+    page = await jobs.result_page(scope.user, scope.project, job.id, offset=offset, limit=limit)
+    assert page.text == value[offset : offset + limit]
+    assert page.offset == offset and page.total_chars == len(value)
+    assert [(s.start, s.end) for s in page.spans] == expected_spans
+    assert page.text_sha256 == publication.text_sha256
+    assert page.input_revision_id == scope.revision
+
+
+async def test_result_page_empty_publication_and_authorization_before_read(db):
+    scope = await seed(db)
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(DocumentRevision)
+            .where(DocumentRevision.id == scope.revision)
+            .values(raw_text="")
+        )
+        await session.commit()
+    jobs = DocumentJobs(db)
+    job = await jobs.enqueue(scope.user, scope.project, scope.document, scope.revision)
+    with pytest.raises(JobError) as unavailable:
+        await jobs.result_page(scope.user, scope.project, job.id)
+    assert unavailable.value.code == "result_unavailable"
+    await jobs.publish(await jobs.claim("worker"), "", [])
+    page = await jobs.result_page(scope.user, scope.project, job.id)
+    assert page.text == "" and page.spans == [] and page.total_chars == 0
+    outsider = await seed(db)
+
+    def forbid_publication_query(conn, cursor, statement, parameters, context, many):
+        assert "document_job_publications" not in statement
+
+    event.listen(db.engine.sync_engine, "before_cursor_execute", forbid_publication_query)
+    try:
+        for user, project in [
+            (outsider.user, scope.project),
+            (scope.user, None),
+            (scope.user, outsider.project),
+        ]:
+            with pytest.raises(JobError) as error:
+                await jobs.result_page(user, project, job.id)
+            assert error.value.status == 404
+    finally:
+        event.remove(db.engine.sync_engine, "before_cursor_execute", forbid_publication_query)
+
+
+async def test_result_page_filters_maximum_citation_payload(db):
+    scope = await seed(db)
+    value = "x" * 2000
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(DocumentRevision)
+            .where(DocumentRevision.id == scope.revision)
+            .values(raw_text=value)
+        )
+        await session.commit()
+    jobs = DocumentJobs(db)
+    job = await jobs.enqueue(scope.user, scope.project, scope.document, scope.revision)
+    spans = [CitationSpan(start=i, end=i + 1) for i in range(0, 2000, 2)]
+    await jobs.publish(await jobs.claim("worker"), value, spans)
+    page = await jobs.result_page(scope.user, scope.project, job.id, offset=1000, limit=1)
+    assert page.spans == [CitationSpan(start=1000, end=1001)]
+    for offset, limit in [(-1, 1), (0, 0), (0, 8001)]:
+        with pytest.raises(JobError) as error:
+            await jobs.result_page(scope.user, scope.project, job.id, offset=offset, limit=limit)
+        assert error.value.status == 422
+
+
+@pytest.mark.parametrize("terminal", ["failed", "cancelled"])
+async def test_terminal_enqueue_and_cancel_preserve_state_and_budget(db, terminal):
+    scope, jobs, job = await queued(db)
+    lease = await jobs.claim("worker")
+    if terminal == "failed":
+        await jobs.fail(lease, "invalid_input")
+    else:
+        await jobs.cancel(scope.user, scope.project, job.id)
+    original = await jobs.get(scope.user, scope.project, job.id)
+    cancelled = await jobs.cancel(scope.user, scope.project, job.id)
+    duplicate = await jobs.enqueue(scope.user, scope.project, scope.document, scope.revision)
+    assert cancelled.state == duplicate.state == terminal
+    assert duplicate.id == job.id and duplicate.attempts == original.attempts == 1
+    assert duplicate.max_attempts == original.max_attempts
+    assert cancelled.error_code == duplicate.error_code == original.error_code
+    assert await jobs.claim("no-revival") is None
+    with pytest.raises(JobError):
+        await jobs.publish(lease, TEXT, SPANS)
+
+
+@pytest.mark.parametrize("worker_id", ["", "x" * 81, "worker space", "worker\n", "ў-worker", "a/b"])
+async def test_invalid_worker_identifier_cannot_consume_an_attempt(db, worker_id):
+    scope, jobs, job = await queued(db)
+    with pytest.raises(ValueError):
+        await jobs.claim(worker_id)
+    untouched = await jobs.get(scope.user, scope.project, job.id)
+    assert untouched.state == "queued" and untouched.attempts == 0

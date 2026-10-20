@@ -38,12 +38,17 @@ class JobOut(BaseModel):
 
 
 class PublicationOut(BaseModel):
+    """A Unicode page; spans intersect its text but retain global, unclipped offsets.
+
+    Offsets at/beyond total_chars return empty text/spans and preserve offset.
+    """
+
     id: uuid.UUID
     input_revision_id: uuid.UUID
     parser_version: str
     text_sha256: str
     offset_unit: Literal["unicode_codepoints"] = "unicode_codepoints"
-    text: str
+    text: str = Field(max_length=8000)
     offset: int
     total_chars: int
-    spans: list[CitationSpan]
+    spans: list[CitationSpan] = Field(max_length=1000)
