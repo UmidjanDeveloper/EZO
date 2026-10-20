@@ -148,7 +148,6 @@ class IsolatedExecutor:
                     raise ExecutorError("source_mismatch")
                 if cancelled is not None and cancelled.is_set():
                     raise ExecutorError("cancelled")
-                return result
         finally:
             # Terminate the entire namespace, including setsid/double-fork children.
             # A daemon failure is never evidence that workload cleanup succeeded.
@@ -167,6 +166,12 @@ class IsolatedExecutor:
                         process.stdout.close()
                     if process.stderr is not None:
                         process.stderr.close()
+
+        # Cancellation can arrive while Docker performs cleanup after extraction.
+        # Never acknowledge a successful result before that final check.
+        if cancelled is not None and cancelled.is_set():
+            raise ExecutorError("cancelled")
+        return result
 
     def _verify(self, name: str) -> None:
         container = json.loads(self._docker("inspect", name))[0]

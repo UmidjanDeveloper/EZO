@@ -166,3 +166,21 @@ def test_malformed_input_returns_no_private_stderr() -> None:
         IsolatedExecutor(IMAGE).extract(b"private_document_secret", "pdf")
     assert str(caught.value) == "Isolated document processing failed: processing_failed"
     assert names() == before
+
+
+def test_cancellation_during_cleanup_does_not_acknowledge_result() -> None:
+    assert IMAGE
+    cancelled = threading.Event()
+    before = names()
+
+    class CancelOnCleanup(IsolatedExecutor):
+        @staticmethod
+        def _docker(*args: str) -> bytes:
+            result = IsolatedExecutor._docker(*args)
+            if args[0] == "rm":
+                cancelled.set()
+            return result
+
+    with pytest.raises(ExecutorError, match="cancelled"):
+        CancelOnCleanup(IMAGE).extract(book(), "epub", cancelled=cancelled)
+    assert names() == before
