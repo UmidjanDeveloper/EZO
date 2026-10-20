@@ -106,7 +106,7 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     await app.state.services.db.dispose()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def controlled_native_regression_fixtures():
     # Legacy native tests exercise only repository-owned fixtures. This explicit
     # test exception is never entered by application startup or a worker.
