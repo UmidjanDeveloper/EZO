@@ -129,7 +129,8 @@ explicitly design staged K1 ingestion and atomic search activation; this service
 alone does not make the old pipeline fenced.
 
 Limits: 2,000,000 Unicode code points of normalized text, 1,000 ordered nonoverlapping
-spans. Each span satisfies `0 <= start < end <= len(text)`. Offsets address the exact
+spans. SQL length predicates reject oversized legacy revisions before materializing
+source text in the API/worker process, both on enqueue and publication. Each span satisfies `0 <= start < end <= len(text)`. Offsets address the exact
 stored snapshot in **Unicode code points**, not bytes/UTF-16 or separately normalized
 text. Current v1 requires output text equal to the pinned source revision, canonical
 under the existing K1 normalizer, and matching the enqueue-time text SHA-256 and file
@@ -162,19 +163,22 @@ worker CLI, Redis, Celery or external service was added.
 
 ## Verification and review evidence
 
-Final **local** results on the retained code (842 API cases collected per backend):
+Final **local** results on the retained code (843 API cases collected per backend):
 
 | Check | Passed | Failed | Skipped |
 | --- | ---: | ---: | ---: |
-| API SQLite, including existing K1/K2/native suites | 836 | 0 | 6 |
-| API PostgreSQL 16 + pgvector | 841 | 0 | 1 |
-| Focused SQLite job contract tests (overlaps full suite) | 35 | 0 | 1 |
+| API SQLite, including existing K1/K2/native suites | 837 | 0 | 6 |
+| API PostgreSQL 16 + pgvector | 842 | 0 | 1 |
+| Focused SQLite job contract tests (overlaps full suite) | 36 | 0 | 1 |
 | Frontend/shared unit tests | 65 | 0 | 0 |
 
 SQLite skips: 2 PostgreSQL role checks, 1 SKIP LOCKED test, migration lock, 2 pgvector
 operator cases. PostgreSQL skips the SQLite-only fallback case. No OCR/Office test
-was skipped in either final full suite. There are **36 new job regression cases**;
+was skipped in either final full suite. There are **37 new job regression cases**;
 counts from overlapping focused/full suites must not be added together.
+
+The oversized-source ORM-load regression failed before the SQL read guard and passes
+after it; rejecting only after loading the full source was insufficient.
 
 The new cases cover API/engine restarts; concurrent claimers; an actual PostgreSQL
 row lock; expired lease recovery; stale/expired/cancelled worker rejection; heartbeat;
@@ -190,7 +194,7 @@ PostgreSQL; no new schema drift. PostgreSQL's existing vector reflection warning
 remains. anon/authenticated have no DML privileges on either new table.
 
 API Docker build passes. Image:
-`sha256:8dfe0d833783cfeb70b5355910987d77a4fcadd33e88ad99e407e94f01993ffb`.
+`sha256:736da3b8e1a7a02e884568ff0edeb724e437b66507f2424546f782eabc2e1add`.
 A real container smoke applies 0016, checks auth 401/200 and tini PID 1, exits a trusted
 one-shot worker after claiming, restarts the API container with that running job,
 fault-expires its lease, then uses a second worker process to reclaim attempt 2 and
@@ -230,7 +234,7 @@ deployment, ruleset modification, production credentials or paid APIs were used.
 | apps/api/src/ezo_api/schemas/document_jobs.py | Strict owner API and Unicode offset contracts |
 | apps/api/src/ezo_api/api/routes/document_jobs.py | Enqueue/status/cancel/bounded result control plane |
 | apps/api/src/ezo_api/main.py | Register the authenticated router; no worker startup |
-| apps/api/tests/integration/test_document_jobs.py | 36 lifecycle, contention, isolation and integrity cases |
+| apps/api/tests/integration/test_document_jobs.py | 37 lifecycle, contention, isolation and integrity cases |
 | .github/workflows/ci.yml | Narrow push trigger for this branch, preserving all checks |
-| .github/workflows/security.yml | Same narrow branch trigger so API PR access is not needed to run security checks |
+| .github/workflows/security.yml | Same narrow branch trigger and job-source audit paths for current-head security checks |
 | docs/P1_STUDENT_DURABLE_JOBS.md | Architecture, local evidence, limits and review handoff |
