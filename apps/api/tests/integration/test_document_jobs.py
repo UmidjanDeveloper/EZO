@@ -559,3 +559,29 @@ async def test_processor_version_upgrade_creates_a_new_immutable_publication(db,
         unchanged.spans == old_result.spans
         and unchanged.parser_version == old_result.parser_version
     )
+
+
+async def test_oversized_source_is_rejected_before_materializing_revision_text(db):
+    scope = await seed(db)
+    async with db.sessionmaker() as session:
+        await session.execute(
+            update(DocumentRevision)
+            .where(DocumentRevision.id == scope.revision)
+            .values(raw_text="x" * 2_000_001)
+        )
+        await session.commit()
+
+    # An ORM load guard proves the oversized body never reaches the Python object.
+    def no_oversized_load(instance, context):
+        if instance.id == scope.revision:
+            pytest.fail("Oversized source was materialized before checking its SQL budget")
+
+    event.listen(DocumentRevision, "load", no_oversized_load)
+    try:
+        with pytest.raises(JobError) as error:
+            await DocumentJobs(db).enqueue(
+                scope.user, scope.project, scope.document, scope.revision
+            )
+        assert error.value.code == "resource_limit"
+    finally:
+        event.remove(DocumentRevision, "load", no_oversized_load)
