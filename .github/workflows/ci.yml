@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor"]
   pull_request:
 
 permissions:
@@ -118,6 +118,17 @@ jobs:
         run: docker compose --profile voice --profile student config --quiet
       - name: Build API image
         run: docker build -t ezo-api:ci apps/api
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+      - name: Install isolated controller regression dependencies
+        working-directory: apps/api
+        run: uv sync --frozen
+      - name: Per-document isolation, hostile descendants, OOM, cancellation and controller crash
+        run: apps/api/.venv/bin/python scripts/test_isolated_executor.py --api-image ezo-api:ci
+      - name: Isolated executor report
+        if: always()
+        run: python3 scripts/test_report.py "Isolated executor=apps/api/reports/isolated-executor.xml"
       - name: Production image fails closed without a native executor
         run: |
           docker run --rm --entrypoint python ezo-api:ci -c "
