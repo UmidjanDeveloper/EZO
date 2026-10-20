@@ -196,10 +196,10 @@ async def test_project_duplicate_deletion_keeps_other_project_file(client, app):
         assert await app.state.services.storage.get(document.storage_key) == TEXT.encode()
 
 
-
 def test_direct_official_html_parser_cannot_bypass_isolation():
     from ezo_api.knowledge.parsers.base import ParseError
     from ezo_api.knowledge.parsers.html import parse_html
+
     token = isolation._FIXTURES.set(False)
     try:
         with (
