@@ -156,6 +156,13 @@ jobs:
             ezo-api-office:ci python /tmp/check-reaping.py
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
+      - name: Web runtime includes the patched zlib package
+        run: |
+          docker run --rm --entrypoint sh ezo-web:ci -c '
+            version=$(apk info -v zlib)
+            version=${version#zlib-}
+            test "$(apk version -t "$version" 1.3.2-r1)" != "<"
+          '
       - name: Unsafe production configuration fails before HTTP startup
         run: |
           if docker run --rm -e EZO_ENV=production ezo-api:ci; then

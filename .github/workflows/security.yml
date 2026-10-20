@@ -92,6 +92,18 @@ jobs:
               --scanners vuln --format json --output "/reports/$component.trivy.json" \
               --no-progress "ezo-$component:scan"
           done
+      - name: The known web zlib advisory is patched, not suppressed
+        run: |
+          python3 - <<'PYCODE'
+          import json
+          with open("reports/security/web.trivy.json") as source:
+              report = json.load(source)
+          assert not any(
+              finding["VulnerabilityID"] == "CVE-2026-85091"
+              for result in report.get("Results", [])
+              for finding in result.get("Vulnerabilities", [])
+          ), "Known zlib security update was not applied"
+          PYCODE
       - name: Report all findings and enforce the fixable HIGH/CRITICAL gate
         if: always()
         run: python3 scripts/container_vulnerability_gate.py reports/security/api.trivy.json reports/security/web.trivy.json
