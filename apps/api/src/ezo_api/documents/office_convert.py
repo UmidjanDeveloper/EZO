@@ -193,7 +193,7 @@ class OfficeConverter:
                     "LibreOffice could not convert the file"
                     + (f": {detail[-1][:160]}" if detail else "."),
                 )
-            if output.stat().st_size > MAX_OUTPUT_BYTES:
+            if output.stat().st_size >= MAX_OUTPUT_BYTES:
                 raise OfficeConvertError("The PDF would be too large.", "output_limit")
             pdf = output.read_bytes()
         try:

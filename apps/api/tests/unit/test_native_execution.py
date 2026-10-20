@@ -102,3 +102,48 @@ def test_office_stops_diagnostic_flood_before_timeout(tmp_path: Path) -> None:
     with pytest.raises(office_convert.OfficeConvertError) as error:
         converter.to_pdf_sync(buffer.getvalue(), "docx")
     assert error.value.code == "output_limit"
+
+
+@pytest.mark.parametrize("count", [1023, 1024, 1025])
+def test_native_file_boundary_cannot_succeed_with_truncated_output(count: int) -> None:
+    code = f'import os; os.write(1, b"x"*{count})'
+    if count < 1024:
+        result = process_limits.run_native(
+            [sys.executable, "-c", code], timeout=2, file_limit=1024, stdout_limit=2048
+        )
+        assert result.stdout == b"x" * count
+    else:
+        with pytest.raises(process_limits.NativeOutputLimit):
+            process_limits.run_native(
+                [sys.executable, "-c", code], timeout=2, file_limit=1024, stdout_limit=2048
+            )
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Linux native signal disposition")
+def test_exec_restores_sigxfsz_default() -> None:
+    with pytest.raises(process_limits.NativeOutputLimit):
+        process_limits.run_native(
+            ["/bin/sh", "-c", "kill -XFSZ $$; exit 0"],
+            timeout=2,
+            file_limit=1024,
+            stdout_limit=1024,
+        )
+
+
+def test_office_pdf_exactly_at_file_limit_is_rejected(monkeypatch, tmp_path):
+    import subprocess
+
+    from tests.files import make_docx
+
+    def completed(args, **kwargs):
+        work = kwargs["cwd"]
+        (work / "out").mkdir()
+        (work / "out" / "input.pdf").write_bytes(b"x" * 1024)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(office_convert, "MAX_OUTPUT_BYTES", 1024)
+    monkeypatch.setattr(office_convert, "run_native", completed)
+    converter = office_convert.OfficeConverter("/unused", "fixture")
+    with pytest.raises(office_convert.OfficeConvertError) as error:
+        converter.to_pdf_sync(make_docx("Title", ["text"]), "docx")
+    assert error.value.code == "output_limit"

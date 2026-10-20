@@ -85,13 +85,13 @@ def run_native(
             try:
                 while True:
                     if (
-                        os.fstat(stdout.fileno()).st_size > stdout_limit
-                        or os.fstat(stderr.fileno()).st_size > stderr_limit
+                        os.fstat(stdout.fileno()).st_size >= stdout_limit
+                        or os.fstat(stderr.fileno()).st_size >= stderr_limit
                     ):
                         raise NativeOutputLimit
                     returncode = process.poll()
                     if returncode is not None:
-                        if returncode != 0 and (
+                        if (
                             os.fstat(stdout.fileno()).st_size >= file_limit
                             or os.fstat(stderr.fileno()).st_size >= file_limit
                         ):
@@ -109,6 +109,11 @@ def run_native(
                         process.wait(timeout=min(remaining, 0.05))
             finally:
                 _kill_group(process)
+            # A descendant may have written between leader exit and group cleanup.
+            if os.fstat(stdout.fileno()).st_size >= min(stdout_limit, file_limit) or os.fstat(
+                stderr.fileno()
+            ).st_size >= min(stderr_limit, file_limit):
+                raise NativeOutputLimit
             stdout.seek(0)
             stderr.seek(0)
             out, err = stdout.read(stdout_limit + 1), stderr.read(stderr_limit + 1)
@@ -185,6 +190,12 @@ def main() -> None:
     resource.setrlimit(resource.RLIMIT_CPU, (int(seconds), int(seconds) + 1))
     resource.setrlimit(resource.RLIMIT_FSIZE, (int(file_bytes), int(file_bytes)))
     deny_network()
+    # Python ignores these signals; exec preserves SIG_IGN unless explicitly reset.
+    import signal
+
+    for name in ("SIGPIPE", "SIGXFZ", "SIGXFSZ"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), signal.SIG_DFL)
     os.execv(binary, [binary, *args])  # noqa: S606 - fixed binary from server configuration
 
 
