@@ -3,6 +3,16 @@
 What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
 working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
 
+## Coordinated P0/P1 review — 2026-10-20
+
+Base `db7b548fb6544c978312d00e971fe1dfa470d35a` (PR #13).
+Current [controlled Student review](docs/P0_P1_CONTROLLED_STUDENT_REVIEW.md) supersedes
+older readiness statements below. Native processing is disabled without a verified
+isolated executor; production no longer includes OCR/Office binaries. A separate
+bounded durable stored-text consumer and scoped Student reading API are implemented.
+Exact final test/scan results belong to this task's final handoff, not historical tables.
+No production readiness, deployment or complete PDF/DOCX/EPUB Student V1 is claimed.
+
 ## P0 final hardening / P1 planning — current verification, 2026-10-19
 
 Base: c09e94ce9dc29b2e2a9ec467bbaee3c4d902d9b1, merged PR #8;
