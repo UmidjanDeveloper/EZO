@@ -194,3 +194,19 @@ async def test_project_duplicate_deletion_keeps_other_project_file(client, app):
     async with app.state.services.db.sessionmaker() as session:
         document = await session.get(KnowledgeDocument, uuid.UUID(second["id"]))
         assert await app.state.services.storage.get(document.storage_key) == TEXT.encode()
+
+
+
+def test_direct_official_html_parser_cannot_bypass_isolation():
+    from ezo_api.knowledge.parsers.base import ParseError
+    from ezo_api.knowledge.parsers.html import parse_html
+    token = isolation._FIXTURES.set(False)
+    try:
+        with (
+            patch("trafilatura.extract", side_effect=AssertionError("Extractor reached")),
+            pytest.raises(ParseError) as error,
+        ):
+            parse_html(b"<html>untrusted website</html>", "official.html")
+        assert error.value.code == "isolation_unavailable"
+    finally:
+        isolation._FIXTURES.reset(token)

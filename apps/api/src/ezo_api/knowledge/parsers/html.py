@@ -6,11 +6,14 @@ import json
 
 import trafilatura
 
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.knowledge.parsers.base import ParsedDocument, ParseError, Section
 from ezo_api.knowledge.parsers.text import decode_text
 
 
 def parse_html(data: bytes, filename: str) -> ParsedDocument:
+    if not native_fixtures_allowed():
+        raise ParseError(ISOLATION_MESSAGE, "isolation_unavailable")
     html = decode_text(data)
     result = trafilatura.extract(
         html, output_format="json", with_metadata=True, include_tables=True, favor_precision=True
