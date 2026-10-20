@@ -50,6 +50,12 @@ class IsolatedExecutor:
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise ExecutorError("executor_unavailable") from exc
         if completed.returncode:
+            # During concurrent create, Docker reserves a name before ps/inspect
+            # necessarily exposes the container. Recognize only its exact fixed
+            # name conflict; authentication, image and daemon errors stay distinct.
+            conflict = f'Conflict. The container name "/{SLOT_NAME}" is already in use'.encode()
+            if args and args[0] == "create" and conflict in completed.stderr:
+                raise ExecutorError("executor_busy")
             raise ExecutorError("executor_unavailable")
         return completed.stdout
 

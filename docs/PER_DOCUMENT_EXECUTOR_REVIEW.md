@@ -88,7 +88,10 @@ Controllers using this protocol share one reserved Docker name,
 `ezo-native-active-v1`. Docker's atomic name reservation admits at most **one native
 workload per daemon**, across processes and controller hosts, without an in-memory
 semaphore or a host-local lock. A concurrent request gets `executor_busy` before
-its input is attached. This does not change database job state or retry budgets.
+its input is attached. Docker may reserve the name before `ps/inspect` exposes
+the winner; its exact reserved-name conflict is classified as busy without
+treating unrelated image/authentication/daemon failures as backpressure.
+This does not change database job state or retry budgets.
 Callers must treat busy as backpressure, not terminal document failure.
 
 An active, paused, restarting or freshly created reservation is never removed by
