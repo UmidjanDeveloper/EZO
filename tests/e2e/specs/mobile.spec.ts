@@ -8,3 +8,10 @@ test("mobile: history drawer and chat work on a phone", async ({ page }) => {
   await page.getByRole("link", { name: "Xotira" }).click();
   await expect(page.getByRole("heading", { name: "Xotira" })).toBeVisible();
 });
+
+test("mobile: Student upload and reading controls fit the phone", async ({ page }) => {
+  await page.goto("/student");
+  await expect(page.getByRole("heading", { name: "EZO Student" })).toBeVisible();
+  await expect(page.getByLabel("Yoki o‘rganish uchun matn")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+});
