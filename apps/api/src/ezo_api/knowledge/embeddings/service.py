@@ -81,7 +81,7 @@ class EmbeddingService:
                     "query" if purpose == "query" else "document",
                 )
             except ProviderError as exc:
-                logger.warning("Embedding failed with %s: %s", self.active.key, exc)
+                logger.warning("Embedding provider request failed (%s)", exc.kind.value)
                 raise EmbeddingError(f"Embedding failed ({exc.kind.value}).", exc.hint) from exc
             if len(result) != len(batch) or any(not vector for vector in result):
                 raise EmbeddingError("The embedding provider returned an unexpected result.")

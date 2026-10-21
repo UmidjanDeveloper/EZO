@@ -68,6 +68,7 @@ def main() -> int:
             "-q",
             "-rs",
             "tests/integration/test_isolated_executor_container.py",
+            "tests/integration/test_student_executor.py",
             "--junitxml=" + options.junitxml,
         ],
         cwd=REPO / "apps/api",

@@ -60,14 +60,28 @@ class Lease:
 
 
 class DocumentJobs:
-    def __init__(self, db: Database, *, lease_seconds: int = 60, max_attempts: int = 3) -> None:
+    def __init__(
+        self,
+        db: Database,
+        *,
+        lease_seconds: int = 60,
+        max_attempts: int = 3,
+        parser_version: str | None = None,
+    ) -> None:
         if not 5 <= lease_seconds <= 300:
             raise ValueError("Lease duration must be from 5 to 300 seconds")
         if not 1 <= max_attempts <= 5:
             raise ValueError("Attempt limit must be from 1 to 5")
+        if parser_version not in (None, PARSER_VERSION, "isolated-extraction/v1"):
+            raise ValueError("Unsupported processor version")
+        self._parser_version = parser_version
         self.max_attempts = max_attempts
         self.db = db
         self.lease_seconds = lease_seconds
+
+    @property
+    def parser_version(self) -> str:
+        return self._parser_version or PARSER_VERSION
 
     @asynccontextmanager
     async def _transaction(self, *, write: bool = True) -> AsyncIterator[AsyncSession]:
@@ -182,7 +196,7 @@ class DocumentJobs:
                 select(DocumentJob).where(
                     DocumentJob.document_id == document_id,
                     DocumentJob.input_revision_id == revision_id,
-                    DocumentJob.parser_version == PARSER_VERSION,
+                    DocumentJob.parser_version == self.parser_version,
                 )
             )
             if existing:
@@ -201,7 +215,7 @@ class DocumentJobs:
                 input_revision_id=revision_id,
                 input_content_hash=revision.content_hash,
                 input_text_sha256=text_hash,
-                parser_version=PARSER_VERSION,
+                parser_version=self.parser_version,
                 max_attempts=self.max_attempts,
                 available_at=await self._now(session),
             )
@@ -246,7 +260,7 @@ class DocumentJobs:
                         ),
                     )
                     .where(
-                        DocumentJob.parser_version == PARSER_VERSION,
+                        DocumentJob.parser_version == self.parser_version,
                         DocumentJob.user_id == KnowledgeDocument.user_id,
                         or_(
                             DocumentJob.project_id.is_(None),
@@ -348,6 +362,8 @@ class DocumentJobs:
     async def publish(
         self, lease: Lease, normalized_text: str, spans: list[CitationSpan]
     ) -> DocumentJobPublication:
+        if self.parser_version != PARSER_VERSION:
+            raise JobError("invalid_input", ERRORS["invalid_input"], 422)
         if len(normalized_text) > MAX_TEXT_CHARS or len(spans) > MAX_SPANS:
             raise JobError("resource_limit", ERRORS["resource_limit"], 422)
         if normalize_text(normalized_text) != normalized_text:
@@ -482,6 +498,8 @@ class DocumentJobs:
 
     async def read_input(self, lease: Lease) -> str:
         """Bounded pinned source for the fixed stored-text worker, never a parser."""
+        if self.parser_version != PARSER_VERSION:
+            raise JobError("invalid_input", ERRORS["invalid_input"], 422)
         async with self._transaction() as session:
             job = await self._leased(session, lease)
             row = (

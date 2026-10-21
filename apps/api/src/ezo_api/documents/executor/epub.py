@@ -107,7 +107,21 @@ def parse_epub(data: bytes) -> ParsedDocument:
                 chars += len(text)
                 if chars > 2_000_000:
                     raise ParseError("EPUB text exceeds its character budget.")
-                sections.append(Section(text=text))
+                heading_node = next(
+                    (
+                        node
+                        for node in bodies[0].iter()
+                        if node.tag.rsplit("}", 1)[-1].lower()
+                        in ("h1", "h2", "h3", "h4", "h5", "h6")
+                    ),
+                    None,
+                )
+                heading = (
+                    " ".join(" ".join(heading_node.itertext()).split())[:200]
+                    if heading_node is not None
+                    else None
+                )
+                sections.append(Section(text=text, heading=heading or None))
                 members.append(member)
             return ParsedDocument(sections=sections, metadata={"section_sources": members})
     except ParseError:
