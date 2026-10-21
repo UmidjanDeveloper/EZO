@@ -35,3 +35,23 @@ test("student: mocked AI UI renders citations and interactive quiz", async ({ pa
   await expect(page.getByText("To‘g‘ri.", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Manbalar" })).toBeVisible();
 });
+
+test("student: bounded library pagination keeps older books accessible", async ({ page }) => {
+  const books = Array.from({ length: 31 }, (_, i) => ({ title: `Kitob ${i + 1}`, job: {
+    id: `fixture-${i}`, document_id: `document-${i}`, project_id: null,
+    state: "queued", attempts: 0, max_attempts: 3, error_message: null,
+    parser_version: "isolated-extraction/v1",
+  } }));
+  await page.route("**/api/student/library?*", route => {
+    const offset = Number(new URL(route.request().url()).searchParams.get("offset") ?? 0);
+    return route.fulfill({ json: books.slice(offset, offset + 31) });
+  });
+  await page.goto("/student");
+  await expect(page.getByRole("button", { name: /Kitob 1 Navbatda/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Kitob 31/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Keyingi hujjatlar", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Kitob 31/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Keyingi hujjatlar", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Oldingi hujjatlar", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Kitob 1 Navbatda/ })).toBeVisible();
+});

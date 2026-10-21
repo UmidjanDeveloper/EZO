@@ -14,6 +14,8 @@ type Learning = { status: string; text: string; generated: boolean; provider: st
 
 export function StudentPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [libraryOffset, setLibraryOffset] = useState(0);
+  const [moreBooks, setMoreBooks] = useState(false);
   const [selected, setSelected] = useState<Entry | null>(null);
   const [page, setPage] = useState<Page | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -31,10 +33,11 @@ export function StudentPage() {
   const [offset, setOffset] = useState(0);
   const [text, setText] = useState("");
   const refresh = useCallback(async () => {
-    const rows = await studentRequest<Entry[]>("student/library");
-    setEntries(rows);
+    const rows = await studentRequest<Entry[]>(`student/library?offset=${libraryOffset}&limit=31`);
+    setEntries(rows.slice(0, 30));
+    setMoreBooks(rows.length > 30);
     setSelected(current => current ? rows.find(e => e.job.id === current.job.id) ?? null : null);
-  }, []);
+  }, [libraryOffset]);
   useEffect(() => {
     let active = true;
     async function load() {
@@ -103,6 +106,11 @@ export function StudentPage() {
         {entries.map(entry => <button key={entry.job.id} className={`${button} break-words text-left`} aria-pressed={entry.job.id === selectedId} onClick={() => choose(entry)}>
           {entry.title}<span className="block text-xs text-ink-muted">{({ queued: "Navbatda", running: "O‘qilmoqda", completed: "Tayyor", failed: "Xato", cancelled: "Bekor qilindi" })[entry.job.state] ?? entry.job.state}</span>
         </button>)}
+        {entries.length > 0 && <p aria-live="polite" className="text-xs text-ink-muted">{libraryOffset + 1}–{libraryOffset + entries.length}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button className={button} disabled={libraryOffset === 0} onClick={() => setLibraryOffset(Math.max(0, libraryOffset - 30))}>Oldingi hujjatlar</button>
+          <button className={button} disabled={!moreBooks} onClick={() => setLibraryOffset(libraryOffset + 30)}>Keyingi hujjatlar</button>
+        </div>
       </nav>
       <section className="min-w-0" aria-label="O‘qish va o‘rganish">
         {selected && <>
