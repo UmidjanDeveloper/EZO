@@ -168,3 +168,11 @@ def test_epub_spine_order_titles_and_multi_chapter_provenance() -> None:
     assert result.metadata["section_sources"] == ["OPS/b.xhtml", "OPS/a.xhtml"]
     assert [s.heading for s in result.sections] == ["Birinchi bob", "Ўзбек 🙂"]
     assert "First in spine." in result.sections[0].text
+
+
+def test_extraction_rejects_database_incompatible_nuls_before_publication() -> None:
+    with pytest.raises(ValidationError):
+        ExtractionResult(source_sha256="0" * 64, text="x\x00y", sections=[])
+    for field in ("heading", "member"):
+        with pytest.raises(ValidationError):
+            SourceSection.model_validate({"start": 0, "end": 1, field: "x\x00y"})
