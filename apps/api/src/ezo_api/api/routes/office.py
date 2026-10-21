@@ -47,8 +47,7 @@ TEMPLATES: list[OfficeTemplateOut] = [
         type="docx",
         category="Ish yuritish",
         description=(
-            "Vazirliklar, idoralar va tashkilotlarga yuboriladigan "
-            "standart rasmiy xat shabloni."
+            "Vazirliklar, idoralar va tashkilotlarga yuboriladigan standart rasmiy xat shabloni."
         ),
         sample_content={
             "markdown": (

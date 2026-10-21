@@ -1,6 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 test("memory: EZO remembers explicit facts and the user can delete them", async ({ page }) => {
+  // Consent-first: opt in to explicit memory consent in the Memory hub first
+  await page.goto("/memory");
+  const consentToggle = page.getByTestId("memory-consent-toggle");
+  await expect(consentToggle).toBeVisible();
+  await consentToggle.click();
+  await expect(page.getByTestId("memory-consent-badge")).toBeVisible();
+
   await page.goto("/");
   await page.getByTestId("composer-input").fill("Eslab qol: men yashil choyni yaxshi ko‘raman.");
   await page.keyboard.press("Enter");

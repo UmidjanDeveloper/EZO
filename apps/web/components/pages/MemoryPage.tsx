@@ -280,6 +280,7 @@ export function MemoryPage() {
                       ? "bg-accent/20 text-accent"
                       : "bg-surface-3 text-ink-muted",
                   )}
+                  data-testid="memory-consent-badge"
                 >
                   {profile?.memory_consent
                     ? m.personal?.consentGranted ?? "Faol"
@@ -295,8 +296,9 @@ export function MemoryPage() {
           <Button
             variant={profile?.memory_consent ? "ghost" : "primary"}
             size="sm"
-            disabled={consentLoading}
+            disabled={consentLoading || profile === null}
             onClick={() => void toggleConsent()}
+            data-testid="memory-consent-toggle"
           >
             {consentLoading ? (
               <Spinner />
