@@ -33,10 +33,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
+# GHSA-6q48-6c7w-9gw2 also affects system trust: disable only the compromised
+# emSign ECC G3 anchor, retaining unaffected roots and normal TLS verification.
 # No hostile native parser toolchain in the production API. Execution stays disabled
 # until a separately verified isolated executor exists. Keep init and document fonts.
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends tini fonts-liberation fonts-dejavu-core \
+    && sed -i 's@^mozilla/emSign_ECC_Root_CA_-_G3.crt$@!mozilla/emSign_ECC_Root_CA_-_G3.crt@' /etc/ca-certificates.conf \
+    && update-ca-certificates --fresh \
     && python -m pip uninstall -y pip \
     && rm -rf /var/lib/apt/lists/* /root/.cache /usr/local/lib/python3.13/ensurepip
 WORKDIR /app

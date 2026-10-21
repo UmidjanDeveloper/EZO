@@ -80,6 +80,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: docker build -t ezo-api:scan apps/api
+      - name: Bundled and system TLS trust reject the compromised emSign root
+        run: |
+          docker run --rm --network=none --read-only --interactive --entrypoint python \
+            ezo-api:scan - < apps/api/tests/unit/test_tls_trust.py
       - run: docker build -t ezo-web:scan -f apps/web/Dockerfile .
       - name: Scan OS packages and libraries in both images
         run: |
