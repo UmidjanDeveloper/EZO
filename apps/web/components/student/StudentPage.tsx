@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { hasNextStudentPage, studentRequest } from "@/lib/student-api";
 import { PageFrame } from "../pages/PageFrame";
 
-type Job = { id: string; document_id: string; project_id: string | null; state: string; attempts: number; max_attempts: number; error_message: string | null };
+type Job = { parser_version: string; id: string; document_id: string; project_id: string | null; state: string; attempts: number; max_attempts: number; error_message: string | null };
 type Entry = { title: string; job: Job };
 type Section = { start: number; end: number; heading: string | null; page: number | null };
 type Page = { text: string; offset: number; total_chars: number };
@@ -112,7 +112,7 @@ export function StudentPage() {
           {["queued", "running"].includes(selected.job.state) && <button disabled={busy} className={button} onClick={() => void perform(async () => {
             await studentRequest(`knowledge/document-jobs/${selected.job.id}/cancel`, { method: "POST" });
           })}>Bekor qilish</button>}
-          {["failed", "cancelled"].includes(selected.job.state) && <button disabled={busy} className={button} onClick={() => void perform(async () => {
+          {selected.job.parser_version === "isolated-extraction/v1" && ["failed", "cancelled"].includes(selected.job.state) && <button disabled={busy} className={button} onClick={() => void perform(async () => {
             const job = await studentRequest<Job>(`student/readings/${selected.job.id}/retry`, { method: "POST" }); choose({ ...selected, job });
           })}>Qayta urinish</button>}
           {selected.job.state === "completed" && <>
