@@ -14,4 +14,5 @@ class User(UUIDPrimaryKey, Timestamps, Base):
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    role: Mapped[str] = mapped_column(String(30), default="user", nullable=False)
     preferences: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict, nullable=False)

@@ -36,6 +36,27 @@ async def get_current_user(request: Request, services: ServicesDep, session: Ses
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def require_super_admin(user: CurrentUser) -> User:
+    """Strict authorization: only a user with role='super_admin' can access governance endpoints.
+
+    Subscription status (e.g. pro, enterprise) NEVER grants super_admin privilege.
+    """
+    from fastapi import HTTPException
+
+    if getattr(user, "role", "user") != "super_admin":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "forbidden",
+                "message": "Super Admin privileges required. Subscription status does not grant governance access.",
+            },
+        )
+    return user
+
+
+SuperAdminUser = Annotated[User, Depends(require_super_admin)]
+
+
 def client_key(request: Request) -> str:
     """Who the limit applies to. With token auth the edge guard has already checked the
     token, so every request here is the owner's (one shared key: an attacker can neither
