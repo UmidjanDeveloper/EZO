@@ -122,3 +122,37 @@ async def test_public_health_hides_the_version_in_production() -> None:
         assert response.status_code == 200 and "version" not in response.json()
     finally:
         await app.state.services.db.dispose()
+
+
+async def test_merged_workspaces_require_token_with_production_policy() -> None:
+    """No database/provider or request validation may precede owner authentication."""
+    app = create_app(
+        production(
+            OPENAI_API_KEY="",
+            ANTHROPIC_API_KEY="",
+            GEMINI_API_KEY="",
+            EZO_OCR_PROVIDER="none",
+            EZO_OFFICE_CONVERTER="none",
+        )
+    )
+    try:
+        assert app.state.services.router.is_offline
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="https://test") as client:
+            for method, path in (
+                ("GET", "/api/personal/profile"),
+                ("GET", "/api/personal/memories/export"),
+                ("POST", "/api/personal/consent"),
+                ("POST", "/api/personal/goals"),
+                ("GET", "/api/student/status"),
+                ("POST", "/api/student/readings"),
+                ("POST", "/api/ielts/sessions"),
+                ("POST", "/api/ielts/evaluate"),
+                ("POST", "/api/presentations/generate"),
+                ("POST", "/api/office/documents"),
+                ("POST", "/api/office/spreadsheets"),
+            ):
+                for headers in ({}, {"Authorization": "Bearer invalid"}):
+                    response = await client.request(method, path, headers=headers, content=b"{")
+                    assert response.status_code == 401, (method, path, response.text)
+    finally:
+        await app.state.services.db.dispose()
