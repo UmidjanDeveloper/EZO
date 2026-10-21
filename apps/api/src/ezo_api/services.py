@@ -29,8 +29,8 @@ from ezo_api.providers.registry import build_providers
 from ezo_api.providers.router import ModelRouter, load_routing_config
 from ezo_api.security.rate_limit import SlidingWindowRateLimiter
 from ezo_api.settings import Settings
+from ezo_api.storage import build_storage
 from ezo_api.storage.base import StorageProvider
-from ezo_api.storage.local import LocalStorageProvider
 from ezo_api.story.service import StoryService
 from ezo_api.tools.convert_tools import (
     ExtractTablesTool,
@@ -101,6 +101,7 @@ def build_services(
     ocr: OCRProvider | None = None,
     office: OfficeConverter | Literal["auto"] | None = "auto",
     scholar: ScholarSearch | Literal["auto"] | None = "auto",
+    storage: StorageProvider | None = None,
 ) -> Services:
     """Wire everything together. Tests can inject providers, web search, fetcher, voice and
     image providers."""
@@ -117,7 +118,10 @@ def build_services(
     router = ModelRouter(
         routing,
         model_providers,
-        OfflineProvider(chunk_delay_seconds=0.02 if settings.environment != "test" else 0.0),
+        OfflineProvider(
+            chunk_delay_seconds=0.02 if settings.environment != "test" else 0.0,
+            free_beta=settings.deployment_profile == "free-beta",
+        ),
         preferred_provider=settings.preferred_provider,
     )
     agents = AgentRegistry()
@@ -130,8 +134,8 @@ def build_services(
         context_char_budget=settings.context_char_budget,
         max_output_tokens=routing.max_output_tokens,
     )
-    db = Database(settings.database_url)
-    storage = LocalStorageProvider(settings.storage_dir)
+    db = Database(settings.database_url, small_pool=settings.deployment_profile == "free-beta")
+    storage = storage or build_storage(settings)
     embeddings = EmbeddingService(routing.embeddings, model_providers)
     vectors = VectorStoreResolver(settings.vector_store)
     safe_fetcher = fetcher or SafeFetcher(settings.fetch_allow_private_networks)
@@ -225,6 +229,10 @@ def build_services(
             settings.ingestion_mode,
         ),
     )
+    if settings.deployment_profile == "free-beta":
+        if model_providers:
+            raise ConfigurationError("Free beta requires offline mode without model providers.")
+        services.tools = ToolRegistry()
     core.services = services
     core.memory_index = memory_index
     return services

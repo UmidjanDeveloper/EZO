@@ -109,7 +109,10 @@ class StudentWorker:
 
 
 async def serve(args: argparse.Namespace) -> None:
-    db = Database(Settings().database_url)
+    settings = Settings()
+    if settings.deployment_profile == "free-beta":
+        raise RuntimeError("Autonomous workers are disabled in free beta.")
+    db = Database(settings.database_url)
     if db.engine.dialect.name != "postgresql":
         await db.dispose()
         raise ValueError("Dedicated Student native workers require PostgreSQL")

@@ -49,12 +49,31 @@ class OfflineProvider(ModelProvider):
     display_name = "Offline (no AI provider)"
     capabilities = frozenset({Capability.CHAT, Capability.STREAMING})
 
-    def __init__(self, chunk_delay_seconds: float = 0.0) -> None:
+    def __init__(self, chunk_delay_seconds: float = 0.0, *, free_beta: bool = False) -> None:
         self._delay = chunk_delay_seconds
+        self._free_beta = free_beta
 
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
         language = request.hints.get("language", "uz")
         template = _NOTICE.get(language, _NOTICE["uz"])
+        if self._free_beta:
+            template = {
+                "uz": (
+                    "EZO bepul beta: AI ulanmagan. Bu AI javobi emas. Suhbat saqlanadi; "
+                    "manual xotira, loyihalar, maqsadlar, matnli IELTS mashqi "
+                    "va kichik Office eksportlari mavjud."
+                ),
+                "en": (
+                    "EZO free beta: no AI is connected. This is not an AI answer. "
+                    "Chat is saved; manual memory, projects, goals, IELTS text practice "
+                    "and lightweight Office exports are available."
+                ),
+                "ru": (
+                    "EZO бесплатная бета: ИИ не подключён. Это не ответ ИИ. Доступны "
+                    "история чата, ручная память, проекты, цели, текстовая практика IELTS "
+                    "и небольшие документы Office."
+                ),
+            }.get(language, "EZO free beta: no AI is connected. This is not an AI answer.")
         for word in template.split(" "):
             if self._delay:
                 await asyncio.sleep(self._delay)

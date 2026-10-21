@@ -28,7 +28,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
   const { m } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
-  const { conversations, refreshConversations } = useApp();
+  const { conversations, refreshConversations, status } = useApp();
 
   async function remove(id: string) {
     if (!window.confirm(m.common.confirmDelete)) return;
@@ -49,7 +49,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/settings", label: m.nav.settings, icon: Settings },
-  ];
+  ].filter((item) => status?.deployment_profile !== "free-beta" || !["/student", "/presentations", "/language", "/translate", "/knowledge"].includes(item.href));
 
   return (
     <nav className="flex h-full flex-col gap-3 p-3" aria-label={m.nav.history}>

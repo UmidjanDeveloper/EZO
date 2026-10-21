@@ -9,7 +9,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 
-from ezo_api.api.deps import CurrentUser, SessionDep, rate_limit
+from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import (
     LanguageGoal,
@@ -131,9 +131,11 @@ async def get_personal_profile(
 
 @router.post("/consent")
 async def update_memory_consent(
-    body: MemoryConsentUpdate, session: SessionDep, user: CurrentUser
+    body: MemoryConsentUpdate, session: SessionDep, user: CurrentUser, services: ServicesDep
 ) -> dict[str, object]:
     """Explicitly grant or revoke consent for memory persistence."""
+    if services.settings.deployment_profile == "free-beta" and body.auto_memory:
+        raise HTTPException(409, detail="Automatic memory capture is disabled in free beta.")
     current_user = await session.get(User, user.id)
     if current_user is None:
         raise HTTPException(401, detail="User not found.")

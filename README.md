@@ -18,9 +18,9 @@ longer workflows. The interface is Uzbek first, with English and Russian built i
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
 > See [ROADMAP.md](ROADMAP.md) and [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
-> **Owner-only, zero-budget hosting:** the current hosted plan is **BLOCKED** by
-> durable backend storage and isolated-worker requirements. See the
-> [free-tier assessment and owner checklist](docs/ZERO_BUDGET_PRIVATE_BETA.md).
+> **Owner-only, zero-budget hosting:** an opt-in private remote-storage/reduced
+> profile is implemented; live Free-plan/privacy/restore validation is still **BLOCKED**.
+> See the [current profile and owner guide](docs/FREE_BETA_STORAGE_PROFILE.md).
 > No cloud deployment or paid activation is authorized. AI keys are optional for offline use.
 
 ---

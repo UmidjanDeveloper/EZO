@@ -15,3 +15,13 @@ test("mobile: Student upload and reading controls fit the phone", async ({ page 
   await expect(page.getByLabel("Yoki o‘rganish uchun matn")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
 });
+
+test("mobile: free beta limitations remain readable without horizontal overflow", async ({ page }) => {
+  await page.route("**/api/status", async route => {
+    const response = await route.fetch();
+    await route.fulfill({ json: { ...(await response.json()), deployment_profile: "free-beta" } });
+  });
+  await page.goto("/office");
+  await expect(page.getByRole("status").filter({ hasText: "Bepul beta" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+});

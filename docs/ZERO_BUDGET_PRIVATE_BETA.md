@@ -1,3 +1,6 @@
+> **Follow-up implementation:** [Remote storage + reduced free-beta profile](FREE_BETA_STORAGE_PROFILE.md).
+> This is the historical pre-adapter assessment; no deployment is authorized.
+
 # Owner-only private beta: zero-budget readiness
 
 **Decision: BLOCKED for a complete hosted EZO beta.** Preparation only. No public

@@ -33,6 +33,19 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 def _validate(body: ChatIn, services: Services) -> TurnInput:
+    if services.settings.deployment_profile == "free-beta" and (
+        body.attachments
+        or body.library_id
+        or body.agent not in (None, "general")
+        or body.channel != "text"
+    ):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "feature_disabled",
+                "message": "Free beta supports offline text chat only.",
+            },
+        )
     text = body.message.strip()
     if not text:
         raise HTTPException(422, detail="Message is empty.")
