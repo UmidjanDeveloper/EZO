@@ -6,7 +6,7 @@ Provides realistic IELTS speaking test workflow:
 - Constructive feedback and progress tracking
 - Uzbek explanations
 - Voice Provider Adapter interface status (with transparent text fallback)
-- Honest estimated band calculation with explicit disclaimer (never official score)
+- Text-only practice with explicit absence of AI/band/pronunciation assessment
 """
 
 from __future__ import annotations
@@ -26,11 +26,9 @@ from ezo_api.language.ielts import (
     CueCard,
     IeltsState,
     advance,
-    band_range,
     cue_card,
     format_cue_card,
     new_test,
-    round_band,
 )
 from ezo_api.language.voice_adapter import default_voice_adapter
 from ezo_api.schemas.ielts import (
@@ -222,42 +220,11 @@ async def advance_ielts_session(
     if step.finished:
         session.status = "completed"
         session.ended_at = utcnow()
-        # Compute estimated band from total words and length
-        user_words = session.user_words or 1
-        fluency = min(8.5, max(4.5, 4.5 + min(3.5, user_words / 150.0)))
-        lexical = min(8.0, max(5.0, 5.0 + min(2.5, user_words / 200.0)))
-        grammar = min(8.0, max(5.0, 5.0 + min(2.5, user_words / 220.0)))
-        pron = 6.0  # transcript-assisted baseline
-
-        session.fluency_score = round_band(fluency)
-        session.lexical_score = round_band(lexical)
-        session.grammar_score = round_band(grammar)
-        session.pronunciation_score = pron
-
-        low, high = band_range([fluency, lexical, grammar], user_words)
-        session.band_low = low
-        session.band_high = high
-
-        feedback_text = (
-            f"Overall Speaking Performance: Estimated Band {low}-{high}. "
-            f"Fluency & Coherence: {session.fluency_score}, "
-            f"Lexical Resource: {session.lexical_score}, "
-            f"Grammatical Range: {session.grammar_score}. "
-            f"You spoke {user_words} words across 3 parts."
-        )
-        explanation_uz = (
-            f"Sinov muvaffaqiyatli yakunlandi! Siz barcha 3 qism bo'yicha "
-            f"jami {user_words} ta so'z aytdingiz. "
-            f"Taxminiy natija: {low} - {high} band oralig'ida. "
-            f"Nutq ravonligi yaxshi rivojlanmoqda, navbatdagi amaliyotda murakkabroq bog'lovchilar "
-            f"(furthermore, in contrast, consequently) dan faolroq foydalanish tavsiya etiladi."
-        )
-        if services.settings.deployment_profile == "free-beta":
-            session.fluency_score = session.lexical_score = session.grammar_score = None
-            session.pronunciation_score = session.band_low = session.band_high = None
-            low = high = None
-            feedback_text = "Text practice completed. No AI or speech assessment was performed."
-            explanation_uz = "Matnli mashq yakunlandi. AI yoki talaffuz baholashi bajarilmadi."
+        # Text length is not an IELTS assessment; audio pronunciation is unobserved.
+        session.fluency_score = session.lexical_score = session.grammar_score = None
+        session.pronunciation_score = session.band_low = session.band_high = None
+        feedback_text = "Text practice completed. No AI or speech assessment was performed."
+        explanation_uz = "Matnli mashq yakunlandi. AI yoki talaffuz baholashi bajarilmadi."
         session.feedback = feedback_text
 
     await db.commit()
@@ -278,63 +245,11 @@ async def advance_ielts_session(
 
 @router.post("/evaluate")
 async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut:
-    """Directly evaluate a speaking answer with 4 criteria, feedback, and Uzbek advice."""
+    """Report observable text practice; never invent AI or pronunciation scores."""
     words = len(payload.answer.split())
-    # Honest baseline heuristic calculation based on answer complexity
-    base_score = 5.0
-    if words >= 40:
-        base_score += 0.5
-    if words >= 80:
-        base_score += 0.5
-    if words >= 120:
-        base_score += 0.5
-
-    # Look for complex sentence markers
-    complex_markers = [
-        "because",
-        "although",
-        "however",
-        "therefore",
-        "in order to",
-        "while",
-        "whereas",
-    ]
-    has_complex = any(m in payload.answer.lower() for m in complex_markers)
-    if has_complex:
-        base_score += 0.5
-
-    fluency = min(9.0, max(4.0, round_band(base_score)))
-    lexical = min(9.0, max(4.0, round_band(base_score - 0.2)))
-    grammar = min(9.0, max(4.0, round_band(base_score - 0.1)))
-    pronunciation = 6.0  # transcript-assisted baseline
-
-    low, high = band_range([fluency, lexical, grammar], words)
-    est_band = round_band((low + high) / 2.0)
-
-    feedback = (
-        f"Answer length: {words} words. Good attempt at addressing the question. "
-        f"To achieve Band 7.0+, extend your reasoning with specific real-life examples "
-        f"and varied discourse markers."
-    )
-    explanation_uz = (
-        f"Javobingiz tahlili: Jami {words} ta so'z. "
-        f"Fikrni ifodalash ravonligi: {fluency}. "
-        f"Lug'at boyligi: {lexical}. Grammatik aniqlik: {grammar}. "
-        f"Tavsiya: Fikringizni bitta jumla bilan cheklamasdan, "
-        f"nima sababdan shunday deb hisoblashingizni "
-        f"aniq misol keltirib boyiting (masalan, 'For instance...' yoki 'A clear example is...')."
-    )
-
     return IeltsEvaluateOut(
-        fluency_score=fluency,
-        lexical_score=lexical,
-        grammar_score=grammar,
-        pronunciation_score=pronunciation,
-        estimated_band_low=low,
-        estimated_band_high=high,
-        estimated_band=est_band,
-        constructive_feedback=feedback,
-        explanation_uz=explanation_uz,
+        constructive_feedback=f"Answer length: {words} words. No AI assessment was performed.",
+        explanation_uz=f"Javobda {words} ta so'z bor. AI va talaffuz baholashi bajarilmagan.",
     )
 
 

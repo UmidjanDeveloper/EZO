@@ -20,7 +20,8 @@ from ezo_api.voice.service import AllVoiceProvidersFailedError, VoiceAttempt
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
 NOT_CONFIGURED_HINT = (
-    "Add OPENAI_API_KEY, or run the optional VoiceStudio service and set VOICESTUDIO_URL. "
+    "Add OPENAI_API_KEY or ELEVENLABS_API_KEY (TTS needs EZO_ELEVENLABS_VOICE_ID), "
+    "or run VoiceStudio and set VOICESTUDIO_URL. "
     "Until then EZO uses the browser's own speech features."
 )
 

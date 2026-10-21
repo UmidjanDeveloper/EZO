@@ -5,6 +5,7 @@ from __future__ import annotations
 from ezo_api.providers.anthropic_provider import AnthropicProvider
 from ezo_api.providers.base import ModelProvider
 from ezo_api.providers.gemini_provider import GeminiProvider
+from ezo_api.providers.limits import CallBudget, LimitedModelProvider
 from ezo_api.providers.openai_provider import OpenAIProvider
 from ezo_api.settings import Settings
 
@@ -28,4 +29,12 @@ def build_providers(settings: Settings) -> dict[str, ModelProvider]:
         )
     if settings.gemini_api_key:
         providers["gemini"] = GeminiProvider(settings.gemini_api_key.get_secret_value(), timeout)
-    return providers
+    budget = CallBudget(
+        settings.provider_calls_per_day,
+        settings.provider_concurrency,
+        settings.provider_operation_seconds,
+    )
+    return {
+        name: LimitedModelProvider(provider, budget, settings)
+        for name, provider in providers.items()
+    }

@@ -471,3 +471,5 @@ run the same tests on PostgreSQL. CI (`.github/workflows/ci.yml`) runs both.
   them are ignored.
 - Every tool EZO uses (file search, web search, page reading) is logged with redacted
   arguments; see the debug trace of an answer.
+
+Full-owner beta ($10 infrastructure planning, deployment BLOCKED): [architecture/capabilities](docs/FULL_OWNER_BETA.md), [Uzbek owner guide](docs/FULL_OWNER_SETUP_UZ.md), [VM benchmark protocol](docs/FULL_OWNER_BETA_BENCHMARKS.md).

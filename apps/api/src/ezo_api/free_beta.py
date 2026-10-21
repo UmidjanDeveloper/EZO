@@ -56,6 +56,8 @@ def validate_free_beta(settings: Settings) -> None:
         raise ValueError("Free beta requires owner token auth and private remote storage.")
     if settings.environment == "development":
         raise ValueError("Hosted free beta requires EZO_ENV=production; test is for fixtures only.")
+    if settings.elevenlabs_api_key:
+        raise ValueError("Free beta requires absent ElevenLabs credentials.")
     if any(
         value and value.get_secret_value().strip()
         for value in (

@@ -62,19 +62,18 @@ class IeltsEvaluateIn(BaseModel):
 
 
 class IeltsEvaluateOut(BaseModel):
-    fluency_score: float
-    lexical_score: float
-    grammar_score: float
-    pronunciation_score: float
-    estimated_band_low: float
-    estimated_band_high: float
-    estimated_band: float
+    fluency_score: float | None = None
+    lexical_score: float | None = None
+    grammar_score: float | None = None
+    pronunciation_score: float | None = None
+    estimated_band_low: float | None = None
+    estimated_band_high: float | None = None
+    estimated_band: float | None = None
     constructive_feedback: str
     explanation_uz: str
     disclaimer: str = (
-        "Eslatma: Ushbu ball rasmiy IELTS sertifikati emas. "
-        "U sun'iy intellekt tomonidan mustaqil o'rganish va "
-        "amaliyot uchun berilgan taxminiy ko'rsatkichdir."
+        "Rasmiy IELTS sertifikati emas. AI yoki talaffuz baholashi bajarilmagan. "
+        "Text practice only; not an AI assessment or IELTS band estimate."
     )
 
 
