@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     environment: Literal["development", "production", "test"] = Field(
         default="development", alias="EZO_ENV"
     )
+    deployment_profile: Literal["full", "free-beta"] = Field(
+        default="full", alias="EZO_DEPLOYMENT_PROFILE"
+    )
+    storage_provider: Literal["local", "supabase"] = Field(
+        default="local", alias="EZO_STORAGE_PROVIDER"
+    )
+    supabase_url: str = Field(default="", alias="EZO_SUPABASE_URL")
+    supabase_storage_key: SecretStr | None = Field(default=None, alias="EZO_SUPABASE_STORAGE_KEY")
+    supabase_storage_bucket: str = Field(default="ezo-private", alias="EZO_SUPABASE_STORAGE_BUCKET")
+    storage_max_bytes: int = Field(
+        default=5_000_000, ge=1, le=5_000_000, alias="EZO_STORAGE_MAX_BYTES"
+    )
     log_level: str = Field(default="INFO", alias="EZO_LOG_LEVEL")
 
     database_url: str = Field(

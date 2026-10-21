@@ -38,6 +38,10 @@ def validate_key(key: str) -> str:
 class StorageProvider(ABC):
     name: str
 
+    async def aclose(self) -> None:
+        """Release provider connections (local storage has none)."""
+        return None
+
     @abstractmethod
     async def put(self, key: str, data: bytes) -> StoredObject: ...
 

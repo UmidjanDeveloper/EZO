@@ -19,6 +19,11 @@ from ezo_api.settings import Settings
 HOSTING_MARKERS = ("RENDER", "K_SERVICE", "FLY_APP_NAME", "RAILWAY_ENVIRONMENT", "DYNO")
 VOLUME_SENTINEL = ".ezo-volume"
 TRANSACTION_POOLER_PORT = 6543
+PRIVILEGED_ROLE_SQL = (
+    "SELECT EXISTS (SELECT 1 FROM pg_roles r WHERE "
+    "(r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolbypassrls OR r.rolreplication) "
+    "AND pg_has_role(current_user, r.oid, 'MEMBER'))"
+)
 
 
 class DeploymentError(RuntimeError):
@@ -27,8 +32,32 @@ class DeploymentError(RuntimeError):
 
 def validate_production(settings: Settings) -> None:
     """Fail closed when an Internet-facing API is configured as production."""
+    from ezo_api.free_beta import validate_free_beta
+
+    try:
+        validate_free_beta(settings)
+    except ValueError as exc:
+        raise DeploymentError(str(exc)) from None
+    if settings.storage_provider == "supabase":
+        from ezo_api.storage.supabase import validate_endpoint
+
+        try:
+            validate_endpoint(settings.supabase_url, settings.supabase_storage_bucket)
+        except ValueError as exc:
+            raise DeploymentError(str(exc)) from None
+        if (
+            not settings.supabase_storage_key
+            or len(settings.supabase_storage_key.get_secret_value().strip()) < 32
+        ):
+            raise DeploymentError("Supabase storage requires its server-only credential.")
+        if settings.deployment_profile != "free-beta":
+            raise DeploymentError(
+                "Remote storage is reviewed only for the reduced free-beta profile."
+            )
     if settings.environment != "production":
         return
+    if settings.deployment_profile == "free-beta" and settings.storage_provider != "supabase":
+        raise DeploymentError("Production free beta requires verified private remote storage.")
     token = settings.api_token.get_secret_value() if settings.api_token else ""
     if settings.auth_mode != "token" or len(token.strip()) < 32:
         raise DeploymentError(
@@ -80,6 +109,19 @@ def validate_production(settings: Settings) -> None:
         raise DeploymentError(
             "Production requires a PostgreSQL DATABASE_URL with sslmode=verify-full."
         )
+    if settings.deployment_profile == "free-beta":
+        project = urlsplit(settings.supabase_url).hostname
+        ref = project.split(".")[0] if project else ""
+        username = unquote(database.username or "")
+        same_project = database.hostname == f"db.{ref}.supabase.co" or (
+            bool(database.hostname and database.hostname.endswith(".pooler.supabase.com"))
+            and username.endswith("." + ref)
+        )
+        if not same_project or (database.port or 5432) != 5432:
+            raise DeploymentError(
+                "Free beta database and Storage must use the same "
+                "Supabase project/session endpoint."
+            )
     if database.port == TRANSACTION_POOLER_PORT:
         # Transaction pooling breaks prepared statements and session state.
         raise DeploymentError(
@@ -147,6 +189,27 @@ def check_environment(settings: Settings, environ: Mapping[str, str]) -> None:
 
 def check_storage(settings: Settings) -> None:
     """Uploads must land on a durable disk, not in the container's temporary layer."""
+    if settings.storage_provider == "supabase":
+        import asyncio
+
+        from ezo_api.storage import build_storage
+        from ezo_api.storage.supabase import SupabaseStorageProvider
+
+        async def remote_check() -> None:
+            provider = build_storage(settings)
+            try:
+                assert isinstance(provider, SupabaseStorageProvider)
+                await provider.preflight()
+            finally:
+                await provider.aclose()
+
+        try:
+            asyncio.run(remote_check())
+        except Exception:
+            raise DeploymentError(
+                "Private remote storage preflight failed; HTTP startup refused."
+            ) from None
+        return
     storage = settings.storage_dir
     try:
         storage.mkdir(parents=True, exist_ok=True)
@@ -161,6 +224,30 @@ def check_storage(settings: Settings) -> None:
             f"EZO_STORAGE_DIR ({storage}) is not a mounted disk. Attach the persistent "
             f"disk there, or create {VOLUME_SENTINEL} in it if the volume is mounted above."
         )
+
+
+def check_database_role(settings: Settings) -> None:
+    """Refuse administrator credentials before running any migration."""
+    if settings.environment != "production" or settings.deployment_profile != "free-beta":
+        return
+    from sqlalchemy import create_engine, text
+
+    from ezo_api.db.session import to_sync_url
+
+    engine = create_engine(to_sync_url(settings.database_url))
+    try:
+        with engine.connect() as connection:
+            privileged = connection.scalar(text(PRIVILEGED_ROLE_SQL))
+            if privileged is not False:
+                raise DeploymentError(
+                    "Free beta requires a non-privileged application database role."
+                )
+    except DeploymentError:
+        raise
+    except Exception:
+        raise DeploymentError("Database role preflight failed; migrations refused.") from None
+    finally:
+        engine.dispose()
 
 
 def check_database(settings: Settings) -> None:
@@ -194,6 +281,32 @@ def check_database(settings: Settings) -> None:
                     "'SELECT,INSERT,UPDATE,REFERENCES'))"
                 )
             )
+            if settings.deployment_profile == "free-beta":
+                privileged = connection.scalar(text(PRIVILEGED_ROLE_SQL))
+                if privileged is not False:
+                    raise DeploymentError(
+                        "Free beta requires a non-privileged application database role."
+                    )
+                policies = connection.scalar(
+                    text(
+                        "SELECT count(*) FROM pg_policies WHERE schemaname='storage' "
+                        "AND tablename IN ('objects','buckets') "
+                        "AND NOT (roles <@ ARRAY['service_role']::name[])"
+                    )
+                )
+                protected = connection.scalar(
+                    text(
+                        "SELECT count(*) FROM pg_class c "
+                        "JOIN pg_namespace n ON n.oid=c.relnamespace "
+                        "WHERE n.nspname='storage' AND c.relname IN ('objects','buckets') "
+                        "AND c.relrowsecurity"
+                    )
+                )
+                if policies or protected != 2:
+                    raise DeploymentError(
+                        "Storage requires RLS and no client-facing policies "
+                        "in this dedicated project."
+                    )
             if exposed:
                 raise DeploymentError(
                     "The public Data API roles (anon/authenticated) still have privileges on "
@@ -212,6 +325,7 @@ def main(argv: Sequence[str] = ()) -> None:
         return
     check_environment(settings, os.environ)
     validate_production(settings)
+    check_database_role(settings)
     check_storage(settings)
 
 

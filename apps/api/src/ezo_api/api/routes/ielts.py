@@ -17,7 +17,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 
-from ezo_api.api.deps import CurrentUser, SessionDep, rate_limit
+from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
+from ezo_api.api.ownership import require_owned_conversation
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import LanguageMistake, LanguageSession, LanguageTurn
 from ezo_api.language.ielts import (
@@ -122,6 +123,7 @@ async def start_ielts_session(
     payload: IeltsSessionCreate, db: SessionDep, user: CurrentUser
 ) -> IeltsSessionOut:
     """Start a structured IELTS speaking test session."""
+    await require_owned_conversation(db, user.id, payload.conversation_id)
     session_id = uuid.uuid4()
     state = new_test(str(session_id))
     meta: dict[str, Any] = {
@@ -160,7 +162,11 @@ async def get_ielts_session(
 
 @router.post("/sessions/{session_id}/advance")
 async def advance_ielts_session(
-    session_id: uuid.UUID, payload: IeltsAdvanceIn, db: SessionDep, user: CurrentUser
+    session_id: uuid.UUID,
+    payload: IeltsAdvanceIn,
+    db: SessionDep,
+    user: CurrentUser,
+    services: ServicesDep,
 ) -> IeltsAdvanceOut:
     """Submit a speaking turn answer and advance to the next question or part."""
     session = await db.get(LanguageSession, session_id)
@@ -169,7 +175,7 @@ async def advance_ielts_session(
     if session.status == "completed":
         raise HTTPException(status_code=400, detail="IELTS session is already completed.")
 
-    meta = session.meta or {}
+    meta = dict(session.meta or {})
     ielts_data = meta.get("ielts") or {}
     state = IeltsState.from_dict(ielts_data)
 
@@ -246,6 +252,12 @@ async def advance_ielts_session(
             f"Nutq ravonligi yaxshi rivojlanmoqda, navbatdagi amaliyotda murakkabroq bog'lovchilar "
             f"(furthermore, in contrast, consequently) dan faolroq foydalanish tavsiya etiladi."
         )
+        if services.settings.deployment_profile == "free-beta":
+            session.fluency_score = session.lexical_score = session.grammar_score = None
+            session.pronunciation_score = session.band_low = session.band_high = None
+            low = high = None
+            feedback_text = "Text practice completed. No AI or speech assessment was performed."
+            explanation_uz = "Matnli mashq yakunlandi. AI yoki talaffuz baholashi bajarilmadi."
         session.feedback = feedback_text
 
     await db.commit()

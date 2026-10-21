@@ -374,3 +374,35 @@ async def delete_artifact(
     await services.artifacts.delete(session, artifact)
     await session.commit()
     return Response(status_code=204)
+
+
+async def _current_number(session: AsyncSession, artifact: Artifact) -> int:
+    number = await session.scalar(
+        select(ArtifactVersion.version_number).where(
+            ArtifactVersion.artifact_id == artifact.id,
+            ArtifactVersion.id == artifact.current_version_id,
+        )
+    )
+    if number is None:
+        raise HTTPException(404, detail="Artifact version not found.")
+    return number
+
+
+@router.get("/{artifact_id}/download")
+async def download_current(
+    artifact_id: uuid.UUID, session: SessionDep, user: CurrentUser, services: ServicesDep
+) -> Response:
+    artifact = await _owned(session, user.id, artifact_id)
+    return await download_version(
+        artifact_id, await _current_number(session, artifact), session, user, services
+    )
+
+
+@router.get("/{artifact_id}/exports/{name}")
+async def download_current_export(
+    artifact_id: uuid.UUID, name: str, session: SessionDep, user: CurrentUser, services: ServicesDep
+) -> Response:
+    artifact = await _owned(session, user.id, artifact_id)
+    return await download_export(
+        artifact_id, await _current_number(session, artifact), name, session, user, services
+    )

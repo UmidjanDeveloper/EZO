@@ -239,6 +239,8 @@ class ImageProviderInfo(BaseModel):
 
 
 class SystemStatus(BaseModel):
+    deployment_profile: str = "full"
+    disabled_capabilities: list[str] = []
     version: str
     environment: str
     database: str

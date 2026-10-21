@@ -6,6 +6,7 @@ import { Badge, Button, Card, cn, Spinner } from "@ezo/ui";
 import { ChevronDown, Download, History, Pencil, Save, Trash2, Type } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useApp } from "@/lib/app-state";
 import { api } from "@/lib/api";
 import { formatBytes, saveBlob } from "@/lib/download";
 import { useI18n } from "@/lib/i18n/context";
@@ -121,6 +122,8 @@ function ArtifactRow({
 }
 
 function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void }) {
+  const { status } = useApp();
+  const readOnly = status?.deployment_profile === "free-beta";
   const { m, f } = useI18n();
   const fetchDetail = useCallback(() => api.getArtifact(id), [id]);
   const { data: loaded, error } = useApiData(fetchDetail);
@@ -212,7 +215,7 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
             <Download size={14} /> {m.artifacts.download}
           </Button>
         ) : null}
-        {isText && !editing ? (
+        {isText && !editing && !readOnly ? (
           <Button
             variant="ghost"
             size="sm"
@@ -228,6 +231,7 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
         <Button
           variant="ghost"
           size="sm"
+          disabled={readOnly}
           onClick={() => {
             setTitle(detail.title);
             setRenaming(true);
@@ -244,6 +248,7 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
               void run(() => api.deleteArtifact(id));
             }
           }}
+          disabled={readOnly}
           data-testid="artifact-delete"
         >
           <Trash2 size={14} /> {m.artifacts.delete}
@@ -336,7 +341,7 @@ function ArtifactDetails({ id, onChanged }: { id: string; onChanged: () => void 
             >
               <Download size={14} />
             </button>
-            {!version.current ? (
+            {!version.current && !readOnly ? (
               <button
                 type="button"
                 onClick={() => void run(() => api.restoreArtifactVersion(id, version.version_number))}

@@ -28,6 +28,7 @@ from ezo_api.db.models import Artifact, ArtifactVersion
 from ezo_api.db.models.artifacts import ARTIFACT_STATUSES, ARTIFACT_TYPES
 from ezo_api.knowledge.uploads import extension_of, sanitize_filename, sha256_hex
 from ezo_api.storage.base import StorageError, StorageProvider
+from ezo_api.storage.supabase import StorageUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,8 @@ class ArtifactService:
             raise ArtifactError("not_found", f"This version has no {name!r} export.")
         try:
             return entry, await self.storage.get(entry["key"])
+        except StorageUnavailableError:
+            raise
         except StorageError as exc:
             raise ArtifactError("missing_file", "The exported file is missing.") from exc
 
@@ -316,6 +319,8 @@ class ArtifactService:
     async def read(self, version: ArtifactVersion) -> bytes:
         try:
             return await self.storage.get(version.storage_key)
+        except StorageUnavailableError:
+            raise
         except StorageError as exc:
             raise ArtifactError(
                 "missing_file", "The stored file for this version is missing."

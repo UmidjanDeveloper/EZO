@@ -256,6 +256,8 @@ export interface ImageProviderInfo {
 }
 
 export interface SystemStatus {
+  deployment_profile?: "full" | "free-beta";
+  disabled_capabilities?: string[];
   version: string;
   environment: string;
   database: string;

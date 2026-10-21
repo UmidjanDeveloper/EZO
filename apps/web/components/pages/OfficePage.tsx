@@ -10,7 +10,9 @@ import {
   Table as TableIcon,
 } from "lucide-react";
 import { useCallback, useState, type FormEvent } from "react";
-import { apiUrl, storedToken } from "@/lib/api";
+import { useApp } from "@/lib/app-state";
+import { api, apiUrl, storedToken } from "@/lib/api";
+import { saveBlob } from "@/lib/download";
 import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "./PageFrame";
@@ -42,6 +44,8 @@ interface OfficeArtifact {
 
 export function OfficePage() {
   const { m } = useI18n();
+  const { status } = useApp();
+  const freeBeta = status?.deployment_profile === "free-beta";
   const [activeTab, setActiveTab] = useState<OfficeTab>("document");
 
   const authHeaders = useCallback(() => {
@@ -105,6 +109,20 @@ export function OfficePage() {
     }
   }
 
+  async function downloadFile(artifact: OfficeArtifact, format?: string) {
+    try {
+      const detail = await api.getArtifact(artifact.artifact_id);
+      const version = detail.current_version;
+      if (!version) throw new Error("Fayl versiyasi topilmadi.");
+      const result = format
+        ? await api.downloadExport(artifact.artifact_id, version.version_number, format)
+        : await api.downloadArtifact(artifact.artifact_id, version.version_number);
+      saveBlob(result.blob, result.filename);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   async function handleCreateDocument(e: FormEvent) {
     e.preventDefault();
     if (!docTitle.trim() || !docMarkdown.trim()) return;
@@ -117,7 +135,7 @@ export function OfficePage() {
         body: JSON.stringify({
           title: docTitle.trim(),
           markdown: docMarkdown.trim(),
-          export_pdf: exportPdf,
+          export_pdf: freeBeta ? false : exportPdf,
         }),
       });
       if (res.ok) {
@@ -291,24 +309,23 @@ export function OfficePage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a
-                href={`${apiUrl()}${recentSuccess.download_url}`}
-                download
+              <button
+                type="button"
+                onClick={() => void downloadFile(recentSuccess)}
                 className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               >
                 <Download size={14} />
                 {recentSuccess.type === "document" ? "DOCX yuklab olish" : "XLSX yuklab olish"}
-              </a>
+              </button>
               {recentSuccess.exports["pdf"] ? (
-                <a
-                  href={`${apiUrl()}${recentSuccess.exports["pdf"]}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => void downloadFile(recentSuccess, "pdf")}
                   className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <FileText size={14} />
                   PDF versiya
-                </a>
+                </button>
               ) : null}
             </div>
           </div>
@@ -338,11 +355,12 @@ export function OfficePage() {
               <label className="flex items-center gap-2 text-xs text-ink-muted">
                 <input
                   type="checkbox"
-                  checked={exportPdf}
+                  checked={!freeBeta && exportPdf}
+                  disabled={freeBeta}
                   onChange={(e) => setExportPdf(e.target.checked)}
                   className="rounded border-line"
                 />
-                {m.office?.exportPdf ?? "PDF nusxasini ham eksport qilish"}
+                {freeBeta ? "PDF bepul profilda o‘chirilgan (DOCX ishlaydi)" : (m.office?.exportPdf ?? "PDF nusxasini ham eksport qilish")}
               </label>
 
               <Button
@@ -418,14 +436,14 @@ export function OfficePage() {
                   </div>
                 </div>
 
-                <a
-                  href={`${apiUrl()}${art.download_url}`}
-                  download
+                <button
+                  type="button"
+                  onClick={() => void downloadFile(art)}
                   className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <Download size={13} />
                   {m.office?.download ?? "Yuklab olish"}
-                </a>
+                </button>
               </div>
             ))
           )}

@@ -64,7 +64,13 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
         for name, display in KNOWN_PROVIDERS.items()
     ]
     profile = services.personality
+    from ezo_api.free_beta import DISABLED
+
     return SystemStatus(
+        deployment_profile=services.settings.deployment_profile,
+        disabled_capabilities=DISABLED
+        if services.settings.deployment_profile == "free-beta"
+        else [],
         version=__version__,
         environment=services.settings.environment,
         database="sqlite" if services.settings.is_sqlite else "postgresql",
@@ -87,7 +93,8 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
                 key=spec.key,
                 names=spec.names,
                 description=spec.description,
-                available=spec.available,
+                available=spec.available
+                and (services.settings.deployment_profile != "free-beta" or spec.key == "general"),
                 maturity=spec.maturity,
                 phase=spec.phase,
             )
@@ -115,11 +122,13 @@ async def me(user: CurrentUser) -> UserOut:
 
 @router.patch("/me/preferences", dependencies=limited)
 async def update_preferences(
-    body: PreferencesUpdate, session: SessionDep, current: CurrentUser
+    body: PreferencesUpdate, session: SessionDep, current: CurrentUser, services: ServicesDep
 ) -> UserOut:
     user = await session.get(User, current.id)
     if user is None:
         raise HTTPException(401, detail="User not found.")
+    if services.settings.deployment_profile == "free-beta" and body.auto_memory:
+        raise HTTPException(409, detail="Automatic memory capture is disabled in free beta.")
     merged = Preferences.model_validate(user.preferences or {}).model_dump()
     merged.update(body.model_dump(exclude_unset=True, exclude_none=True))
     user.preferences = Preferences.model_validate(merged).model_dump()

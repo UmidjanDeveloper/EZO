@@ -41,9 +41,11 @@ def _enable_sqlite_foreign_keys(dbapi_connection: Any, _record: Any) -> None:
 class Database:
     """Owns the engine and session factory for the application lifetime."""
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, *, small_pool: bool = False) -> None:
         async_url = to_async_url(url)
         kwargs: dict[str, Any] = {"pool_pre_ping": True}
+        if small_pool and not async_url.startswith("sqlite"):
+            kwargs.update(pool_size=2, max_overflow=0, pool_timeout=10)
         self.engine: AsyncEngine = create_async_engine(async_url, **kwargs)
         if async_url.startswith("sqlite"):
             event.listen(self.engine.sync_engine, "connect", _enable_sqlite_foreign_keys)
