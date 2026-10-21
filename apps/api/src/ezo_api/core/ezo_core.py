@@ -789,10 +789,9 @@ class EzoCore:
         saved_memories = 0
         with prepared.tracer.step("save_memory") as step:
             prefs = prepared.user.preferences or {}
-            has_consent = bool(
-                prefs.get("memory_consent", False) or prefs.get("auto_memory", False)
-            )
-            if has_consent:
+            has_consent = bool(prefs.get("memory_consent", False))
+            auto_memory = bool(prefs.get("auto_memory", False))
+            if has_consent and auto_memory:
                 capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,
                     prepared.user_message.content,
@@ -804,8 +803,10 @@ class EzoCore:
                     f"created={len(capture.created)} reinforced={len(capture.reinforced)} "
                     f"skipped_sensitive={capture.skipped_sensitive}"
                 )
-            else:
+            elif not has_consent:
                 step.summary = "disabled: explicit memory consent required"
+            else:
+                step.summary = "disabled: auto_memory is turned off in preferences"
 
         message = Message(
             conversation_id=prepared.conversation.id,

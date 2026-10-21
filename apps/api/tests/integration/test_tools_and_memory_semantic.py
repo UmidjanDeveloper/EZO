@@ -88,5 +88,6 @@ async def test_semantic_memory_retrieval_is_selective(
 
 
 async def test_auto_captured_memories_are_embedded(client: AsyncClient, app: FastAPI) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     await stream_chat(client, message="Eslab qol: men minimalist dizaynni yoqtiraman.")
     assert await count_vectors(app, "memory") == 1
