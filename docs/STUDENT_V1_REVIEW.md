@@ -21,6 +21,8 @@ raw SHA256. Successful extraction creates a **different output revision**.
 
 `StudentIngestion` selects the installed native processor version using the
 existing DocumentJobs locking/fencing service. StoredTextWorker cannot claim it.
+Legacy K1 startup recovery, direct ingestion and reindexing exclude Student-managed
+raw documents; they cannot race or overwrite the fenced Student index.
 Native publication validates source bytes/hash, lease token/attempt/expiry and exact
 extraction offsets. Output revision, chunks, publication and completed state commit
 atomically. K2 sees only the current indexed revision. An index batch checks that

@@ -331,3 +331,21 @@ async def test_fatal_executor_failure_stops_worker_without_failing_healthy_input
     assert current.error_code is None
     with pytest.raises(JobError):
         await jobs.result(scope.user, scope.project, job.id)
+
+
+async def test_legacy_ingestion_recovery_cannot_consume_student_native_sources(client, app):
+    created = (await client.post("/api/student/uploads?filename=book.pdf", content=DATA)).json()
+    # A real API restart invokes this legacy recovery method. Student jobs must
+    # remain exclusive to their fenced worker, including after publication.
+    assert await app.state.services.ingestion.resume_unfinished() == 0
+    async with app.state.services.db.sessionmaker() as session:
+        doc = await app.state.services.knowledge.ingest(session, uuid.UUID(created["document_id"]))
+        assert doc.status == "queued" and doc.error is None
+    response = await client.post(f"/api/knowledge/documents/{created['document_id']}/reindex")
+    assert response.status_code == 409 and response.json()["error"]["code"] == "student_managed"
+    jobs = StudentIngestion(app.state.services.db)
+    lease = await jobs.claim("native")
+    await jobs.publish_extraction(lease, extracted())
+    async with app.state.services.db.sessionmaker() as session:
+        doc = await app.state.services.knowledge.ingest(session, uuid.UUID(created["document_id"]))
+        assert doc.status == "indexed" and doc.chunk_count == 2

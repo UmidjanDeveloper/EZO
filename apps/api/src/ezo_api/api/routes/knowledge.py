@@ -302,6 +302,14 @@ async def reindex_document(
     document_id: uuid.UUID, session: SessionDep, user: CurrentUser, services: ServicesDep
 ) -> KnowledgeDocumentOut:
     document = await _owned(session, user.id, document_id)
+    if (document.meta or {}).get("student") is True:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "student_managed",
+                "message": "Use Student job retry for this document.",
+            },
+        )
     if document.status in ("queued", "processing"):
         raise HTTPException(409, detail="The document is already being processed.")
     document.status = "queued"

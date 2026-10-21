@@ -397,6 +397,10 @@ class KnowledgeService:
         document = await session.get(KnowledgeDocument, document_id)
         if document is None:
             raise LookupError(f"Document {document_id} not found")
+        if (document.meta or {}).get("student") is True:
+            # Student raw revisions have no legacy storage pointer. Their current
+            # revision/index/status belong exclusively to fenced publication.
+            return document
         document.status = "processing"
         document.error = None
         await session.commit()

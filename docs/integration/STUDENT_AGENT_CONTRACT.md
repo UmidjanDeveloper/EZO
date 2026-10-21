@@ -25,10 +25,12 @@ their processor version and separate worker.
 
 ## HTTP contracts
 
-All UUIDs serialize as strings. Structured service errors use FastAPI's
-`{"detail":{"code":"...","message":"safe fixed description"}}`.
-The shared edge guard uses `{"error":{"code":"...","message":"..."}}`.
-Clients must handle both. Request models reject unknown fields.
+All UUIDs serialize as strings. The application HTTP exception handler and the shared edge guard normalize errors to
+`{"error":{"code":"...","message":"safe description"}}`. Although route code passes
+FastAPI `detail` internally, the actual wire contract is the error envelope. Validation
+errors use code `validation_error` with bounded location/type/message details.
+The Student client also tolerates a standard FastAPI detail envelope for compatibility.
+Request models reject unknown fields.
 
 - `GET /api/student/status`: text submission support, raw upload formats,
   separate-worker requirement, API `native_execution: disabled`, and
@@ -101,6 +103,11 @@ HTML or tool directives. Sources and generated outputs are untrusted. Student ha
 no code/tool installation, repository write, secret retrieval, GitHub push or deploy
 capability. These outputs confer no action approval on another agent. Existing
 owner approval remains required by the owning orchestration layer.
+
+Student-managed raw documents are excluded from legacy K1 startup recovery and direct
+ingestion. The legacy reindex endpoint returns 409 `student_managed` before changing
+status/index; use the Student job lifecycle instead. The internal boolean metadata
+marker `student=true` is reserved for this ownership boundary.
 
 No Antigravity agent registration, tool registry or general chat routing was changed.
 No caller should scrape the Student UI or depend on internal worker credentials.
