@@ -1,6 +1,7 @@
 """Protocol and hostile EPUB preflight regressions, without native execution."""
 
 import io
+import subprocess
 import threading
 import zipfile
 
@@ -103,3 +104,41 @@ def test_cancelled_request_never_creates_workload() -> None:
     cancelled.set()
     with pytest.raises(ExecutorError, match="cancelled"):
         IsolatedExecutor("sha256:" + "0" * 64).extract(b"x", "pdf", cancelled=cancelled)
+
+
+@pytest.mark.parametrize(
+    "operation,message,code",
+    [
+        (
+            "create",
+            'Conflict. The container name "/ezo-native-active-v1" is already in use '
+            'by container "fixture"',
+            "executor_busy",
+        ),
+        (
+            "create",
+            'Conflict. The container name "/other" is already in use',
+            "executor_unavailable",
+        ),
+        ("create", "Cannot connect to the Docker daemon", "executor_unavailable"),
+        (
+            "start",
+            'Conflict. The container name "/ezo-native-active-v1" is already in use',
+            "executor_unavailable",
+        ),
+    ],
+)
+def test_only_reserved_create_conflict_is_backpressure(
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    message: str,
+    code: str,
+) -> None:
+    def failed(*args: object, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(
+            ["fixture-docker"], 1, stdout=b"", stderr=message.encode()
+        )
+
+    monkeypatch.setattr(subprocess, "run", failed)
+    with pytest.raises(ExecutorError, match=code):
+        IsolatedExecutor._docker(operation)

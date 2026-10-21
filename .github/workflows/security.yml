@@ -7,7 +7,7 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery"]
     paths:
       - "apps/api/Dockerfile"
       - "docker-compose.yml"
@@ -80,6 +80,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: docker build -t ezo-api:scan apps/api
+      - name: Bundled and system TLS trust reject the compromised emSign root
+        run: |
+          docker run --rm --network=none --read-only --interactive --entrypoint python \
+            ezo-api:scan - < apps/api/tests/unit/test_tls_trust.py
       - run: docker build -t ezo-web:scan -f apps/web/Dockerfile .
       - name: Scan OS packages and libraries in both images
         run: |

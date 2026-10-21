@@ -184,3 +184,197 @@ def test_cancellation_during_cleanup_does_not_acknowledge_result() -> None:
     with pytest.raises(ExecutorError, match="cancelled"):
         CancelOnCleanup(IMAGE).extract(book(), "epub", cancelled=cancelled)
     assert names() == before
+
+
+def test_second_controller_cannot_exceed_daemon_workload_budget() -> None:
+    assert IMAGE and PROBE
+    before = names()
+    cancelled = threading.Event()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        future = pool.submit(IsolatedExecutor(PROBE).extract, b"stall", "pdf", cancelled=cancelled)
+        try:
+            wait_new(before)
+            with pytest.raises(ExecutorError, match="executor_busy"):
+                IsolatedExecutor(IMAGE).extract(book(), "epub")
+        finally:
+            cancelled.set()
+            with pytest.raises(ExecutorError):
+                future.result(timeout=35)
+    assert names() == before
+
+
+def test_atomic_creation_loser_does_not_remove_winning_workload() -> None:
+    assert PROBE
+    before = names()
+    barrier = threading.Barrier(2)
+    cancelled = threading.Event()
+
+    class SimultaneousControllers(IsolatedExecutor):
+        def _recover_slot(self) -> None:
+            super()._recover_slot()
+            barrier.wait(timeout=10)
+
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        futures = [
+            pool.submit(
+                SimultaneousControllers(PROBE).extract, b"stall", "pdf", cancelled=cancelled
+            )
+            for _ in range(2)
+        ]
+        try:
+            done, pending = concurrent.futures.wait(
+                futures, timeout=20, return_when=concurrent.futures.FIRST_COMPLETED
+            )
+            assert len(done) == len(pending) == 1
+            with pytest.raises(ExecutorError, match="executor_busy"):
+                done.pop().result()
+            name = wait_new(before)
+            assert name in names()  # losing creator's finally did not kill the winner
+        finally:
+            cancelled.set()
+            for future in futures:
+                with pytest.raises(ExecutorError):
+                    future.result(timeout=35)
+    assert names() == before
+
+
+def test_stopped_crash_residue_is_recovered_without_force() -> None:
+    assert IMAGE
+    from ezo_api.documents.executor.controller import SLOT_NAME
+
+    before = names()
+    identity = subprocess.check_output(
+        [
+            DOCKER,
+            "create",
+            "--name",
+            SLOT_NAME,
+            "--label=ezo.executor=isolated-v1",
+            "--label=ezo.executor.slot=single-v1",
+            IMAGE,
+        ],
+        text=True,
+    ).strip()
+    try:
+        # Repository-owned command only; this image's parser entrypoint is not run.
+        subprocess.run([DOCKER, "start", identity], check=True, capture_output=True)
+        subprocess.check_output([DOCKER, "wait", identity], timeout=35)
+        assert IsolatedExecutor(IMAGE).extract(book(), "epub").text == "Salom"
+    finally:
+        subprocess.run([DOCKER, "rm", "-f", identity], check=False, capture_output=True)
+    assert names() == before
+
+
+def test_fresh_created_reservation_is_not_stolen() -> None:
+    assert IMAGE
+    from ezo_api.documents.executor.controller import SLOT_NAME
+
+    identity = subprocess.check_output(
+        [
+            DOCKER,
+            "create",
+            "--name",
+            SLOT_NAME,
+            "--label=ezo.executor=isolated-v1",
+            "--label=ezo.executor.slot=single-v1",
+            IMAGE,
+        ],
+        text=True,
+    ).strip()
+    try:
+        with pytest.raises(ExecutorError, match="executor_busy"):
+            IsolatedExecutor(IMAGE).extract(book(), "epub")
+        assert (
+            subprocess.check_output(
+                [DOCKER, "inspect", "--format", "{{.Id}}", SLOT_NAME], text=True
+            ).strip()
+            == identity
+        )
+    finally:
+        subprocess.run([DOCKER, "rm", identity], check=True, capture_output=True)
+
+
+def test_delayed_old_controller_cannot_start_or_remove_replacement() -> None:
+    assert IMAGE
+    from ezo_api.documents.executor.controller import SLOT_NAME
+
+    replacement = ""
+
+    class ReplaceBeforeAttach(IsolatedExecutor):
+        def _verify(self, identity: str) -> None:
+            nonlocal replacement
+            super()._verify(identity)
+            self._docker("rm", identity)
+            replacement = (
+                self._docker(
+                    "create",
+                    "--name",
+                    SLOT_NAME,
+                    "--label=ezo.executor=isolated-v1",
+                    "--label=ezo.executor.slot=single-v1",
+                    "--label=ezo.executor.request=replacement-fixture",
+                    self.image,
+                )
+                .decode()
+                .strip()
+            )
+
+    try:
+        with pytest.raises(ExecutorError):
+            ReplaceBeforeAttach(IMAGE).extract(book(), "epub")
+        assert (
+            subprocess.check_output(
+                [DOCKER, "inspect", "--format", "{{.State.Status}}", replacement], text=True
+            ).strip()
+            == "created"
+        )
+    finally:
+        if replacement:
+            subprocess.run([DOCKER, "rm", replacement], check=True, capture_output=True)
+
+
+def test_foreign_reserved_name_is_never_deleted() -> None:
+    assert IMAGE
+    from ezo_api.documents.executor.controller import SLOT_NAME
+
+    identity = subprocess.check_output(
+        [DOCKER, "create", "--name", SLOT_NAME, IMAGE], text=True
+    ).strip()
+    try:
+        with pytest.raises(ExecutorError, match="executor_slot_conflict"):
+            IsolatedExecutor(IMAGE).extract(book(), "epub")
+        assert (
+            subprocess.check_output(
+                [DOCKER, "inspect", "--format", "{{.Id}}", SLOT_NAME], text=True
+            ).strip()
+            == identity
+        )
+    finally:
+        subprocess.run([DOCKER, "rm", identity], check=True, capture_output=True)
+
+
+def test_abandoned_created_reservation_recovers_with_simulated_age(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert IMAGE
+    from ezo_api.documents.executor import controller
+
+    identity = subprocess.check_output(
+        [
+            DOCKER,
+            "create",
+            "--name",
+            controller.SLOT_NAME,
+            "--label=ezo.executor=isolated-v1",
+            "--label=ezo.executor.slot=single-v1",
+            IMAGE,
+        ],
+        text=True,
+    ).strip()
+    try:
+        # Simulate the 120-second admission grace expiring; do not claim a real
+        # two-minute wall-clock test. The actual Docker created-state path runs.
+        monkeypatch.setattr(controller, "CREATED_GRACE_SECONDS", 0)
+        assert IsolatedExecutor(IMAGE).extract(book(), "epub").text == "Salom"
+    finally:
+        subprocess.run([DOCKER, "rm", identity], check=False, capture_output=True)
