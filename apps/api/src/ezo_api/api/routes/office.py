@@ -11,7 +11,6 @@ Provides safe document and spreadsheet authoring:
 from __future__ import annotations
 
 import asyncio
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,7 +18,7 @@ from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.artifacts.service import ArtifactError
-from ezo_api.db.models import Artifact, ArtifactVersion
+from ezo_api.db.models import Artifact
 from ezo_api.documents.markdown_io import parse_markdown
 from ezo_api.documents.model import word_count
 from ezo_api.documents.spreadsheet.writer import Sheet, render_csv, render_xlsx
@@ -47,7 +46,10 @@ TEMPLATES: list[OfficeTemplateOut] = [
         title="Rasmiy xat (Official Letter)",
         type="docx",
         category="Ish yuritish",
-        description="Vazirliklar, idoralar va tashkilotlarga yuboriladigan standart rasmiy xat shabloni.",
+        description=(
+            "Vazirliklar, idoralar va tashkilotlarga yuboriladigan "
+            "standart rasmiy xat shabloni."
+        ),
         sample_content={
             "markdown": (
                 "# RASMIY XAT\n\n"
@@ -55,7 +57,8 @@ TEMPLATES: list[OfficeTemplateOut] = [
                 "**Kimdan:** EZO OS loyihasi jamoasi\n\n"
                 "**Mavzu:** Hamkorlik aloqalarini o'rnatish to'g'risida\n\n"
                 "Hurmatli hamkasblar!\n\n"
-                "Mazkur xat orqali Sizning tashkilotingiz bilan axborot texnologiyalari va ta'lim sohasida o'zaro hamkorlikni rivojlantirish istagini bildiramiz.\n\n"
+                "Mazkur xat orqali Sizning tashkilotingiz bilan axborot texnologiyalari va "
+                "ta'lim sohasida o'zaro hamkorlikni rivojlantirish istagini bildiramiz.\n\n"
                 "Hurmat bilan,\n\n**Bosh ijrochi direktor**"
             )
         },
@@ -78,7 +81,8 @@ TEMPLATES: list[OfficeTemplateOut] = [
                 "- Yuqori yuklamali mikroxizmatlar arxitekturasini ishlab chiqish.\n"
                 "- AI agentlari integratsiyasini boshqarish.\n\n"
                 "## Ma'lumoti\n"
-                "- Bakalavr: Axborot texnologiyalari, Toshkent axborot texnologiyalari universiteti (2018 - 2022)"
+                "- Bakalavr: Axborot texnologiyalari, Toshkent axborot texnologiyalari "
+                "universiteti (2018 - 2022)"
             )
         },
     ),
@@ -130,9 +134,7 @@ async def create_document_endpoint(
     user: CurrentUser,
 ) -> OfficeArtifactOut:
     """Create a DOCX document artifact with optional PDF export."""
-    files = await asyncio.to_thread(
-        render_document, payload.markdown, payload.title, "docx", None
-    )
+    files = await asyncio.to_thread(render_document, payload.markdown, payload.title, "docx", None)
     stem = file_stem(payload.title, "document")
     exports = {
         _EXPORT_NAMES[ext]: (f"{stem}.{ext}", data)
@@ -162,13 +164,10 @@ async def create_document_endpoint(
         )
         await db.commit()
     except ArtifactError as exc:
-        raise HTTPException(status_code=422, detail=exc.message)
+        raise HTTPException(status_code=422, detail=exc.message) from exc
 
     artifact_id = result.artifact.id
-    export_links = {
-        ext: f"/api/artifacts/{artifact_id}/exports/{ext}"
-        for ext in exports
-    }
+    export_links = {ext: f"/api/artifacts/{artifact_id}/exports/{ext}" for ext in exports}
     return OfficeArtifactOut(
         artifact_id=artifact_id,
         title=result.artifact.title,
@@ -216,13 +215,10 @@ async def create_spreadsheet_endpoint(
         )
         await db.commit()
     except ArtifactError as exc:
-        raise HTTPException(status_code=422, detail=exc.message)
+        raise HTTPException(status_code=422, detail=exc.message) from exc
 
     artifact_id = result.artifact.id
-    export_links = {
-        ext: f"/api/artifacts/{artifact_id}/exports/{ext}"
-        for ext in exports
-    }
+    export_links = {ext: f"/api/artifacts/{artifact_id}/exports/{ext}" for ext in exports}
     return OfficeArtifactOut(
         artifact_id=artifact_id,
         title=result.artifact.title,
@@ -235,9 +231,7 @@ async def create_spreadsheet_endpoint(
 
 
 @router.get("/artifacts")
-async def list_office_artifacts(
-    db: SessionDep, user: CurrentUser
-) -> list[OfficeArtifactOut]:
+async def list_office_artifacts(db: SessionDep, user: CurrentUser) -> list[OfficeArtifactOut]:
     """List all document and spreadsheet artifacts owned by the user."""
     rows = await db.scalars(
         select(Artifact)
@@ -250,7 +244,11 @@ async def list_office_artifacts(
     )
     items: list[OfficeArtifactOut] = []
     for art in rows.all():
-        ext = "docx" if art.artifact_type == "document" else ("xlsx" if art.artifact_type == "spreadsheet" else "pptx")
+        ext = (
+            "docx"
+            if art.artifact_type == "document"
+            else ("xlsx" if art.artifact_type == "spreadsheet" else "pptx")
+        )
         stem = file_stem(art.title, "office")
         items.append(
             OfficeArtifactOut(

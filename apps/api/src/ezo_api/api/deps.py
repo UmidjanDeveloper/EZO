@@ -48,7 +48,10 @@ async def require_super_admin(user: CurrentUser) -> User:
             status_code=403,
             detail={
                 "code": "forbidden",
-                "message": "Super Admin privileges required. Subscription status does not grant governance access.",
+                "message": (
+                    "Super Admin privileges required. "
+                    "Subscription status does not grant governance access."
+                ),
             },
         )
     return user

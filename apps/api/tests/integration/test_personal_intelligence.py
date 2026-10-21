@@ -1,10 +1,12 @@
-"""Integration tests for Personal Intelligence K9: consent, goals, profile, export, and tenant isolation."""
+"""Integration tests for Personal Intelligence K9: consent, goals, profile,
+export, and tenant isolation.
+"""
 
 from __future__ import annotations
 
 import uuid
+
 from httpx import AsyncClient
-from sqlalchemy import select
 
 from ezo_api.db.models import Memory, PersonalGoal, User
 from tests.fakes import FakeProvider
@@ -123,7 +125,7 @@ async def test_personal_goals_crud(client: AsyncClient) -> None:
     assert del_res.status_code == 204
 
     # Verify deleted
-    after_del = await client.get(f"/api/personal/goals?status=completed")
+    after_del = await client.get("/api/personal/goals?status=completed")
     assert not any(g["id"] == goal_id for g in after_del.json())
 
 
@@ -131,7 +133,11 @@ async def test_personal_memories_export(client: AsyncClient) -> None:
     # Add manual memory
     await client.post(
         "/api/memories",
-        json={"content": "Python va TypeScript dasturchisi", "category": "personal", "importance": 0.9},
+        json={
+            "content": "Python va TypeScript dasturchisi",
+            "category": "personal",
+            "importance": 0.9,
+        },
     )
 
     export_res = await client.get("/api/personal/memories/export")
@@ -148,9 +154,7 @@ async def test_personal_memories_export(client: AsyncClient) -> None:
     assert direct_export.json()["total_memories"] >= 1
 
 
-async def test_tenant_isolation_memories_and_goals(
-    client: AsyncClient, app
-) -> None:
+async def test_tenant_isolation_memories_and_goals(client: AsyncClient, app) -> None:
     """Ensure User A cannot view, mutate or delete User B's memories or goals."""
     async with app.state.services.db.sessionmaker() as session:
         # Create user B

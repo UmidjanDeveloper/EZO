@@ -65,7 +65,8 @@ class TextFallbackVoiceAdapter(VoiceAdapterInterface):
             notice_uz=(
                 "Ovozli xizmat (Speech-to-Text / Text-to-Speech) hozirda sozlanmagan. "
                 "IELTS simulyatori to'liq matnli rejimda ishlamoqda. "
-                "Rasmiy IELTS sertifikati emas — ta'limiy va mustaqil tayyorgarlik uchun taxminiy baholash."
+                "Rasmiy IELTS sertifikati emas — "
+                "ta'limiy va mustaqil tayyorgarlik uchun taxminiy baholash."
             ),
             notice_en=(
                 "Voice service (Speech-to-Text / Text-to-Speech) is currently unconfigured. "

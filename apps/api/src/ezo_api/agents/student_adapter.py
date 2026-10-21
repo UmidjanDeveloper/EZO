@@ -11,16 +11,12 @@ Does NOT modify or import private internals of Student V1 durable jobs or execut
 from __future__ import annotations
 
 import re
-import uuid
 from typing import Any
 
 from ezo_api.agents.base import Agent, AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.catalog import AgentSpec
 from ezo_api.core.intent import Intent
 from ezo_api.core.text import normalize
-from ezo_api.documents.isolation import ISOLATION_MESSAGE
-from ezo_api.personality.profile import ContextMode
-from ezo_api.providers.types import ChatMessage
 
 _STUDENT_PATTERNS = re.compile(
     r"(?<!\w)("
@@ -45,26 +41,36 @@ def wants_student(text: str) -> bool:
 
 
 class StudentClientAdapter:
-    """Public client adapter interacting with the Student reading service without private imports."""
+    """Public client adapter interacting with Student service without private imports."""
 
     @staticmethod
     def get_public_status() -> dict[str, Any]:
+        """Align with STUDENT_AGENT_CONTRACT.md public HTTP contract."""
         return {
-            "supported_submission": "authorized_utf8_text",
-            "max_input_bytes": 2_000_000,
+            "supported_submissions": ["authorized_utf8_text", "raw_binary_upload"],
+            "raw_upload_formats": ["pdf", "docx", "epub"],
+            "max_raw_input_bytes": 5_242_880,  # 5 MiB per STUDENT_AGENT_CONTRACT.md
+            "max_text_input_bytes": 2_000_000,
             "worker": "stored-normalized-text/v1",
-            "native_execution": "disabled",
-            "blocked_formats": ["pdf", "docx", "epub", "xlsx", "image", "html"],
-            "reason": ISOLATION_MESSAGE,
+            "native_execution": "disabled",  # Public API disables in-process native execution
+            "raw_processing": "requires_separate_dedicated_postgresql_worker",
+            "unsupported_formats": ["xlsx", "image", "html"],
+            "security_boundaries": (
+                "Raw uploads (PDF, DOCX, EPUB gacha 5MB) saqlanadi va faqat izolyatsiyalangan "
+                "alohida PostgreSQL native worker orqali bajariladi. API ichida bevosita native "
+                "kod bajarilishi xavfsizlik maqsadida taqiqlangan."
+            ),
         }
 
     @staticmethod
     async def get_status_summary() -> str:
         status = StudentClientAdapter.get_public_status()
+        raw_fmts = ", ".join(f.upper() for f in status["raw_upload_formats"])
         return (
-            f"Student xizmati holati: {status['worker']} faol. "
-            f"Matn formati (UTF-8): ruxsat etilgan ({status['max_input_bytes'] // 1_000_000}MB gacha). "
-            f"Format cheklovlari: {', '.join(status['blocked_formats'])} (sabab: {status['reason']})."
+            f"Student V1 xizmati holati: {raw_fmts} (5MB gacha) va "
+            f"UTF-8 matnlar qo'llab-quvvatlanadi. "
+            f"Xavfsizlik: API da native execution o'chirilgan, "
+            f"xom fayllar faqat ajratilgan izolyatsiyalangan worker orqali qayta ishlanadi."
         )
 
 
@@ -77,7 +83,11 @@ STUDENT_SPEC = AgentSpec(
     phase="Student Foundation",
     context_mode="teacher",
     route="chat",
-    limitation_note="PDF/DOCX native ijrosi xavfsizlik cheklovlari tufayli vaqtincha to'xtatilgan. Matn orqali o'rganish to'liq qo'llab-quvvatlanadi.",
+    limitation_note=(
+        "PDF, DOCX va EPUB darsliklari (5MB gacha) hamda to'g'ridan-to'g'ri matn qabul qilinadi. "
+        "Xavfsizlik talablariga ko'ra xom fayllar izolyatsiyalangan alohida worker orqali "
+        "qayta ishlanadi."
+    ),
 )
 
 
@@ -96,7 +106,8 @@ class StudentAdapterAgent(Agent):
     def plan(self, turn: AgentTurn) -> AgentPlan:
         instructions = (
             "Siz EZO OS ning Talaba (Student) ta'lim agentisiz. "
-            "Foydalanuvchi kitob yoki darslikni o'rganishni so'raganda (masalan, 'Python kitobini o'rgan'), "
+            "Foydalanuvchi kitob yoki darslikni o'rganishni so'raganda "
+            "(masalan, 'Python kitobini o'rgan'), "
             "unga o'quv rejasini tuzib bering, asosiy mavzularni tushuntiring va matnni "
             "o'rganish uchun qanday kiritish mumkinligini aniq ko'rsating. "
             "Barcha tushuntirishlarni o'zbek tilida, do'stona va pedagogik uslubda bering."

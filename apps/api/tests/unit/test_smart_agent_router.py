@@ -8,11 +8,13 @@ Verifies the required intent and agent routing behavior:
 - "Manbalar bilan tadqiqot qil" -> Research
 """
 
-import pytest
-
-from ezo_api.agents.catalog import AGENTS
 from ezo_api.agents.registry import AgentRegistry
-from ezo_api.agents.student_adapter import STUDENT_SPEC, StudentAdapterAgent, wants_student
+from ezo_api.agents.student_adapter import (
+    STUDENT_SPEC,
+    StudentAdapterAgent,
+    StudentClientAdapter,
+    wants_student,
+)
 from ezo_api.core.intent import Intent, classify_intent
 
 
@@ -53,6 +55,13 @@ def test_student_adapter_agent_spec_and_plan() -> None:
     assert agent.spec.available is True
     assert agent.spec.intent == Intent.GENERAL
     assert STUDENT_SPEC.key == "student"
+
+    status = StudentClientAdapter.get_public_status()
+    assert "pdf" in status["raw_upload_formats"]
+    assert "docx" in status["raw_upload_formats"]
+    assert "epub" in status["raw_upload_formats"]
+    assert status["native_execution"] == "disabled"
+    assert status["max_raw_input_bytes"] == 5_242_880
 
 
 def test_registry_maps_intents_to_active_agents() -> None:

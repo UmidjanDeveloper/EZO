@@ -11,9 +11,8 @@ Provides:
 from __future__ import annotations
 
 import asyncio
-from functools import partial
-import json
 import uuid
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -84,7 +83,11 @@ async def intake_brief(brief: PresentationBriefIn) -> PresentationOutlineOut:
             layout="problem_solution",
             title="Muammo va dolzarblik",
             summary="Hozirgi holat va mavjud asosiy qiyinchiliklar tahlili",
-            bullet_hints=["Asosiy sabablar", "Bozor yoki amaliyotdagi to'siqlar", "Yechimga bo'lgan talab"],
+            bullet_hints=[
+                "Asosiy sabablar",
+                "Bozor yoki amaliyotdagi to'siqlar",
+                "Yechimga bo'lgan talab",
+            ],
         )
     )
 
@@ -121,9 +124,15 @@ async def intake_brief(brief: PresentationBriefIn) -> PresentationOutlineOut:
             SlideOutlineItem(
                 slide_number=current_num,
                 layout="roadmap" if current_num == total - 1 else "bullets",
-                title="Amalga oshirish rejasi va bosqichlar" if current_num == total - 1 else f"Asosiy yo'nalish {current_num}",
+                title="Amalga oshirish rejasi va bosqichlar"
+                if current_num == total - 1
+                else f"Asosiy yo'nalish {current_num}",
                 summary="Amaliy harakatlar ketma-ketligi va muddatlar",
-                bullet_hints=["1-chorak maqsadlari", "2-chorak maqsadlari", "Monitoring va baholash"],
+                bullet_hints=[
+                    "1-chorak maqsadlari",
+                    "2-chorak maqsadlari",
+                    "Monitoring va baholash",
+                ],
             )
         )
         current_num += 1
@@ -173,7 +182,11 @@ async def generate_presentation(
     else:
         slide_specs = [
             SlideSpec(layout="cover", title=payload.title, subtitle="Taqdimot"),
-            SlideSpec(layout="bullets", title="Kirish", bullets=["Asosiy maqsad", "Kutilayotgan natijalar"]),
+            SlideSpec(
+                layout="bullets",
+                title="Kirish",
+                bullets=["Asosiy maqsad", "Kutilayotgan natijalar"],
+            ),
             SlideSpec(layout="closing", title="Rahmat!", subtitle="Savollar bormi?"),
         ]
 
@@ -188,7 +201,9 @@ async def generate_presentation(
     try:
         build = await asyncio.to_thread(partial(build_deck, deck))
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Failed to build presentation deck: {exc}")
+        raise HTTPException(
+            status_code=422, detail=f"Failed to build presentation deck: {exc}"
+        ) from exc
 
     stem = file_stem(deck.title, "presentation")
     exports = deck_exports(build, stem)
@@ -218,7 +233,7 @@ async def generate_presentation(
         )
         await db.commit()
     except ArtifactError as exc:
-        raise HTTPException(status_code=422, detail=exc.message)
+        raise HTTPException(status_code=422, detail=exc.message) from exc
 
     artifact_id = result.artifact.id
     return PresentationArtifactOut(

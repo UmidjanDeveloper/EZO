@@ -18,10 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 
 from ezo_api.api.deps import CurrentUser, SessionDep, rate_limit
-from ezo_api.core.text import normalize
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import LanguageMistake, LanguageSession, LanguageTurn
-from ezo_api.language.analysis import measure
 from ezo_api.language.ielts import (
     CUE_CARDS,
     CueCard,
@@ -183,7 +181,9 @@ async def advance_ielts_session(
 
     turn_count = (
         await db.scalar(
-            select(func.count()).select_from(LanguageTurn).where(LanguageTurn.session_id == session.id)
+            select(func.count())
+            .select_from(LanguageTurn)
+            .where(LanguageTurn.session_id == session.id)
         )
         or 0
     )
@@ -240,7 +240,8 @@ async def advance_ielts_session(
             f"You spoke {user_words} words across 3 parts."
         )
         explanation_uz = (
-            f"Sinov muvaffaqiyatli yakunlandi! Siz barcha 3 qism bo'yicha jami {user_words} ta so'z aytdingiz. "
+            f"Sinov muvaffaqiyatli yakunlandi! Siz barcha 3 qism bo'yicha "
+            f"jami {user_words} ta so'z aytdingiz. "
             f"Taxminiy natija: {low} - {high} band oralig'ida. "
             f"Nutq ravonligi yaxshi rivojlanmoqda, navbatdagi amaliyotda murakkabroq bog'lovchilar "
             f"(furthermore, in contrast, consequently) dan faolroq foydalanish tavsiya etiladi."
@@ -265,7 +266,7 @@ async def advance_ielts_session(
 
 @router.post("/evaluate")
 async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut:
-    """Directly evaluate a speaking answer with 4 criteria, constructive feedback, and Uzbek advice."""
+    """Directly evaluate a speaking answer with 4 criteria, feedback, and Uzbek advice."""
     words = len(payload.answer.split())
     # Honest baseline heuristic calculation based on answer complexity
     base_score = 5.0
@@ -277,7 +278,15 @@ async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut
         base_score += 0.5
 
     # Look for complex sentence markers
-    complex_markers = ["because", "although", "however", "therefore", "in order to", "while", "whereas"]
+    complex_markers = [
+        "because",
+        "although",
+        "however",
+        "therefore",
+        "in order to",
+        "while",
+        "whereas",
+    ]
     has_complex = any(m in payload.answer.lower() for m in complex_markers)
     if has_complex:
         base_score += 0.5
@@ -299,7 +308,8 @@ async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut
         f"Javobingiz tahlili: Jami {words} ta so'z. "
         f"Fikrni ifodalash ravonligi: {fluency}. "
         f"Lug'at boyligi: {lexical}. Grammatik aniqlik: {grammar}. "
-        f"Tavsiya: Fikringizni bitta jumla bilan cheklamasdan, nima sababdan shunday deb hisoblashingizni "
+        f"Tavsiya: Fikringizni bitta jumla bilan cheklamasdan, "
+        f"nima sababdan shunday deb hisoblashingizni "
         f"aniq misol keltirib boyiting (masalan, 'For instance...' yoki 'A clear example is...')."
     )
 

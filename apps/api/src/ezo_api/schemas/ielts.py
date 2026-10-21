@@ -73,7 +73,8 @@ class IeltsEvaluateOut(BaseModel):
     explanation_uz: str
     disclaimer: str = (
         "Eslatma: Ushbu ball rasmiy IELTS sertifikati emas. "
-        "U sun'iy intellekt tomonidan mustaqil o'rganish va amaliyot uchun berilgan taxminiy ko'rsatkichdir."
+        "U sun'iy intellekt tomonidan mustaqil o'rganish va "
+        "amaliyot uchun berilgan taxminiy ko'rsatkichdir."
     )
 
 

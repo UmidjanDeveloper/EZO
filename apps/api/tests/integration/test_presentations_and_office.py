@@ -18,7 +18,9 @@ async def test_presentation_themes_and_intake(client: AsyncClient) -> None:
     # 2. Intake brief
     brief = {
         "title": "Sun'iy Intellekt va Kelajak",
-        "topic": "O'zbekistonda ta'lim tizimini sun'iy intellekt orqali rivojlantirish istiqbollari",
+        "topic": (
+            "O'zbekistonda ta'lim tizimini sun'iy intellekt orqali rivojlantirish istiqbollari"
+        ),
         "audience": "O'qituvchilar va talabalar",
         "slide_count": 5,
         "theme": "ezo",
@@ -94,7 +96,11 @@ async def test_office_templates_and_document_creation(client: AsyncClient) -> No
     # 2. Create DOCX document
     doc_payload = {
         "title": "Sinov Rasmiy Xati",
-        "markdown": "# RASMIY XAT\n\nHurmatli hamkasblar,\n\nUshbu xat tizim xavfsizligini tekshirish uchun tuzildi.\n\nHurmat bilan,\n**Muallif**",
+        "markdown": (
+            "# RASMIY XAT\n\nHurmatli hamkasblar,\n\n"
+            "Ushbu xat tizim xavfsizligini tekshirish uchun tuzildi.\n\n"
+            "Hurmat bilan,\n**Muallif**"
+        ),
         "export_pdf": True,
     }
     doc_resp = await client.post("/api/office/documents", json=doc_payload)

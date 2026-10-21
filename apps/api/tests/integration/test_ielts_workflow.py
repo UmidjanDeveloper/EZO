@@ -35,8 +35,8 @@ async def test_ielts_voice_status_fallback(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_ielts_evaluate_direct_answer(client: AsyncClient) -> None:
     answer = (
-        "In my free time, I really enjoy reading programming books and playing chess with my friends "
-        "because it helps me develop strategic thinking and relax after a busy working day."
+        "In my free time, I really enjoy reading programming books and playing "
+        "chess with my friends because it helps me develop strategic thinking."
     )
     resp = await client.post("/api/ielts/evaluate", json={"answer": answer, "part": 1})
     assert resp.status_code == 200
@@ -69,7 +69,10 @@ async def test_ielts_full_session_lifecycle(client: AsyncClient) -> None:
     # 3. Advance Part 1 answers
     adv1 = await client.post(
         f"/api/ielts/sessions/{session_id}/advance",
-        json={"answer": "I am from Tashkent and it is known for historic architecture.", "speech_seconds": 15.0},
+        json={
+            "answer": "I am from Tashkent and it is known for historic architecture.",
+            "speech_seconds": 15.0,
+        },
     )
     assert adv1.status_code == 200
     assert adv1.json()["session_id"] == session_id

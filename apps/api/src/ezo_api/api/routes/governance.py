@@ -14,7 +14,6 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from ezo_api.agents.registry import AgentRegistry
 from ezo_api.api.deps import SuperAdminUser, rate_limit
 
 router = APIRouter(

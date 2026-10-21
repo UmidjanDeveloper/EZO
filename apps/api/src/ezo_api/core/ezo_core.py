@@ -789,7 +789,9 @@ class EzoCore:
         saved_memories = 0
         with prepared.tracer.step("save_memory") as step:
             prefs = prepared.user.preferences or {}
-            has_consent = bool(prefs.get("memory_consent", False) or prefs.get("auto_memory", False))
+            has_consent = bool(
+                prefs.get("memory_consent", False) or prefs.get("auto_memory", False)
+            )
             if has_consent:
                 capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,

@@ -1,10 +1,10 @@
-"""Personal Intelligence K9 endpoints: goals, preferences, intelligence profile, and memory export."""
+"""Personal Intelligence K9 endpoints: goals, preferences, intelligence profile,
+and memory export.
+"""
 
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
@@ -45,16 +45,16 @@ async def _owned_goal(session: SessionDep, user_id: uuid.UUID, goal_id: uuid.UUI
 
 
 @router.get("/profile", response_model=PersonalIntelligenceProfile)
-async def get_personal_profile(session: SessionDep, user: CurrentUser) -> PersonalIntelligenceProfile:
+async def get_personal_profile(
+    session: SessionDep, user: CurrentUser
+) -> PersonalIntelligenceProfile:
     """Consolidated Personal Intelligence profile: consent, memory counts, goals and progress."""
     prefs = user.preferences or {}
     memory_consent = bool(prefs.get("memory_consent", False))
     auto_memory = bool(prefs.get("auto_memory", False))
 
     # Memory statistics
-    memories = list(
-        (await session.scalars(select(Memory).where(Memory.user_id == user.id))).all()
-    )
+    memories = list((await session.scalars(select(Memory).where(Memory.user_id == user.id))).all())
     categories: dict[str, int] = {}
     sensitive_count = 0
     profile_count = 0
@@ -99,7 +99,9 @@ async def get_personal_profile(session: SessionDep, user: CurrentUser) -> Person
         select(func.count(LanguageSession.id)).where(LanguageSession.user_id == user.id)
     )
     vocab_count = await session.scalar(
-        select(func.count(LanguageVocabularyItem.id)).where(LanguageVocabularyItem.user_id == user.id)
+        select(func.count(LanguageVocabularyItem.id)).where(
+            LanguageVocabularyItem.user_id == user.id
+        )
     )
     lang_goals_count = await session.scalar(
         select(func.count(LanguageGoal.id)).where(LanguageGoal.user_id == user.id)
@@ -242,7 +244,14 @@ async def update_goal(
         merged.update(body.metadata)
         goal.meta = merged
 
-    audit(session, user.id, "personal_goal.update", "goal", goal.id, {"fields": sorted(body.model_fields_set)})
+    audit(
+        session,
+        user.id,
+        "personal_goal.update",
+        "goal",
+        goal.id,
+        {"fields": sorted(body.model_fields_set)},
+    )
     await session.commit()
     return goal_out(goal)
 
@@ -284,13 +293,17 @@ async def export_memories(session: SessionDep, user: CurrentUser) -> MemoryExpor
     ]
     for m in rows:
         esc_content = m.content.replace("|", "\\|").replace("\n", " ")
+        updated_str = m.updated_at.strftime("%Y-%m-%d")
         lines.append(
-            f"| {m.memory_type} | {m.category} | {esc_content} | {m.importance:.2f} | {m.source} | {m.updated_at.strftime('%Y-%m-%d')} |"
+            f"| {m.memory_type} | {m.category} | {esc_content} | "
+            f"{m.importance:.2f} | {m.source} | {updated_str} |"
         )
 
     lines.append("")
     lines.append("---")
-    lines.append("*EZO OS Maxfiylik kafolati: Ushbu ma'lumotlar faqat sizning hisobingizga tegishli.*")
+    lines.append(
+        "*EZO OS Maxfiylik kafolati: Ushbu ma'lumotlar faqat sizning hisobingizga tegishli.*"
+    )
     md_text = "\n".join(lines)
 
     audit(session, user.id, "personal.memories_exported", "memory", None, {"count": len(rows)})
