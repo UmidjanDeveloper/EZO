@@ -1,5 +1,13 @@
 # EZO roadmap
 
+Student V1 review candidate (`feat/student-v1-complete`): the separate native worker,
+immutable raw revisions, exact indexed citations, Student UI and provider-backed
+excerpt learning are described in [docs/STUDENT_V1_REVIEW.md](docs/STUDENT_V1_REVIEW.md).
+Native execution in the public API remains disabled. Dedicated runtime approval,
+live-provider quality evaluation and the documented dependency risks remain open;
+this is not a production-readiness declaration. Historical milestone counts below
+must not be used as this branch's validation results.
+
 This is the **only** roadmap. Phase names here are the ones used in the code
 (`apps/api/src/ezo_api/agents/catalog.py`, `apps/api/src/ezo_api/maturity.py`; a test keeps
 them in sync) and in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).

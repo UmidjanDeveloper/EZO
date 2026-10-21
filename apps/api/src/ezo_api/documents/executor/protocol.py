@@ -30,6 +30,12 @@ class SourceSection(BaseModel):
     heading: str | None = Field(default=None, max_length=200)
     member: str | None = Field(default=None, max_length=400)
 
+    @model_validator(mode="after")
+    def database_safe_metadata(self) -> SourceSection:
+        if any(value is not None and "\x00" in value for value in (self.heading, self.member)):
+            raise ValueError("Source metadata contains an unsupported NUL character")
+        return self
+
 
 class ExtractionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -41,6 +47,10 @@ class ExtractionResult(BaseModel):
 
     @model_validator(mode="after")
     def offsets(self) -> ExtractionResult:
+        # PostgreSQL text/JSONB cannot store U+0000. Reject untrusted parser data
+        # before publication; stripping it here would invalidate source offsets.
+        if "\x00" in self.text:
+            raise ValueError("Source text contains an unsupported NUL character")
         previous = 0
         for section in self.sections:
             if not previous <= section.start < section.end <= len(self.text):

@@ -60,7 +60,8 @@ class IngestionRunner:
             ids = (
                 await session.scalars(
                     select(KnowledgeDocument.id).where(
-                        KnowledgeDocument.status.in_(("queued", "processing"))
+                        KnowledgeDocument.status.in_(("queued", "processing")),
+                        KnowledgeDocument.meta["student"].as_boolean().is_not(True),
                     )
                 )
             ).all()

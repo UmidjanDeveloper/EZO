@@ -26,6 +26,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
   const footer = [
     { href: "/artifacts", label: m.nav.artifacts, icon: Layers },
     { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
+    { href: "/student", label: "Student", icon: FileStack },
     { href: "/translate", label: m.nav.translation, icon: Languages },
     { href: "/language", label: m.nav.language, icon: GraduationCap },
     { href: "/memory", label: m.nav.memory, icon: Brain },

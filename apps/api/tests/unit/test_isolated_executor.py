@@ -142,3 +142,37 @@ def test_only_reserved_create_conflict_is_backpressure(
     monkeypatch.setattr(subprocess, "run", failed)
     with pytest.raises(ExecutorError, match=code):
         IsolatedExecutor._docker(operation)
+
+
+def test_epub_spine_order_titles_and_multi_chapter_provenance() -> None:
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr(
+            "META-INF/container.xml", '<container><rootfile full-path="OPS/book.opf"/></container>'
+        )
+        archive.writestr(
+            "OPS/book.opf",
+            "<package><manifest>"
+            '<item id="a" href="a.xhtml" media-type="application/xhtml+xml"/>'
+            '<item id="b" href="b.xhtml" media-type="application/xhtml+xml"/>'
+            '</manifest><spine><itemref idref="b"/><itemref idref="a"/></spine></package>',
+        )
+        archive.writestr(
+            "OPS/a.xhtml", "<html><body><h1>Ўзбек 🙂</h1><p>Second in spine.</p></body></html>"
+        )
+        archive.writestr(
+            "OPS/b.xhtml", "<html><body><h1>Birinchi bob</h1><p>First in spine.</p></body></html>"
+        )
+    result = parse_epub(output.getvalue())
+    assert result.metadata["section_sources"] == ["OPS/b.xhtml", "OPS/a.xhtml"]
+    assert [s.heading for s in result.sections] == ["Birinchi bob", "Ўзбек 🙂"]
+    assert "First in spine." in result.sections[0].text
+
+
+def test_extraction_rejects_database_incompatible_nuls_before_publication() -> None:
+    with pytest.raises(ValidationError):
+        ExtractionResult(source_sha256="0" * 64, text="x\x00y", sections=[])
+    for field in ("heading", "member"):
+        with pytest.raises(ValidationError):
+            SourceSection.model_validate({"start": 0, "end": 1, field: "x\x00y"})

@@ -1,5 +1,8 @@
 # Isolated per-document executor — independent review boundary
 
+Current Student integration review: [STUDENT_V1_REVIEW.md](STUDENT_V1_REVIEW.md).
+The milestone evidence below is historical; it does not describe native worker activation.
+
 The initial boundary was based on PR #14. Admission/recovery hardening is based
 on integration `57bf803457d031c00c847aa0dd213068b5e16b96` (externally merged PR #15). It adds an **operator-only extraction boundary**, not a live native
 Student worker. Production/API native execution remains disabled. No deployment,

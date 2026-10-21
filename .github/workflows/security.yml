@@ -7,13 +7,16 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery", "feat/student-v1-complete"]
     paths:
       - "apps/api/Dockerfile"
       - "docker-compose.yml"
       - "apps/api/src/**"
       - "apps/api/tests/**"
       - "apps/web/Dockerfile"
+      - "apps/web/app/**"
+      - "apps/web/components/**"
+      - "apps/web/lib/**"
       - "apps/api/pyproject.toml"
       - "apps/api/uv.lock"
       - "pnpm-lock.yaml"
