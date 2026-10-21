@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from dataclasses import replace
 from typing import Literal
@@ -47,6 +48,18 @@ class QuizItem(BaseModel):
 class Quiz(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[QuizItem] = Field(min_length=1, max_length=5)
+
+
+def check_numeric_sources(text: str, sources: list[SourceRef]) -> None:
+    """K2's display formatter handles 1..3 digits; reject larger IDs here too.
+
+    Match bounded model output, compare strings (never parse arbitrary-length ints).
+    This checks identity only, never claims to verify semantic entailment.
+    """
+    allowed = {str(source.n) for source in sources}
+    for group in re.findall(r"\[([\d\s,;]+)\]", text):
+        if any(number.strip() not in allowed for number in re.split(r"[,;]", group)):
+            raise JobError("invalid_model_output", "AI cited an unknown source identifier.", 502)
 
 
 async def generate(router: ModelRouter, request: ChatRequest) -> tuple[str, str]:
@@ -255,6 +268,7 @@ async def learn(
                     or any(len(c) > 600 for c in item.choices)
                 ):
                     raise ValueError("invalid_quiz")
+                check_numeric_sources(item.explanation, sources)
                 checked = verify_citations(item.explanation, sources)
                 if (
                     checked.invalid_numbers
@@ -267,6 +281,7 @@ async def learn(
                 "invalid_model_output", "AI output did not pass citation/schema checks.", 502
             ) from exc
         text = "\n".join(i.explanation for i in quiz.items)
+    check_numeric_sources(text, sources)
     checked = verify_citations(text, sources)
     if checked.invalid_numbers or not checked.cited:
         raise JobError(

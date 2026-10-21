@@ -193,9 +193,10 @@ async def test_api_upload_learning_guide_quiz_with_mock_provider(client, app, fa
     )
     quiz = await client.post(f"/api/student/documents/{doc}/learn", json={"kind": "quiz"})
     assert quiz.status_code == 200 and quiz.json()["quiz"]["items"][0]["answer"] == 0
-    fake_anthropic.reply = "Uydirma [999]."
-    invalid = await client.post(f"/api/student/documents/{doc}/learn", json={"kind": "summary"})
-    assert invalid.status_code == 502
+    for unverified in ("Uydirma [999].", "Claim [1][1234]", "Claim [1][1,1234]", "No citation"):
+        fake_anthropic.reply = unverified
+        invalid = await client.post(f"/api/student/documents/{doc}/learn", json={"kind": "summary"})
+        assert invalid.status_code == 502
     app.state.services.router.providers = {}
     offline = await client.post(f"/api/student/documents/{doc}/learn", json={"kind": "summary"})
     assert offline.status_code == 503 and "provider_unavailable" in offline.text
