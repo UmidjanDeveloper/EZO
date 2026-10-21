@@ -1,3 +1,6 @@
+> **Superseded for the current zero-budget mission:** use [Zero-budget private beta](ZERO_BUDGET_PRIVATE_BETA.md).
+> This historical paid runbook is not launch authorization. Its native API/OCR and job claims are stale; do not follow them.
+
 # EZO private beta: telefon orqali ishga tushirish
 
 **Hozir deploy qilinmaydi.** Bu qo‘llanma kelajakdagi alohida tasdiqlangan launch uchun.
@@ -115,7 +118,7 @@ Codex ularni avtomatik bajarmaydi. Quyidagi misollar haqiqiy credential emas.
 ## 8. Render API va doimiy disk
 
 - Manzil: https://dashboard.render.com → **New + → Blueprint → GitHub repository EZO**.
-  Faqat tasdiqlangan commitdagi render.yamlni tanlang. Narxni tekshiring.
+  Faqat tasdiqlangan commitdagi deploy/render-paid-reference.yamlni tanlang. Narxni tekshiring.
 - Docker root: apps/api; Dockerfile: ./Dockerfile; bitta instance; disk:
   **/app/storage**, 10 GB; health: **/api/health**. Auto-deploy o‘chiq qolsin.
 - Dastlab Standard; real RAMni kuzating. OCR/Office uchun bepul/512 MB hostga tayanmang.

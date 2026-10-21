@@ -18,13 +18,18 @@ longer workflows. The interface is Uzbek first, with English and Russian built i
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
 > See [ROADMAP.md](ROADMAP.md) and [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
+> **Owner-only, zero-budget hosting:** the current hosted plan is **BLOCKED** by
+> durable backend storage and isolated-worker requirements. See the
+> [free-tier assessment and owner checklist](docs/ZERO_BUDGET_PRIVATE_BETA.md).
+> No cloud deployment or paid activation is authorized. AI keys are optional for offline use.
+
 ---
 
 ## Tezkor boshlash (Uzbek quick start)
 
 1. [Docker Desktop](https://www.docker.com/products/docker-desktop/) ni o‘rnating va ishga tushiring.
 2. Loyiha papkasida `.env.example` faylidan nusxa olib, nomini `.env` qiling.
-   Ichiga kamida bitta AI kalitini yozing (masalan `ANTHROPIC_API_KEY=...`).
+   Offline ishlatish uchun AI kalitlarini bo‘sh qoldiring. Pullik AI ishlatish hozir ruxsat etilmagan.
 3. Terminalda (Windows: PowerShell) loyiha papkasida:
 
    ```
