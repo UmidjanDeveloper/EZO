@@ -23,6 +23,15 @@ from ezo_api.knowledge.jobs.service import JobError
 from ezo_api.settings import Settings
 from ezo_api.student.ingestion import StudentIngestion
 
+FATAL_EXECUTOR_ERRORS = frozenset(
+    {
+        "cleanup_failed",
+        "isolation_unavailable",
+        "invalid_container_identity",
+        "executor_slot_conflict",
+    }
+)
+
 
 class StudentWorker:
     def __init__(self, jobs: StudentIngestion, executor: IsolatedExecutor, worker_id: str):
@@ -53,11 +62,27 @@ class StudentWorker:
                 await self.jobs.publish_extraction(lease, result)
         except (JobError, ExecutorError, TimeoutError) as exc:
             cancelled.set()
+            fatal = (
+                exc
+                if isinstance(exc, ExecutorError) and exc.code in FATAL_EXECUTOR_ERRORS
+                else None
+            )
             if task is not None:
-                # Physical cleanup must finish before another claim. Do not cancel the
-                # to_thread Future: that would detach a live Docker controller thread.
-                with suppress(ExecutorError):
+                # Join, never detach the controller, even after cancellation/lease loss.
+                try:
                     await asyncio.shield(task)
+                except ExecutorError as thread_error:
+                    if thread_error.code in FATAL_EXECUTOR_ERRORS:
+                        fatal = thread_error
+            if fatal is not None:
+                if fatal.code != "cleanup_failed":
+                    # These fixed errors occur before Docker start/input consumption.
+                    # Revoke/refund the unadmitted claim, then stop the whole worker.
+                    with suppress(JobError):
+                        await self.jobs.defer_admission(lease)
+                # Unknown cleanup outcome retains its fenced running lease. No new
+                # claim is allowed; independent watchdog + operator recovery apply.
+                raise fatal from None
             transient = isinstance(exc, TimeoutError) or getattr(exc, "code", "") in (
                 "executor_busy",
                 "executor_unavailable",

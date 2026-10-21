@@ -61,6 +61,9 @@ it never cancels/detaches a to_thread Future and claims another job while it run
 On controller/worker SIGKILL, the existing independent watchdog bounds running
 work; unused created containers are reconciled after the existing 120-second grace.
 DB failure stops the worker safely rather than logging source-bearing SQL exceptions.
+A failed cleanup stops the entire worker with its running lease fenced; it cannot
+claim another job after an unknown cleanup outcome. Pre-start isolation/identity/slot
+configuration errors refund the unadmitted claim and stop the worker for operator repair.
 
 Atomic slot rejection starts no workload: only this fixed `executor_busy` category
 refunds an unadmitted claim and defers it two seconds, revoking its token. Unknown

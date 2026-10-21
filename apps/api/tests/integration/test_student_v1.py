@@ -301,3 +301,32 @@ async def test_learning_rejects_foreign_user_and_mutated_citation_offsets(client
         f"/api/student/documents/{created['document_id']}/learn", json={"kind": "summary"}
     )
     assert response.status_code == 200 and response.json()["status"] == "insufficient_evidence"
+
+
+@pytest.mark.parametrize(
+    "code", ["cleanup_failed", "isolation_unavailable", "executor_slot_conflict"]
+)
+async def test_fatal_executor_failure_stops_worker_without_failing_healthy_input(db, code):
+    import asyncio
+
+    scope, jobs, job = await raw_queued(db)
+
+    class BrokenExecutor:
+        calls = 0
+
+        def extract(self, data, format, *, cancelled):
+            self.calls += 1
+            raise ExecutorError(code)
+
+    executor = BrokenExecutor()
+    with pytest.raises(ExecutorError) as error:
+        await asyncio.wait_for(
+            StudentWorker(jobs, executor, "fatal-worker").run(asyncio.Event()), timeout=5
+        )
+    assert error.value.code == code and executor.calls == 1
+    current = await jobs.get(scope.user, scope.project, job.id)
+    assert current.state == ("running" if code == "cleanup_failed" else "queued")
+    assert current.attempts == (1 if code == "cleanup_failed" else 0)
+    assert current.error_code is None
+    with pytest.raises(JobError):
+        await jobs.result(scope.user, scope.project, job.id)
