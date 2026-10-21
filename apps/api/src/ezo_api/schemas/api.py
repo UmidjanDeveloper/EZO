@@ -25,20 +25,25 @@ class Preferences(BaseModel):
     ui_language: LanguageCode = "uz"
     response_language: Literal["auto", "uz", "en", "ru"] = "auto"
     humor: Literal["default", "off", "light", "normal"] = "default"
-    auto_memory: bool = True
+    memory_consent: bool = False
+    auto_memory: bool = False
+    learning_style: str = "balanced"
 
 
 class PreferencesUpdate(BaseModel):
     ui_language: LanguageCode | None = None
     response_language: Literal["auto", "uz", "en", "ru"] | None = None
     humor: Literal["default", "off", "light", "normal"] | None = None
+    memory_consent: bool | None = None
     auto_memory: bool | None = None
+    learning_style: str | None = None
 
 
 class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     display_name: str
+    role: str = "user"
     preferences: Preferences
 
 

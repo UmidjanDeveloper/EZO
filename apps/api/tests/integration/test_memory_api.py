@@ -7,6 +7,7 @@ from tests.integration.helpers import stream_chat
 async def test_memory_is_captured_and_retrieved_in_later_conversations(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     await stream_chat(client, message="Ezo, eslab qol: men minimalist dizaynni yoqtiraman.")
     memories = (await client.get("/api/memories")).json()
     assert len(memories) == 1
@@ -21,6 +22,7 @@ async def test_memory_is_captured_and_retrieved_in_later_conversations(
 
 
 async def test_repeated_statements_reinforce_instead_of_duplicating(client: AsyncClient) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     await stream_chat(client, message="I prefer dark mode interfaces.")
     await stream_chat(client, message="I prefer dark mode interfaces.")
     memories = (await client.get("/api/memories")).json()
@@ -29,12 +31,14 @@ async def test_repeated_statements_reinforce_instead_of_duplicating(client: Asyn
 
 
 async def test_sensitive_and_ordinary_messages_are_not_stored(client: AsyncClient) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     await stream_chat(client, message="Remember that my password is hunter2.")
     await stream_chat(client, message="What is the capital of France?")
     assert (await client.get("/api/memories")).json() == []
 
 
 async def test_auto_memory_can_be_disabled(client: AsyncClient) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     response = await client.patch("/api/me/preferences", json={"auto_memory": False})
     assert response.json()["preferences"]["auto_memory"] is False
     await stream_chat(client, message="Eslab qol: men choyni yaxshi ko'raman.")
@@ -66,6 +70,7 @@ async def test_delete_all_requires_confirmation(client: AsyncClient) -> None:
 async def test_project_memories_stay_in_their_project(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
     project = (await client.post("/api/projects", json={"name": "EZO website"})).json()
     await stream_chat(
         client, message="We decided to use a dark blue color palette.", project_id=project["id"]

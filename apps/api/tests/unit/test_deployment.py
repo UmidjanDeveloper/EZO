@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -18,7 +19,7 @@ def production(**overrides: object) -> Settings:
         "EZO_DEBUG_TRACES": "false",
         "EZO_CORS_ORIGINS": "https://ezo.example.com",
         "DATABASE_URL": "postgresql://owner:db-test-password@db.example.com/ezo?sslmode=verify-full",
-        "EZO_STORAGE_DIR": "/app/storage",
+        "EZO_STORAGE_DIR": str(Path("/app/storage").resolve()),
     }
     values.update(overrides)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

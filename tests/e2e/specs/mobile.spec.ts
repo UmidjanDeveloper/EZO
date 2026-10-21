@@ -6,7 +6,7 @@ test("mobile: history drawer and chat work on a phone", async ({ page }) => {
   await expect(page.getByTestId("composer-input")).toBeVisible();
   await page.getByTestId("open-history").click();
   await page.getByRole("link", { name: "Xotira" }).click();
-  await expect(page.getByRole("heading", { name: "Xotira" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Xotira/ })).toBeVisible();
 });
 
 test("mobile: Student upload and reading controls fit the phone", async ({ page }) => {

@@ -30,6 +30,7 @@ from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
 from ezo_api.agents.learning import wants_learning
 from ezo_api.agents.references import latest_artifact
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
+from ezo_api.agents.student_adapter import STUDENT_SPEC, StudentAdapterAgent, wants_student
 from ezo_api.core import messages
 from ezo_api.core.intent import Intent, IntentResult, classify_intent
 from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
@@ -334,12 +335,25 @@ class EzoCore:
                 # Files attached to the message (or a recognised PDF operation such as
                 # "2-betni o'chir"): the request is about documents.
                 intent = IntentResult(Intent.DOCUMENT, 1.0, ("attached_files",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and wants_student(turn.text)
+                and await active_language_session(session, user.id, conversation.id) is None
+            ):
+                intent = IntentResult(Intent.GENERAL, 1.0, ("student",), intent.scores)
             step.summary = f"{intent.intent.value} ({intent.confidence:.2f})" + (
                 f" signals={list(intent.signals)}" if intent.signals else ""
             )
 
         with tracer.step("select_agent") as step:
-            selection = self.agents.select(intent.intent, turn.forced_agent)
+            if turn.forced_agent == "student" or (
+                turn.forced_agent is None
+                and wants_student(turn.text)
+                and await active_language_session(session, user.id, conversation.id) is None
+            ):
+                selection = AgentSelection(agent=StudentAdapterAgent(), requested=STUDENT_SPEC)
+            else:
+                selection = self.agents.select(intent.intent, turn.forced_agent)
             step.summary = selection.agent.spec.key + (
                 f" covering unavailable {selection.requested.key}" if selection.is_fallback else ""
             )
@@ -774,7 +788,10 @@ class EzoCore:
 
         saved_memories = 0
         with prepared.tracer.step("save_memory") as step:
-            if (prepared.user.preferences or {}).get("auto_memory", True):
+            prefs = prepared.user.preferences or {}
+            has_consent = bool(prefs.get("memory_consent", False))
+            auto_memory = bool(prefs.get("auto_memory", False))
+            if has_consent and auto_memory:
                 capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,
                     prepared.user_message.content,
@@ -786,8 +803,10 @@ class EzoCore:
                     f"created={len(capture.created)} reinforced={len(capture.reinforced)} "
                     f"skipped_sensitive={capture.skipped_sensitive}"
                 )
+            elif not has_consent:
+                step.summary = "disabled: explicit memory consent required"
             else:
-                step.summary = "disabled by user preference"
+                step.summary = "disabled: auto_memory is turned off in preferences"
 
         message = Message(
             conversation_id=prepared.conversation.id,
