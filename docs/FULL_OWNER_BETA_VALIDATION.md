@@ -41,7 +41,7 @@ are recorded in final handoff, not inferred from earlier PRs.
 | Isolated native container regressions, current image | 22 passed, 0 failed/skipped |
 | Ruff / formatting / mypy | Passed; 454 Python files, 307 source files checked by mypy |
 | Frontend lint / typecheck / unit / production build | Passed; 68 unit tests (58 web, 10 shared) |
-| Playwright | Main desktop/mobile suite 38 passed; separate new IELTS browser case 1 passed |
+| Playwright | Final combined desktop/mobile suite 39 passed, 0 failed/skipped |
 | PostgreSQL migrations | Upgrade head 0018 and Alembic check passed; vector type autogenerate warning retained |
 | pip-audit / pnpm production audit | 80 Python packages, 0 advisories; Node 0 advisories |
 | Secret scan before final commit | 155 commits, 0 leaks; committed scan recorded in final handoff |
@@ -77,6 +77,18 @@ These failed attempts are not reported as passing runs.
 Initial failure evidence is retained, including the baseline IELTS regression and any
 native OCR/environment failures. Thresholds, OCR recall requirements, security gates,
 auth, consent and sandbox restrictions are not weakened to make tests green.
+The first hosted Web job failed at its E2E step; detailed hosted logs required sign-in
+and were unavailable via the connected API. A local combined run reproduced **38
+passed / 1 failed**: the new IELTS test left a session in the shared fixture owner's
+database and broke the existing language empty-state assertion. The test now deletes
+only its own session in `finally`, respecting the API's explicit `confirm=true`
+requirement. An intermediate cleanup attempt returned409 (37 passed / 2 failed),
+also retained. Final combined run: **39 passed**. No assertion, auth or confirmation
+check was relaxed; production code was unchanged. Security push coverage now includes
+E2E changes so this fixture correction receives fresh scans as well.
+
+The dedicated IELTS screen still uses a fallback voice-status stub; the global
+OpenAI/ElevenLabs voice service is not a newly completed spoken IELTS examiner.
 No independent reviewer has approved this patch; separate review remains pending.
 
 ## Remaining blockers

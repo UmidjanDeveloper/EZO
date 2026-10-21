@@ -69,6 +69,8 @@ OpenAI/Gemini/ElevenLabs, owner token va DB URL’ni `NEXT_PUBLIC_*`ga yozmang.
   xarajat qilishi mumkin. Alert’ning o‘zi hard limit emas.
 - Provider xatosi yoki quota bo‘lmasa, natija “haqiqiy AI javobi” deb ko‘rsatilmasin.
   IELTS text practice ball/talaffuz bahosini o‘ylab topmaydi; null natija — haqiqiy holat.
+  Alohida IELTS ekranining voice adapteri hali fallback stub: global voice API
+  mavjudligi to‘liq ovozli IELTS imtihoni ulanganini anglatmaydi.
 
 ## 5. Super Admin — faqat offline operator amali
 
