@@ -1,5 +1,8 @@
 # P1.1 / Task 01 — durable document job foundation
 
+Current Student integration review: [STUDENT_V1_REVIEW.md](STUDENT_V1_REVIEW.md).
+The milestone evidence below is historical; it does not describe native worker activation.
+
 2026-10-20. Task baseline: `4a233a373d208093e5321d7f251cd6154fdf3509` (PR #10).
 Initial branch: `feat/p1-student-durable-jobs`.
 

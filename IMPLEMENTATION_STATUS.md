@@ -1,5 +1,13 @@
 # EZO implementation status
 
+Student V1 review candidate (`feat/student-v1-complete`): the separate native worker,
+immutable raw revisions, exact indexed citations, Student UI and provider-backed
+excerpt learning are described in [docs/STUDENT_V1_REVIEW.md](docs/STUDENT_V1_REVIEW.md).
+Native execution in the public API remains disabled. Dedicated runtime approval,
+live-provider quality evaluation and the documented dependency risks remain open;
+this is not a production-readiness declaration. Historical milestone counts below
+must not be used as this branch's validation results.
+
 What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
 working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
 
