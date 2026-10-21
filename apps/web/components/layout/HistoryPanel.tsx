@@ -1,7 +1,21 @@
 "use client";
 
 import { cn } from "@ezo/ui";
-import { Brain, FileStack, FolderKanban, GraduationCap, Languages, Layers, PanelLeftClose, Plus, Settings, Trash2 } from "lucide-react";
+import {
+  Award,
+  Brain,
+  FileSpreadsheet,
+  FileStack,
+  FolderKanban,
+  GraduationCap,
+  Languages,
+  Layers,
+  PanelLeftClose,
+  Plus,
+  Presentation,
+  Settings,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -9,7 +23,7 @@ import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { EzoRobot } from "../robot/EzoRobot";
 
-/** Conversation history: the only navigation EZO needs. */
+/** Conversation history: the primary navigation for EZO OS. */
 export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
   const { m } = useI18n();
   const pathname = usePathname();
@@ -25,10 +39,13 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
 
   const footer = [
     { href: "/artifacts", label: m.nav.artifacts, icon: Layers },
-    { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
     { href: "/student", label: "Student", icon: FileStack },
-    { href: "/translate", label: m.nav.translation, icon: Languages },
+    { href: "/presentations", label: m.nav.presentations, icon: Presentation },
+    { href: "/office", label: m.nav.office, icon: FileSpreadsheet },
+    { href: "/ielts", label: m.nav.ielts, icon: Award },
     { href: "/language", label: m.nav.language, icon: GraduationCap },
+    { href: "/translate", label: m.nav.translation, icon: Languages },
+    { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/settings", label: m.nav.settings, icon: Settings },
