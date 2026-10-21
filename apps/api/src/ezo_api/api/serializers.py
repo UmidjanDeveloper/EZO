@@ -25,5 +25,6 @@ def user_out(user: User) -> UserOut:
         id=user.id,
         email=user.email,
         display_name=user.display_name,
+        role=getattr(user, "role", "user"),
         preferences=Preferences.model_validate(user.preferences or {}),
     )
