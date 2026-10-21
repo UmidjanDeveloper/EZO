@@ -138,3 +138,14 @@ async def delete_all_memories(
     )
     await session.commit()
     return Response(status_code=204)
+
+
+@router.get("/export")
+async def export_memories(session: SessionDep, user: CurrentUser) -> dict[str, object]:
+    query = select(Memory).where(Memory.user_id == user.id).order_by(Memory.updated_at.desc())
+    rows = list((await session.scalars(query)).all())
+    return {
+        "user_id": str(user.id),
+        "total_memories": len(rows),
+        "memories": [MemoryOut.model_validate(m).model_dump() for m in rows],
+    }
