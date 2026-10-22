@@ -1,13 +1,17 @@
 # Mandatory upstream implementation matrix — eight repositories
 
-Current base: `4ca35662bbe50235f51558303b9c2d38e56f22d0` (remote integration;
-PR24 externally merged the earlier b7b8b09 candidate). New branch:
-`feat/jarvis-eight-upstream-integration`. All three JARVIS commits are preserved
-on that latest base. Codex did not merge PR24 or deploy anything.
+Upstream integration landed through externally merged PR25 at
+`cd9bbd0633022885ef429929a52228146dc51408` (head6ab4a95, identical source tree).
+Its earlier base4ca3566/PR24 work is preserved. Codex did not merge PR24/25 or deploy.
+Current continuation: `feat/knowledge-refresh-governance`, based on cd9bbd0.
+Knowledge recovery, per-document publication serialization, input integrity and
+local atomic storage prerequisites are documented in KNOWLEDGE_REFRESH_GOVERNANCE.md.
+They do not complete K7 or waive any upstream gate. Independent-review evidence
+is not inferred from an external owner merge.
 
 All eight are binding requirements. Review/reference is not implementation.
 Status below covers the exact named feature; no row certifies whole-framework or
-end-to-end owner desktop automation. New source is still a review candidate.
+end-to-end owner desktop automation. Continuation changes remain review candidates.
 Antigravity owns UI, Chrome extension and companion UX; no new UI files are edited.
 Source paths in the table are relative to `apps/api/src/ezo_api/`; test paths are
 relative to `apps/api/tests/` unless stated otherwise. All four new license notices
