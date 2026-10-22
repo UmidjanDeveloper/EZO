@@ -210,3 +210,12 @@ compressed or redirect responses fail without returning partial success; provide
 fallback remains under existing configuration. Cancellation closes the stream.
 No new credential, consent, provider or dollar-cap claim. See
 `docs/master/VOICE_RESOURCE_LIMITS.md` for exact bounds and tests.
+
+### Learned-source interrupted index recovery (no API schema change)
+
+Identical content still resumes a queued/processing document whose index publication
+was interrupted. Healthy completed revisions and unchanged failed/needs_ocr states
+are preserved; no durable DocumentJob attempts are reset. This does not add a K7
+queue, schedule, permission grant or remote execution capability. See
+`docs/master/KNOWLEDGE_REFRESH_GOVERNANCE.md` for confirmed commit boundaries and
+the required staged/fenced publication design.

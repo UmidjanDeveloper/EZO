@@ -325,3 +325,126 @@ async def test_library_scoped_search_excludes_other_files_on_both_search_paths(
         "/api/knowledge/search", json={**query, "library_id": str(uuid.uuid4())}
     )
     assert stranger.status_code == 404
+
+
+@pytest.mark.parametrize("interrupted_status", ["queued", "processing", "indexed"])
+async def test_restart_indexes_unchanged_document_interrupted_before_publication(
+    api: AsyncClient,
+    web: FakeWeb,
+    learning_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupted_status: str,
+) -> None:
+    import asyncio
+
+    docs_site(web)
+    runner = learning_app.state.services.learning
+
+    async def do_not_start_yet(source_id):
+        pass
+
+    with monkeypatch.context() as hold:
+        hold.setattr(runner, "submit", do_not_start_yet)
+        created = await api.post(
+            "/api/learning/sources",
+            json={
+                "target": f"{DOCS}/guide/",
+                "limits": {"min_interval_seconds": 0},
+            },
+        )
+    assert created.status_code == 202
+    source_id = uuid.UUID(created.json()["id"])
+
+    original_ingest = runner.service.knowledge.ingest
+
+    async def crash(*args, **kwargs):
+        if interrupted_status == "indexed":
+            await original_ingest(*args, **kwargs)
+        raise asyncio.CancelledError
+
+    with monkeypatch.context() as crash_point:
+        # Both real commit boundaries exist in production: file registration and
+        # the ingest() processing-status commit before parsing/index publication.
+        crash_point.setattr(
+            runner.service.knowledge,
+            "_run_pipeline" if interrupted_status == "processing" else "ingest",
+            crash,
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await runner.service.run(source_id)
+    async with learning_app.state.services.db.sessionmaker() as session:
+        [interrupted] = (await session.scalars(select(KnowledgeDocument))).all()
+        interrupted_id = interrupted.id
+        assert interrupted.status == interrupted_status
+        interrupted_revision = interrupted.current_revision_id
+        assert (interrupted_revision is not None) == (interrupted_status == "indexed")
+    # Real startup recovery; fetch again returns identical bytes, not new content.
+    assert await runner.resume_unfinished() == 1
+    async with learning_app.state.services.db.sessionmaker() as session:
+        recovered = await session.get(KnowledgeDocument, interrupted_id)
+        assert recovered.status == "indexed"
+        assert recovered.current_revision_id is not None
+        if interrupted_revision is not None:
+            assert recovered.current_revision_id == interrupted_revision
+        before = dict(
+            (
+                await session.execute(
+                    select(KnowledgeDocument.id, KnowledgeDocument.current_revision_id)
+                )
+            ).all()
+        )
+        source = await session.get(LearnedSource, source_id)
+        assert source.status == "indexed"
+
+    async def healthy_duplicates_must_not_reindex(*args, **kwargs):
+        raise AssertionError("Already indexed identical input was needlessly reindexed")
+
+    with monkeypatch.context() as no_repeat:
+        no_repeat.setattr(runner.service.knowledge, "ingest", healthy_duplicates_must_not_reindex)
+        await runner.service.run(source_id)
+    async with learning_app.state.services.db.sessionmaker() as session:
+        assert (
+            dict(
+                (
+                    await session.execute(
+                        select(KnowledgeDocument.id, KnowledgeDocument.current_revision_id)
+                    )
+                ).all()
+            )
+            == before
+        )
+        assert (await session.get(LearnedSource, source_id)).status == "indexed"
+
+
+@pytest.mark.parametrize("terminal_status", ["failed", "needs_ocr"])
+async def test_source_refresh_does_not_revive_unchanged_terminal_document(
+    api: AsyncClient,
+    web: FakeWeb,
+    learning_app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+    terminal_status: str,
+) -> None:
+    docs_site(web)
+    source = await learn(api, f"{DOCS}/guide/")
+    source_id = uuid.UUID(source["id"])
+    async with learning_app.state.services.db.sessionmaker() as session:
+        document = await session.scalar(select(KnowledgeDocument).limit(1))
+        document.status, document.error = terminal_status, "terminal fixture error"
+        document_id, revision_id = document.id, document.current_revision_id
+        await session.commit()
+
+    retried = []
+
+    async def must_not_retry(*args, **kwargs):
+        retried.append(args)
+        raise AssertionError("Unchanged terminal input was implicitly retried")
+
+    monkeypatch.setattr(
+        learning_app.state.services.learning.service.knowledge, "ingest", must_not_retry
+    )
+    await learning_app.state.services.learning.service.run(source_id)
+    assert not retried
+    async with learning_app.state.services.db.sessionmaker() as session:
+        document = await session.get(KnowledgeDocument, document_id)
+        assert (document.status, document.error) == (terminal_status, "terminal fixture error")
+        assert document.current_revision_id == revision_id

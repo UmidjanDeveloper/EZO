@@ -300,6 +300,11 @@ class LearningService:
             await session.commit()
             if not result.duplicate:
                 changed += 1
+            # Content deduplication does not prove index publication succeeded.
+            # A crash can follow file registration or the processing-status
+            # commit. Resume only those incomplete states; do not revive failed
+            # documents or reindex healthy unchanged revisions automatically.
+            if not result.duplicate or result.document.status in ("queued", "processing"):
                 await self.knowledge.ingest(session, document_id)
             indexed_document = await session.get(KnowledgeDocument, document_id)
             if indexed_document is None:
