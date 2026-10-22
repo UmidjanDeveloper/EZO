@@ -24,6 +24,7 @@ on:
       - "pnpm-lock.yaml"
       - "**/package.json"
       - ".github/workflows/security.yml"
+      - ".github/workflows/ci.yml"
   pull_request:
 
 permissions:
