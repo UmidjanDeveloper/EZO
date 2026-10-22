@@ -203,6 +203,20 @@ async def test_registry_privacy_refresh_and_deletion(
     assert refreshed.status_code == 202
     detail = (await api.get(f"/api/learning/sources/{source['id']}")).json()
     assert detail["stats"]["changed"] == 0 and detail["stats"]["content_changed"] is False
+    versions_path = f"/api/learning/sources/{source['id']}/versions"
+    versions = (await api.get(versions_path)).json()
+    assert len(versions) == 2
+    assert versions[0]["content_hash"] == versions[1]["content_hash"]
+    assert versions[0]["previous_content_hash"] == versions[1]["content_hash"]
+    assert versions[0]["documents"]
+    assert all(d["revision_id"] and d["content_hash"] for d in versions[0]["documents"])
+    assert all(
+        set(d) == {"document_id", "revision_id", "content_hash"} for d in versions[0]["documents"]
+    )
+    assert len((await api.get(versions_path + "?limit=1")).json()) == 1
+    assert (await api.get(versions_path + "?offset=100")).json() == []
+    assert (await api.get(versions_path + "?limit=51")).status_code == 422
+    assert (await api.get(f"/api/learning/sources/{uuid.uuid4()}/versions")).status_code == 404
 
     # Unsafe or unknown targets are refused before anything is registered.
     private = await api.post("/api/learning/sources", json={"target": "http://internal.corp/docs"})

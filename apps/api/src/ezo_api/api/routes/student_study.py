@@ -126,6 +126,65 @@ async def progress(
     }
 
 
+@router.get("/practice-plan")
+async def practice_plan(
+    user: CurrentUser,
+    session: SessionDep,
+    project_id: uuid.UUID | None = None,
+    limit: int = Query(10, ge=1, le=20),
+) -> dict[str, Any]:
+    """A read-only next-session recommendation from real recall schedules.
+
+    Not a generated curriculum, mastery score or measured learning outcome. Only
+    already-due cards are selected; the response never modifies review history.
+    """
+    await _call(scope(session, user.id, project_id))
+    now = utcnow()
+    # Select metadata only: no full document text or card answer materialization.
+    rows = (
+        await session.execute(
+            select(
+                StudyCard.id,
+                StudyCard.document_id,
+                StudyCard.revision_id,
+                StudyCard.quote_start,
+                StudyCard.quote_end,
+                StudyCard.version,
+                StudyCard.interval_days,
+                StudyCard.due_at,
+            )
+            .join(KnowledgeDocument, KnowledgeDocument.id == StudyCard.document_id)
+            .where(*active_filters(user.id, project_id), StudyCard.due_at <= now)
+            .order_by(StudyCard.interval_days, StudyCard.due_at, StudyCard.id)
+            .limit(limit)
+        )
+    ).all()
+    return {
+        "policy": "due-recall-session-v1",
+        "assessment": "self_reported_recall",
+        "generated_at": now.isoformat(),
+        "scope": "current_source_revisions",
+        "items": [
+            {
+                "action": "review_card",
+                "card_id": str(row.id),
+                "document_id": str(row.document_id),
+                "revision_id": str(row.revision_id),
+                "quote_start": row.quote_start,
+                "quote_end": row.quote_end,
+                "offset_unit": "unicode_codepoints",
+                "expected_version": row.version,
+                "due_at": row.due_at.isoformat(),
+                "reason": "initial_or_lapsed_recall"
+                if row.interval_days == 0
+                else "scheduled_recall",
+            }
+            for row in rows
+        ],
+        "empty_reason": "no_due_cards" if not rows else None,
+    }
+
+
 @router.delete("/cards/{card_id}", status_code=204)
 async def delete_card(
     card_id: uuid.UUID,

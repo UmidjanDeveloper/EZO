@@ -71,6 +71,43 @@ async def test_quote_offsets_recall_idempotency_and_progress(client, app):
     assert (await client.get("/api/student/cards?limit=101")).status_code == 422
 
 
+async def test_practice_plan_adapts_to_actual_schedule_without_writing_progress(client, app):
+    c, _ = await card(client, app)
+    before = (await client.get("/api/student/progress")).json()
+    plan = await client.get("/api/student/practice-plan?limit=1")
+    assert plan.status_code == 200, plan.text
+    item = plan.json()["items"][0]
+    assert item["card_id"] == c["id"]
+    assert item["revision_id"] == c["revision_id"]
+    assert item["quote_start"] == c["quote_start"] and item["quote_end"] == c["quote_end"]
+    assert item["expected_version"] == 0
+    assert item["reason"] == "initial_or_lapsed_recall"
+    assert (await client.get("/api/student/progress")).json() == before
+    response = await client.post(
+        f"/api/student/cards/{c['id']}/review",
+        json={"event_id": str(uuid.uuid4()), "expected_version": 0, "rating": "good"},
+    )
+    assert response.status_code == 200
+    plan = (await client.get("/api/student/practice-plan")).json()
+    assert plan["items"] == [] and plan["empty_reason"] == "no_due_cards"
+    assert (await client.get("/api/student/practice-plan?limit=21")).status_code == 422
+    assert (
+        await client.get(f"/api/student/practice-plan?project_id={uuid.uuid4()}")
+    ).status_code == 404
+
+
+async def test_practice_plan_excludes_foreign_cards_and_stale_sources(client, app):
+    c, _ = await card(client, app)
+    async with app.state.services.db.sessionmaker() as session:
+        await session.execute(
+            update(KnowledgeDocument)
+            .where(KnowledgeDocument.id == uuid.UUID(c["document_id"]))
+            .values(status="failed")
+        )
+        await session.commit()
+    assert (await client.get("/api/student/practice-plan")).json()["items"] == []
+
+
 @pytest.mark.parametrize(
     "change",
     [

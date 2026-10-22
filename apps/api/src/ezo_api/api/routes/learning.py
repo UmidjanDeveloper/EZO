@@ -11,12 +11,13 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.models import (
+    AuditLog,
     Conversation,
     KnowledgeDocument,
     KnowledgeLibrary,
@@ -404,6 +405,35 @@ async def refresh_source(
     await runner.submit(source.id)
     await session.refresh(source)
     return SourceOut.model_validate(source)
+
+
+@router.get("/sources/{source_id}/versions")
+async def source_versions(
+    source_id: uuid.UUID,
+    session: SessionDep,
+    user: CurrentUser,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0, le=100000),
+) -> list[dict[str, Any]]:
+    """Actual run provenance only. Missing historical records are never fabricated."""
+    await _owned_source(session, user.id, source_id)
+    rows = (
+        await session.scalars(
+            select(AuditLog)
+            .where(
+                AuditLog.user_id == user.id,
+                AuditLog.action == "learning.source_version",
+                AuditLog.target_type == "learned_source",
+                AuditLog.target_id == str(source_id),
+            )
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).all()
+    return [
+        {"id": str(row.id), "created_at": row.created_at.isoformat(), **row.details} for row in rows
+    ]
 
 
 @router.delete("/sources/{source_id}", status_code=204)
