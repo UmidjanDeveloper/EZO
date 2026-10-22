@@ -1,5 +1,10 @@
 # Mandatory upstream implementation matrix — eight repositories
 
+Current base: `4ca35662bbe50235f51558303b9c2d38e56f22d0` (remote integration;
+PR24 externally merged the earlier b7b8b09 candidate). New branch:
+`feat/jarvis-eight-upstream-integration`. All three JARVIS commits are preserved
+on that latest base. Codex did not merge PR24 or deploy anything.
+
 All eight are binding requirements. Review/reference is not implementation.
 Status below covers the exact named feature; no row certifies whole-framework or
 end-to-end owner desktop automation. New source is still a review candidate.
