@@ -228,7 +228,7 @@ def check_storage(settings: Settings) -> None:
 
 def check_database_role(settings: Settings) -> None:
     """Refuse administrator credentials before running any migration."""
-    if settings.environment != "production" or settings.deployment_profile != "free-beta":
+    if settings.environment != "production":
         return
     from sqlalchemy import create_engine, text
 
@@ -240,7 +240,7 @@ def check_database_role(settings: Settings) -> None:
             privileged = connection.scalar(text(PRIVILEGED_ROLE_SQL))
             if privileged is not False:
                 raise DeploymentError(
-                    "Free beta requires a non-privileged application database role."
+                    "Production requires a non-privileged application database role."
                 )
     except DeploymentError:
         raise

@@ -1,0 +1,169 @@
+"""Super Admin change proposals. Confirmation grants review intent, never execution."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import uuid
+from typing import Any, Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
+
+from ezo_api.api.deps import ServicesDep, SessionDep, SuperAdminUser, rate_limit
+from ezo_api.db.models import AuditLog, KnowledgeLibrary, LearnedSource
+from ezo_api.learning.analyzer import CapabilityAnalyzer
+from ezo_api.security.audit import audit
+
+router = APIRouter(
+    prefix="/api/admin/governance/improvements",
+    tags=["governance"],
+    dependencies=[Depends(rate_limit("default"))],
+)
+
+
+class ProposalIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    library_id: uuid.UUID
+    goal: str = Field(min_length=1, max_length=1000)
+
+
+class ConfirmationIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    proposal_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    decision: Literal["request_independent_review", "reject"]
+    confirm: Literal[True]
+
+
+@router.post("", status_code=201)
+async def propose(
+    body: ProposalIn,
+    admin: SuperAdminUser,
+    session: SessionDep,
+    services: ServicesDep,
+) -> dict[str, Any]:
+    library = await session.scalar(
+        select(KnowledgeLibrary).where(
+            KnowledgeLibrary.id == body.library_id, KnowledgeLibrary.user_id == admin.id
+        )
+    )
+    if library is None:
+        raise HTTPException(404, detail="Library not found.")
+    count = await session.scalar(
+        select(func.count())
+        .select_from(LearnedSource)
+        .where(LearnedSource.library_id == library.id, LearnedSource.user_id == admin.id)
+    )
+    if (count or 0) > 10:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "proposal_limit",
+                "message": "Select a library with at most ten sources.",
+            },
+        )
+    report = await CapabilityAnalyzer(registered_tools=services.tools.names()).analyze_library(
+        session, library
+    )
+    # A capability report is an evidence-graded proposal, never a tested skill.
+    # Keep a bounded immutable snapshot; no generated source, tool or shell call.
+    payload = {
+        "goal": body.goal,
+        "library_id": str(library.id),
+        "analysis": report.model_dump(mode="json"),
+        "status": "proposal_only",
+        "execution_authorized": False,
+        "sandbox_tested": False,
+        "required_gates": [
+            "reviewed_k4_sandbox",
+            "isolated_regression_tests",
+            "independent_review",
+            "explicit_owner_merge_approval",
+        ],
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    if len(encoded.encode()) > 32000:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "proposal_limit",
+                "message": "Select a smaller library for a bounded proposal.",
+            },
+        )
+    digest = hashlib.sha256(encoded.encode()).hexdigest()
+    proposal_id = uuid.uuid4()
+    session.add(
+        AuditLog(
+            id=proposal_id,
+            user_id=admin.id,
+            action="governance.proposal",
+            target_type="improvement",
+            target_id=str(proposal_id),
+            details={"sha256": digest, "proposal": payload},
+        )
+    )
+    await session.commit()
+    return {"id": str(proposal_id), "sha256": digest, **payload}
+
+
+@router.get("")
+async def proposals(
+    admin: SuperAdminUser,
+    session: SessionDep,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0, le=100000),
+) -> list[dict[str, Any]]:
+    rows = (
+        await session.scalars(
+            select(AuditLog)
+            .where(AuditLog.user_id == admin.id, AuditLog.action == "governance.proposal")
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).all()
+    return [{"id": str(r.id), **r.details} for r in rows]
+
+
+@router.post("/{proposal_id}/decision")
+async def decide(
+    proposal_id: uuid.UUID,
+    body: ConfirmationIn,
+    admin: SuperAdminUser,
+    session: SessionDep,
+) -> dict[str, Any]:
+    proposal = await session.scalar(
+        select(AuditLog).where(
+            AuditLog.id == proposal_id,
+            AuditLog.user_id == admin.id,
+            AuditLog.action == "governance.proposal",
+        )
+    )
+    if proposal is None:
+        raise HTTPException(404, detail="Proposal not found.")
+    if proposal.details["sha256"] != body.proposal_sha256:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "proposal_changed",
+                "message": "Confirm the exact proposal hash being reviewed.",
+            },
+        )
+    audit(
+        session,
+        admin.id,
+        "governance.proposal_decision",
+        "improvement",
+        proposal_id,
+        {"sha256": body.proposal_sha256, "decision": body.decision, "execution_authorized": False},
+    )
+    await session.commit()
+    return {
+        "proposal_id": str(proposal_id),
+        "decision": body.decision,
+        "execution_authorized": False,
+        "merge_authorized": False,
+        "deployment_authorized": False,
+        "sandbox_tested": False,
+    }

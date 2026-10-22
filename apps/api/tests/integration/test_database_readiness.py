@@ -40,3 +40,18 @@ def test_readiness_detects_inherited_public_privileges(database_url: str, grant:
         check_database(settings)
     finally:
         engine.dispose()
+
+
+def test_full_profile_refuses_privileged_role_before_migration(database_url: str) -> None:
+    if not database_url.startswith("postgres"):
+        pytest.skip("Real PostgreSQL role inheritance catalog")
+    from ezo_api.deployment import check_database_role
+
+    settings = Settings(
+        _env_file=None,
+        EZO_ENV="production",
+        DATABASE_URL=database_url,
+        EZO_DEPLOYMENT_PROFILE="full",
+    )
+    with pytest.raises(DeploymentError, match="non-privileged"):
+        check_database_role(settings)

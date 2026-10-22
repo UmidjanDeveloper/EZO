@@ -30,7 +30,7 @@ from ezo_api.services import Services
 class LearningRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     project_id: uuid.UUID | None = None
-    kind: Literal["answer", "study_guide", "summary", "quiz"] = "answer"
+    kind: Literal["answer", "study_guide", "summary", "quiz", "flashcards"] = "answer"
     question: str = Field(default="", max_length=2000)
     section_start: int | None = Field(default=None, ge=0, le=2_000_000)
     language: Literal["uz", "en", "ru"] = "uz"
@@ -48,6 +48,19 @@ class QuizItem(BaseModel):
 class Quiz(BaseModel):
     model_config = ConfigDict(extra="forbid")
     items: list[QuizItem] = Field(min_length=1, max_length=5)
+
+
+class Flashcard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    front: str = Field(min_length=1, max_length=600)
+    back: str = Field(min_length=1, max_length=2000)
+    source: int = Field(ge=1, le=6)
+    quote: str = Field(min_length=1, max_length=400)
+
+
+class Flashcards(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[Flashcard] = Field(min_length=1, max_length=5)
 
 
 def check_numeric_sources(text: str, sources: list[SourceRef]) -> None:
@@ -233,6 +246,11 @@ async def learn(
             '"answer":0,"explanation":"... [1]","source":1}]}. '
             "Use 1..5 questions and valid zero-based answer indices."
         ),
+        "flashcards": (
+            'Return ONLY JSON: {"items":[{"front":"question","back":"answer [1]",'
+            '"source":1,"quote":"exact substring of the source"}]}. '
+            "Create 1..5 proposed flashcards. Cite the chosen source in every back."
+        ),
     }
     text, provider = await generate(
         services.router,
@@ -258,6 +276,45 @@ async def learn(
         ),
     )
     quiz = None
+    flashcards: list[dict[str, object]] | None = None
+    if request.kind == "flashcards":
+        from ezo_api.student.provenance import chunk_offsets
+
+        try:
+            proposals = Flashcards.model_validate_json(text)
+            flashcards = []
+            for proposed_card in proposals.items:
+                if proposed_card.source > len(sources):
+                    raise ValueError("unknown_source")
+                source = sources[proposed_card.source - 1]
+                card_chunk = await session.get(KnowledgeChunk, source.chunk_id)
+                if card_chunk is None:
+                    raise ValueError("source_missing")
+                offsets = await chunk_offsets(session, card_chunk)
+                if offsets is None or proposed_card.quote not in source.excerpt:
+                    raise ValueError("invalid_quote")
+                check_numeric_sources(proposed_card.back, sources)
+                back = verify_citations(proposed_card.back, sources)
+                if back.invalid_numbers or proposed_card.source not in {s.n for s in back.cited}:
+                    raise ValueError("invalid_citation")
+                start = offsets[0] + source.excerpt.index(proposed_card.quote)
+                flashcards.append(
+                    {
+                        "document_id": str(document_id),
+                        "revision_id": str(source.revision_id),
+                        "chunk_id": str(source.chunk_id),
+                        "project_id": str(request.project_id) if request.project_id else None,
+                        "front": proposed_card.front,
+                        "back": proposed_card.back,
+                        "quote_start": start,
+                        "quote_end": start + len(proposed_card.quote),
+                    }
+                )
+            text = "\n".join(proposed_card.back for proposed_card in proposals.items)
+        except (ValidationError, ValueError) as exc:
+            raise JobError(
+                "invalid_model_output", "Flashcards failed citation/schema checks.", 502
+            ) from exc
     if request.kind == "quiz":
         try:
             quiz = Quiz.model_validate_json(text)
@@ -287,7 +344,7 @@ async def learn(
         raise JobError(
             "invalid_model_output", "AI output did not cite verified retrieved sources.", 502
         )
-    return {
+    response = {
         "status": "generated",
         "text": checked.text,
         "provider": provider,
@@ -297,3 +354,7 @@ async def learn(
         "citations": [s.to_metadata() for s in checked.cited],
         "quiz": quiz.model_dump() if quiz else None,
     }
+    if flashcards is not None:
+        response["flashcards"] = flashcards
+        response["persistence"] = "proposal_only_explicit_save_required"
+    return response
