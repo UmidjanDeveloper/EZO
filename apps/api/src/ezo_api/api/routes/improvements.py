@@ -44,10 +44,14 @@ class DraftIn(BaseModel):
     source: str = Field(min_length=1, max_length=MAX_BYTES)
     purpose: str = Field(min_length=1, max_length=1000)
 
-    @field_validator("source")
+    @field_validator("source", "purpose")
     @classmethod
     def source_bytes(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > MAX_BYTES:
+        try:
+            size = len(value.encode("utf-8"))
+        except UnicodeEncodeError as exc:
+            raise ValueError("Draft must contain valid Unicode scalar values.") from exc
+        if size > MAX_BYTES:
             raise ValueError("Draft exceeds UTF-8 byte limit.")
         return value
 

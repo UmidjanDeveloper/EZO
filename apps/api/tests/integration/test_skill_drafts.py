@@ -1,5 +1,6 @@
 """Backend RBAC, immutable source identity and non-authorizing review intent."""
 
+import json
 import uuid
 
 from sqlalchemy import select
@@ -81,6 +82,13 @@ async def test_rejected_draft_stays_untrusted_and_unicode_bytes_are_bounded(clie
     assert response.json()["validation"]["static_status"] == "rejected"
     assert response.json()["status"] == "untrusted_draft"
     assert (await client.post(prefix, json={**body, "source": "😀" * 5000})).status_code == 422
+    assert (
+        await client.post(
+            prefix,
+            content=json.dumps({**body, "source": "\ud800"}).encode(),
+            headers={"content-type": "application/json"},
+        )
+    ).status_code == 422
     other = f"/api/admin/governance/improvements/{uuid.uuid4()}/drafts"
     assert (await client.post(other, json=body)).status_code == 404
     assert (await client.get(other)).status_code == 404
