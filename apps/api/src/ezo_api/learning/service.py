@@ -279,6 +279,7 @@ class LearningService:
             raise LookupError(source_id)
         seen_urls: set[str] = set()
         hashes: list[str] = []
+        manifest: list[dict[str, str | None]] = []
         changed = 0
         for document in inspection.documents:
             if document.url in seen_urls:
@@ -300,6 +301,20 @@ class LearningService:
             if not result.duplicate:
                 changed += 1
                 await self.knowledge.ingest(session, document_id)
+            indexed_document = await session.get(KnowledgeDocument, document_id)
+            if indexed_document is None:
+                raise LookupError(source_id)
+            manifest.append(
+                {
+                    "document_id": str(document_id),
+                    "revision_id": (
+                        str(indexed_document.current_revision_id)
+                        if indexed_document.current_revision_id
+                        else None
+                    ),
+                    "content_hash": indexed_document.content_hash,
+                }
+            )
             knowledge_source = await session.get(KnowledgeSource, knowledge_source_id)
             if knowledge_source is None:
                 raise LookupError(source_id)
@@ -401,6 +416,30 @@ class LearningService:
             "learned_source",
             source_id,
             {"status": status, "documents": len(seen_urls), "stopped": inspection.stopped},
+        )
+        # Immutable-by-API, bounded provenance for this actual completed attempt.
+        # No raw source, credentials or full extracted text enters the audit payload.
+        # A partial fetch is explicitly partial; this is not a whole-source snapshot.
+        audit(
+            session,
+            user_id,
+            "learning.source_version",
+            "learned_source",
+            source_id,
+            {
+                "schema": "source-version-v1",
+                "content_hash": learned.content_hash,
+                "previous_content_hash": previous_hash,
+                "version": learned.version,
+                "status": status,
+                "complete_fetch": bool(inspection.documents)
+                and inspection.stopped is None
+                and not inspection.errors,
+                "documents": manifest[:200],
+                "manifest_truncated": len(manifest) > 200,
+                "changed": changed,
+                "removed": removed,
+            },
         )
         await session.commit()
 

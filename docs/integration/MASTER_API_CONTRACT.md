@@ -90,3 +90,32 @@ There is no execute/install/push/merge/deploy route. Owner review intent is not
 independent review, approval to run generated code or approval to merge a PR.
 These additive contracts are ready for Antigravity review, not evidence that
 Antigravity implemented or approved any frontend integration.
+
+
+## Additive final-backend candidate contracts (awaiting independent review)
+
+Base ce9b21f; existing contracts unchanged. No frontend edits are required here.
+
+- POST `/api/admin/governance/improvements/{proposal_id}/drafts`: Super Admin,
+  same proposal owner, exact `proposal_sha256`, `language:python`, `source`
+  <=16384 UTF-8 bytes, `purpose`1..1000; unknown fields422. Returns201 with
+  `id`, canonical payload `sha256`, immutable source and static `validation`.
+  Static rejection is saved as untrusted data, never run. Wrong hash409;
+  absent/foreign proposal404; ordinary/subscription user403.
+- GET same path: owned paginated immutable drafts, `limit`1..50 (20 default),
+  `offset`0..100000. Response entries `{id,sha256,draft}`. Empty pages return[].
+- POST `.../drafts/{draft_id}/decision`: exact `draft_sha256`,
+  `decision:request_independent_review|reject`, `confirm:true`. Durable review
+  intent only, all execution/merge/deployment flagsfalse; exact parent/owner and
+  hash checked. No code execution, installation, git or CI-verification endpoint.
+- GET `/api/learning/sources/{source_id}/versions`: authenticated source owner;
+  limit1..50/offset0..100000; entries actual finalization audit ID/time, schema
+  source-version-v1, content/previous hash, source version/status, complete_fetch,
+  bounded document/revision/hash manifest, truncation flag, changed/removed counts.
+  Older runs are not backfilled. Missing/foreign/deleted source404, empty page[].
+- GET `/api/student/practice-plan`: exact owned nullable `project_id`, `limit`1..20
+  (10 default). Metadata-only due recall actions for current source revisions,
+  lower recall interval then due/id order. Contains policy, assessment, generated_at,
+  items(card/document/revision IDs, original global quote offsets, expected_version,
+  due_at, reason), empty_reason. No model or writes; it is not a curriculum or
+  mastery measure. Existing card review fences/authorization still apply.
