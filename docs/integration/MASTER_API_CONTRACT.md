@@ -177,3 +177,14 @@ DACL support. Android/iOS/Chrome support must not be inferred from Linux tests.
 Antigravity integration remains pending. Do not display a completed voice/file/PDF/
 Telegram task from a static plan or arithmetic receipt. No API for remote dispatch,
 external sending, grant creation or automatic pairing is implied by these contracts.
+
+### Local companion controls (no new remote API)
+
+Trusted operator CLI now accepts `--cancel-request <uuid>` or `--revoke`, with
+the same pinned identity/root/key FD configuration. Cancellation tombstones and
+permanent authority revocation survive process restart; final completion is fenced
+under a journal write transaction. Wire messages remain v1. Journal upgrades v1→v2
+transactionally; old binaries must refuse v2 rather than ignore revocation.
+Missing control/replay state is not reset. No automatic retry/re-enable, remote
+control ingress or new tool action is introduced. Full semantics and rollback
+limits: `docs/master/COMPANION_LIFECYCLE.md`.

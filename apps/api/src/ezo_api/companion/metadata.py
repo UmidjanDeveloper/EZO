@@ -130,7 +130,7 @@ class MetadataCompanion:
                     len(header) != 100
                     or header[:16] != b"SQLite format 3\x00"
                     or int.from_bytes(header[68:72], "big") != JOURNAL_APPLICATION_ID
-                    or int.from_bytes(header[60:64], "big") != 1
+                    or int.from_bytes(header[60:64], "big") not in (1, 2)
                 ):
                     raise CompanionError("foreign_or_incompatible_journal")
         finally:
@@ -146,15 +146,50 @@ class MetadataCompanion:
                 if tables:
                     raise CompanionError("foreign_or_incompatible_journal")
                 connection.execute("PRAGMA application_id=0x455A4F31")
-                connection.execute("PRAGMA user_version=1")
-            elif application_id != JOURNAL_APPLICATION_ID or version != 1:
+            elif application_id != JOURNAL_APPLICATION_ID or version not in (1, 2):
                 raise CompanionError("foreign_or_incompatible_journal")
+            if version in (1, 2):
+                required = {"metadata_requests", "metadata_binding"}
+                if version == 2:
+                    required |= {"metadata_controls", "metadata_cancellations"}
+                tables = {
+                    row[0]
+                    for row in connection.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    )
+                }
+                if (
+                    not required <= tables
+                    or connection.execute(
+                        "SELECT count(*) FROM metadata_binding WHERE id=1"
+                    ).fetchone()[0]
+                    != 1
+                ):
+                    raise CompanionError("incomplete_journal_requires_owner_review")
+                if version == 2 and connection.execute(
+                    "SELECT revoked FROM metadata_controls WHERE id=1"
+                ).fetchone() not in ((0,), (1,)):
+                    raise CompanionError("incomplete_journal_requires_owner_review")
             connection.execute("PRAGMA max_page_count=4096")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS metadata_requests ("
                 "id TEXT PRIMARY KEY, request_sha256 TEXT NOT NULL, "
                 "started_at INTEGER NOT NULL, status TEXT NOT NULL, receipt_sha256 TEXT)"
             )
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS metadata_controls ("
+                "id INTEGER PRIMARY KEY CHECK(id=1), "
+                "revoked INTEGER NOT NULL CHECK(revoked IN (0,1)), revoked_at INTEGER, "
+                "CHECK((revoked=0 AND revoked_at IS NULL) OR "
+                "(revoked=1 AND revoked_at IS NOT NULL)))"
+            )
+            connection.execute("INSERT OR IGNORE INTO metadata_controls(id,revoked) VALUES (1,0)")
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS metadata_cancellations ("
+                "request_id TEXT PRIMARY KEY, cancelled_at INTEGER NOT NULL)"
+            )
+            # Old binaries must reject this journal rather than ignore revocation.
+            connection.execute("PRAGMA user_version=2")
             connection.execute("COMMIT")
             return connection
         except BaseException:
@@ -166,6 +201,68 @@ class MetadataCompanion:
             os.close(self._fd)
             self._fd = -1
         self._journal.close()
+
+    def _checkpoint(self, request_id: uuid.UUID) -> None:
+        if self._journal.execute("SELECT revoked FROM metadata_controls WHERE id=1").fetchone()[0]:
+            raise CompanionError("device_authority_revoked")
+        if self._journal.execute(
+            "SELECT 1 FROM metadata_cancellations WHERE request_id=?", (str(request_id),)
+        ).fetchone():
+            raise CompanionError("cancelled")
+
+    def revoke(self) -> None:
+        """Trusted local operator action. Permanent for this bound journal; no reset API."""
+        self._journal.execute("BEGIN IMMEDIATE")
+        try:
+            self._journal.execute(
+                "UPDATE metadata_controls SET revoked=1,revoked_at=COALESCE(revoked_at,?) "
+                "WHERE id=1",
+                (int(time.time()),),
+            )
+            self._journal.execute(
+                "UPDATE metadata_requests SET status='revoked' WHERE status='started'"
+            )
+            self._journal.execute("COMMIT")
+        except BaseException:
+            if self._journal.in_transaction:
+                self._journal.execute("ROLLBACK")
+            raise
+
+    def cancel_request(self, request_id: uuid.UUID) -> str:
+        """Cancel before/during work without rewriting a historical terminal result."""
+        self._journal.execute("BEGIN IMMEDIATE")
+        try:
+            row = self._journal.execute(
+                "SELECT status FROM metadata_requests WHERE id=?", (str(request_id),)
+            ).fetchone()
+            if row and row[0] not in ("started", "cancelled"):
+                result = "already_terminal"
+            else:
+                exists = self._journal.execute(
+                    "SELECT 1 FROM metadata_cancellations WHERE request_id=?", (str(request_id),)
+                ).fetchone()
+                if not exists:
+                    count = self._journal.execute(
+                        "SELECT count(*) FROM metadata_cancellations"
+                    ).fetchone()[0]
+                    if count >= MAX_REQUESTS:
+                        raise CompanionError("device_cancellation_budget_exhausted")
+                    self._journal.execute(
+                        "INSERT INTO metadata_cancellations VALUES (?,?)",
+                        (str(request_id), int(time.time())),
+                    )
+                self._journal.execute(
+                    "UPDATE metadata_requests SET status='cancelled' "
+                    "WHERE id=? AND status='started'",
+                    (str(request_id),),
+                )
+                result = "cancelled"
+            self._journal.execute("COMMIT")
+            return result
+        except BaseException:
+            if self._journal.in_transaction:
+                self._journal.execute("ROLLBACK")
+            raise
 
     def _admit(self, request: SignedRequest, now: int) -> None:
         payload = request.payload
@@ -180,6 +277,7 @@ class MetadataCompanion:
             raise CompanionError("request_expired_or_future")
         try:
             self._journal.execute("BEGIN IMMEDIATE")
+            self._checkpoint(payload.request_id)
             if (
                 self._journal.execute("SELECT count(*) FROM metadata_requests").fetchone()[0]
                 >= MAX_REQUESTS
@@ -208,6 +306,7 @@ class MetadataCompanion:
         self._admit(request, now)
         payload = request.payload
         try:
+            self._checkpoint(payload.request_id)
             if cancelled():
                 raise CompanionError("cancelled")
             files: list[FileMetadata] = []
@@ -216,6 +315,7 @@ class MetadataCompanion:
             started = time.monotonic()
             with os.scandir(self._fd) as entries:
                 for entry in entries:
+                    self._checkpoint(payload.request_id)
                     if cancelled():
                         raise CompanionError("cancelled")
                     if time.monotonic() - started > 2 or int(time.time()) >= payload.expires_at:
@@ -265,6 +365,12 @@ class MetadataCompanion:
                 created_at=int(time.time()),
             )
             signed = sign_response(response, self.device_key)
+            # Linearization point: completion and local controls share the same
+            # write lock. A cancel/revoke committed first prevents publication.
+            self._journal.execute("BEGIN IMMEDIATE")
+            self._checkpoint(payload.request_id)
+            if int(time.time()) >= payload.expires_at or time.monotonic() - started > 2:
+                raise CompanionError("deadline_exceeded")
             self._journal.execute(
                 "UPDATE metadata_requests SET status=?,receipt_sha256=? WHERE id=?",
                 (
@@ -273,10 +379,13 @@ class MetadataCompanion:
                     str(payload.request_id),
                 ),
             )
+            self._journal.execute("COMMIT")
             return signed
         except BaseException:
+            if self._journal.in_transaction:
+                self._journal.execute("ROLLBACK")
             self._journal.execute(
-                "UPDATE metadata_requests SET status=? WHERE id=?",
+                "UPDATE metadata_requests SET status=? WHERE id=? AND status='started'",
                 ("interrupted", str(payload.request_id)),
             )
             raise
@@ -301,6 +410,9 @@ def main() -> None:
     parser.add_argument("--root-id", type=uuid.UUID, required=True)
     parser.add_argument("--controller-public-key", required=True)
     parser.add_argument("--device-key-fd", type=int, required=True)
+    control = parser.add_mutually_exclusive_group()
+    control.add_argument("--revoke", action="store_true")
+    control.add_argument("--cancel-request", type=uuid.UUID)
     args = parser.parse_args()
     companion = None
     try:
@@ -311,10 +423,6 @@ def main() -> None:
         controller_key = Ed25519PublicKey.from_public_bytes(
             bytes.fromhex(args.controller_public_key)
         )
-        data = sys.stdin.buffer.read(8193)
-        if len(data) > 8192:
-            raise CompanionError("request_size_limit")
-        request = SignedRequest.model_validate_json(data)
         companion = MetadataCompanion(
             args.root,
             args.journal,
@@ -324,6 +432,17 @@ def main() -> None:
             controller_key=controller_key,
             device_key=device_key,
         )
+        if args.revoke:
+            companion.revoke()
+            print(json.dumps({"outcome": "authority_revoked"}))
+            return
+        if args.cancel_request:
+            print(json.dumps({"outcome": companion.cancel_request(args.cancel_request)}))
+            return
+        data = sys.stdin.buffer.read(8193)
+        if len(data) > 8192:
+            raise CompanionError("request_size_limit")
+        request = SignedRequest.model_validate_json(data)
         result = companion.execute(request)
         print(result.model_dump_json())
     except (CompanionError, OSError, ValueError, sqlite3.Error, ValidationError) as exc:

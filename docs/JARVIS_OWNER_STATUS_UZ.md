@@ -16,6 +16,11 @@ Sakkizta upstream bo‘yicha holat: master/UPSTREAM_IMPLEMENTATION_MATRIX.md.
   regular fayllari metadata’sini o‘qiydi. Body o‘qimaydi, symlink/FIFO ochmaydi,
   parser/shell/model ishga tushirmaydi. Ed25519 signature, actor/device/task/root,
   qisqa deadline va restartdan keyingi replay/root identity tekshiriladi.
+- Lokal operator request UUID’ni doimiy cancel qilishi yoki journal ruxsatini
+  butunlay revoke qilishi mumkin. Bu holat restartdan keyin ham saqlanadi.
+  Tugallangan natijalar o‘zgartirilmaydi; cancel/revoke natija commitidan oldin
+  bo‘lsa, yangi completion qaytmaydi. Remote pairing yoki UI hali yo‘q.
+  Aniq holatlar va rollback cheklovlari: master/COMPANION_LIFECYCLE.md.
 
 ## Xavfsiz lokal tekshiruv
 

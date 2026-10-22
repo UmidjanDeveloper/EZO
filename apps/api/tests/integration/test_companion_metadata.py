@@ -298,3 +298,235 @@ def test_existing_unrelated_sqlite_database_is_not_modified_as_a_journal(device)
             ]
             == 1
         )
+
+
+def test_local_revocation_is_permanent_across_restart_and_new_request_ids(device):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    engine.revoke()
+    engine.revoke()
+    engine.close()
+    restarted = MetadataCompanion(root, journal, **options)
+    try:
+        with pytest.raises(CompanionError, match="authority_revoked"):
+            restarted.execute(request(device))
+        assert (
+            restarted._journal.execute("SELECT count(*) FROM metadata_requests").fetchone()[0] == 0
+        )
+    finally:
+        restarted.close()
+
+
+def test_cancel_before_admission_survives_restart_without_fake_completion(device):
+    root, journal, _, _, _, options = device
+    command = request(device)
+    engine = MetadataCompanion(root, journal, **options)
+    assert engine.cancel_request(command.payload.request_id) == "cancelled"
+    assert engine.cancel_request(command.payload.request_id) == "cancelled"
+    engine.close()
+    restarted = MetadataCompanion(root, journal, **options)
+    try:
+        with pytest.raises(CompanionError, match="cancelled"):
+            restarted.execute(command)
+        assert (
+            restarted._journal.execute("SELECT count(*) FROM metadata_requests").fetchone()[0] == 0
+        )
+    finally:
+        restarted.close()
+
+
+@pytest.mark.parametrize("operation", ["cancel", "revoke"])
+@pytest.mark.parametrize("boundary", ["before_scan", "before_publication"])
+def test_other_connection_control_fences_actual_inflight_completion(device, operation, boundary):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    operator = MetadataCompanion(root, journal, **options)
+    command = request(device)
+    calls = 0
+
+    def control_at_boundary():
+        nonlocal calls
+        calls += 1
+        if calls == (1 if boundary == "before_scan" else 2):
+            if operation == "cancel":
+                operator.cancel_request(command.payload.request_id)
+            else:
+                operator.revoke()
+        return False
+
+    try:
+        with pytest.raises(CompanionError, match=r"cancelled|authority_revoked"):
+            engine.execute(command, cancelled=control_at_boundary)
+        status, receipt = engine._journal.execute(
+            "SELECT status,receipt_sha256 FROM metadata_requests WHERE id=?",
+            (str(command.payload.request_id),),
+        ).fetchone()
+        assert status == ("cancelled" if operation == "cancel" else "revoked")
+        assert receipt is None
+    finally:
+        engine.close()
+        operator.close()
+
+
+def test_late_controls_preserve_historical_receipt_and_do_not_revive_work(device):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    command = request(device)
+    try:
+        engine.execute(command)
+        before = engine._journal.execute("SELECT * FROM metadata_requests").fetchall()
+        assert engine.cancel_request(command.payload.request_id) == "already_terminal"
+        engine.revoke()
+        assert engine._journal.execute("SELECT * FROM metadata_requests").fetchall() == before
+        with pytest.raises(CompanionError, match="authority_revoked"):
+            engine.execute(command)
+    finally:
+        engine.close()
+
+
+def test_v1_upgrade_preserves_replay_and_disallows_old_journal_version_contract(device):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    command = request(device)
+    engine.execute(command)
+    rows = engine._journal.execute("SELECT * FROM metadata_requests").fetchall()
+    engine.close()
+    with sqlite3.connect(journal) as db:
+        db.execute("DROP TABLE metadata_controls")
+        db.execute("DROP TABLE metadata_cancellations")
+        db.execute("PRAGMA user_version=1")
+    upgraded = MetadataCompanion(root, journal, **options)
+    try:
+        assert upgraded._journal.execute("SELECT * FROM metadata_requests").fetchall() == rows
+        with pytest.raises(CompanionError, match="replayed_request"):
+            upgraded.execute(command)
+        upgraded.revoke()
+        assert int.from_bytes(journal.read_bytes()[60:64], "big") == 2
+    finally:
+        upgraded.close()
+
+
+@pytest.mark.parametrize("table", ["metadata_controls", "metadata_requests", "metadata_binding"])
+def test_missing_journal_authority_or_replay_state_is_not_silently_reset(device, table):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    engine.revoke()
+    engine.close()
+    with sqlite3.connect(journal) as db:
+        db.execute(f"DROP TABLE {table}")  # fixed test identifiers
+    with pytest.raises(CompanionError, match="incomplete_journal"):
+        MetadataCompanion(root, journal, **options)
+
+
+@pytest.mark.parametrize("operation", ["cancel", "revoke"])
+def test_real_operator_process_prevents_result_publication(device, operation):
+    root, journal, controller, key, identities, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    command = request(device)
+    key_path = journal.parent / "ephemeral-control-test-key"
+    key_path.write_bytes(key.private_bytes_raw())
+    key_path.chmod(0o600)
+    called = False
+
+    def operator_process():
+        nonlocal called
+        if called:
+            return False
+        called = True
+        with key_path.open("rb") as key_file:
+            args = [
+                sys.executable,
+                "-m",
+                "ezo_api.companion.metadata",
+                "--root",
+                str(root),
+                "--journal",
+                str(journal),
+                "--controller-public-key",
+                controller.public_key().public_bytes_raw().hex(),
+                "--device-key-fd",
+                str(key_file.fileno()),
+            ]
+            for name, value in identities.items():
+                args += ["--" + name.replace("_", "-"), str(value)]
+            args += (
+                ["--revoke"]
+                if operation == "revoke"
+                else ["--cancel-request", str(command.payload.request_id)]
+            )
+            result = subprocess.run(  # noqa: S603 - fixed module; trusted test fixture flags
+                args,
+                input="",
+                capture_output=True,
+                text=True,
+                pass_fds=(key_file.fileno(),),
+                timeout=5,
+                check=False,
+            )
+        assert result.returncode == 0, result.stderr
+        assert json.loads(result.stdout)["outcome"] == (
+            "authority_revoked" if operation == "revoke" else "cancelled"
+        )
+        assert key.private_bytes_raw().hex() not in result.stdout
+        return False
+
+    try:
+        with pytest.raises(CompanionError, match=r"cancelled|authority_revoked"):
+            engine.execute(command, cancelled=operator_process)
+        assert (
+            engine._journal.execute("SELECT receipt_sha256 FROM metadata_requests").fetchone()[0]
+            is None
+        )
+    finally:
+        engine.close()
+
+
+def test_process_crash_after_admission_does_not_reexecute_or_invent_receipt(device):
+    import multiprocessing
+
+    root, journal, _, _, _, options = device
+    command = request(device)
+
+    def crash_after_admission():
+        engine = MetadataCompanion(root, journal, **options)
+        engine.execute(command, cancelled=lambda: os._exit(23))
+
+    process = multiprocessing.get_context("fork").Process(target=crash_after_admission)
+    process.start()
+    try:
+        process.join(timeout=5)
+        assert process.exitcode == 23
+    finally:
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+    restarted = MetadataCompanion(root, journal, **options)
+    try:
+        with pytest.raises(CompanionError, match="replayed_request"):
+            restarted.execute(command)
+        assert restarted._journal.execute(
+            "SELECT status,receipt_sha256 FROM metadata_requests"
+        ).fetchone() == ("started", None)
+    finally:
+        restarted.close()
+
+
+def test_cancellation_budget_never_resets_but_duplicate_cancel_remains_idempotent(device):
+    root, journal, _, _, _, options = device
+    engine = MetadataCompanion(root, journal, **options)
+    ids = [str(uuid.uuid4()) for _ in range(10000)]
+    try:
+        engine._journal.execute("BEGIN")
+        engine._journal.executemany(
+            "INSERT INTO metadata_cancellations VALUES (?,1)", ((item,) for item in ids)
+        )
+        engine._journal.execute("COMMIT")
+        assert engine.cancel_request(uuid.UUID(ids[0])) == "cancelled"
+        with pytest.raises(CompanionError, match="cancellation_budget_exhausted"):
+            engine.cancel_request(uuid.uuid4())
+        assert (
+            engine._journal.execute("SELECT count(*) FROM metadata_cancellations").fetchone()[0]
+            == 10000
+        )
+    finally:
+        engine.close()
