@@ -1,5 +1,10 @@
 # Pinned upstream review — 22 October 2026
 
+Historical six-repository selection snapshot. The owner subsequently made all eight
+upstreams mandatory, including Microsoft JARVIS and OpenJarvis. Current implemented
+features and exclusions are tracked in [UPSTREAM_IMPLEMENTATION_MATRIX.md](UPSTREAM_IMPLEMENTATION_MATRIX.md).
+The earlier no-integration decisions below are not a waiver of that expanded mission.
+
 Upstream repositories were fetched read-only, with no install scripts, agents,
 models or upstream binaries executed. This is a component-selection review, not a
 complete audit of six projects. Issue reports are untrusted allegations unless

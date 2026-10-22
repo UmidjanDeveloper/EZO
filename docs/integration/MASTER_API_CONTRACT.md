@@ -119,3 +119,56 @@ Base ce9b21f; existing contracts unchanged. No frontend edits are required here.
   items(card/document/revision IDs, original global quote offsets, expected_version,
   due_at, reason), empty_reason. No model or writes; it is not a curriculum or
   mastery measure. Existing card review fences/authorization still apply.
+
+
+## Eight-upstream / JARVIS foundation (backend candidate; no remote device dispatch)
+
+- POST `/api/jarvis/percentages`: authenticated, default rate limit, explicit
+  `method:percent_change|percent_of`,1..50 `pairs` each `{id,previous,current}`,
+  ASCII decimal strings (<=18 integer and12 fractional digits, <=32 chars),
+  `decimal_places`0..8 default4. No expressions, exponent, float/NaN, unknown fields,
+  duplicate pair IDs, guessed method or zero denominator. Returns actual textual
+  results, explicit formula/ROUND_HALF_EVEN, caller-input provenance and a durable
+  receipt. It does not extract file data, produce PDF, infer recipients or send.
+- GET `/api/jarvis/receipts/{id}`: owner-scoped calculation receipt; absent/foreign
+  returns404. Schema ezo-execution-receipt-v1 stores tool_call outcome, hashes and
+  actual duration only, no financial values, file contents, prompts or guessed
+  model token/cost/quality scores. `external_delivery:not_attempted` is literal.
+- GET `/api/jarvis/capabilities`: code-registered tool schemas, confirmation flags,
+  timeouts and execution_authorized:false. Registration/schema availability does
+  not imply configured provider health. Explicit device_features list unmet
+  Windows/Chrome/mobile/Office-PDF/Telegram requirements; none is silently enabled.
+- POST `/api/jarvis/inspect-plan`: `{nodes:[{id,tool,arguments}],links:[{source,target}]}`,
+  <=12 nodes, <=144 links, arguments <=4096 UTF-8 JSON bytes/node. Unique IDs,
+  no duplicate/missing/self/cyclic edges. Reuses MissionPlan and actual tool schema;
+  fixed read-only planning allowlist intersected with registered tools. Unknown
+  arguments, caller approval flags and execution/shell tools rejected422. Returns
+  canonical normalized plan hash, status static_inspection_only and no authority.
+  It does not query the documents named in arguments or attest their ownership.
+  Runtime authorization must run again at any future action boundary.
+
+Companion protocol source: `apps/api/src/ezo_api/companion/protocol.py`.
+Only action `file.metadata.list`. Version1 messages bind actor/device/task/root,
+request UUID and <=60-second lifetime; Ed25519 domain-separated request/response
+signatures and exact request hash. No filesystem path, shell, install, message,
+file-content-read or general code parameter exists. The standalone Linux module
+is configured by the owner with a selected root, manually pinned controller public
+key and device private key via inherited FD (never argv/stdout). It has **no remote
+pairing/enrollment/API queue yet** and is not loaded by the main API.
+
+Linux metadata implementation uses an owned O_DIRECTORY/O_NOFOLLOW root FD,
+nonrecursive <=1000-entry scan, <=50 returned regular-file metadata rows, persistent
+private replay journal (<=10000 requests, fail closed on budget), root/actor/device/
+key identity binding across restart and signed actual outcomes. Symlinks, FIFOs,
+directories and device nodes are excluded. File IDs are identities, not bearer
+read grants. Filenames are untrusted display data and must be escaped by UX.
+Sorting uses mtime, not verified download chronology; ties and incomplete scans
+must prompt clarification before choosing a file. Two-second scan checks are
+cooperative between OS calls, not proof that a stalled filesystem syscall can be
+cancelled; parent/controller hard-stop and production-host acceptance remain gates.
+This is not K4 general-code isolation. Windows is refused without native handle/
+DACL support. Android/iOS/Chrome support must not be inferred from Linux tests.
+
+Antigravity integration remains pending. Do not display a completed voice/file/PDF/
+Telegram task from a static plan or arithmetic receipt. No API for remote dispatch,
+external sending, grant creation or automatic pairing is implied by these contracts.
