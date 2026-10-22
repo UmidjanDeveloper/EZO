@@ -13,7 +13,6 @@ import {
   PanelLeftClose,
   Plus,
   Presentation,
-  Settings,
   ShieldCheck,
   Trash2,
 } from "lucide-react";

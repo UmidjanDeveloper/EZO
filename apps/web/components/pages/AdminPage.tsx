@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
-import { useI18n } from "@/lib/i18n/context";
 import { PageFrame } from "./PageFrame";
 
 interface GovernanceStatus {
@@ -77,8 +76,6 @@ interface ImprovementProposal {
 }
 
 export function AdminPage() {
-  const { m } = useI18n();
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -145,8 +142,63 @@ export function AdminPage() {
   }, [authHeaders]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    let active = true;
+    const headers = authHeaders();
+
+    Promise.allSettled([
+      fetch(`${apiUrl()}/api/admin/governance/status`, { headers }),
+      fetch(`${apiUrl()}/api/status`, { headers }),
+      fetch(`${apiUrl()}/api/health`),
+      fetch(`${apiUrl()}/api/admin/governance/improvements`, { headers }),
+    ])
+      .then(async ([statusRes, sysRes, healthRes, propRes]) => {
+        if (!active) return;
+
+        if (statusRes.status === "fulfilled") {
+          const res = statusRes.value;
+          if (res.status === 403) {
+            setForbidden(true);
+            setLoading(false);
+            return;
+          }
+          if (res.ok) {
+            const data = (await res.json()) as GovernanceStatus;
+            if (active) setGovStatus(data);
+          } else {
+            if (active) setError(`HTTP ${res.status}`);
+          }
+        } else {
+          if (active) setError(String(statusRes.reason));
+        }
+
+        if (sysRes.status === "fulfilled" && sysRes.value.ok) {
+          const data = (await sysRes.value.json()) as SystemStatus;
+          if (active) setSystemStatus(data);
+        }
+
+        if (healthRes.status === "fulfilled" && healthRes.value.ok) {
+          const data = (await healthRes.value.json()) as HealthStatus;
+          if (active) setHealthStatus(data);
+        }
+
+        if (propRes.status === "fulfilled" && propRes.value.ok) {
+          const data = (await propRes.value.json()) as ImprovementProposal[];
+          if (active) setProposals(data);
+        }
+
+        if (active) setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : String(err));
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [authHeaders]);
 
   async function handleDecision(proposal: ImprovementProposal, decision: "request_independent_review" | "reject") {
     setActingProposalId(proposal.id);
@@ -255,7 +307,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="p-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Ma'lumotlar bazasi</span>
+                  <span>Ma&apos;lumotlar bazasi</span>
                   <Database size={16} className="text-primary" />
                 </div>
                 <div className="flex items-center gap-2">
@@ -392,7 +444,7 @@ export function AdminPage() {
                 <div className="p-8 text-center text-ink-muted border border-dashed border-line rounded-xl">
                   <p className="text-sm">Hozircha ko‘rib chiqilmagan yangi arxitektura takliflari mavjud emas.</p>
                   <p className="text-xs text-ink-faint mt-1">
-                    Barcha amallar to‘g‘ridan-to‘g‘ri ma'lumotlar bazasining AuditLog jadvalida qayd etiladi.
+                    Barcha amallar to‘g‘ridan-to‘g‘ri ma&apos;lumotlar bazasining AuditLog jadvalida qayd etiladi.
                   </p>
                 </div>
               ) : (

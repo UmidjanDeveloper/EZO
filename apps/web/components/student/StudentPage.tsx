@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Brain, CheckCircle, ChevronLeft, ChevronRight, FileText, Layers, ListTodo, Sparkles } from "lucide-react";
+import { BookOpen, Brain, Layers, ListTodo, Sparkles } from "lucide-react";
 import { hasNextStudentPage, studentRequest } from "@/lib/student-api";
 import { PageFrame } from "../pages/PageFrame";
 
@@ -137,10 +137,25 @@ export function StudentPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "flashcards") {
-      void loadCards();
-    }
-  }, [activeTab, loadCards]);
+    if (activeTab !== "flashcards") return;
+    let active = true;
+    Promise.all([
+      studentRequest<StudyCardOut[]>("student/cards"),
+      studentRequest<StudyProgressOut>("student/progress"),
+    ])
+      .then(([fetchedCards, fetchedProgress]) => {
+        if (active) {
+          setCards(fetchedCards);
+          setProgress(fetchedProgress);
+        }
+      })
+      .catch(() => {
+        // Offline or empty
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeTab]);
 
   async function handleReview(card: StudyCardOut, rating: "again" | "hard" | "good" | "easy") {
     try {
