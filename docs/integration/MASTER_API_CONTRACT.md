@@ -119,3 +119,94 @@ Base ce9b21f; existing contracts unchanged. No frontend edits are required here.
   items(card/document/revision IDs, original global quote offsets, expected_version,
   due_at, reason), empty_reason. No model or writes; it is not a curriculum or
   mastery measure. Existing card review fences/authorization still apply.
+
+
+## Eight-upstream / JARVIS foundation (backend candidate; no remote device dispatch)
+
+- POST `/api/jarvis/percentages`: authenticated, default rate limit, explicit
+  `method:percent_change|percent_of`,1..50 `pairs` each `{id,previous,current}`,
+  ASCII decimal strings (<=18 integer and12 fractional digits, <=32 chars),
+  `decimal_places`0..8 default4. No expressions, exponent, float/NaN, unknown fields,
+  duplicate pair IDs, guessed method or zero denominator. Returns actual textual
+  results, explicit formula/ROUND_HALF_EVEN, caller-input provenance and a durable
+  receipt. It does not extract file data, produce PDF, infer recipients or send.
+- GET `/api/jarvis/receipts/{id}`: owner-scoped calculation receipt; absent/foreign
+  returns404. Schema ezo-execution-receipt-v1 stores tool_call outcome, hashes and
+  actual duration only, no financial values, file contents, prompts or guessed
+  model token/cost/quality scores. `external_delivery:not_attempted` is literal.
+- GET `/api/jarvis/capabilities`: code-registered tool schemas, confirmation flags,
+  timeouts and execution_authorized:false. Registration/schema availability does
+  not imply configured provider health. Explicit device_features list unmet
+  Windows/Chrome/mobile/Office-PDF/Telegram requirements; none is silently enabled.
+- POST `/api/jarvis/inspect-plan`: `{nodes:[{id,tool,arguments}],links:[{source,target}]}`,
+  <=12 nodes, <=144 links, arguments <=4096 UTF-8 JSON bytes/node. Unique IDs,
+  no duplicate/missing/self/cyclic edges. Reuses MissionPlan and actual tool schema;
+  fixed read-only planning allowlist intersected with registered tools. Unknown
+  arguments, caller approval flags and execution/shell tools rejected422. Returns
+  canonical normalized plan hash, status static_inspection_only and no authority.
+  It does not query the documents named in arguments or attest their ownership.
+  Runtime authorization must run again at any future action boundary.
+
+Companion protocol source: `apps/api/src/ezo_api/companion/protocol.py`.
+Only action `file.metadata.list`. Version1 messages bind actor/device/task/root,
+request UUID and <=60-second lifetime; Ed25519 domain-separated request/response
+signatures and exact request hash. Canonical bytes are UTF-8 JSON, ASCII keys sorted,
+compact separators, Unicode preserved, complete normalized schema/default fields.
+`size_bytes` and `modified_ns` are decimal **strings**: JavaScript must not round
+nanoseconds through Number. Issuance/response clocks tolerate at most5 seconds
+of skew; expiry is enforced without grace. No filesystem path, shell, install, message,
+file-content-read or general code parameter exists. The standalone Linux module
+is configured by the owner with a selected root, manually pinned controller public
+key and device private key via inherited FD (never argv/stdout). It has **no remote
+pairing/enrollment/API queue yet** and is not loaded by the main API.
+
+Linux metadata implementation uses an owned O_DIRECTORY/O_NOFOLLOW root FD,
+nonrecursive <=1000-entry scan, <=50 returned regular-file metadata rows, persistent
+private replay journal (<=10000 requests, fail closed on budget), dedicated EZO1
+application/schema identity (foreign owner SQLite databases rejected before writes), root/actor/device/
+key identity binding across restart and signed actual outcomes. Symlinks, FIFOs,
+directories and device nodes are excluded. File IDs are identities, not bearer
+read grants. Filenames are untrusted display data and must be escaped by UX.
+Sorting uses mtime, not verified download chronology; ties and incomplete scans
+must prompt clarification before choosing a file. Two-second scan checks are
+cooperative between OS calls, not proof that a stalled filesystem syscall can be
+cancelled; parent/controller hard-stop and production-host acceptance remain gates.
+This is not K4 general-code isolation. Windows is refused without native handle/
+DACL support. Android/iOS/Chrome support must not be inferred from Linux tests.
+
+Antigravity integration remains pending. Do not display a completed voice/file/PDF/
+Telegram task from a static plan or arithmetic receipt. No API for remote dispatch,
+external sending, grant creation or automatic pairing is implied by these contracts.
+
+### Local companion controls (no new remote API)
+
+Trusted operator CLI now accepts `--cancel-request <uuid>` or `--revoke`, with
+the same pinned identity/root/key FD configuration. Cancellation tombstones and
+permanent authority revocation survive process restart; final completion is fenced
+under a journal write transaction. Wire messages remain v1. Journal upgrades v1→v2
+transactionally; old binaries must refuse v2 rather than ignore revocation.
+Missing control/replay state is not reset. No automatic retry/re-enable, remote
+control ingress or new tool action is introduced. Full semantics and rollback
+limits: `docs/master/COMPANION_LIFECYCLE.md`.
+
+### Native mission result truthfulness correction
+
+`NativeOrchestrationProvider` (existing in-process backend module, no new HTTP
+mission route) now emits `completed` only if every required step completed.
+A rejected required approval with dependent steps skipped ends `cancelled` with
+`failure_reason`; other unsuccessful incomplete endings fail. Existing actual
+step failures still end `failed`. Result `outputs` retain real partial outputs,
+but the top-level non-success summary reports the ending reason rather than the
+last successful intermediate step. This intentionally corrects the older test
+contract that labelled a rejected action/QA-skipped mission `completed`.
+Antigravity must preserve these status distinctions and never render partial
+outputs as successful delivery. No execution permissions or enum values added.
+
+### Voice resource enforcement (no schema change)
+
+OpenAI/VoiceStudio now enforce existing audio limits before SDK response buffering,
+<=256000-byte transcript/error responses and an operation-wide deadline. Oversize,
+compressed or redirect responses fail without returning partial success; provider
+fallback remains under existing configuration. Cancellation closes the stream.
+No new credential, consent, provider or dollar-cap claim. See
+`docs/master/VOICE_RESOURCE_LIMITS.md` for exact bounds and tests.

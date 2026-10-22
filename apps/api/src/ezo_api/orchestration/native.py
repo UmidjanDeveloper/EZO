@@ -206,7 +206,9 @@ class NativeOrchestrationProvider(OrchestrationProvider):
         return MissionResult(
             mission_id=mission.id,
             status=mission.status,
-            summary=final.summary if final else (mission.failure_reason or ""),
+            summary=final.summary
+            if mission.status == "completed" and final
+            else (mission.failure_reason or f"Mission {mission.status}."),
             outputs=outputs,
             artifacts=mission.artifacts,
             skipped_steps=[s.spec.id for s in mission.steps if s.status in ("rejected", "skipped")],
@@ -367,11 +369,21 @@ class NativeOrchestrationProvider(OrchestrationProvider):
 
     def _finish(self, mission: Mission) -> None:
         failed = [s for s in mission.steps if s.status == "failed"]
+        incomplete = [s for s in mission.steps if s.status != "completed"]
         mission.completed_at = now()
         if failed:
             mission.status = "failed"
             mission.failure_reason = "; ".join(f"{s.spec.title}: {s.error}" for s in failed)[:2_000]
             self._event(mission, "failed", f"Mission failed: {mission.failure_reason}")
+        elif incomplete:
+            rejected = [s for s in incomplete if s.status == "rejected"]
+            mission.status = "cancelled" if rejected else "failed"
+            mission.failure_reason = (
+                "Required approval rejected: " + "; ".join(s.spec.title for s in rejected)
+                if rejected
+                else "Mission did not complete all required steps."
+            )[:2_000]
+            self._event(mission, mission.status, mission.failure_reason)
         else:
             mission.status = "completed"
             self._event(mission, "completed", "Mission completed.")

@@ -239,7 +239,7 @@ async def test_approval_gate_approve_and_reject() -> None:
     await provider.submit_approval(USER, rejected.id, rejected.approvals[0].id, approved=False)
     await provider.wait(USER, rejected.id)
     assert rejected.step("push").status == "rejected" and rejected.step("qa").status == "skipped"
-    assert rejected.status == "completed"
+    assert rejected.status == "cancelled"
     assert (await provider.get_result(USER, rejected.id)).skipped_steps == ["push", "qa"]
 
 
@@ -376,3 +376,33 @@ def test_ruflo_env_is_hardened_isolated_and_secret_free(monkeypatch: pytest.Monk
     assert env["CLAUDE_FLOW_AUTO_UPDATE"] == "false" and env["RUFLO_DAEMON_AUTOSTART"] == "0"
     assert env["RUFLO_MCP_ENFORCE_POLICY"] == "1"
     assert "ANTHROPIC_API_KEY" not in env and "DATABASE_URL" not in env
+
+
+async def test_rejected_required_action_never_reports_success_or_completed_partial_summary():
+    recorder = Recorder()
+    provider = NativeOrchestrationProvider(recorder)
+    mission = await provider.start_mission(
+        USER,
+        plan(
+            {"id": "research", "title": "Read evidence", "agent_type": "research"},
+            {
+                "id": "send",
+                "title": "Send document",
+                "agent_type": "document",
+                "requires_approval": True,
+                "approval_reason": "External delivery needs owner approval.",
+                "depends_on": ["research"],
+            },
+            {"id": "qa", "title": "Verify delivery", "agent_type": "qa", "depends_on": ["send"]},
+        ),
+    )
+    await provider.wait(USER, mission.id)
+    await provider.submit_approval(USER, mission.id, mission.approvals[0].id, approved=False)
+    await provider.wait(USER, mission.id)
+    result = await provider.get_result(USER, mission.id)
+    assert result.status == "cancelled"
+    assert result.failure_reason and "approval" in result.failure_reason.lower()
+    assert result.summary == result.failure_reason
+    assert set(result.outputs) == {"research"}
+    assert "send" not in recorder.seen and "qa" not in recorder.seen
+    assert not any(event.kind == "completed" for event in mission.events)

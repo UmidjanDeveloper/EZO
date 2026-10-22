@@ -10,10 +10,12 @@ dependencies = [
     "anyio>=4.15.1",
     # GHSA-6q48-6c7w-9gw2: exclude compromised emSign ECC trust root.
     "certifi>=2026.10.19",
+    "cryptography==50.0.2",
     "defusedxml==0.7.1",
     "fastapi>=0.143.3",
     "google-genai>=2.31.0",
     "httpx>=0.28.1",
+    "httpx2==2.13.1",
     "llama-index-core==0.14.25",
     "numpy>=2.5.4",
     "openai>=3.33.0",
