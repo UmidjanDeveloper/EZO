@@ -14,6 +14,7 @@ on:
       - "apps/api/src/**"
       - "apps/api/tests/**"
       - "tests/e2e/**"
+      - "docs/master/**"
       - "apps/web/Dockerfile"
       - "apps/web/app/**"
       - "apps/web/components/**"

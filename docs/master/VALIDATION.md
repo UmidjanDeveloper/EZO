@@ -3,14 +3,19 @@
 Integration base: **c3303d94c128406dfd286168cd9dd02079c61f1a**.
 Preserved PR21 ancestor: **3ec6cf1cfc7e90588f8c3c2a033a255c3ff70c0b**.
 Backend source/test commit: **4af75877696bc82584bf3c8986ed2563d00abd2b**. Contract/research commit: **c43727df4e0d176854f84f9d3d46847f5b9de2c0**.
-Later evidence/documentation commits do not change those backend sources.
+A later confirmed concurrent-delete/review race is fixed in **a2097f98e3e2c596016a1bd795f265b049968ec3**.
+The real PostgreSQL study subset passed **12/12** after the fix (the reproducer
+failed before it). Full backend reruns and hosted checks for this final source
+are in progress at this evidence commit. The table below records completed
+pre-race-fix full suites; final current-head JUnit/status is in the attached
+`ezo-master-review-evidence` archive and GitHub Actions, not invented in advance.
 
-## Final local checks — 22 October 2026
+## Completed local checks — 22 October 2026
 
 | Check | Actual result |
 |---|---|
-| Full backend SQLite, OCR/Office required | **1038 passed,0 failed,35 skipped** (1073 collected) |
-| Full backend PostgreSQL/pgvector, OCR/Office required | **1050 passed,0 failed,23 skipped** (1073 collected); real concurrent duplicate card reviews included |
+| Full backend SQLite, OCR/Office required | **1038 passed,0 failed,35 skipped** (1073 collected), before the added delete-race case |
+| Full backend PostgreSQL/pgvector, OCR/Office required | **1050 passed,0 failed,23 skipped** (1073 collected), before the added delete-race case; concurrent duplicate reviews included |
 | New flashcard regression subset | **8 passed,0 failed,0 skipped**; also included in final full suites |
 | Ruff / formatting | Passed;465 Python files formatted |
 | mypy | Passed;313 source files |
@@ -41,6 +46,11 @@ actually reports `llama-index-core0.14.25`, `lxml6.1.3`, compiled/runtime libxml
 
 ## Failures retained and investigated
 
+- Real PostgreSQL concurrent deletion reproducer: **1 failed** before the fix;
+  ORM refresh of a deleted row raised500. The fix locks document then card and
+  explicitly returns404 for a missing card. Existing version/idempotency fences
+  remain. PostgreSQL study subset then passed **12/12**.
+
 - An early synthesis fixture referenced a nonexistent FakeProvider.calls field:
   **8 passed,1 failed**. Fixed the fixture to inspect actual requests/embed_calls.
 - First flashcard fixture cited source1 while quoting source2: **29 passed,1 failed,
@@ -68,6 +78,8 @@ Push checks for source/contract headc43727d:
 - [CI#154](https://github.com/UmidjanDeveloper/EZO/actions/runs/39739407382): in progress at last recorded observation.
 - [Security#81](https://github.com/UmidjanDeveloper/EZO/actions/runs/39739407432): **success**, Python/Node/images jobs completed.
 
+These are timestamped historical observations, not final-head CI claims.
+Latest exact-head run states are captured in the final review evidence archive.
 Hosted job states are read from public GitHub run pages. Hosted log/artifact API
 access is forbidden; no hosted test counts, detailed scan counts or hidden logs are
 invented. Local web Docker failure is distinct from the hosted Docker job success.
