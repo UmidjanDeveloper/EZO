@@ -33,6 +33,7 @@ from ezo_api.companion.protocol import (
 
 MAX_ENTRIES = 1000
 MAX_REQUESTS = 10000
+JOURNAL_APPLICATION_ID = 0x455A4F31  # EZO1; never open an arbitrary owner database
 
 
 class MetadataCompanion:
@@ -123,16 +124,38 @@ class MetadataCompanion:
                 or info.st_nlink != 1
             ):
                 raise CompanionError("unsafe_journal")
+            if info.st_size:
+                header = os.pread(fd, 100, 0)
+                if (
+                    len(header) != 100
+                    or header[:16] != b"SQLite format 3\x00"
+                    or int.from_bytes(header[68:72], "big") != JOURNAL_APPLICATION_ID
+                    or int.from_bytes(header[60:64], "big") != 1
+                ):
+                    raise CompanionError("foreign_or_incompatible_journal")
         finally:
             os.close(fd)
         connection = sqlite3.connect(path, timeout=1, isolation_level=None)
         try:
+            connection.execute("PRAGMA trusted_schema=OFF")
+            connection.execute("BEGIN IMMEDIATE")
+            application_id = connection.execute("PRAGMA application_id").fetchone()[0]
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if application_id == 0 and not info.st_size:
+                tables = connection.execute("SELECT count(*) FROM sqlite_master").fetchone()[0]
+                if tables:
+                    raise CompanionError("foreign_or_incompatible_journal")
+                connection.execute("PRAGMA application_id=0x455A4F31")
+                connection.execute("PRAGMA user_version=1")
+            elif application_id != JOURNAL_APPLICATION_ID or version != 1:
+                raise CompanionError("foreign_or_incompatible_journal")
             connection.execute("PRAGMA max_page_count=4096")
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS metadata_requests ("
                 "id TEXT PRIMARY KEY, request_sha256 TEXT NOT NULL, "
                 "started_at INTEGER NOT NULL, status TEXT NOT NULL, receipt_sha256 TEXT)"
             )
+            connection.execute("COMMIT")
             return connection
         except BaseException:
             connection.close()
@@ -217,11 +240,11 @@ class MetadataCompanion:
                         FileMetadata(
                             file_id=hashlib.sha256(identity.encode()).hexdigest(),
                             name=entry.name,
-                            size_bytes=info.st_size,
-                            modified_ns=info.st_mtime_ns,
+                            size_bytes=str(info.st_size),
+                            modified_ns=str(info.st_mtime_ns),
                         )
                     )
-            files.sort(key=lambda item: (-item.modified_ns, item.name))
+            files.sort(key=lambda item: (-int(item.modified_ns), item.name))
             if cancelled():
                 raise CompanionError("cancelled")
             if int(time.time()) >= payload.expires_at:
