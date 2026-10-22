@@ -150,3 +150,49 @@ async def test_postgres_concurrent_duplicate_is_exactly_once(client, app):
     assert results[0] == results[1] and results[0]["version"] == 1
     async with app.state.services.db.sessionmaker() as session:
         assert await session.scalar(select(func.count()).select_from(StudyReview)) == 1
+
+
+async def test_postgres_concurrent_card_deletion_returns_not_found(client, app):
+    from sqlalchemy import delete, text
+
+    if app.state.services.db.engine.dialect.name != "postgresql":
+        pytest.skip("Real PostgreSQL concurrent deletion")
+    c, _ = await card(client, app)
+    db = app.state.services.db
+    task = None
+    async with db.sessionmaker() as blocker:
+        await blocker.scalar(
+            select(KnowledgeDocument.id)
+            .where(KnowledgeDocument.id == uuid.UUID(c["document_id"]))
+            .with_for_update()
+        )
+        try:
+            task = asyncio.create_task(
+                client.post(
+                    f"/api/student/cards/{c['id']}/review",
+                    json={"event_id": str(uuid.uuid4()), "expected_version": 0, "rating": "good"},
+                )
+            )
+            async with db.sessionmaker() as observer:
+                for _ in range(100):
+                    waiting = await observer.scalar(
+                        text(
+                            "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE "
+                            "datname=current_database() AND pid<>pg_backend_pid() "
+                            "AND wait_event_type='Lock' AND query ILIKE '%knowledge_documents%' "
+                            "AND query ILIKE '%FOR UPDATE%')"
+                        )
+                    )
+                    await observer.rollback()
+                    if waiting:
+                        break
+                    await asyncio.sleep(0.01)
+                assert waiting, "Review must reach the held document lock"
+            async with db.sessionmaker() as deleting:
+                await deleting.execute(delete(StudyCard).where(StudyCard.id == uuid.UUID(c["id"])))
+                await deleting.commit()
+        finally:
+            await blocker.rollback()
+        assert task is not None
+        response = await asyncio.wait_for(task, 10)
+    assert response.status_code == 404

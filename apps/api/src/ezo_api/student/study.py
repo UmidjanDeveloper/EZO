@@ -207,7 +207,21 @@ async def review_card(
     )
     if active is None:
         raise JobError("revision_conflict", "The source changed or is no longer available.")
-    await session.refresh(card)
+    # A concurrent explicit deletion may finish while the document lock waits.
+    # Reload under a card lock instead of refresh(), which raises an ORM 500 for
+    # a missing row. Keep lock order document -> card, as for document deletion.
+    current = await session.scalar(
+        select(StudyCard)
+        .where(
+            StudyCard.id == card.id,
+            StudyCard.user_id == user,
+            StudyCard.project_id.is_not_distinct_from(body.project_id),
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if current is None:
+        raise JobError("not_found", "Card not found.", 404)
     previous = await replay()
     if previous is not None:
         return previous
