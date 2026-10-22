@@ -47,6 +47,7 @@ from ezo_api.tools.document_tools import (
 from ezo_api.tools.ocr_tools import OcrTool
 from ezo_api.tools.official_tools import OfficialSearchTool, VerifyOfficialDocumentTool
 from ezo_api.tools.pdf_tools import PdfTool
+from ezo_api.tools.percentage import PercentageTool
 from ezo_api.tools.registry import ToolRegistry
 from ezo_api.tools.research_tools import KnowledgeSearchTool, WebFetchTool, WebSearchTool
 from ezo_api.tools.visual_tools import CreateGraphicTool, EditImageTool, GenerateImageTool
@@ -177,6 +178,7 @@ def build_services(
         web_search=web_search,
         tools=ToolRegistry(
             [
+                PercentageTool(),
                 KnowledgeSearchTool(),
                 WebSearchTool(),
                 WebFetchTool(),
