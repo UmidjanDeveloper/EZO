@@ -4,7 +4,8 @@
 narxi va 4/8 GB VM sinovlari tasdiqlanishi kerak. Hozirgi status: **BLOCKED**.
 Serverlar uchun oylik jami limit $10; AI xizmatlari xarajati alohida.
 [Imkoniyatlar va xarajatlar jadvali](FULL_OWNER_BETA.md),
-[tekshiruv dalillari](FULL_OWNER_BETA_VALIDATION.md).
+[oldingi tekshiruv dalillari](FULL_OWNER_BETA_VALIDATION.md),
+[joriy master matrix](master/ACCEPTANCE_MATRIX.md) va [joriy testlar](master/VALIDATION.md).
 
 ## 1. Xarajatni tekshiring — hech narsa sotib olmang
 
@@ -35,7 +36,8 @@ bu yetishmayotgan implementatsiyani o‘zi yaratmaydi.
 
 ## 3. PostgreSQL va fayllar
 
-0018 gacha Alembic migration ishlashi kerak. Administrator DB credentialini API’ga
+Master candidate uchun 0019 gacha Alembic migration ishlashi kerak.
+0019 Student kartalari va review tarixini qo‘shadi; V1 reviziyalarini o‘zgartirmaydi. Administrator DB credentialini API’ga
 bermang. Mavjud [cheklangan rol skripti](../deploy/supabase-private-beta-role.sql)
 Supabase uchun; o‘z PG serveringizda unga teng, alohida tekshirilgan rol/grantlar
 kerak. `anon`/`authenticated` uchun tasodifiy public table/column grantlar bo‘lmasin.
