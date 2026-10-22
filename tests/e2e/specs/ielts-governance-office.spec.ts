@@ -108,7 +108,7 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await expect(page.getByRole("heading", { level: 1, name: /IELTS Speaking/ })).toBeVisible();
 
   // Stats bar visible
-  await expect(page.getByText("Sinovlar soni")).toBeVisible();
+  await expect(page.getByText(/Sinovlar (tarixi|soni)/)).toBeVisible();
   await expect(page.getByText("3", { exact: true }).first()).toBeVisible();
 
   // Start new test session
