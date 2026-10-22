@@ -43,6 +43,47 @@ interface Flashcard {
   known: boolean | null;
 }
 
+interface StudyCardOut {
+  id: string;
+  document_id: string;
+  revision_id: string;
+  chunk_id: string;
+  project_id?: string | null;
+  front: string;
+  back: string;
+  quote: string;
+  due_at: string;
+  version: number;
+  interval_days: number;
+}
+
+interface StudyProgressOut {
+  active_cards: number;
+  due_cards: number;
+  review_events: number;
+  reviewed_cards: number;
+  assessment: string;
+}
+
+interface ConceptNode {
+  label: string;
+  quote: string;
+  source: number;
+}
+
+interface ConceptEdge {
+  source: string;
+  target: string;
+  label: string;
+  source_quote: string;
+}
+
+interface SynthesisConceptGraph {
+  scope: string;
+  nodes: ConceptNode[];
+  edges: ConceptEdge[];
+}
+
 export function StudentPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [libraryOffset, setLibraryOffset] = useState(0);
@@ -75,6 +116,79 @@ export function StudentPage() {
     { day: 3, title: "Test va o'z-o'zini sinash", description: "Bob bo'yicha testlar tuzish va xatolarni tahlil qilish", completed: false },
     { day: 4, title: "Flesh-kartalar bilan takrorlash", description: "Murakkab terminlar bo'yicha xotirani mustahkamlash", completed: false },
   ]);
+
+  // Real backend study cards, progress and synthesis
+  const [cards, setCards] = useState<StudyCardOut[]>([]);
+  const [progress, setProgress] = useState<StudyProgressOut | null>(null);
+  const [conceptGraph, setConceptGraph] = useState<SynthesisConceptGraph | null>(null);
+  const [conceptLoading, setConceptLoading] = useState(false);
+
+  const loadCards = useCallback(async () => {
+    try {
+      const [fetchedCards, fetchedProgress] = await Promise.all([
+        studentRequest<StudyCardOut[]>("student/cards"),
+        studentRequest<StudyProgressOut>("student/progress"),
+      ]);
+      setCards(fetchedCards);
+      setProgress(fetchedProgress);
+    } catch {
+      // Offline or empty
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "flashcards") {
+      void loadCards();
+    }
+  }, [activeTab, loadCards]);
+
+  async function handleReview(card: StudyCardOut, rating: "again" | "hard" | "good" | "easy") {
+    try {
+      await studentRequest(`student/cards/${card.id}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_id: crypto.randomUUID(),
+          expected_version: card.version,
+          rating,
+        }),
+      });
+      await loadCards();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleDeleteCard(cardId: string) {
+    try {
+      await studentRequest(`student/cards/${cardId}?confirm=true`, { method: "DELETE" });
+      await loadCards();
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function handleGenerateConceptGraph() {
+    if (!documentId) return;
+    setConceptLoading(true);
+    try {
+      const res = await studentRequest<SynthesisConceptGraph>("student/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document_ids: [documentId],
+          question: "Hujjatdagi asosiy tushunchalar va ularning mantiqiy bog‘liqligi",
+          language: "uz",
+          kind: "concept_graph",
+        }),
+      });
+      setConceptGraph(res);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setConceptLoading(false);
+    }
+  }
 
   const refresh = useCallback(async () => {
     const rows = await studentRequest<Entry[]>(`student/library?offset=${libraryOffset}&limit=31`);
@@ -717,51 +831,191 @@ export function StudentPage() {
                   {/* TAB 3: Interactive Flashcards */}
                   {activeTab === "flashcards" && (
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
-                      <div>
-                        <h3 className="font-bold text-ink">Asosiy Tushunchalar bo‘yicha Flash-kartalar</h3>
-                        <p className="text-xs text-ink-muted">Kartani bosib ta&apos;rifni ko‘ring va o‘z bilimingizni baholang</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-bold text-ink">Asosiy Tushunchalar bo‘yicha Flash-kartalar</h3>
+                          <p className="text-xs text-ink-muted">
+                            Manbadan iqtibos olingan kartalar. Spaced repetition orqali eslab qolishni mustahkamlang.
+                          </p>
+                        </div>
+                        {progress && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="rounded-full bg-accent/10 px-2.5 py-1 font-medium text-accent border border-accent/20">
+                              Faol: {progress.active_cards} ta
+                            </span>
+                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-600 border border-emerald-500/20">
+                              O‘rganilgan: {progress.reviewed_cards} ta
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {flashcards.map((card) => {
-                          const isFlipped = !!flippedCards[card.id];
-                          return (
-                            <div
-                              key={card.id}
-                              onClick={() => setFlippedCards({ ...flippedCards, [card.id]: !isFlipped })}
-                              className="cursor-pointer rounded-2xl border border-line bg-surface-2/40 p-5 shadow-sm transition-all hover:border-accent hover:shadow-md"
-                            >
-                              <div className="flex items-center justify-between text-xs text-ink-faint">
-                                <span>Karta #{card.id}</span>
-                                <span className="text-[11px] font-medium text-accent">
-                                  {isFlipped ? "Ta'rif" : "Tugmani bosing (Flip)"}
-                                </span>
+                      {cards.length > 0 ? (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {cards.map((card) => {
+                            const isFlipped = !!flippedCards[card.id as unknown as number];
+                            return (
+                              <div
+                                key={card.id}
+                                className="rounded-2xl border border-line bg-surface-2/40 p-4 shadow-sm transition-all hover:border-accent flex flex-col justify-between gap-3"
+                              >
+                                <div
+                                  className="cursor-pointer"
+                                  onClick={() =>
+                                    setFlippedCards({
+                                      ...flippedCards,
+                                      [card.id as unknown as number]: !isFlipped,
+                                    })
+                                  }
+                                >
+                                  <div className="flex items-center justify-between text-xs text-ink-faint">
+                                    <span className="font-mono">Karta v{card.version}</span>
+                                    <span className="text-[11px] font-medium text-accent">
+                                      {isFlipped ? "Ta'rif (Orqa)" : "Savol (Oldi — Flip)"}
+                                    </span>
+                                  </div>
+                                  <div className="my-3 min-h-[60px] flex items-center justify-center text-center">
+                                    {!isFlipped ? (
+                                      <h4 className="text-base font-bold text-ink">{card.front}</h4>
+                                    ) : (
+                                      <p className="text-xs leading-relaxed text-ink-muted">{card.back}</p>
+                                    )}
+                                  </div>
+                                  {card.quote && (
+                                    <p className="text-[11px] text-ink-faint italic border-t border-line/40 pt-2 line-clamp-2">
+                                      &ldquo;{card.quote}&rdquo;
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between border-t border-line/60 pt-2 text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDeleteCard(card.id)}
+                                    className="text-[11px] text-danger hover:underline"
+                                  >
+                                    O‘chirish
+                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-ink font-medium"
+                                      onClick={() => void handleReview(card, "again")}
+                                    >
+                                      Qayta
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-amber-600 font-medium"
+                                      onClick={() => void handleReview(card, "hard")}
+                                    >
+                                      Qiyin
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-primary font-medium"
+                                      onClick={() => void handleReview(card, "good")}
+                                    >
+                                      Yaxshi
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-emerald-600 font-medium"
+                                      onClick={() => void handleReview(card, "easy")}
+                                    >
+                                      Oson
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="my-4 min-h-[70px] flex items-center justify-center text-center">
-                                {!isFlipped ? (
-                                  <h4 className="text-base font-bold text-ink">{card.term}</h4>
-                                ) : (
-                                  <p className="text-xs leading-relaxed text-ink-muted">{card.definition}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-center gap-2 border-t border-line/50 pt-3 text-[11px]">
-                                <span className="rounded bg-success/10 px-2 py-0.5 text-success">Bilaman</span>
-                                <span className="rounded bg-surface-3 px-2 py-0.5 text-ink-muted">Qaytarish kerak</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-ink-muted">
+                            <p className="font-medium text-ink">Hali saqlangan o‘quv kartalari yo‘q.</p>
+                            <p className="mt-1 text-ink-faint">
+                              Quyidagi dinamik namunaviy kartalar orqali tushunchalarni ko‘rib chiqishingiz mumkin:
+                            </p>
+                          </div>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {flashcards.map((card) => {
+                              const isFlipped = !!flippedCards[card.id];
+                              return (
+                                <div
+                                  key={card.id}
+                                  onClick={() => setFlippedCards({ ...flippedCards, [card.id]: !isFlipped })}
+                                  className="cursor-pointer rounded-2xl border border-line bg-surface-2/40 p-4 shadow-sm transition-all hover:border-accent hover:shadow-md"
+                                >
+                                  <div className="flex items-center justify-between text-xs text-ink-faint">
+                                    <span>Namuna #{card.id}</span>
+                                    <span className="text-[11px] font-medium text-accent">
+                                      {isFlipped ? "Ta'rif" : "Flip"}
+                                    </span>
+                                  </div>
+                                  <div className="my-3 min-h-[50px] flex items-center justify-center text-center">
+                                    {!isFlipped ? (
+                                      <h4 className="text-sm font-bold text-ink">{card.term}</h4>
+                                    ) : (
+                                      <p className="text-xs leading-relaxed text-ink-muted">{card.definition}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* TAB 4: Concept Visualization Tree */}
                   {activeTab === "concepts" && (
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
-                      <div>
-                        <h3 className="font-bold text-ink">Kitob Strukturasi va Konsept Daraxti</h3>
-                        <p className="text-xs text-ink-muted">Hujjatning iyerarxik boblari va bo‘limlari xaritasi</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-bold text-ink">Kitob Strukturasi va Konsept Daraxti</h3>
+                          <p className="text-xs text-ink-muted">Hujjatning iyerarxik boblari va model talqini konsept grafi</p>
+                        </div>
+                        <button
+                          type="button"
+                          className={button}
+                          disabled={conceptLoading || !provider}
+                          onClick={() => void handleGenerateConceptGraph()}
+                        >
+                          {conceptLoading ? "Tahlil qilinmoqda..." : "Konsept grafini tahlil qilish (AI)"}
+                        </button>
                       </div>
+
+                      {conceptGraph && (
+                        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-primary">AI Konsept Grafi</span>
+                            <span className="text-ink-faint">Ko‘lam: {conceptGraph.scope}</span>
+                          </div>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {conceptGraph.nodes.map((n, i) => (
+                              <div key={i} className="p-2.5 rounded-lg border border-line bg-surface text-xs space-y-1">
+                                <span className="font-bold text-ink">{n.label}</span>
+                                <p className="text-ink-muted italic">&ldquo;{n.quote}&rdquo;</p>
+                              </div>
+                            ))}
+                          </div>
+                          {conceptGraph.edges.length > 0 && (
+                            <div className="pt-2 border-t border-line/60">
+                              <h5 className="text-xs font-semibold text-ink mb-1.5">Bog‘liqliklar:</h5>
+                              <ul className="text-xs space-y-1 text-ink-muted">
+                                {conceptGraph.edges.map((e, i) => (
+                                  <li key={i}>
+                                    <strong>{e.source}</strong> &rarr; <em>{e.label}</em> &rarr; <strong>{e.target}</strong>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="space-y-3 pt-2">
                         {sections.length > 0 ? (

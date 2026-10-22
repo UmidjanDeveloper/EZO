@@ -37,6 +37,7 @@ from ezo_api.db.models.organization import OrganizationAsset, OrganizationProfil
 from ezo_api.db.models.personal import PersonalGoal
 from ezo_api.db.models.project import Project
 from ezo_api.db.models.student import StudentRawRevision
+from ezo_api.db.models.study import StudyCard, StudyReview
 from ezo_api.db.models.translation import GlossaryTerm
 from ezo_api.db.models.user import User
 
@@ -79,6 +80,8 @@ __all__ = [
     "StoryScene",
     "StoryTimeline",
     "StudentRawRevision",
+    "StudyCard",
+    "StudyReview",
     "ToolCall",
     "User",
     "VectorEntry",

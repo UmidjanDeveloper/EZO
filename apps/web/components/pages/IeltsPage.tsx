@@ -61,13 +61,13 @@ interface IeltsStats {
 }
 
 interface EvaluationResult {
-  fluency_score: number;
-  lexical_score: number;
-  grammar_score: number;
-  pronunciation_score: number;
-  estimated_band_low: number;
-  estimated_band_high: number;
-  estimated_band: number;
+  fluency_score: number | null;
+  lexical_score: number | null;
+  grammar_score: number | null;
+  pronunciation_score: number | null;
+  estimated_band_low: number | null;
+  estimated_band_high: number | null;
+  estimated_band: number | null;
   constructive_feedback: string;
   explanation_uz: string;
   disclaimer: string;
@@ -194,7 +194,7 @@ export function IeltsPage() {
     if (!session || !answer.trim()) return;
     setLoading(true);
     try {
-      // 1. Instant criterion evaluation
+      // 1. Observable practice feedback; absent assessment scores remain null
       const evalRes = await fetch(`${apiUrl()}/api/ielts/evaluate`, {
         method: "POST",
         headers: authHeaders(),
@@ -432,7 +432,7 @@ export function IeltsPage() {
                   {m.ielts?.feedback ?? "Natija va Mezonlar Tahlili"}
                 </h4>
                 <span className="rounded-lg bg-accent/20 px-2.5 py-1 text-sm font-bold text-accent">
-                  Band {evalResult.estimated_band.toFixed(1)}
+                  Band {evalResult.estimated_band?.toFixed(1) ?? "—"}
                 </span>
               </div>
 
@@ -441,25 +441,25 @@ export function IeltsPage() {
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
                   <p className="text-xs text-ink-muted">{m.ielts?.fluency ?? "Ravonlik"}</p>
                   <p className="text-base font-bold text-ink">
-                    {evalResult.fluency_score.toFixed(1)}
+                    {evalResult.fluency_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
                   <p className="text-xs text-ink-muted">{m.ielts?.lexical ?? "Lug'at"}</p>
                   <p className="text-base font-bold text-ink">
-                    {evalResult.lexical_score.toFixed(1)}
+                    {evalResult.lexical_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
                   <p className="text-xs text-ink-muted">{m.ielts?.grammar ?? "Grammatika"}</p>
                   <p className="text-base font-bold text-ink">
-                    {evalResult.grammar_score.toFixed(1)}
+                    {evalResult.grammar_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
                   <p className="text-xs text-ink-muted">{m.ielts?.pronunciation ?? "Talaffuz"}</p>
                   <p className="text-base font-bold text-ink">
-                    {evalResult.pronunciation_score.toFixed(1)}
+                    {evalResult.pronunciation_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
               </div>

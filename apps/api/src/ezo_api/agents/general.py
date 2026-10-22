@@ -75,6 +75,8 @@ class GeneralAgent(Agent):
         """Look into the user's files when they may be relevant (no extra tools otherwise)."""
         gathered = Gathered()
         tools = ctx.tools
+        if tools.services.settings.deployment_profile == "free-beta":
+            return gathered
         if tools.library_scope is not None:
             gathered.sources = await run_tool(
                 gathered,

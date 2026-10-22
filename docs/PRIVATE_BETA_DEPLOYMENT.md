@@ -1,3 +1,6 @@
+> **Superseded for the current zero-budget mission:** use [Zero-budget private beta](ZERO_BUDGET_PRIVATE_BETA.md).
+> This historical paid runbook is not launch authorization. Its native API/OCR and job claims are stale; do not follow them.
+
 # EZO single-owner private beta
 
 The current P0/P1 engineering mission explicitly excludes deployment/provisioning.
@@ -120,7 +123,7 @@ access. A public UI by itself grants no API access.
    is not in system roots, download its trusted CA from Supabase settings, mount it on
    the API host, and set `sslrootcert=/path/to/ca.crt` instead. Never disable verification.
    Production validation rejects SQLite and unverified TLS modes.
-4. After approval, create the Render service from `render.yaml`. It defines no automatic
+4. After approval, create the Render service from `deploy/render-paid-reference.yaml`. It defines no automatic
    deploy trigger, one Standard instance and a 10 GB persistent disk. Configure the
    session database URL and exact frontend HTTPS origin. Render can generate the owner
    token; copy it securely to the owner's browser only. Add at least one provider key

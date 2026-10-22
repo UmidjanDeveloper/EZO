@@ -11,12 +11,15 @@ Provides safe document and spreadsheet authoring:
 from __future__ import annotations
 
 import asyncio
+import threading
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
+from ezo_api.api.ownership import require_owned_conversation
 from ezo_api.artifacts.service import ArtifactError
 from ezo_api.db.models import Artifact
 from ezo_api.documents.markdown_io import parse_markdown
@@ -39,6 +42,19 @@ router = APIRouter(
     tags=["office"],
     dependencies=[Depends(rate_limit("default"))],
 )
+
+_RENDER_SLOT = threading.BoundedSemaphore(1)
+
+
+def _bounded_render[Result](fn: Callable[..., Result], *args: Any) -> Result:
+    # Ownership lives in the physical worker thread, including after HTTP cancellation.
+    if not _RENDER_SLOT.acquire(blocking=False):
+        raise HTTPException(429, detail="An Office export is already rendering; retry later.")
+    try:
+        return fn(*args)
+    finally:
+        _RENDER_SLOT.release()
+
 
 TEMPLATES: list[OfficeTemplateOut] = [
     OfficeTemplateOut(
@@ -133,7 +149,26 @@ async def create_document_endpoint(
     user: CurrentUser,
 ) -> OfficeArtifactOut:
     """Create a DOCX document artifact with optional PDF export."""
-    files = await asyncio.to_thread(render_document, payload.markdown, payload.title, "docx", None)
+    await require_owned_conversation(db, user.id, payload.conversation_id)
+    if services.settings.deployment_profile == "free-beta":
+        if payload.export_pdf:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "feature_disabled",
+                    "message": "PDF conversion is disabled; request DOCX only.",
+                },
+            )
+        if len(payload.markdown) > 12_000:
+            raise HTTPException(413, detail="Free beta Office text limit is 12000 characters.")
+    if services.settings.deployment_profile == "free-beta":
+        files = await asyncio.to_thread(
+            _bounded_render, render_document, payload.markdown, payload.title, "docx", None
+        )
+    else:
+        files = await asyncio.to_thread(
+            render_document, payload.markdown, payload.title, "docx", None
+        )
     stem = file_stem(payload.title, "document")
     exports = {
         _EXPORT_NAMES[ext]: (f"{stem}.{ext}", data)
@@ -186,14 +221,28 @@ async def create_spreadsheet_endpoint(
     user: CurrentUser,
 ) -> OfficeArtifactOut:
     """Create an XLSX or CSV spreadsheet artifact."""
+    await require_owned_conversation(db, user.id, payload.conversation_id)
+    if services.settings.deployment_profile == "free-beta" and (
+        len(payload.sheets) > 2
+        or sum(len(s.rows) for s in payload.sheets) > 200
+        or sum(len(r) for s in payload.sheets for r in s.rows) > 2000
+        or any(len(str(v)) > 1000 for s in payload.sheets for r in s.rows for v in r)
+    ):
+        raise HTTPException(413, detail="Free beta spreadsheet exceeds its bounded workload.")
     sheets = [Sheet(s.name, s.columns, [list(r) for r in s.rows]) for s in payload.sheets]
     stem = file_stem(payload.title, "spreadsheet")
+
+    async def xlsx() -> bytes:
+        if services.settings.deployment_profile == "free-beta":
+            return await asyncio.to_thread(_bounded_render, render_xlsx, sheets, payload.title)
+        return await asyncio.to_thread(render_xlsx, sheets, payload.title)
+
     if payload.format == "xlsx":
-        data = await asyncio.to_thread(render_xlsx, sheets, payload.title)
+        data = await xlsx()
         exports = {"csv": (f"{stem}.csv", render_csv(sheets[0]))} if len(sheets) == 1 else {}
     else:
         data = render_csv(sheets[0])
-        exports = {"xlsx": (f"{stem}.xlsx", await asyncio.to_thread(render_xlsx, sheets))}
+        exports = {"xlsx": (f"{stem}.xlsx", await xlsx())}
 
     rows_count = sum(len(s.rows) for s in sheets)
     metadata: dict[str, Any] = {"sheets": len(sheets), "rows": rows_count, "format": payload.format}

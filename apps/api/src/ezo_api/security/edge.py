@@ -48,10 +48,13 @@ async def _reply(send: Send, status: int, code: str, message: str, **headers: st
 
 
 class EdgeGuardMiddleware:
-    def __init__(self, app: ASGIApp, *, token: str | None, max_body_bytes: int) -> None:
+    def __init__(
+        self, app: ASGIApp, *, token: str | None, max_body_bytes: int, free_beta: bool = False
+    ) -> None:
         self.app = app
         self.token = token.encode() if token else None
         self.max_body = max_body_bytes
+        self.free_beta = free_beta
         self.failures = SlidingWindowRateLimiter()
 
     def _authorized(self, scope: Scope) -> bool:
@@ -89,6 +92,18 @@ class EdgeGuardMiddleware:
             await _reply(send, 401, "unauthorized", "Missing or invalid API token.")
             return
         scope.setdefault("state", {})[AUTHENTICATED] = self.token is not None
+
+        if self.free_beta:
+            from ezo_api.free_beta import allowed
+
+            if not allowed(scope.get("method", ""), path):
+                await _reply(
+                    send,
+                    409,
+                    "feature_disabled",
+                    "This capability is disabled in the free beta profile.",
+                )
+                return
 
         declared = None
         for name, value in scope.get("headers", []):

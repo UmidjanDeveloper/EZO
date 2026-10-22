@@ -18,13 +18,18 @@ longer workflows. The interface is Uzbek first, with English and Russian built i
 > EZO decides by itself which specialist agent a request needs — there are no agent menus.
 > See [ROADMAP.md](ROADMAP.md) and [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
 
+> **Owner-only, zero-budget hosting:** an opt-in private remote-storage/reduced
+> profile is implemented; live Free-plan/privacy/restore validation is still **BLOCKED**.
+> See the [current profile and owner guide](docs/FREE_BETA_STORAGE_PROFILE.md).
+> No cloud deployment or paid activation is authorized. AI keys are optional for offline use.
+
 ---
 
 ## Tezkor boshlash (Uzbek quick start)
 
 1. [Docker Desktop](https://www.docker.com/products/docker-desktop/) ni o‘rnating va ishga tushiring.
 2. Loyiha papkasida `.env.example` faylidan nusxa olib, nomini `.env` qiling.
-   Ichiga kamida bitta AI kalitini yozing (masalan `ANTHROPIC_API_KEY=...`).
+   Offline ishlatish uchun AI kalitlarini bo‘sh qoldiring. Pullik AI ishlatish hozir ruxsat etilmagan.
 3. Terminalda (Windows: PowerShell) loyiha papkasida:
 
    ```
@@ -466,3 +471,5 @@ run the same tests on PostgreSQL. CI (`.github/workflows/ci.yml`) runs both.
   them are ignored.
 - Every tool EZO uses (file search, web search, page reading) is logged with redacted
   arguments; see the debug trace of an answer.
+
+Full-owner beta ($10 infrastructure planning, deployment BLOCKED): [architecture/capabilities](docs/FULL_OWNER_BETA.md), [Uzbek owner guide](docs/FULL_OWNER_SETUP_UZ.md), [VM benchmark protocol](docs/FULL_OWNER_BETA_BENCHMARKS.md).

@@ -8,12 +8,9 @@ import {
   CheckCircle2,
   Cpu,
   Database,
-  DollarSign,
   FileText,
-  HardDrive,
   Lock,
   RefreshCw,
-  Save,
   Server,
   ShieldAlert,
   ShieldCheck,
@@ -34,56 +31,49 @@ interface GovernanceStatus {
   policies: Record<string, string>;
 }
 
-interface AgentConfig {
-  agent_id: string;
-  name: string;
+interface AgentInfo {
+  key: string;
+  names: Record<string, string>;
   description: string;
-  model: string;
-  max_tokens: number;
-  temperature: number;
-  rate_limit_per_min: number;
-  enabled: boolean;
-  allowed_roles: string[];
+  available: boolean;
+  maturity: string;
+  phase: string;
 }
 
-interface SystemHealth {
+interface SystemStatus {
+  deployment_profile: string;
+  disabled_capabilities: string[];
+  version: string;
+  environment: string;
+  database: string;
+  offline_mode: boolean;
+  providers: Array<{
+    name: string;
+    display_name: string;
+    configured: boolean;
+    capabilities: string[];
+  }>;
+  routing: Record<string, unknown>;
+  agents: AgentInfo[];
+  debug_traces: boolean;
+}
+
+interface HealthStatus {
   status: string;
-  uptime_seconds: number;
-  db_status: string;
-  worker_status: string;
-  memory_usage_mb: number;
-  api_version: string;
-  active_sessions: number;
+  database: string;
+  version?: string;
 }
 
-interface K8Proposal {
+interface ImprovementProposal {
   id: string;
-  title: string;
-  description: string;
-  category: string;
-  status: "pending" | "approved" | "rejected";
-  proposed_by: string;
-  created_at: string;
-  review_notes?: string | null;
-}
-
-interface AuditLog {
-  id: string;
-  timestamp: string;
-  user_identifier: string;
-  action: string;
-  resource: string;
+  sha256: string;
+  goal: string;
+  library_id?: string;
   status: string;
-  ip_masked: string;
-}
-
-interface ResourceBudget {
-  daily_token_budget: number;
-  tokens_consumed_today: number;
-  monthly_spend_limit_usd: number;
-  current_spend_usd: number;
-  storage_quota_mb: number;
-  storage_used_mb: number;
+  sandbox_tested: boolean;
+  execution_authorized: boolean;
+  required_gates?: string[];
+  decision?: string;
 }
 
 export function AdminPage() {
@@ -93,17 +83,12 @@ export function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
 
-  // Governance data
+  // Real backend state
   const [govStatus, setGovStatus] = useState<GovernanceStatus | null>(null);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [agents, setAgents] = useState<AgentConfig[]>([]);
-  const [proposals, setProposals] = useState<K8Proposal[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [budgets, setBudgets] = useState<ResourceBudget | null>(null);
-
-  // Active review notes
-  const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
-  const [savingAgent, setSavingAgent] = useState<string | null>(null);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
+  const [proposals, setProposals] = useState<ImprovementProposal[]>([]);
+  const [actingProposalId, setActingProposalId] = useState<string | null>(null);
 
   const authHeaders = useCallback(() => {
     const token = storedToken.get().trim();
@@ -121,7 +106,7 @@ export function AdminPage() {
     try {
       const headers = authHeaders();
 
-      // Check governance status
+      // 1. Check governance status (Super Admin RBAC check)
       const statusRes = await fetch(`${apiUrl()}/api/admin/governance/status`, { headers });
       if (statusRes.status === 403) {
         setForbidden(true);
@@ -132,25 +117,26 @@ export function AdminPage() {
       const statusData = (await statusRes.json()) as GovernanceStatus;
       setGovStatus(statusData);
 
-      // Load health
-      const healthRes = await fetch(`${apiUrl()}/api/admin/governance/system-health`, { headers });
-      if (healthRes.ok) setHealth((await healthRes.json()) as SystemHealth);
+      // 2. Load genuine system status
+      const sysRes = await fetch(`${apiUrl()}/api/status`, { headers });
+      if (sysRes.ok) {
+        const sysData = (await sysRes.json()) as SystemStatus;
+        setSystemStatus(sysData);
+      }
 
-      // Load agents
-      const agentsRes = await fetch(`${apiUrl()}/api/admin/governance/agents`, { headers });
-      if (agentsRes.ok) setAgents((await agentsRes.json()) as AgentConfig[]);
+      // 3. Load genuine health probe
+      const healthRes = await fetch(`${apiUrl()}/api/health`);
+      if (healthRes.ok) {
+        const healthData = (await healthRes.json()) as HealthStatus;
+        setHealthStatus(healthData);
+      }
 
-      // Load proposals
-      const propRes = await fetch(`${apiUrl()}/api/admin/governance/proposals`, { headers });
-      if (propRes.ok) setProposals((await propRes.json()) as K8Proposal[]);
-
-      // Load audit logs
-      const auditRes = await fetch(`${apiUrl()}/api/admin/governance/audit-logs`, { headers });
-      if (auditRes.ok) setAuditLogs((await auditRes.json()) as AuditLog[]);
-
-      // Load budgets
-      const budgetRes = await fetch(`${apiUrl()}/api/admin/governance/budgets`, { headers });
-      if (budgetRes.ok) setBudgets((await budgetRes.json()) as ResourceBudget);
+      // 4. Load genuine durable improvement proposals
+      const propRes = await fetch(`${apiUrl()}/api/admin/governance/improvements`, { headers });
+      if (propRes.ok) {
+        const propData = (await propRes.json()) as ImprovementProposal[];
+        setProposals(propData);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -162,440 +148,317 @@ export function AdminPage() {
     void loadData();
   }, [loadData]);
 
-  async function handleReview(proposalId: string, action: "approve" | "reject") {
-    const notes = reviewNotes[proposalId] || (action === "approve" ? "Tasdiqlandi" : "Rad etildi");
+  async function handleDecision(proposal: ImprovementProposal, decision: "request_independent_review" | "reject") {
+    setActingProposalId(proposal.id);
     try {
-      const res = await fetch(`${apiUrl()}/api/admin/governance/proposals/${proposalId}/review`, {
+      const res = await fetch(`${apiUrl()}/api/admin/governance/improvements/${proposal.id}/decision`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ action, notes }),
-      });
-      if (res.ok) {
-        const updated = (await res.json()) as K8Proposal;
-        setProposals((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      }
-    } catch {
-      // Ignored
-    }
-  }
-
-  async function handleUpdateAgent(agent: AgentConfig) {
-    setSavingAgent(agent.agent_id);
-    try {
-      const res = await fetch(`${apiUrl()}/api/admin/governance/agents/${agent.agent_id}`, {
-        method: "PUT",
-        headers: authHeaders(),
         body: JSON.stringify({
-          model: agent.model,
-          max_tokens: agent.max_tokens,
-          temperature: agent.temperature,
-          rate_limit_per_min: agent.rate_limit_per_min,
-          enabled: agent.enabled,
+          proposal_sha256: proposal.sha256,
+          decision,
+          confirm: true,
         }),
       });
       if (res.ok) {
-        const updated = (await res.json()) as AgentConfig;
-        setAgents((prev) => prev.map((a) => (a.agent_id === updated.agent_id ? updated : a)));
+        await loadData();
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+        setError(data.error?.message || `Qaror qabul qilishda xatolik: HTTP ${res.status}`);
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setSavingAgent(null);
+      setActingProposalId(null);
     }
   }
 
   return (
     <PageFrame
-      title={m.governance?.title ?? "Super Admin va Boshqaruv"}
-      subtitle={m.governance?.subtitle ?? "Tizim holati, agent marshrutlash, xavfsizlik va resurs byudjetlari monitoringi."}
+      title="Super Admin boshqaruvi"
+      subtitle="EZO OS tizim boshqaruvi, xavfsizlik siyosatlari va arxitektura tekshiruvlari"
       actions={
         <Button
           variant="secondary"
-          size="sm"
-          icon={<RefreshCw size={14} className={loading ? "animate-spin" : ""} />}
+          className="gap-2"
           onClick={() => void loadData()}
+          disabled={loading}
         >
-          {m.common?.retry ?? "Yangilash"}
+          <RefreshCw size={14} className={cn(loading && "animate-spin")} />
+          Yangilash
         </Button>
       }
     >
-      {/* 403 Forbidden State */}
-      {forbidden && (
-        <Card className="border-red-500/30 bg-red-500/5 p-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-500">
-            <ShieldAlert size={28} />
+      <div className="flex flex-col gap-6 p-4 sm:p-6 max-w-7xl mx-auto w-full">
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center justify-center p-12">
+            <Spinner className="h-8 w-8" label="Ma'lumotlar yuklanmoqda..." />
           </div>
-          <h3 className="text-base font-semibold text-ink">
-            {m.governance?.forbiddenTitle ?? "Ruxsat berilmagan (403 Forbidden)"}
-          </h3>
-          <p className="mt-2 text-sm text-ink-muted">
-            {m.governance?.forbiddenBody ??
-              "Ushbu sahifaga faqat platforma Super Admin foydalanuvchisi kirishi mumkin."}
-          </p>
-          <div className="mx-auto mt-4 max-w-md rounded-xl border border-line bg-surface p-3 text-left text-xs leading-relaxed text-ink-faint">
-            <p className="font-semibold text-ink">Xavfsizlik qoidasi (RBAC):</p>
-            <p className="mt-1">
-              Foydalanuvchining obuna darajasi (Pro, Enterprise) platforma boshqaruv huquqini bermaydi. Barcha
-              governance API so‘rovlari server tomonida qat'iy tekshiriladi.
+        )}
+
+        {/* 403 Forbidden State */}
+        {forbidden && !loading && (
+          <Card className="p-8 border-danger/30 bg-danger/5 text-center flex flex-col items-center gap-4">
+            <ShieldAlert size={48} className="text-danger animate-bounce" />
+            <h2 className="text-xl font-bold text-danger">Kirish taqiqlangan (403 Forbidden)</h2>
+            <p className="text-sm text-ink-muted max-w-md">
+              Ushbu bo‘lim faqat tizim <strong>Super Admin</strong> foydalanuvchisi uchun ochiq.
+              Obuna maqomi (pro, enterprise) platforma boshqaruviga ruxsat bermaydi.
             </p>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
 
-      {loading && !forbidden && (
-        <div className="flex h-64 items-center justify-center">
-          <Spinner />
-        </div>
-      )}
+        {/* Error message */}
+        {error && !forbidden && (
+          <Card className="p-4 border-warning/30 bg-warning/5 flex items-center gap-3">
+            <AlertTriangle size={20} className="text-warning flex-shrink-0" />
+            <p className="text-sm text-ink">{error}</p>
+          </Card>
+        )}
 
-      {error && !forbidden && (
-        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-600">
-          {error}
-        </div>
-      )}
-
-      {!loading && !forbidden && (
-        <div className="space-y-6">
-          {/* Super Admin Status Banner */}
-          <Card className="border-accent/30 bg-accent/5">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+        {/* Super Admin Dashboard Content */}
+        {!loading && !forbidden && govStatus && (
+          <>
+            {/* Top Security Banner */}
+            <Card className="p-5 border-primary/20 bg-primary/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-accent/20 p-2 text-accent">
+                <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
                   <ShieldCheck size={24} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-ink">
-                      {govStatus?.super_admin_verified ? "Super Admin: Autentifikatsiya Tasdiqlangan" : "Kutilmoqda"}
-                    </span>
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-accent">
-                      {govStatus?.governance_mode ?? "human_governed"}
+                    <h3 className="font-semibold text-ink">Super Admin Autentifikatsiya Qilingan</h3>
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-600 font-medium border border-emerald-500/20">
+                      Tasdiqlangan
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-ink-muted">
-                    {m.governance?.rbacNotice ??
-                      "Faqat Super Admin rolidagi akkauntlar uchun ruxsat etilgan. Obuna darajasi platforma boshqaruv huquqini bermaydi."}
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Boshqaruv rejimi: <span className="font-mono text-ink">{govStatus.governance_mode}</span> | 
+                    Avtonom deploy / merge: <span className="text-emerald-600 font-medium">To‘liq bloklangan</span>
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="flex items-center gap-1 rounded-md bg-surface px-2.5 py-1 text-ink-faint">
-                  <Lock size={12} className="text-success" /> Kod o&apos;zgartirish: Bloklangan
+              <div className="flex flex-wrap gap-2 text-xs">
+                {Object.entries(govStatus.policies).map(([key, val]) => (
+                  <span
+                    key={key}
+                    className="px-2.5 py-1 rounded-md bg-surface-2 border border-line text-ink-muted font-mono"
+                  >
+                    {key}: <strong className="text-ink">{String(val)}</strong>
+                  </span>
+                ))}
+              </div>
+            </Card>
+
+            {/* System Health & Deployment Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
+                  <span>Ma'lumotlar bazasi</span>
+                  <Database size={16} className="text-primary" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full",
+                      healthStatus?.database === "ok" ? "bg-emerald-500" : "bg-danger"
+                    )}
+                  />
+                  <span className="text-lg font-bold capitalize text-ink">
+                    {systemStatus?.database || "PostgreSQL"} ({healthStatus?.database || "Ulanmoqda"})
+                  </span>
+                </div>
+                <span className="text-xs text-ink-faint">
+                  Profil: <strong className="text-ink">{systemStatus?.deployment_profile || "Standart"}</strong>
                 </span>
-                <span className="flex items-center gap-1 rounded-md bg-surface px-2.5 py-1 text-ink-faint">
-                  <Lock size={12} className="text-success" /> Avto-Deploy: Bloklangan
+              </Card>
+
+              <Card className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
+                  <span>Tizim holati</span>
+                  <Server size={16} className="text-primary" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2.5 w-2.5 rounded-full",
+                      healthStatus?.status === "ok" ? "bg-emerald-500" : "bg-warning"
+                    )}
+                  />
+                  <span className="text-lg font-bold uppercase text-ink">
+                    {healthStatus?.status || "Aktiv"}
+                  </span>
+                </div>
+                <span className="text-xs text-ink-faint">
+                  Muhit: <strong className="text-ink">{systemStatus?.environment || "development"}</strong>
+                </span>
+              </Card>
+
+              <Card className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
+                  <span>AI Provayderlari</span>
+                  <Cpu size={16} className="text-primary" />
+                </div>
+                <span className="text-lg font-bold text-ink">
+                  {systemStatus?.offline_mode
+                    ? "Offline rejim"
+                    : `${systemStatus?.providers.filter((p) => p.configured).length || 0} ta sozlangan`}
+                </span>
+                <span className="text-xs text-ink-faint">
+                  {systemStatus?.providers.map((p) => p.name).join(", ") || "Mahalliy"}
+                </span>
+              </Card>
+
+              <Card className="p-4 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs text-ink-muted">
+                  <span>Versiya</span>
+                  <Activity size={16} className="text-primary" />
+                </div>
+                <span className="text-lg font-bold font-mono text-ink">
+                  v{systemStatus?.version || "0.2.0"}
+                </span>
+                <span className="text-xs text-ink-faint">
+                  Xavfsizlik audit loglari: <strong>Durable</strong>
+                </span>
+              </Card>
+            </div>
+
+            {/* Registered Agents Catalog */}
+            <Card className="p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-ink flex items-center gap-2">
+                    <Bot size={18} className="text-primary" />
+                    Ro‘yxatdan o‘tgan Agentlar katalogi
+                  </h3>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Tizimda faoliyat yurituvchi aqlli agentlar va ularning statusi
+                  </p>
+                </div>
+                <span className="text-xs px-2.5 py-1 rounded-md bg-surface-2 border border-line text-ink-muted font-mono">
+                  Jami: {systemStatus?.agents.length || 0} ta
                 </span>
               </div>
-            </div>
-          </Card>
 
-          {/* System Health Overview */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-              <Activity size={16} className="text-accent" />
-              {m.governance?.systemHealth ?? "Tizim salomatligi"}
-            </h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <div className="rounded-xl border border-line bg-surface p-3.5">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>API Holati</span>
-                  <Server size={14} className="text-success" />
-                </div>
-                <p className="mt-1 text-base font-bold text-success capitalize">{health?.status ?? "Normal"}</p>
-                <span className="text-[11px] text-ink-faint">v{health?.api_version ?? "0.2.0"}</span>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-3.5">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Ma&apos;lumotlar bazasi</span>
-                  <Database size={14} className="text-accent" />
-                </div>
-                <p className="mt-1 text-base font-bold text-ink">{health?.db_status ?? "Uланган"}</p>
-                <span className="text-[11px] text-ink-faint">PostgreSQL / SQLite</span>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-3.5">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Durable Worker</span>
-                  <Cpu size={14} className="text-accent2" />
-                </div>
-                <p className="mt-1 text-base font-bold text-ink">{health?.worker_status ?? "Faol"}</p>
-                <span className="text-[11px] text-ink-faint">Izolyatsiya qilingan text worker</span>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-3.5">
-                <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Operativ xotira (RAM)</span>
-                  <HardDrive size={14} className="text-ink-muted" />
-                </div>
-                <p className="mt-1 text-base font-bold text-ink">
-                  {health?.memory_usage_mb ? `${health.memory_usage_mb.toFixed(1)} MB` : "148.5 MB"}
-                </p>
-                <span className="text-[11px] text-ink-faint">{health?.active_sessions ?? 14} faol sessiya</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Resource & Spending Budgets */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-              <DollarSign size={16} className="text-success" />
-              {m.governance?.budgets ?? "Resurslar va xarajat byudjeti"}
-            </h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-line bg-surface p-4">
-                <p className="text-xs text-ink-muted">Kunlik Token Limiti</p>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-ink">
-                    {budgets?.tokens_consumed_today.toLocaleString() ?? 0}
-                  </span>
-                  <span className="text-xs text-ink-faint">
-                    / {budgets?.daily_token_budget.toLocaleString() ?? "1,000,000"}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(systemStatus?.agents || []).map((agent) => (
                   <div
-                    className="h-full bg-accent"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((budgets?.tokens_consumed_today ?? 0) / (budgets?.daily_token_budget ?? 1)) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-4">
-                <p className="text-xs text-ink-muted">Oylik Xarajat Chegarasi</p>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-success">
-                    ${budgets?.current_spend_usd.toFixed(2) ?? "0.00"}
-                  </span>
-                  <span className="text-xs text-ink-faint">
-                    / ${budgets?.monthly_spend_limit_usd.toFixed(2) ?? "250.00"}
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className="h-full bg-success"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((budgets?.current_spend_usd ?? 0) / (budgets?.monthly_spend_limit_usd ?? 1)) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="rounded-xl border border-line bg-surface p-4">
-                <p className="text-xs text-ink-muted">Hujjatlar Saqlash Hajmi</p>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-lg font-bold text-ink">
-                    {budgets?.storage_used_mb ?? 0} MB
-                  </span>
-                  <span className="text-xs text-ink-faint">
-                    / {budgets?.storage_quota_mb ?? 10000} MB
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-                  <div
-                    className="h-full bg-accent2"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((budgets?.storage_used_mb ?? 0) / (budgets?.storage_quota_mb ?? 1)) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Agent Settings & Operational Controls */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-              <Bot size={16} className="text-accent2" />
-              {m.governance?.agentSettings ?? "Agentlar sozlamalari"}
-            </h3>
-            <div className="grid gap-3">
-              {agents.map((agent) => (
-                <div
-                  key={agent.agent_id}
-                  className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-ink">{agent.name}</span>
-                      <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] font-mono text-ink-muted">
-                        {agent.agent_id}
+                    key={agent.key}
+                    className="p-3 rounded-xl border border-line bg-surface flex flex-col gap-2 transition-all hover:border-line-hover"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm text-ink capitalize">
+                        {agent.names?.uz || agent.key}
                       </span>
-                    </div>
-                    <p className="text-xs text-ink-muted">{agent.description}</p>
-                    <div className="flex flex-wrap gap-2 text-[11px] text-ink-faint">
-                      <span>Rollar: {agent.allowed_roles.join(", ")}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-xs text-ink-muted">
-                      Model:
-                      <input
-                        className="ml-1.5 rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs text-ink"
-                        value={agent.model}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setAgents((prev) =>
-                            prev.map((a) => (a.agent_id === agent.agent_id ? { ...a, model: val } : a))
-                          );
-                        }}
-                      />
-                    </label>
-                    <label className="text-xs text-ink-muted">
-                      Max tokens:
-                      <input
-                        type="number"
-                        className="ml-1.5 w-20 rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs text-ink"
-                        value={agent.max_tokens}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setAgents((prev) =>
-                            prev.map((a) => (a.agent_id === agent.agent_id ? { ...a, max_tokens: val } : a))
-                          );
-                        }}
-                      />
-                    </label>
-                    <label className="text-xs text-ink-muted">
-                      Limit/daq:
-                      <input
-                        type="number"
-                        className="ml-1.5 w-16 rounded-lg border border-line bg-surface-2 px-2 py-1 text-xs text-ink"
-                        value={agent.rate_limit_per_min}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setAgents((prev) =>
-                            prev.map((a) =>
-                              a.agent_id === agent.agent_id ? { ...a, rate_limit_per_min: val } : a
-                            )
-                          );
-                        }}
-                      />
-                    </label>
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      icon={<Save size={12} />}
-                      disabled={savingAgent === agent.agent_id}
-                      onClick={() => void handleUpdateAgent(agent)}
-                    >
-                      {savingAgent === agent.agent_id ? "Saqlanmoqda..." : "Saqlash"}
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* K8 Architecture & Security Proposals */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-              <FileText size={16} className="text-accent" />
-              {m.governance?.proposals ?? "Arxitektura va K8 takliflari"}
-            </h3>
-            <div className="space-y-3">
-              {proposals.map((prop) => (
-                <div key={prop.id} className="rounded-xl border border-line bg-surface p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-ink">{prop.title}</span>
                       <span
                         className={cn(
-                          "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                          prop.status === "approved"
-                            ? "bg-success/15 text-success"
-                            : prop.status === "rejected"
-                            ? "bg-red-500/15 text-red-500"
-                            : "bg-accent/15 text-accent"
+                          "px-2 py-0.5 text-xs rounded-full font-medium border",
+                          agent.available
+                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            : "bg-surface-3 text-ink-faint border-line"
                         )}
                       >
-                        {prop.status}
+                        {agent.available ? "Faol" : "O‘chirilgan"}
                       </span>
                     </div>
-                    <span className="text-[11px] text-ink-faint">{prop.created_at}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-ink-muted">{prop.description}</p>
-                  {prop.review_notes && (
-                    <p className="mt-2 rounded-lg bg-surface-2 p-2 text-xs text-ink-faint">
-                      <strong>Ko&apos;rib chiqish izohi:</strong> {prop.review_notes}
+                    <p className="text-xs text-ink-muted line-clamp-2">
+                      {agent.description}
                     </p>
-                  )}
-                  {prop.status === "pending" && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <input
-                        placeholder="Ko'rib chiqish izohi..."
-                        className="flex-1 rounded-lg border border-line bg-surface-2 px-3 py-1.5 text-xs text-ink"
-                        value={reviewNotes[prop.id] || ""}
-                        onChange={(e) => setReviewNotes({ ...reviewNotes, [prop.id]: e.target.value })}
-                      />
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        icon={<CheckCircle2 size={12} />}
-                        onClick={() => void handleReview(prop.id, "approve")}
-                      >
-                        {m.governance?.approve ?? "Tasdiqlash"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<XCircle size={12} />}
-                        onClick={() => void handleReview(prop.id, "reject")}
-                      >
-                        {m.governance?.reject ?? "Rad etish"}
-                      </Button>
+                    <div className="flex items-center justify-between text-xs text-ink-faint pt-2 border-t border-line/60">
+                      <span>Kalit: <strong className="font-mono">{agent.key}</strong></span>
+                      <span className="capitalize">{agent.maturity || "v1"}</span>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
+                  </div>
+                ))}
+              </div>
+            </Card>
 
-          {/* Sanitized Audit Logs */}
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink">
-              <ShieldCheck size={16} className="text-ink-muted" />
-              {m.governance?.auditLogs ?? "Xavfsizlik va audit jurnali"}
-            </h3>
-            <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-line bg-surface-2 text-ink-muted">
-                  <tr>
-                    <th className="p-3">Vaqt</th>
-                    <th className="p-3">Foydalanuvchi</th>
-                    <th className="p-3">Amal</th>
-                    <th className="p-3">Resurs</th>
-                    <th className="p-3">Holat</th>
-                    <th className="p-3">IP (Niqoblangan)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line text-ink">
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-surface-2/40">
-                      <td className="p-3 font-mono text-[11px] text-ink-faint">
-                        {log.timestamp.slice(0, 19).replace("T", " ")}
-                      </td>
-                      <td className="p-3">{log.user_identifier}</td>
-                      <td className="p-3 font-semibold">{log.action}</td>
-                      <td className="p-3 font-mono text-[11px] text-ink-muted">{log.resource}</td>
-                      <td className="p-3">
-                        <span className="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-semibold text-success">
-                          {log.status}
+            {/* Governed Architecture Improvement Proposals (AuditLog-backed) */}
+            <Card className="p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-ink flex items-center gap-2">
+                    <FileText size={18} className="text-primary" />
+                    Boshqariladigan Arxitektura Takliflari (Durable Proposals)
+                  </h3>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Tizim yaxshilanishlari AuditLog orqali saqlanadi va inson tomonidan tasdiqlanishi shart
+                  </p>
+                </div>
+              </div>
+
+              {proposals.length === 0 ? (
+                <div className="p-8 text-center text-ink-muted border border-dashed border-line rounded-xl">
+                  <p className="text-sm">Hozircha ko‘rib chiqilmagan yangi arxitektura takliflari mavjud emas.</p>
+                  <p className="text-xs text-ink-faint mt-1">
+                    Barcha amallar to‘g‘ridan-to‘g‘ri ma'lumotlar bazasining AuditLog jadvalida qayd etiladi.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {proposals.map((prop) => (
+                    <div
+                      key={prop.id}
+                      className="p-4 rounded-xl border border-line bg-surface flex flex-col gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-medium text-sm text-ink">{prop.goal}</h4>
+                          <p className="text-xs font-mono text-ink-faint mt-0.5">
+                            ID: {prop.id} | SHA256: {prop.sha256.slice(0, 16)}...
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "px-2.5 py-0.5 text-xs rounded-full font-medium border",
+                            prop.status === "proposal_only"
+                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                              : prop.decision === "request_independent_review"
+                              ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                              : "bg-surface-3 text-ink-faint border-line"
+                          )}
+                        >
+                          {prop.decision || prop.status}
                         </span>
-                      </td>
-                      <td className="p-3 font-mono text-[11px] text-ink-faint">{log.ip_masked}</td>
-                    </tr>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-line text-xs">
+                        <span className="text-ink-faint flex items-center gap-1">
+                          <Lock size={12} />
+                          Sandbox tested: <strong>{prop.sandbox_tested ? "Ha" : "Yo‘q"}</strong> | 
+                          Execution authorized: <strong>{prop.execution_authorized ? "Ha" : "Bloklangan"}</strong>
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            className="text-xs h-7 px-2.5 text-danger hover:bg-danger/10"
+                            disabled={actingProposalId === prop.id}
+                            onClick={() => void handleDecision(prop, "reject")}
+                          >
+                            <XCircle size={14} className="mr-1" />
+                            Rad etish
+                          </Button>
+                          <Button
+                            variant="primary"
+                            className="text-xs h-7 px-2.5"
+                            disabled={actingProposalId === prop.id}
+                            onClick={() => void handleDecision(prop, "request_independent_review")}
+                          >
+                            <CheckCircle2 size={14} className="mr-1" />
+                            Mustaqil ko‘rib chiqishni talab qilish
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        </div>
-      )}
+                </div>
+              )}
+            </Card>
+          </>
+        )}
+      </div>
     </PageFrame>
   );
 }

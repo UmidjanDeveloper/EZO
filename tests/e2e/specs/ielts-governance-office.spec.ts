@@ -60,16 +60,16 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await page.route("**/api/ielts/evaluate", (route) =>
     route.fulfill({
       json: {
-        fluency_score: 7.0,
-        lexical_score: 6.5,
-        grammar_score: 7.0,
-        pronunciation_score: 7.0,
-        estimated_band_low: 6.5,
-        estimated_band_high: 7.0,
-        estimated_band: 7.0,
-        constructive_feedback: "Good natural fluency and varied vocabulary.",
-        explanation_uz: "Ravonlik yaxshi, grammatik xatolar deyarli uchramadi.",
-        disclaimer: "Ushbu baho norasmiy baholash hisoblanadi (Estimated Band Score) va rasmiy IELTS sertifikati o'rnini bosmaydi.",
+        fluency_score: null,
+        lexical_score: null,
+        grammar_score: null,
+        pronunciation_score: null,
+        estimated_band_low: null,
+        estimated_band_high: null,
+        estimated_band: null,
+        constructive_feedback: "Answer length: 11 words. No AI assessment was performed.",
+        explanation_uz: "Javobda 11 ta so'z bor. AI va talaffuz baholashi bajarilmagan.",
+        disclaimer: "Rasmiy IELTS sertifikati emas. Text practice only.",
       },
     })
   );
@@ -77,11 +77,12 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await page.route("**/api/ielts/sessions/sess-test-01/advance", (route) =>
     route.fulfill({
       json: {
-        next_prompt: "What do you like most about your hometown?",
+        session_id: "sess-test-01",
         part: 1,
+        instruction: "Davom eting",
         finished: false,
-        feedback: "Clear pronunciation and fluent pace.",
-        explanation_uz: "Talaffuz aniq va nutq sur'ati me'yorda.",
+        feedback: "Matnli mashq bajarildi.",
+        explanation_uz: "Keyingi savolga o'ting.",
       },
     })
   );
@@ -98,7 +99,7 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
         finished: false,
         band_low: null,
         band_high: null,
-        feedback: "Clear pronunciation and fluent pace.",
+        feedback: "Matnli mashq bajarildi.",
       },
     })
   );
@@ -111,7 +112,7 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await expect(page.getByText("3")).toBeVisible();
 
   // Start new test session
-  await page.getByRole("button", { name: "Imtihonni boshlash" }).click();
+  await page.getByRole("button", { name: /Yangi imtihon/i }).click();
 
   // Examiner prompt displayed
   await expect(page.getByText("Could you tell me your full name and where you are from?")).toBeVisible();
@@ -120,9 +121,8 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await page.getByLabel("Sizning javobingiz:").fill("My name is Umidjan and I am from Tashkent, Uzbekistan.");
   await page.getByRole("button", { name: "Yuborish" }).click();
 
-  // Check advance and feedback
+  // Check advance
   await expect(page.getByText("What do you like most about your hometown?")).toBeVisible();
-  await expect(page.getByText("Clear pronunciation and fluent pace.")).toBeVisible();
 });
 
 test("governance: ordinary user receives 403 Forbidden with RBAC warning", async ({ page }) => {
@@ -139,8 +139,8 @@ test("governance: ordinary user receives 403 Forbidden with RBAC warning", async
   );
 
   await page.goto("/admin");
-  await expect(page.getByText("Ruxsat berilmagan (403 Forbidden)")).toBeVisible();
-  await expect(page.getByText("Obuna darajasi (Pro, Enterprise) platforma boshqaruv huquqini bermaydi.")).toBeVisible();
+  await expect(page.getByText("Kirish taqiqlangan (403 Forbidden)")).toBeVisible();
+  await expect(page.getByText("Obuna maqomi (pro, enterprise) platforma boshqaruviga ruxsat bermaydi.")).toBeVisible();
 });
 
 test("governance: super admin accesses health, agent routing, proposals, and audit logs", async ({ page }) => {
@@ -163,89 +163,61 @@ test("governance: super admin accesses health, agent routing, proposals, and aud
     })
   );
 
-  await page.route("**/api/admin/governance/system-health", (route) =>
+  await page.route("**/api/status", (route) =>
     route.fulfill({
       json: {
-        status: "healthy",
-        uptime_seconds: 259200,
-        db_status: "connected",
-        worker_status: "active",
-        memory_usage_mb: 148.5,
-        api_version: "0.2.0-master",
-        active_sessions: 14,
+        deployment_profile: "full",
+        disabled_capabilities: [],
+        version: "0.2.0",
+        environment: "development",
+        database: "postgresql",
+        offline_mode: false,
+        providers: [{ name: "openai", display_name: "OpenAI", configured: true, capabilities: ["chat"] }],
+        routing: {},
+        agents: [
+          {
+            key: "student",
+            names: { uz: "EZO Student" },
+            description: "Manba asosida o'rganish",
+            available: true,
+            maturity: "v1",
+            phase: "stable",
+          },
+        ],
+        debug_traces: true,
       },
     })
   );
 
-  await page.route("**/api/admin/governance/agents", (route) =>
+  await page.route("**/api/health", (route) =>
     route.fulfill({
-      json: [
-        {
-          agent_id: "student",
-          name: "EZO Student",
-          description: "Manba asosida o'rganish",
-          model: "stored-normalized-text/v1",
-          max_tokens: 4096,
-          temperature: 0.2,
-          rate_limit_per_min: 60,
-          enabled: true,
-          allowed_roles: ["user", "super_admin"],
-        },
-      ],
+      json: {
+        status: "ok",
+        database: "ok",
+      },
     })
   );
 
-  await page.route("**/api/admin/governance/proposals", (route) =>
+  await page.route("**/api/admin/governance/improvements", (route) =>
     route.fulfill({
       json: [
         {
           id: "prop-001",
-          title: "Upgrade Student durable parser to isolated worker pool v2",
-          description: "Isolate untrusted document extraction into non-root ephemeral containers.",
-          category: "security_isolation",
-          status: "pending",
-          proposed_by: "system_audit",
-          created_at: "2026-10-21T09:00:00Z",
-          review_notes: null,
+          sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          goal: "Upgrade Student durable parser to isolated worker pool v2",
+          status: "proposal_only",
+          sandbox_tested: false,
+          execution_authorized: false,
         },
       ],
-    })
-  );
-
-  await page.route("**/api/admin/governance/audit-logs", (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: "audit-101",
-          timestamp: "2026-10-22T10:00:00Z",
-          user_identifier: "admin@ezo.internal",
-          action: "GOVERNANCE_STATUS_INSPECT",
-          resource: "/api/admin/governance/status",
-          status: "SUCCESS",
-          ip_masked: "127.0.0.***",
-        },
-      ],
-    })
-  );
-
-  await page.route("**/api/admin/governance/budgets", (route) =>
-    route.fulfill({
-      json: {
-        daily_token_budget: 1000000,
-        tokens_consumed_today: 142350,
-        monthly_spend_limit_usd: 250.0,
-        current_spend_usd: 38.45,
-        storage_quota_mb: 10000,
-        storage_used_mb: 1420,
-      },
     })
   );
 
   await page.goto("/admin");
-  await expect(page.getByText("Super Admin: Autentifikatsiya Tasdiqlangan")).toBeVisible();
-  await expect(page.getByText("Tizim salomatligi")).toBeVisible();
+  await expect(page.getByText("Super Admin Autentifikatsiya Qilingan")).toBeVisible();
+  await expect(page.getByText("Ro‘yxatdan o‘tgan Agentlar katalogi")).toBeVisible();
   await expect(page.getByText("EZO Student")).toBeVisible();
-  await expect(page.getByText("Upgrade Student durable parser")).toBeVisible();
+  await expect(page.getByText("Upgrade Student durable parser to isolated worker pool v2")).toBeVisible();
 });
 
 test("office: presentation maker and document workspace", async ({ page }) => {

@@ -1,4 +1,7 @@
-# Review only: creating this service incurs charges. No automatic deployments.
+# PAID REFERENCE ONLY — NOT authorized by the zero-budget private-beta decision.
+# Deliberately outside the root render.yaml discovery path. Do not import/provision.
+# See docs/ZERO_BUDGET_PRIVATE_BETA.md for the current BLOCKED hosting assessment.
+# Creating this service incurs charges. No automatic deployments.
 services:
   - type: web
     name: ezo-api

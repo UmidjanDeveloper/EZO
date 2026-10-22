@@ -35,6 +35,18 @@ class Settings(BaseSettings):
     environment: Literal["development", "production", "test"] = Field(
         default="development", alias="EZO_ENV"
     )
+    deployment_profile: Literal["full", "free-beta"] = Field(
+        default="full", alias="EZO_DEPLOYMENT_PROFILE"
+    )
+    storage_provider: Literal["local", "supabase"] = Field(
+        default="local", alias="EZO_STORAGE_PROVIDER"
+    )
+    supabase_url: str = Field(default="", alias="EZO_SUPABASE_URL")
+    supabase_storage_key: SecretStr | None = Field(default=None, alias="EZO_SUPABASE_STORAGE_KEY")
+    supabase_storage_bucket: str = Field(default="ezo-private", alias="EZO_SUPABASE_STORAGE_BUCKET")
+    storage_max_bytes: int = Field(
+        default=5_000_000, ge=1, le=5_000_000, alias="EZO_STORAGE_MAX_BYTES"
+    )
     log_level: str = Field(default="INFO", alias="EZO_LOG_LEVEL")
 
     database_url: str = Field(
@@ -58,6 +70,19 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = Field(default=None, alias="GEMINI_API_KEY")
     preferred_provider: Literal["openai", "anthropic", "gemini"] | None = Field(
         default=None, alias="EZO_PREFERRED_PROVIDER"
+    )
+    provider_max_output_tokens: int = Field(
+        default=16000, ge=1, le=32000, alias="EZO_PROVIDER_MAX_OUTPUT_TOKENS"
+    )
+    provider_max_input_chars: int = Field(
+        default=512000, ge=1000, le=1000000, alias="EZO_PROVIDER_MAX_INPUT_CHARS"
+    )
+    provider_calls_per_day: int = Field(
+        default=1000, ge=1, le=10000, alias="EZO_PROVIDER_CALLS_PER_DAY"
+    )
+    provider_concurrency: int = Field(default=2, ge=1, le=8, alias="EZO_PROVIDER_CONCURRENCY")
+    provider_operation_seconds: float = Field(
+        default=180, ge=1, le=600, alias="EZO_PROVIDER_OPERATION_SECONDS"
     )
     provider_timeout_seconds: float = Field(default=120.0, alias="EZO_PROVIDER_TIMEOUT")
 
@@ -110,6 +135,24 @@ class Settings(BaseSettings):
     voice_providers: Annotated[list[str], NoDecode] = Field(
         default=["auto"], alias="EZO_VOICE_PROVIDERS"
     )
+    elevenlabs_api_key: SecretStr | None = Field(default=None, alias="ELEVENLABS_API_KEY")
+    elevenlabs_voice_id: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_VOICE_ID"
+    )
+    elevenlabs_stt_model: str = Field(
+        default="scribe_v1", pattern=r"^[A-Za-z0-9_-]{1,100}$", alias="EZO_ELEVENLABS_STT_MODEL"
+    )
+    elevenlabs_tts_model: str = Field(
+        default="eleven_multilingual_v2",
+        pattern=r"^[A-Za-z0-9_-]{1,100}$",
+        alias="EZO_ELEVENLABS_TTS_MODEL",
+    )
+    elevenlabs_tts_languages: Annotated[list[str], NoDecode] = Field(
+        default=["en", "ru"], alias="EZO_ELEVENLABS_TTS_LANGUAGES"
+    )
+    voice_calls_per_day: int = Field(default=100, ge=1, le=10000, alias="EZO_VOICE_CALLS_PER_DAY")
+    voice_concurrency: int = Field(default=1, ge=1, le=4, alias="EZO_VOICE_CONCURRENCY")
+    voice_max_text_chars: int = Field(default=4000, ge=1, le=4000, alias="EZO_VOICE_MAX_TEXT_CHARS")
     voicestudio_url: str | None = Field(default=None, alias="VOICESTUDIO_URL")
     voicestudio_api_key: SecretStr | None = Field(default=None, alias="VOICESTUDIO_API_KEY")
     voicestudio_voice: str = Field(default="default", alias="VOICESTUDIO_VOICE")
@@ -127,12 +170,10 @@ class Settings(BaseSettings):
     openai_stt_model: str = Field(default="gpt-4o-mini-transcribe", alias="EZO_OPENAI_STT_MODEL")
     openai_tts_model: str = Field(default="gpt-4o-mini-tts", alias="EZO_OPENAI_TTS_MODEL")
     openai_tts_voice: str = Field(default="alloy", alias="EZO_OPENAI_TTS_VOICE")
-    elevenlabs_api_key: SecretStr | None = Field(default=None, alias="ELEVENLABS_API_KEY")
-    elevenlabs_voice_id: str = Field(default="21m00Tcm4TlvDq8ikWAM", alias="ELEVENLABS_VOICE_ID")
-    elevenlabs_model_id: str = Field(default="eleven_multilingual_v2", alias="ELEVENLABS_MODEL_ID")
-    elevenlabs_stt_model: str = Field(default="scribe_v1", alias="ELEVENLABS_STT_MODEL")
-    voice_max_audio_mb: int = Field(default=10, alias="EZO_VOICE_MAX_AUDIO_MB")
-    voice_timeout_seconds: float = Field(default=60.0, alias="EZO_VOICE_TIMEOUT_SECONDS")
+    voice_max_audio_mb: int = Field(default=10, ge=1, le=25, alias="EZO_VOICE_MAX_AUDIO_MB")
+    voice_timeout_seconds: float = Field(
+        default=60.0, ge=1, le=180, alias="EZO_VOICE_TIMEOUT_SECONDS"
+    )
 
     # Images (Visual Agent). Exact model IDs are configuration: check your provider's
     # current model list. "none" disables image generation entirely.
@@ -190,6 +231,7 @@ class Settings(BaseSettings):
     )
 
     @field_validator(
+        "elevenlabs_api_key",
         "openai_api_key",
         "anthropic_api_key",
         "gemini_api_key",
@@ -226,7 +268,7 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
 
-    @field_validator("voice_providers", mode="before")
+    @field_validator("voice_providers", "elevenlabs_tts_languages", mode="before")
     @classmethod
     def _split_voice_providers(cls, value: object) -> object:
         if isinstance(value, str):

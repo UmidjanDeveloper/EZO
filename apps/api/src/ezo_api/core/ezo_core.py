@@ -346,7 +346,9 @@ class EzoCore:
             )
 
         with tracer.step("select_agent") as step:
-            if turn.forced_agent == "student" or (
+            if self.services and self.services.settings.deployment_profile == "free-beta":
+                selection = self.agents.select(Intent.GENERAL, "general")
+            elif turn.forced_agent == "student" or (
                 turn.forced_agent is None
                 and wants_student(turn.text)
                 and await active_language_session(session, user.id, conversation.id) is None
@@ -791,7 +793,11 @@ class EzoCore:
             prefs = prepared.user.preferences or {}
             has_consent = bool(prefs.get("memory_consent", False))
             auto_memory = bool(prefs.get("auto_memory", False))
-            if has_consent and auto_memory:
+            if (
+                has_consent
+                and auto_memory
+                and not (self.services and self.services.settings.deployment_profile == "free-beta")
+            ):
                 capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,
                     prepared.user_message.content,

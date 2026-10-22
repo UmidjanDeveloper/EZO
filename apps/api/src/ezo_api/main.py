@@ -5,7 +5,9 @@ Run locally with:  uv run uvicorn ezo_api.main:create_app --factory --reload
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -26,6 +28,7 @@ from ezo_api.api.routes import (
     document_jobs,
     governance,
     ielts,
+    improvements,
     knowledge,
     language,
     learning,
@@ -37,6 +40,7 @@ from ezo_api.api.routes import (
     projects,
     stories,
     student,
+    student_study,
     system,
     translation,
     voice,
@@ -94,6 +98,12 @@ def create_app(
 ) -> FastAPI:
     """Build the app. `overrides` (web_search, fetcher, voice, visual) are for tests."""
     settings = settings or get_settings()
+    from ezo_api.free_beta import validate_free_beta
+
+    validate_free_beta(settings)
+    from ezo_api.deployment import check_environment
+
+    check_environment(settings, os.environ)
     validate_production(settings)
     logging.basicConfig(
         level=settings.log_level.upper(),
@@ -104,33 +114,44 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        mode = (
-            "OFFLINE (no AI provider key found)"
-            if services.router.is_offline
-            else ("providers=" + ",".join(sorted(services.router.providers)))
-        )
-        logger.info(
-            "EZO API %s starting: %s, database=%s",
-            __version__,
-            mode,
-            "sqlite" if settings.is_sqlite else "postgresql",
-        )
-        async with services.db.sessionmaker() as session:
-            interrupted = await services.official.recover_interrupted(session)
-        if interrupted:
-            logger.info("Marked %s interrupted official-source sync run(s)", interrupted)
-        resumed = await services.ingestion.resume_unfinished()
-        if resumed:
-            logger.info("Resumed ingestion of %s unfinished document(s)", resumed)
-        if services.learning is not None:
-            relearn = await services.learning.resume_unfinished()
-            if relearn:
-                logger.info("Resumed reading of %s learned source(s)", relearn)
-        yield
-        if services.learning is not None:
-            await services.learning.shutdown()
-        await services.ingestion.shutdown()
-        await services.db.dispose()
+        try:
+            from ezo_api.deployment import check_database
+
+            await asyncio.to_thread(check_database, settings)
+            from ezo_api.storage.supabase import SupabaseStorageProvider
+
+            if isinstance(services.storage, SupabaseStorageProvider):
+                await services.storage.check_private()
+            mode = (
+                "OFFLINE (no AI provider key found)"
+                if services.router.is_offline
+                else ("providers=" + ",".join(sorted(services.router.providers)))
+            )
+            logger.info(
+                "EZO API %s starting: %s, database=%s",
+                __version__,
+                mode,
+                "sqlite" if settings.is_sqlite else "postgresql",
+            )
+            if settings.deployment_profile != "free-beta":
+                async with services.db.sessionmaker() as session:
+                    interrupted = await services.official.recover_interrupted(session)
+                if interrupted:
+                    logger.info("Marked %s interrupted official-source sync run(s)", interrupted)
+                resumed = await services.ingestion.resume_unfinished()
+                if resumed:
+                    logger.info("Resumed ingestion of %s unfinished document(s)", resumed)
+                if services.learning is not None:
+                    relearn = await services.learning.resume_unfinished()
+                    if relearn:
+                        logger.info("Resumed reading of %s learned source(s)", relearn)
+            yield
+        finally:
+            if services.learning is not None:
+                await services.learning.shutdown()
+            await services.ingestion.shutdown()
+            await services.storage.aclose()
+            await services.db.dispose()
 
     app = FastAPI(
         title="EZO API",
@@ -148,7 +169,10 @@ def create_app(
     app.add_middleware(
         EdgeGuardMiddleware,
         token=services.auth.required_token,
-        max_body_bytes=settings.max_upload_bytes + 2 * 1024 * 1024,
+        max_body_bytes=262_144
+        if settings.deployment_profile == "free-beta"
+        else settings.max_upload_bytes + 2 * 1024 * 1024,
+        free_beta=settings.deployment_profile == "free-beta",
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
@@ -160,6 +184,17 @@ def create_app(
         # Lets the web app read download filenames and which voice answered.
         expose_headers=["Content-Disposition", "X-EZO-Voice-Provider"],
     )
+
+    from ezo_api.storage.base import StorageError
+    from ezo_api.storage.supabase import StorageLimitError
+
+    @app.exception_handler(StorageError)
+    async def _storage_error(_: Request, exc: StorageError) -> JSONResponse:
+        return _error(
+            413 if isinstance(exc, StorageLimitError) else 503,
+            "storage_unavailable",
+            "Private storage could not complete the request.",
+        )
 
     @app.exception_handler(AuthError)
     async def _auth_error(_: Request, exc: AuthError) -> JSONResponse:
@@ -202,7 +237,9 @@ def create_app(
         projects,
         document_jobs,
         governance,
+        improvements,
         student,
+        student_study,
         knowledge,
         voice,
         artifacts,
