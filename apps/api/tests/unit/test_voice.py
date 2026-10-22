@@ -218,3 +218,16 @@ async def test_voicestudio_wire_format_with_real_sdk() -> None:
         "response_format": "mp3",
         "language": "uz",
     }
+
+
+def test_build_voice_service_with_elevenlabs() -> None:
+    svc = build_voice_service(
+        make(
+            ELEVENLABS_API_KEY="el-key",
+            EZO_ELEVENLABS_VOICE_ID="test_voice_id",
+            OPENAI_API_KEY="sk-x",
+            EZO_VOICE_PROVIDERS="elevenlabs, openai",
+        )
+    )
+    assert [p.name for p in svc.tts] == ["elevenlabs", "openai"]
+    assert [p.name for p in svc.stt] == ["elevenlabs", "openai"]

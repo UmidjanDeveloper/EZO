@@ -22,6 +22,7 @@ from ezo_api.voice.openai_audio import OpenAIAudioProvider
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 P = TypeVar("P", SpeechToTextProvider, TextToSpeechProvider)
+AudioProvider = SpeechToTextProvider | TextToSpeechProvider
 
 
 @dataclass(slots=True)
@@ -104,7 +105,7 @@ class VoiceService:
 
 
 def build_voice_service(settings: Settings) -> VoiceService:
-    """Providers in the order of EZO_VOICE_PROVIDERS ("auto" = VoiceStudio, then OpenAI)."""
+    """Providers in the order of EZO_VOICE_PROVIDERS ("auto" = VoiceStudio, ElevenLabs, OpenAI)."""
     available: dict[str, OpenAIAudioProvider | ElevenLabsProvider] = {}
     if settings.voicestudio_url:
         key = (
@@ -120,16 +121,6 @@ def build_voice_service(settings: Settings) -> VoiceService:
             send_language_to_tts=True,
             timeout=settings.voice_timeout_seconds,
         )
-    if settings.openai_api_key:
-        available["openai"] = OpenAIAudioProvider(
-            "openai",
-            api_key=settings.openai_api_key.get_secret_value(),
-            base_url=settings.openai_base_url,
-            stt_model=settings.openai_stt_model,
-            tts_model=settings.openai_tts_model,
-            voice=settings.openai_tts_voice,
-            timeout=settings.voice_timeout_seconds,
-        )
     if settings.elevenlabs_api_key:
         available["elevenlabs"] = ElevenLabsProvider(
             settings.elevenlabs_api_key.get_secret_value(),
@@ -140,6 +131,16 @@ def build_voice_service(settings: Settings) -> VoiceService:
             timeout=settings.voice_timeout_seconds,
             max_audio=settings.voice_max_audio_mb * 1024 * 1024,
             max_text=settings.voice_max_text_chars,
+        )
+    if settings.openai_api_key:
+        available["openai"] = OpenAIAudioProvider(
+            "openai",
+            api_key=settings.openai_api_key.get_secret_value(),
+            base_url=settings.openai_base_url,
+            stt_model=settings.openai_stt_model,
+            tts_model=settings.openai_tts_model,
+            voice=settings.openai_tts_voice,
+            timeout=settings.voice_timeout_seconds,
         )
     order = (
         ["voicestudio", "elevenlabs", "openai"]

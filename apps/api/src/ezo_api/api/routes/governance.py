@@ -5,6 +5,7 @@ Enforces strict governance constraints:
 - Super Admin alone controls platform governance and system diagnostics.
 - Subscription status (pro, enterprise) NEVER escalates to Super Admin.
 - Strict rejection of autonomous code modification, auto-merge, or auto-deployment.
+- Zero credential exposure: tokens, keys, database connection strings are never returned.
 """
 
 from __future__ import annotations
@@ -48,5 +49,6 @@ async def get_governance_status(admin_user: SuperAdminUser) -> GovernanceStatusO
             "memory_opt_in": "enforced",
             "subscription_privilege_escalation": "blocked",
             "k8_autonomous_modification": "disabled",
+            "credential_masking": "enforced",
         },
     )
