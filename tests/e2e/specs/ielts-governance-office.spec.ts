@@ -109,7 +109,7 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
 
   // Stats bar visible
   await expect(page.getByText("Sinovlar soni")).toBeVisible();
-  await expect(page.getByText("3")).toBeVisible();
+  await expect(page.getByText("3", { exact: true }).first()).toBeVisible();
 
   // Start new test session
   await page.getByRole("button", { name: /Yangi imtihon/i }).click();
@@ -140,7 +140,7 @@ test("governance: ordinary user receives 403 Forbidden with RBAC warning", async
 
   await page.goto("/admin");
   await expect(page.getByText("Kirish taqiqlangan (403 Forbidden)")).toBeVisible();
-  await expect(page.getByText("Obuna maqomi (pro, enterprise) platforma boshqaruviga ruxsat bermaydi.")).toBeVisible();
+  await expect(page.getByText(/Obuna maqomi \(pro, enterprise\) platforma boshqaruviga ruxsat bermaydi/)).toBeVisible();
 });
 
 test("governance: super admin accesses health, agent routing, proposals, and audit logs", async ({ page }) => {

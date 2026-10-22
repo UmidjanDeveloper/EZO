@@ -213,7 +213,7 @@ export function OfficePage() {
           </div>
           <p className="text-xs leading-relaxed text-ink-muted">
             {m.office?.safeNotice ??
-              "Xavfsizlik kafolati: Barcha Word va Excel fayllari makroslarsiz, tashqi havfli skriptlarsiz toza formatda generatsiya qilinadi."}
+              "Makroslar va tashqi skriptlarsiz toza, xavfsiz ofis fayllari yaratiladi."}
           </p>
         </div>
       </Card>

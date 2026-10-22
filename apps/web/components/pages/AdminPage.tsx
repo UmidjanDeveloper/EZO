@@ -256,6 +256,8 @@ export function AdminPage() {
             <h2 className="text-xl font-bold text-danger">Kirish taqiqlangan (403 Forbidden)</h2>
             <p className="text-sm text-ink-muted max-w-md">
               Ushbu bo‘lim faqat tizim <strong>Super Admin</strong> foydalanuvchisi uchun ochiq.
+            </p>
+            <p className="text-sm text-ink-muted max-w-md">
               Obuna maqomi (pro, enterprise) platforma boshqaruviga ruxsat bermaydi.
             </p>
           </Card>

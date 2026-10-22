@@ -179,7 +179,7 @@ export function PresentationsPage() {
 
             <form onSubmit={handleGenerateOutline} className="space-y-3">
               <TextField
-                label={m.presentations?.topicLabel ?? "Taqdimot mavzusi / Sarlavha"}
+                label={m.presentations?.topicLabel ?? "Taqdimot mavzusi"}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
