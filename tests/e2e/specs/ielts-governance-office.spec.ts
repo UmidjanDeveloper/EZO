@@ -112,14 +112,14 @@ test("ielts: interactive speaking workflow, criteria evaluation and disclaimer",
   await expect(page.getByText("3", { exact: true }).first()).toBeVisible();
 
   // Start new test session
-  await page.getByRole("button", { name: /Yangi imtihon/i }).click();
+  await page.getByRole("button", { name: /Yangi imtihon/i }).first().click();
 
   // Examiner prompt displayed
   await expect(page.getByText("Could you tell me your full name and where you are from?")).toBeVisible();
 
   // Type answer and submit
   await page.getByLabel("Sizning javobingiz:").fill("My name is Umidjan and I am from Tashkent, Uzbekistan.");
-  await page.getByRole("button", { name: "Yuborish" }).click();
+  await page.getByRole("button", { name: /Yuborish/i }).click();
 
   // Check advance
   await expect(page.getByText("What do you like most about your hometown?")).toBeVisible();
@@ -215,7 +215,7 @@ test("governance: super admin accesses health, agent routing, proposals, and aud
 
   await page.goto("/admin");
   await expect(page.getByText("Super Admin Autentifikatsiya Qilingan")).toBeVisible();
-  await expect(page.getByText("Ro‘yxatdan o‘tgan Agentlar katalogi")).toBeVisible();
+  await expect(page.getByText(/Ro[‘']yxatdan o[‘']tgan Agentlar katalogi/)).toBeVisible();
   await expect(page.getByText("EZO Student")).toBeVisible();
   await expect(page.getByText("Upgrade Student durable parser to isolated worker pool v2")).toBeVisible();
 });
@@ -227,5 +227,5 @@ test("office: presentation maker and document workspace", async ({ page }) => {
 
   await page.goto("/office");
   await expect(page.getByRole("heading", { level: 1, name: /Hujjatlar va Ofis/ })).toBeVisible();
-  await expect(page.getByText("Makroslar va tashqi skriptlarsiz toza, xavfsiz ofis fayllari yaratiladi.")).toBeVisible();
+  await expect(page.getByText(/Makroslar va tashqi skriptlarsiz toza, xavfsiz ofis fayllari yaratiladi/)).toBeVisible();
 });
