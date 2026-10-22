@@ -52,3 +52,36 @@ The next K7 implementation needs the following coherent changes together:
 These are unimplemented engineering requirements, not waived by the recovery fix.
 K4 general execution remains disabled; no parser/sandbox shortcut, autonomous code
 execution, remote service, paid API call, merge or deployment is introduced here.
+
+## Additional concurrency prerequisite: one index per pending input
+
+Recovery validation reproduced another failure: two ingestion runners could enter
+the pipeline for the same processing input and rewrite its completed revision's
+chunk set. The new regression failed before serialization. This is reachable
+through independent background/startup runners; a local semaphore in one runner
+is not a cross-runner lock.
+
+`KnowledgeService.ingest` now acquires a database write lock and refreshes the row
+at both transaction boundaries. PostgreSQL locks the document row; SQLite uses a
+real writer lock rather than pretending FOR UPDATE works. A completed or terminal
+row is returned without reindexing. Explicit API reindex already queues the row,
+so it remains supported. The existing committed processing progress is retained;
+the second lock is held through parsing/index publication. If another runner
+completed while waiting, it reuses that result. After an error rollback, state
+is rechecked under the lock before writing failure, protecting a newer success.
+
+Learning passes the expected source content hash. Replacement input between
+processing and publication raises a superseded-input signal, leaves the new input
+queued/healthy and creates no false failed result or source completion manifest.
+A controlled owner upload between the real commits verifies this on both databases.
+
+This is document-level serialization, not a source lease or full K7 fencing. It
+retains the legacy pipeline's write transaction over embedding work; staged
+embedding/publication remains necessary for efficient locks and source revocation.
+No claim of database-level parallel writer throughput on SQLite, general sandbox
+containment, durable schedules or multi-source atomic snapshots is made.
+
+Expected-hash checks also bind ingestion to the actual stored bytes: a corrupted
+blob or incorrect restore must fail the integrity check before parsing and must
+not publish new chunks under the old registered hash. This is ingestion-time
+integrity, not a claim of an already completed backup/restore drill.

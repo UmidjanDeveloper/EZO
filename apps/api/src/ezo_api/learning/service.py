@@ -239,7 +239,7 @@ class LearningService:
             try:
                 await self._run(session, source_id)
             except LookupError:
-                logger.info("Learned source %s was deleted while it was read", source_id)
+                logger.info("Learned source %s was deleted or superseded while read", source_id)
             except Exception:
                 logger.exception("Learning crashed for source %s", source_id)
                 await session.rollback()
@@ -305,7 +305,9 @@ class LearningService:
             # commit. Resume only those incomplete states; do not revive failed
             # documents or reindex healthy unchanged revisions automatically.
             if not result.duplicate or result.document.status in ("queued", "processing"):
-                await self.knowledge.ingest(session, document_id)
+                await self.knowledge.ingest(
+                    session, document_id, expected_hash=result.document.content_hash
+                )
             indexed_document = await session.get(KnowledgeDocument, document_id)
             if indexed_document is None:
                 raise LookupError(source_id)

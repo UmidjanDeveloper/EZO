@@ -16,7 +16,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.core.language import detect_language
@@ -59,6 +59,10 @@ class AddResult:
     document: KnowledgeDocument
     duplicate: bool
     new_revision: bool
+
+
+class IngestionSuperseded(LookupError):
+    """The input changed while an older ingestion was between commit boundaries."""
 
 
 @dataclass(slots=True)
@@ -391,8 +395,16 @@ class KnowledgeService:
 
     # ------------------------------------------------------------------ ingest
 
-    async def ingest(self, session: AsyncSession, document_id: uuid.UUID) -> KnowledgeDocument:
-        """Run the full pipeline for one document. Never raises for content problems:
+    async def ingest(
+        self,
+        session: AsyncSession,
+        document_id: uuid.UUID,
+        *,
+        expected_hash: str | None = None,
+    ) -> KnowledgeDocument:
+        """Process queued/processing input; explicit reindex must queue it first.
+
+        Duplicate runners reuse a terminal result. Never raises for content problems:
         the document ends up `indexed`, `partial`, `needs_ocr` or `failed` with a message."""
         document = await session.get(KnowledgeDocument, document_id)
         if document is None:
@@ -401,28 +413,68 @@ class KnowledgeService:
             # Student raw revisions have no legacy storage pointer. Their current
             # revision/index/status belong exclusively to fenced publication.
             return document
+        document = await self._locked_input(session, document_id, expected_hash)
+        if not self._pending(document):
+            await session.commit()
+            return document
+        input_hash = document.content_hash
         document.status = "processing"
         document.error = None
         await session.commit()
+        # Keep processing progress visible, then reacquire and refresh under a
+        # write lock. Another runner may have completed or replaced this input
+        # between those transactions. Never rebuild its committed chunk set.
+        document = await self._locked_input(session, document_id, input_hash)
+        if not self._pending(document):
+            await session.commit()
+            return document
         try:
             await self._run_pipeline(session, document)
         except (ParseError, StorageError, UploadRejectedError) as exc:
             await session.rollback()
-            document = await self._reload(session, document_id)
+            document = await self._locked_input(session, document_id, input_hash)
+            if not self._pending(document):
+                await session.commit()
+                return document
             document.status = "failed"
             document.error = getattr(exc, "message", None) or str(exc)
         except Exception:
             logger.error("Ingestion crashed for document %s", document_id)
             await session.rollback()
-            document = await self._reload(session, document_id)
+            document = await self._locked_input(session, document_id, input_hash)
+            if not self._pending(document):
+                await session.commit()
+                return document
             document.status = "failed"
             document.error = "Unexpected error while reading the file. See the API logs."
         await session.commit()
         return document
 
-    async def _reload(self, session: AsyncSession, document_id: uuid.UUID) -> KnowledgeDocument:
-        document = await session.get(KnowledgeDocument, document_id)
-        assert document is not None
+    @staticmethod
+    def _pending(document: KnowledgeDocument) -> bool:
+        return (document.meta or {}).get("student") is not True and document.status in (
+            "queued",
+            "processing",
+        )
+
+    async def _locked_input(
+        self, session: AsyncSession, document_id: uuid.UUID, expected_hash: str | None
+    ) -> KnowledgeDocument:
+        # SELECT FOR UPDATE is ignored by SQLite. A no-op UPDATE locks the row
+        # on PostgreSQL and the writer on SQLite; refresh the identity map too.
+        document = await session.scalar(
+            update(KnowledgeDocument)
+            .where(KnowledgeDocument.id == document_id)
+            .values(updated_at=KnowledgeDocument.updated_at)
+            .returning(KnowledgeDocument)
+            .execution_options(populate_existing=True)
+        )
+        if document is None:
+            await session.rollback()
+            raise LookupError(f"Document {document_id} not found")
+        if expected_hash is not None and document.content_hash != expected_hash:
+            await session.rollback()
+            raise IngestionSuperseded("Document input was superseded")
         return document
 
     async def _run_pipeline(self, session: AsyncSession, document: KnowledgeDocument) -> None:
@@ -430,6 +482,8 @@ class KnowledgeService:
         if not document.storage_key:
             raise StorageError("The document has no stored file.")
         data = await self.storage.get(document.storage_key)
+        if document.content_hash and sha256_hex(data) != document.content_hash:
+            raise ParseError("Stored document integrity check failed.", "integrity_mismatch")
 
         # PARSE (CPU-bound: off the event loop)
         category = str((document.meta or {}).get("category", "text"))

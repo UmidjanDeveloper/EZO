@@ -219,3 +219,11 @@ are preserved; no durable DocumentJob attempts are reset. This does not add a K7
 queue, schedule, permission grant or remote execution capability. See
 `docs/master/KNOWLEDGE_REFRESH_GOVERNANCE.md` for confirmed commit boundaries and
 the required staged/fenced publication design.
+
+Pending document ingestion is also serialized under database write locks across
+independent runners. A second worker reuses an already published result. Source
+ingestion binds the expected content hash; a superseded input aborts without
+marking the replacement failed. Explicit reindex still queues the document first.
+This introduces no new HTTP fields or durable scheduling/execution authority.
+Stored source bytes are verified against the registered hash before parsing;
+corruption fails ingestion without publishing quotes/chunks under a false hash.

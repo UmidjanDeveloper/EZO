@@ -39,7 +39,7 @@ class IngestionRunner:
             try:
                 await self.service.ingest(session, document_id)
             except LookupError:
-                logger.info("Document %s was deleted before ingestion", document_id)
+                logger.info("Document %s was deleted or superseded during ingestion", document_id)
 
     async def submit(self, document_id: uuid.UUID) -> None:
         if self.mode == "inline":

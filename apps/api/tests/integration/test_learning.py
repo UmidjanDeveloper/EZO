@@ -448,3 +448,177 @@ async def test_source_refresh_does_not_revive_unchanged_terminal_document(
         document = await session.get(KnowledgeDocument, document_id)
         assert (document.status, document.error) == (terminal_status, "terminal fixture error")
         assert document.current_revision_id == revision_id
+
+
+async def test_parallel_ingestion_runners_publish_one_unchanged_index(
+    api: AsyncClient, learning_app: FastAPI, web: FakeWeb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import asyncio
+
+    from ezo_api.db.models import DocumentRevision, KnowledgeChunk, KnowledgeSource
+
+    docs_site(web)
+    runner = learning_app.state.services.learning
+
+    async def no_start(source_id):
+        pass
+
+    with monkeypatch.context() as hold:
+        hold.setattr(runner, "submit", no_start)
+        source = (
+            await api.post(
+                "/api/learning/sources",
+                json={
+                    "target": f"{DOCS}/guide/",
+                    "limits": {"min_interval_seconds": 0},
+                },
+            )
+        ).json()
+    maker = learning_app.state.services.db.sessionmaker
+    knowledge = runner.service.knowledge
+    async with maker() as session:
+        learned = await session.get(LearnedSource, uuid.UUID(source["id"]))
+        knowledge_source = await session.get(KnowledgeSource, learned.knowledge_source_id)
+        added = await knowledge.add_source_document(
+            session,
+            knowledge_source,
+            url=f"{DOCS}/guide/fixture.md",
+            filename="fixture.md",
+            title="Fixture",
+            data=b"# Fixture\n\nExact source evidence for parallel recovery.",
+            category="markdown",
+            meta={},
+        )
+        document_id = added.document.id
+        await session.commit()
+    first_running, release, second_running = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    original = knowledge._run_pipeline
+    pipelines = 0
+
+    async def pause_first(session, document):
+        nonlocal pipelines
+        pipelines += 1
+        if pipelines == 1:
+            first_running.set()
+            await release.wait()
+        else:
+            second_running.set()
+        await original(session, document)
+
+    monkeypatch.setattr(knowledge, "_run_pipeline", pause_first)
+
+    async def ingest():
+        async with maker() as session:
+            return await knowledge.ingest(session, document_id)
+
+    first = asyncio.create_task(ingest())
+    second = None
+    try:
+        await asyncio.wait_for(first_running.wait(), 5)
+        second = asyncio.create_task(ingest())
+        # A second API/runner must wait for publication, not rebuild the same
+        # revision/chunks concurrently. SQLite and actual PostgreSQL both run this.
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(second_running.wait(), 0.5)
+        release.set()
+        first_result, second_result = await asyncio.wait_for(asyncio.gather(first, second), 5)
+        assert pipelines == 1
+        assert first_result.current_revision_id == second_result.current_revision_id
+        async with maker() as session:
+            assert await session.scalar(select(func.count()).select_from(DocumentRevision)) == 1
+            assert await session.scalar(select(func.count()).select_from(KnowledgeChunk)) > 0
+    finally:
+        release.set()
+        tasks = [first] + ([second] if second is not None else [])
+        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 5)
+
+
+async def test_replaced_input_between_processing_and_publication_is_not_failed(
+    api: AsyncClient, learning_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ezo_api.knowledge.ingestion.service import IngestionSuperseded
+    from ezo_api.knowledge.uploads import sha256_hex
+
+    services = learning_app.state.services
+
+    async def no_start(document_id):
+        pass
+
+    with monkeypatch.context() as hold:
+        hold.setattr(services.ingestion, "submit", no_start)
+        uploaded = await api.post(
+            "/api/knowledge/documents",
+            files={
+                "file": ("superseded.txt", b"Original input evidence.", "text/plain"),
+            },
+        )
+    assert uploaded.status_code == 201
+    document_id = uuid.UUID(uploaded.json()["document"]["id"])
+    replacement = b"Replacement input evidence remains owned, queued and readable."
+    original_lock = services.knowledge._locked_input
+    calls = 0
+
+    async def replace_before_second_lock(session, doc_id, expected_hash):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            async with services.db.sessionmaker() as owner_session:
+                existing = await owner_session.get(KnowledgeDocument, doc_id)
+                changed = await services.knowledge.add_upload(
+                    owner_session,
+                    existing.user_id,
+                    "superseded.txt",
+                    replacement,
+                    existing.project_id,
+                )
+                assert changed.document.id == doc_id
+                await owner_session.commit()
+        return await original_lock(session, doc_id, expected_hash)
+
+    with monkeypatch.context() as race:
+        race.setattr(services.knowledge, "_locked_input", replace_before_second_lock)
+        async with services.db.sessionmaker() as session:
+            with pytest.raises(IngestionSuperseded):
+                await services.knowledge.ingest(session, document_id)
+    async with services.db.sessionmaker() as session:
+        current = await session.get(KnowledgeDocument, document_id)
+        assert current.content_hash == sha256_hex(replacement)
+        assert current.status == "queued" and current.error is None
+        assert current.current_revision_id is None
+        recovered = await services.knowledge.ingest(session, document_id)
+        assert recovered.status == "indexed"
+        assert recovered.content_hash == sha256_hex(replacement)
+
+
+async def test_corrupted_blob_is_not_indexed_under_the_registered_source_hash(
+    api: AsyncClient, learning_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from ezo_api.db.models import KnowledgeChunk
+    from ezo_api.storage.local import LocalStorageProvider
+
+    services = learning_app.state.services
+
+    async def no_start(document_id):
+        pass
+
+    with monkeypatch.context() as hold:
+        hold.setattr(services.ingestion, "submit", no_start)
+        uploaded = await api.post(
+            "/api/knowledge/documents",
+            files={
+                "file": ("integrity.txt", b"Original authorized source bytes.", "text/plain"),
+            },
+        )
+    assert uploaded.status_code == 201
+    document_id = uuid.UUID(uploaded.json()["document"]["id"])
+    assert isinstance(services.storage, LocalStorageProvider)
+    async with services.db.sessionmaker() as session:
+        document = await session.get(KnowledgeDocument, document_id)
+        original_hash = document.content_hash
+        # Actual disk corruption/incorrect restore, not a user API permission.
+        (services.storage.root / document.storage_key).write_bytes(b"Unrelated replacement bytes.")
+        result = await services.knowledge.ingest(session, document_id)
+        assert result.status == "failed" and "integrity" in result.error.lower()
+        assert result.content_hash == original_hash
+        assert result.current_revision_id is None
+        assert await session.scalar(select(func.count()).select_from(KnowledgeChunk)) == 0
