@@ -127,6 +127,10 @@ class Settings(BaseSettings):
     openai_stt_model: str = Field(default="gpt-4o-mini-transcribe", alias="EZO_OPENAI_STT_MODEL")
     openai_tts_model: str = Field(default="gpt-4o-mini-tts", alias="EZO_OPENAI_TTS_MODEL")
     openai_tts_voice: str = Field(default="alloy", alias="EZO_OPENAI_TTS_VOICE")
+    elevenlabs_api_key: SecretStr | None = Field(default=None, alias="ELEVENLABS_API_KEY")
+    elevenlabs_voice_id: str = Field(default="21m00Tcm4TlvDq8ikWAM", alias="ELEVENLABS_VOICE_ID")
+    elevenlabs_model_id: str = Field(default="eleven_multilingual_v2", alias="ELEVENLABS_MODEL_ID")
+    elevenlabs_stt_model: str = Field(default="scribe_v1", alias="ELEVENLABS_STT_MODEL")
     voice_max_audio_mb: int = Field(default=10, alias="EZO_VOICE_MAX_AUDIO_MB")
     voice_timeout_seconds: float = Field(default=60.0, alias="EZO_VOICE_TIMEOUT_SECONDS")
 

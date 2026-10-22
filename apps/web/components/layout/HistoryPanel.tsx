@@ -14,6 +14,7 @@ import {
   Plus,
   Presentation,
   Settings,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
@@ -49,6 +50,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/settings", label: m.nav.settings, icon: Settings },
+    { href: "/admin", label: m.nav.admin, icon: ShieldCheck },
   ];
 
   return (

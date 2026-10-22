@@ -42,6 +42,7 @@ def test_long_filenames_keep_extension() -> None:
         ("a.png", PNG_1PX, "image"),
         ("old.txt", "Привет".encode("cp1251"), "text"),
     ],
+    ids=["pdf", "docx", "xlsx", "csv", "txt", "md", "png", "old_txt"],
 )
 def test_valid_files(filename: str, data: bytes, category: str) -> None:
     assert detect_kind(filename, data).category == category

@@ -75,3 +75,60 @@ async def test_super_admin_can_access_governance(app: FastAPI, client: AsyncClie
     assert data["autonomous_pr_merge"] is False
     assert data["policies"]["subscription_privilege_escalation"] == "blocked"
     assert data["policies"]["k8_autonomous_modification"] == "disabled"
+
+
+@pytest.mark.asyncio
+async def test_super_admin_endpoints_full_lifecycle(app: FastAPI, client: AsyncClient) -> None:
+    # Ensure user is provisioned as super_admin
+    await client.get("/api/personal/profile")
+    sessionmaker = app.state.services.db.sessionmaker
+    async with sessionmaker() as session:
+        users = (await session.scalars(select(User))).all()
+        user = users[0]
+        user.role = "super_admin"
+        await session.commit()
+
+    # 1. System health
+    health_resp = await client.get("/api/admin/governance/system-health")
+    assert health_resp.status_code == 200
+    assert health_resp.json()["status"] == "healthy"
+
+    # 2. Agent settings list and update
+    agents_resp = await client.get("/api/admin/governance/agents")
+    assert agents_resp.status_code == 200
+    agents = agents_resp.json()
+    assert len(agents) >= 4
+
+    put_resp = await client.put(
+        "/api/admin/governance/agents/student",
+        json={"rate_limit_per_min": 75, "temperature": 0.25},
+    )
+    assert put_resp.status_code == 200
+    assert put_resp.json()["rate_limit_per_min"] == 75
+
+    # 3. K8 proposals list and review
+    prop_resp = await client.get("/api/admin/governance/proposals")
+    assert prop_resp.status_code == 200
+    props = prop_resp.json()
+    assert len(props) >= 2
+
+    review_resp = await client.post(
+        "/api/admin/governance/proposals/prop-001/review",
+        json={"action": "approve", "notes": "Approved after local test suite passed."},
+    )
+    assert review_resp.status_code == 200
+    assert review_resp.json()["status"] == "approved"
+
+    # 4. Audit logs
+    audit_resp = await client.get("/api/admin/governance/audit-logs")
+    assert audit_resp.status_code == 200
+    logs = audit_resp.json()
+    assert len(logs) >= 3
+    for log_item in logs:
+        assert "password" not in log_item
+        assert "secret" not in log_item
+
+    # 5. Resource budgets
+    budget_resp = await client.get("/api/admin/governance/budgets")
+    assert budget_resp.status_code == 200
+    assert budget_resp.json()["daily_token_budget"] == 1_000_000

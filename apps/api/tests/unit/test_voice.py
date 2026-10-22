@@ -218,3 +218,56 @@ async def test_voicestudio_wire_format_with_real_sdk() -> None:
         "response_format": "mp3",
         "language": "uz",
     }
+
+
+async def test_elevenlabs_provider_tts_and_stt() -> None:
+    """ElevenLabs TTS and STT with mocked HTTP endpoints."""
+    from ezo_api.voice.elevenlabs_audio import ElevenLabsAudioProvider
+
+    calls: list[httpx.Request] = []
+
+    def mock_handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        if request.url.path.endswith("/speech-to-text"):
+            return httpx.Response(200, json={"text": "Assalomu alaykum", "language_code": "uz"})
+        if "/text-to-speech/" in request.url.path:
+            return httpx.Response(
+                200, content=b"ID3elevenlabs_mp3", headers={"content-type": "audio/mpeg"}
+            )
+        return httpx.Response(404)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(mock_handler))
+    provider = ElevenLabsAudioProvider(
+        "elevenlabs",
+        api_key="el-test-key",
+        voice_id="test_voice_123",
+        client=client,
+    )
+
+    # Test synthesis
+    speech = await provider.synthesize("Assalomu alaykum", "uz")
+    assert speech.data == b"ID3elevenlabs_mp3"
+    assert speech.provider == "elevenlabs"
+
+    # Test transcription
+    transcript = await provider.transcribe(WAV, "audio/wav", "voice.wav", "uz")
+    assert transcript.text == "Assalomu alaykum"
+    assert transcript.language == "uz"
+    assert transcript.provider == "elevenlabs"
+
+    assert len(calls) == 2
+    tts_req, stt_req = calls
+    assert tts_req.headers["xi-api-key"] == "el-test-key"
+    assert stt_req.headers["xi-api-key"] == "el-test-key"
+
+
+def test_build_voice_service_with_elevenlabs() -> None:
+    svc = build_voice_service(
+        make(
+            ELEVENLABS_API_KEY="el-key",
+            OPENAI_API_KEY="sk-x",
+            EZO_VOICE_PROVIDERS="elevenlabs, openai",
+        )
+    )
+    assert [p.name for p in svc.tts] == ["elevenlabs", "openai"]
+    assert [p.name for p in svc.stt] == ["elevenlabs", "openai"]

@@ -4,13 +4,22 @@ import { Button, Card, cn, Spinner, TextAreaField } from "@ezo/ui";
 import {
   Award,
   ChevronRight,
+  Mic,
   MicOff,
   RotateCcw,
   Send,
+  Square,
+  Volume2,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import {
+  listenOnce,
+  speak,
+  speechRecognitionSupported,
+  speechSynthesisSupported,
+} from "@/lib/speech";
 import { PageFrame } from "./PageFrame";
 
 interface CueCard {
@@ -78,6 +87,44 @@ export function IeltsPage() {
   const [loading, setLoading] = useState(false);
   const [evalResult, setEvalResult] = useState<EvaluationResult | null>(null);
   const [stepFeedback, setStepFeedback] = useState<{ feedback: string; uz: string } | null>(null);
+
+  // Real voice and audio interaction
+  const [isListening, setIsListening] = useState(false);
+  const [stopListeningFn, setStopListeningFn] = useState<(() => void) | null>(null);
+  const [speechSeconds, setSpeechSeconds] = useState(30.0);
+  const [speakingPrompt, setSpeakingPrompt] = useState(false);
+
+  function toggleListening() {
+    if (isListening && stopListeningFn) {
+      stopListeningFn();
+      setIsListening(false);
+      setStopListeningFn(null);
+      return;
+    }
+    if (!speechRecognitionSupported()) {
+      alert("Brauzeringizda ovoz tanish funksiyasi qo'llab-quvvatlanmaydi.");
+      return;
+    }
+    setIsListening(true);
+    const stop = listenOnce("en", {
+      onInterim: (text) => setAnswer(text),
+      onFinal: (text, info) => {
+        setAnswer(text);
+        if (info?.speechSeconds) setSpeechSeconds(info.speechSeconds);
+      },
+      onEnd: () => {
+        setIsListening(false);
+        setStopListeningFn(null);
+      },
+    });
+    setStopListeningFn(() => stop);
+  }
+
+  function handleSpeakPrompt(text: string) {
+    if (!speechSynthesisSupported() || !text) return;
+    setSpeakingPrompt(true);
+    void speak(text, "en").finally(() => setSpeakingPrompt(false));
+  }
 
   const authHeaders = useCallback(() => {
     const token = storedToken.get().trim();
@@ -162,7 +209,7 @@ export function IeltsPage() {
       const advRes = await fetch(`${apiUrl()}/api/ielts/sessions/${session.id}/advance`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ answer: answer.trim(), speech_seconds: 30.0 }),
+        body: JSON.stringify({ answer: answer.trim(), speech_seconds: speechSeconds }),
       });
       if (advRes.ok) {
         const adv = await advRes.json();
@@ -276,9 +323,21 @@ export function IeltsPage() {
 
               {/* Examiner Prompt */}
               <div className="rounded-xl border border-line bg-surface-2/60 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                  Imtihon oluvchi savoli:
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-accent">
+                    Imtihon oluvchi savoli:
+                  </p>
+                  {session.current_prompt && (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1 rounded-md bg-surface-3 px-2 py-0.5 text-xs text-ink-muted hover:text-ink transition-colors"
+                      onClick={() => handleSpeakPrompt(session.current_prompt || "")}
+                    >
+                      <Volume2 size={13} className={speakingPrompt ? "text-accent animate-pulse" : ""} />
+                      {speakingPrompt ? "O'qilmoqda..." : "Savolni tinglash"}
+                    </button>
+                  )}
+                </div>
                 <p className="mt-1.5 whitespace-pre-line text-base font-medium leading-relaxed text-ink">
                   {session.current_prompt || "Savol tayyorlanmoqda..."}
                 </p>
@@ -303,10 +362,27 @@ export function IeltsPage() {
                       {stepFeedback.uz ? <p className="text-accent">{stepFeedback.uz}</p> : null}
                     </div>
                   ) : null}
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-ink-muted">
-                      {answer.split(/\s+/).filter(Boolean).length} ta so&apos;z
-                    </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant={isListening ? "primary" : "secondary"}
+                        size="sm"
+                        icon={
+                          isListening ? (
+                            <Square size={13} className="text-red-500 animate-pulse" />
+                          ) : (
+                            <Mic size={13} />
+                          )
+                        }
+                        onClick={toggleListening}
+                      >
+                        {isListening ? "To'xtatish (Eshitilmoqda...)" : "Ovoz bilan javob berish"}
+                      </Button>
+                      <p className="text-xs text-ink-muted">
+                        {answer.split(/\s+/).filter(Boolean).length} ta so&apos;z
+                      </p>
+                    </div>
                     <Button
                       variant="primary"
                       icon={<Send size={15} />}

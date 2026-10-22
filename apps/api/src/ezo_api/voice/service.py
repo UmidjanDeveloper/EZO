@@ -15,11 +15,13 @@ from ezo_api.voice.base import (
     Transcript,
     VoiceError,
 )
+from ezo_api.voice.elevenlabs_audio import ElevenLabsAudioProvider
 from ezo_api.voice.openai_audio import OpenAIAudioProvider
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T")
 P = TypeVar("P", SpeechToTextProvider, TextToSpeechProvider)
+AudioProvider = SpeechToTextProvider | TextToSpeechProvider
 
 
 @dataclass(slots=True)
@@ -80,8 +82,8 @@ class VoiceService:
 
 
 def build_voice_service(settings: Settings) -> VoiceService:
-    """Providers in the order of EZO_VOICE_PROVIDERS ("auto" = VoiceStudio, then OpenAI)."""
-    available: dict[str, OpenAIAudioProvider] = {}
+    """Providers in the order of EZO_VOICE_PROVIDERS ("auto" = VoiceStudio, ElevenLabs, OpenAI)."""
+    available: dict[str, AudioProvider] = {}
     if settings.voicestudio_url:
         key = (
             settings.voicestudio_api_key.get_secret_value() if settings.voicestudio_api_key else ""
@@ -96,6 +98,15 @@ def build_voice_service(settings: Settings) -> VoiceService:
             send_language_to_tts=True,
             timeout=settings.voice_timeout_seconds,
         )
+    if settings.elevenlabs_api_key:
+        available["elevenlabs"] = ElevenLabsAudioProvider(
+            "elevenlabs",
+            api_key=settings.elevenlabs_api_key.get_secret_value(),
+            voice_id=settings.elevenlabs_voice_id,
+            model_id=settings.elevenlabs_model_id,
+            stt_model=settings.elevenlabs_stt_model,
+            timeout=settings.voice_timeout_seconds,
+        )
     if settings.openai_api_key:
         available["openai"] = OpenAIAudioProvider(
             "openai",
@@ -107,9 +118,14 @@ def build_voice_service(settings: Settings) -> VoiceService:
             timeout=settings.voice_timeout_seconds,
         )
     order = (
-        ["voicestudio", "openai"]
+        ["voicestudio", "elevenlabs", "openai"]
         if settings.voice_providers == ["auto"]
         else settings.voice_providers
     )
-    chosen = [available[name] for name in order if name in available]
-    return VoiceService(stt=chosen, tts=chosen)
+    stt_chosen = [
+        p for name in order if (p := available.get(name)) and isinstance(p, SpeechToTextProvider)
+    ]
+    tts_chosen = [
+        p for name in order if (p := available.get(name)) and isinstance(p, TextToSpeechProvider)
+    ]
+    return VoiceService(stt=stt_chosen, tts=tts_chosen)
