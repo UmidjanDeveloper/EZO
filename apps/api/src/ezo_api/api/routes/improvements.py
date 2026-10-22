@@ -24,10 +24,27 @@ router = APIRouter(
 )
 
 
+def _utf8_size(value: str) -> int:
+    # PostgreSQL JSONB rejects NUL even when JSON-escaped; reject consistently on
+    # SQLite too, before constructing an immutable audit snapshot.
+    if "\x00" in value:
+        raise ValueError("Proposal text must not contain NUL.")
+    try:
+        return len(value.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise ValueError("Proposal text must contain valid Unicode scalar values.") from exc
+
+
 class ProposalIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     library_id: uuid.UUID
     goal: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("goal")
+    @classmethod
+    def unicode_text(cls, value: str) -> str:
+        _utf8_size(value)
+        return value
 
 
 class ConfirmationIn(BaseModel):
@@ -47,11 +64,7 @@ class DraftIn(BaseModel):
     @field_validator("source", "purpose")
     @classmethod
     def source_bytes(cls, value: str) -> str:
-        try:
-            size = len(value.encode("utf-8"))
-        except UnicodeEncodeError as exc:
-            raise ValueError("Draft must contain valid Unicode scalar values.") from exc
-        if size > MAX_BYTES:
+        if _utf8_size(value) > MAX_BYTES:
             raise ValueError("Draft exceeds UTF-8 byte limit.")
         return value
 

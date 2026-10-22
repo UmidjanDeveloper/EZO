@@ -82,6 +82,14 @@ async def test_rejected_draft_stays_untrusted_and_unicode_bytes_are_bounded(clie
     assert response.json()["validation"]["static_status"] == "rejected"
     assert response.json()["status"] == "untrusted_draft"
     assert (await client.post(prefix, json={**body, "source": "😀" * 5000})).status_code == 422
+    for field in ("source", "purpose"):
+        assert (await client.post(prefix, json={**body, field: "bad\x00text"})).status_code == 422
+    assert (
+        await client.post(
+            "/api/admin/governance/improvements",
+            json={"library_id": str(uuid.uuid4()), "goal": "bad\x00goal"},
+        )
+    ).status_code == 422
     assert (
         await client.post(
             prefix,
