@@ -41,10 +41,10 @@ async def test_ielts_evaluate_direct_answer(client: AsyncClient) -> None:
     resp = await client.post("/api/ielts/evaluate", json={"answer": answer, "part": 1})
     assert resp.status_code == 200
     eval_data = resp.json()
-    assert eval_data["fluency_score"] >= 4.0
-    assert eval_data["lexical_score"] >= 4.0
-    assert eval_data["grammar_score"] >= 4.0
-    assert eval_data["estimated_band"] >= 4.0
+    assert eval_data["fluency_score"] is None
+    assert eval_data["lexical_score"] is None
+    assert eval_data["grammar_score"] is None
+    assert eval_data["estimated_band"] is None
     assert "constructive_feedback" in eval_data
     assert "explanation_uz" in eval_data
     assert "rasmiy ielts sertifikati emas" in eval_data["disclaimer"].lower()

@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TypeVar
 
+from ezo_api.providers.limits import CallBudget, UsageLimitError
 from ezo_api.settings import Settings
 from ezo_api.voice.base import (
     SpeechAudio,
@@ -15,6 +16,7 @@ from ezo_api.voice.base import (
     Transcript,
     VoiceError,
 )
+from ezo_api.voice.elevenlabs import ElevenLabsProvider
 from ezo_api.voice.openai_audio import OpenAIAudioProvider
 
 logger = logging.getLogger(__name__)
@@ -47,7 +49,12 @@ class VoiceService:
         self,
         stt: Sequence[SpeechToTextProvider] = (),
         tts: Sequence[TextToSpeechProvider] = (),
+        *,
+        budget: CallBudget | None = None,
+        max_text: int = 4000,
+        max_audio: int = 10 * 1024 * 1024,
     ) -> None:
+        self.budget, self.max_text, self.max_audio = budget, max_text, max_audio
         self.stt = list(stt)
         self.tts = list(tts)
 
@@ -57,7 +64,16 @@ class VoiceService:
         attempts: list[VoiceAttempt] = []
         for provider in providers:
             try:
-                value = await call(provider)
+                if self.budget is None:
+                    value = await call(provider)
+                else:
+                    try:
+                        async with self.budget.admit():
+                            value = await call(provider)
+                    except UsageLimitError:
+                        raise VoiceError("rate_limit", "Voice call budget exhausted.") from None
+                    except TimeoutError:
+                        raise VoiceError("timeout", "Voice operation deadline exceeded.") from None
             except VoiceError as exc:
                 logger.warning("Voice provider %s failed: %s", provider.name, exc.kind)
                 attempts.append(VoiceAttempt(provider.name, False, exc.kind, exc.message))
@@ -71,17 +87,25 @@ class VoiceService:
     async def transcribe(
         self, audio: bytes, mime_type: str, filename: str, language: str | None
     ) -> VoiceResult[Transcript]:
+        if not audio or len(audio) > self.max_audio:
+            raise AllVoiceProvidersFailedError(
+                [VoiceAttempt("limits", False, "bad_audio", "Audio size limit exceeded.")]
+            )
         return await self._first_working(
             self.stt, lambda p: p.transcribe(audio, mime_type, filename, language)
         )
 
     async def synthesize(self, text: str, language: str | None) -> VoiceResult[SpeechAudio]:
+        if not text.strip() or len(text) > self.max_text:
+            raise AllVoiceProvidersFailedError(
+                [VoiceAttempt("limits", False, "bad_audio", "Speech text limit exceeded.")]
+            )
         return await self._first_working(self.tts, lambda p: p.synthesize(text, language))
 
 
 def build_voice_service(settings: Settings) -> VoiceService:
     """Providers in the order of EZO_VOICE_PROVIDERS ("auto" = VoiceStudio, then OpenAI)."""
-    available: dict[str, OpenAIAudioProvider] = {}
+    available: dict[str, OpenAIAudioProvider | ElevenLabsProvider] = {}
     if settings.voicestudio_url:
         key = (
             settings.voicestudio_api_key.get_secret_value() if settings.voicestudio_api_key else ""
@@ -106,10 +130,29 @@ def build_voice_service(settings: Settings) -> VoiceService:
             voice=settings.openai_tts_voice,
             timeout=settings.voice_timeout_seconds,
         )
+    if settings.elevenlabs_api_key:
+        available["elevenlabs"] = ElevenLabsProvider(
+            settings.elevenlabs_api_key.get_secret_value(),
+            voice_id=settings.elevenlabs_voice_id,
+            stt_model=settings.elevenlabs_stt_model,
+            tts_model=settings.elevenlabs_tts_model,
+            languages=settings.elevenlabs_tts_languages,
+            timeout=settings.voice_timeout_seconds,
+            max_audio=settings.voice_max_audio_mb * 1024 * 1024,
+            max_text=settings.voice_max_text_chars,
+        )
     order = (
-        ["voicestudio", "openai"]
+        ["voicestudio", "elevenlabs", "openai"]
         if settings.voice_providers == ["auto"]
         else settings.voice_providers
     )
     chosen = [available[name] for name in order if name in available]
-    return VoiceService(stt=chosen, tts=chosen)
+    return VoiceService(
+        stt=chosen,
+        tts=[p for p in chosen if not isinstance(p, ElevenLabsProvider) or p.voice_id],
+        budget=CallBudget(
+            settings.voice_calls_per_day, settings.voice_concurrency, settings.voice_timeout_seconds
+        ),
+        max_text=settings.voice_max_text_chars,
+        max_audio=settings.voice_max_audio_mb * 1024 * 1024,
+    )
