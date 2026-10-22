@@ -85,3 +85,17 @@ Expected-hash checks also bind ingestion to the actual stored bytes: a corrupted
 blob or incorrect restore must fail the integrity check before parsing and must
 not publish new chunks under the old registered hash. This is ingestion-time
 integrity, not a claim of an already completed backup/restore drill.
+
+## Local storage write prerequisite
+
+The shared `<key>.tmp` rename source caused identical concurrent puts to race;
+a failed replacement left a partial temp file. Both failures were reproduced with
+actual filesystem writes. Local storage now gives each writer a securely created
+0600 temp file in the destination directory, flushes/fsyncs its bytes, atomically
+replaces the destination and removes its own temp on failure. Prior target data
+survives a failed replacement. APIs/storage keys do not change. Independent native
+jobs still receive their authorized staged input, not the private parent volume.
+
+This does not provide persistence on an ephemeral host, a distributed SQL/object
+transaction, crash orphan collection or a filesystem power-loss guarantee. Those
+hosting/cleanup/backup gates remain explicit. No public storage fallback added.
