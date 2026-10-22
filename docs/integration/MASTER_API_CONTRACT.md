@@ -201,3 +201,12 @@ last successful intermediate step. This intentionally corrects the older test
 contract that labelled a rejected action/QA-skipped mission `completed`.
 Antigravity must preserve these status distinctions and never render partial
 outputs as successful delivery. No execution permissions or enum values added.
+
+### Voice resource enforcement (no schema change)
+
+OpenAI/VoiceStudio now enforce existing audio limits before SDK response buffering,
+<=256000-byte transcript/error responses and an operation-wide deadline. Oversize,
+compressed or redirect responses fail without returning partial success; provider
+fallback remains under existing configuration. Cancellation closes the stream.
+No new credential, consent, provider or dollar-cap claim. See
+`docs/master/VOICE_RESOURCE_LIMITS.md` for exact bounds and tests.

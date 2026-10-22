@@ -120,6 +120,7 @@ def build_voice_service(settings: Settings) -> VoiceService:
             voice=settings.voicestudio_voice,
             send_language_to_tts=True,
             timeout=settings.voice_timeout_seconds,
+            max_audio=settings.voice_max_audio_mb * 1024 * 1024,
         )
     if settings.elevenlabs_api_key:
         available["elevenlabs"] = ElevenLabsProvider(
@@ -141,6 +142,7 @@ def build_voice_service(settings: Settings) -> VoiceService:
             tts_model=settings.openai_tts_model,
             voice=settings.openai_tts_voice,
             timeout=settings.voice_timeout_seconds,
+            max_audio=settings.voice_max_audio_mb * 1024 * 1024,
         )
     order = (
         ["voicestudio", "elevenlabs", "openai"]
