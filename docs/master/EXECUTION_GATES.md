@@ -65,3 +65,11 @@ inclusive primary+executor+disk+egress+offsite backup+tax quotes. If that exceed
 $10/month, report the amount and ask the owner to authorize a budget adjustment at
 purchase time. None is purchased here. Run the existing benchmark protocol on real
 approved4/8GB hosts; local import/build/test times are not cloud benchmark evidence.
+
+The local VFS daemon also demonstrated a Docker-create deadline failure under
+shared disk load. Idle rerun recovery is useful reliability evidence, not a cloud
+capacity guarantee. Keep the15-second controller command limit and fail-closed
+slot handling; benchmark image creation/cancellation latency on the actual host.
+Do not silently stretch control deadlines to conceal an oversized or overloaded
+executor. A future dedicated minimal parser image must preserve the same reviewed
+watchdog, cgroup, UID/capability and fixed data protocol checks.
