@@ -70,3 +70,13 @@ across restart, pre-admission/in-flight cancellation, revocation, terminal recei
 integrity, bounded tombstones, transactional v1 upgrade, incomplete state rejection
 and a real process crash after admission. No OS/filesystem mocks or production
 keys are used. This does not prove Windows, mobile, Chrome, voice or Telegram E2E.
+
+## Adjacent mission truthfulness regression
+
+The existing native mission provider reported `completed` after a required owner
+approval was rejected and QA skipped. A new regression reproduced this before
+fixing it. It now ends `cancelled` with the rejection reason; completion requires
+all steps completed. Partial outputs remain inspectable, but a non-success summary
+does not reuse the last intermediate success. This provider remains process-local,
+not a durable remote device queue. No UI, dispatch API, executor or permission was
+added as part of this correction.

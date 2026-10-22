@@ -188,3 +188,16 @@ transactionally; old binaries must refuse v2 rather than ignore revocation.
 Missing control/replay state is not reset. No automatic retry/re-enable, remote
 control ingress or new tool action is introduced. Full semantics and rollback
 limits: `docs/master/COMPANION_LIFECYCLE.md`.
+
+### Native mission result truthfulness correction
+
+`NativeOrchestrationProvider` (existing in-process backend module, no new HTTP
+mission route) now emits `completed` only if every required step completed.
+A rejected required approval with dependent steps skipped ends `cancelled` with
+`failure_reason`; other unsuccessful incomplete endings fail. Existing actual
+step failures still end `failed`. Result `outputs` retain real partial outputs,
+but the top-level non-success summary reports the ending reason rather than the
+last successful intermediate step. This intentionally corrects the older test
+contract that labelled a rejected action/QA-skipped mission `completed`.
+Antigravity must preserve these status distinctions and never render partial
+outputs as successful delivery. No execution permissions or enum values added.
