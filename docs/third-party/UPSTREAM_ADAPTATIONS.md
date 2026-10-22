@@ -27,3 +27,8 @@ implementation matrix. Review/reference is not claimed as full integration.
   AGPL source/model weights are not copied. Supabase remains HTTP/PostgreSQL
   integration; full upstream stack not copied. APEX UI adoption is Antigravity's
   owned deliverable; no new frontend code is added in this candidate.
+
+Runtime copies of these notices are shipped under `ezo_api/_third_party/` so
+API-only Docker builds and installed wheels preserve attribution. Source mirrors
+are checked by `tests/unit/test_runtime_notices.py`; wheel/image presence is
+verified separately. This does not replace transitive wheel/system notices.

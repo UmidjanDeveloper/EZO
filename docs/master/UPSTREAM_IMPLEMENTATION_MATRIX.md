@@ -11,7 +11,9 @@ end-to-end owner desktop automation. New source is still a review candidate.
 Antigravity owns UI, Chrome extension and companion UX; no new UI files are edited.
 Source paths in the table are relative to `apps/api/src/ezo_api/`; test paths are
 relative to `apps/api/tests/` unless stated otherwise. All four new license notices
-are under `docs/third-party/`.
+are under `docs/third-party/`. Runtime copies (plus the existing LlamaIndex notice)
+ship in `apps/api/src/ezo_api/_third_party/` and are checked by
+`tests/unit/test_runtime_notices.py` and actual wheel/image probes.
 
 | Upstream feature | EZO implementation / source files | Working test evidence | License | Status and precise limits |
 |---|---|---|---|---|
