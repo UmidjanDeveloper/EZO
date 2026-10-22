@@ -5,6 +5,7 @@ These tests do not establish Windows/Android/iOS support or remote pairing.
 
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -250,3 +251,50 @@ def test_public_journal_and_symlink_journal_are_rejected(device):
     journal.symlink_to(outside)
     with pytest.raises(OSError):
         MetadataCompanion(root, journal, **options)
+
+
+def test_nanosecond_metadata_survives_javascript_json_without_number_rounding(device):
+    root, journal, _, _, _, options = device
+    path = root / "O‘zbekiston-🙂.txt"
+    path.write_text("private")
+    stamp = 1750000000000000001  # outside IEEE754's exact integer range
+    os.utime(path, ns=(stamp, stamp))
+    engine = MetadataCompanion(root, journal, **options)
+    try:
+        result = engine.execute(request(device))
+        wire = json.loads(result.model_dump_json())["payload"]["files"][0]
+        assert wire["modified_ns"] == str(stamp)
+        assert wire["size_bytes"] == "7"
+    finally:
+        engine.close()
+
+
+def test_accepted_small_controller_clock_skew_has_verifiable_response(device):
+    root, journal, _, key, _, options = device
+    now = int(time.time())
+    command = request(device, issued_at=now + 3, expires_at=now + 60)
+    engine = MetadataCompanion(root, journal, **options)
+    try:
+        result = engine.execute(command)
+        verify_response(result, command.payload, key.public_key(), now=int(time.time()))
+    finally:
+        engine.close()
+
+
+def test_existing_unrelated_sqlite_database_is_not_modified_as_a_journal(device):
+    root, journal, _, _, _, options = device
+    with sqlite3.connect(journal) as connection:
+        connection.execute("CREATE TABLE owner_data(value TEXT)")
+        connection.execute("INSERT INTO owner_data VALUES ('keep')")
+    journal.chmod(0o600)
+    with pytest.raises(CompanionError, match="foreign_or_incompatible_journal"):
+        companion = MetadataCompanion(root, journal, **options)
+        companion.close()
+    with sqlite3.connect(journal) as connection:
+        assert connection.execute("SELECT value FROM owner_data").fetchone()[0] == "keep"
+        assert (
+            connection.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[
+                0
+            ]
+            == 1
+        )

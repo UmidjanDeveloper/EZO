@@ -150,7 +150,11 @@ Base ce9b21f; existing contracts unchanged. No frontend edits are required here.
 Companion protocol source: `apps/api/src/ezo_api/companion/protocol.py`.
 Only action `file.metadata.list`. Version1 messages bind actor/device/task/root,
 request UUID and <=60-second lifetime; Ed25519 domain-separated request/response
-signatures and exact request hash. No filesystem path, shell, install, message,
+signatures and exact request hash. Canonical bytes are UTF-8 JSON, ASCII keys sorted,
+compact separators, Unicode preserved, complete normalized schema/default fields.
+`size_bytes` and `modified_ns` are decimal **strings**: JavaScript must not round
+nanoseconds through Number. Issuance/response clocks tolerate at most5 seconds
+of skew; expiry is enforced without grace. No filesystem path, shell, install, message,
 file-content-read or general code parameter exists. The standalone Linux module
 is configured by the owner with a selected root, manually pinned controller public
 key and device private key via inherited FD (never argv/stdout). It has **no remote
@@ -158,7 +162,8 @@ pairing/enrollment/API queue yet** and is not loaded by the main API.
 
 Linux metadata implementation uses an owned O_DIRECTORY/O_NOFOLLOW root FD,
 nonrecursive <=1000-entry scan, <=50 returned regular-file metadata rows, persistent
-private replay journal (<=10000 requests, fail closed on budget), root/actor/device/
+private replay journal (<=10000 requests, fail closed on budget), dedicated EZO1
+application/schema identity (foreign owner SQLite databases rejected before writes), root/actor/device/
 key identity binding across restart and signed actual outcomes. Symlinks, FIFOs,
 directories and device nodes are excluded. File IDs are identities, not bearer
 read grants. Filenames are untrusted display data and must be escaped by UX.

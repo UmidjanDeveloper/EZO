@@ -44,7 +44,7 @@ CoverageLevel = Literal["full", "partial", "none"]
 LicenseRisk = Literal["safe", "review_needed", "copyleft", "unknown"]
 
 READING = ("queued", "inspecting", "reading", "indexing")
-ANALYZER_VERSION = 3
+ANALYZER_VERSION = 4
 """Bumped when the analysis logic changes, so cached analyses are recomputed."""
 MAX_DOCUMENTS = 50
 MAX_CHARS_PER_DOCUMENT = 20_000
@@ -170,6 +170,16 @@ class LibraryCapabilityReport(BaseModel):
 
 # Ground truth of existing tools in EZO's ToolRegistry
 EZO_TOOL_PROFILES: dict[str, dict[str, Any]] = {
+    "calculate_percentages": {
+        "title": "Explicit Decimal Percentage Calculator",
+        "category": "calculation",
+        "description": (
+            "Computes percent_change or percent_of from caller-supplied decimal strings. "
+            "Does not extract document data, choose a comparison method, "
+            "convert files or send messages."
+        ),
+        "keywords": ["percentage", "percent change", "percent of", "decimal arithmetic"],
+    },
     "knowledge_search": {
         "title": "Knowledge Search",
         "category": "knowledge",

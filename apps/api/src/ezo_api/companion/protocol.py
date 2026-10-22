@@ -53,7 +53,9 @@ class SignedRequest(BaseModel):
 
 
 def canonical(value: BaseModel) -> bytes:
-    return json.dumps(value.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
 
 
 def request_hash(request: MetadataRequest) -> str:
@@ -77,8 +79,10 @@ class FileMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     file_id: str = Field(pattern=r"^[a-f0-9]{64}$")
     name: str = Field(max_length=255)
-    size_bytes: int = Field(ge=0)
-    modified_ns: int
+    # Decimal strings preserve exact values through JavaScript JSON.parse; ns
+    # timestamps already exceed the safe-integer range on ordinary files.
+    size_bytes: str = Field(pattern=r"^(?:0|[1-9][0-9]{0,19})$")
+    modified_ns: str = Field(pattern=r"^-?(?:0|[1-9][0-9]{0,19})$")
 
 
 class MetadataResponse(BaseModel):
@@ -129,7 +133,7 @@ def verify_response(
             getattr(result, name) != getattr(request, name)
             for name in ("request_id", "actor_id", "device_id", "task_id", "root_id")
         )
-        or not request.issued_at <= result.created_at < request.expires_at
+        or not request.issued_at - 5 <= result.created_at < request.expires_at
         or now >= request.expires_at
         or result.created_at > now + 5
     ):
