@@ -1,6 +1,7 @@
 """Student reading over existing K1 revisions and the durable stored-text queue."""
 
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -101,7 +102,14 @@ async def upload_raw(
     services: ServicesDep,
     filename: str = Query(min_length=1, max_length=200),
     project_id: uuid.UUID | None = None,
+    ocr: Annotated[list[str] | None, Query(max_length=4)] = None,
+    no_ocr: bool = False,
 ) -> JobOut:
+    """PDF, DOCX, EPUB, PNG or JPEG. Scans/images are read by isolated OCR.
+
+    `ocr` narrows the OCR languages (eng, uzb, uzb_cyrl, rus; default all four);
+    `no_ocr` stores the source without OCR. OCR runs only when there is no text layer.
+    """
     # Edge guard authenticates before receive and enforces a total body limit.
     # Streaming also enforces the tighter fixed Student input limit.
     from ezo_api.documents.executor.protocol import MAX_INPUT_BYTES
@@ -113,7 +121,9 @@ async def upload_raw(
             raise HTTPException(413, detail={"code": "input_limit", "message": "Maximum 5 MiB."})
         data.extend(part)
     job = await _call(
-        StudentIngestion(services.db).submit_raw(user.id, project_id, filename, bytes(data))
+        StudentIngestion(services.db).submit_raw(
+            user.id, project_id, filename, bytes(data), [] if no_ocr else ocr
+        )
     )
     return JobOut.model_validate(job)
 
@@ -190,12 +200,17 @@ async def structure(
 
 @router.post("/readings/{job_id}/retry", response_model=JobOut, status_code=201)
 async def retry_reading(
-    job_id: uuid.UUID, user: CurrentUser, services: ServicesDep, project_id: uuid.UUID | None = None
+    job_id: uuid.UUID,
+    user: CurrentUser,
+    services: ServicesDep,
+    project_id: uuid.UUID | None = None,
+    ocr: Annotated[list[str] | None, Query(max_length=4)] = None,
 ) -> JobOut:
+    """`ocr` replaces the OCR languages for the new generation (e.g. after ocr_required)."""
     from ezo_api.student.ingestion import StudentIngestion
 
     return JobOut.model_validate(
-        await _call(StudentIngestion(services.db).retry(user.id, project_id, job_id))
+        await _call(StudentIngestion(services.db).retry(user.id, project_id, job_id, ocr))
     )
 
 

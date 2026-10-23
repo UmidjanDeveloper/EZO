@@ -12,7 +12,7 @@ class StudentRawRevision(Base):
     __tablename__ = "student_raw_revisions"
     __table_args__ = (
         CheckConstraint("length(data) > 0 AND length(data) <= 5242880", name="size"),
-        CheckConstraint("format IN ('pdf','docx','epub')", name="format"),
+        CheckConstraint("format IN ('pdf','docx','epub','png','jpeg')", name="format"),
     )
     revision_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("document_revisions.id", ondelete="CASCADE"), primary_key=True

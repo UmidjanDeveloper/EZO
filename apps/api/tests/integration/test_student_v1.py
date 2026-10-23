@@ -15,7 +15,12 @@ from ezo_api.db.models import (
     StudentRawRevision,
 )
 from ezo_api.db.session import Database
-from ezo_api.documents.executor.protocol import ExecutorError, ExtractionResult, SourceSection
+from ezo_api.documents.executor.protocol import (
+    OCR_LANGUAGES,
+    ExecutorError,
+    ExtractionResult,
+    SourceSection,
+)
 from ezo_api.knowledge.jobs.service import DocumentJobs, JobError
 from ezo_api.student.ingestion import StudentIngestion
 from ezo_api.student.worker import StudentWorker
@@ -68,7 +73,7 @@ async def test_raw_registration_is_atomic_idempotent_and_scope_bound(db):
 async def test_publication_indexes_exact_unicode_offsets_and_preserves_raw_revision(db):
     scope, jobs, job = await raw_queued(db)
     lease = await jobs.claim("native")
-    assert await jobs.raw_input(lease) == (DATA, "pdf")
+    assert await jobs.raw_input(lease) == (DATA, "pdf", OCR_LANGUAGES)
     await jobs.publish_extraction(lease, extracted())
     await jobs.publish_extraction(lease, extracted())  # idempotent ACK
     page = await jobs.result_page(scope.user, scope.project, job.id, offset=2, limit=10)
@@ -142,7 +147,7 @@ async def test_worker_physically_cancels_on_owner_cancellation(db):
     started, stopped = threading.Event(), threading.Event()
 
     class BlockingExecutor:
-        def extract(self, data, format, *, cancelled):
+        def extract(self, data, format, *, ocr_languages=(), cancelled):
             started.set()
             try:
                 assert cancelled.wait(5)
@@ -214,7 +219,7 @@ async def test_busy_executor_does_not_exhaust_healthy_jobs(db):
     scope, jobs, job = await raw_queued(db)
 
     class BusyExecutor:
-        def extract(self, data, format, *, cancelled):
+        def extract(self, data, format, *, ocr_languages=(), cancelled):
             raise ExecutorError("executor_busy")
 
     worker = StudentWorker(jobs, BusyExecutor(), "competing")
@@ -315,7 +320,7 @@ async def test_fatal_executor_failure_stops_worker_without_failing_healthy_input
     class BrokenExecutor:
         calls = 0
 
-        def extract(self, data, format, *, cancelled):
+        def extract(self, data, format, *, ocr_languages=(), cancelled):
             self.calls += 1
             raise ExecutorError(code)
 

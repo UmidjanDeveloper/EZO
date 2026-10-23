@@ -15,7 +15,6 @@ import threading
 import time
 import uuid
 from datetime import UTC, datetime
-from typing import Literal
 
 from ezo_api.documents.executor.protocol import (
     HARD_DEADLINE,
@@ -23,9 +22,14 @@ from ezo_api.documents.executor.protocol import (
     MAX_OUTPUT_BYTES,
     MEMORY_BYTES,
     PIDS,
+    ConversionRequest,
+    ConversionResult,
+    ConvertFormat,
     ExecutorError,
+    ExtractFormat,
     ExtractionRequest,
     ExtractionResult,
+    OcrLanguage,
 )
 
 DOCKER = shutil.which("docker") or "/usr/bin/docker"
@@ -62,18 +66,62 @@ class IsolatedExecutor:
     def extract(
         self,
         data: bytes,
-        format: Literal["pdf", "docx", "epub"],
+        format: ExtractFormat,
         *,
+        ocr_languages: tuple[OcrLanguage, ...] = (),
         cancelled: threading.Event | None = None,
     ) -> ExtractionResult:
         if len(data) > MAX_INPUT_BYTES:
             raise ExecutorError("input_limit")
+        request = ExtractionRequest(
+            format=format,
+            data_base64=base64.b64encode(data).decode(),
+            ocr_languages=ocr_languages,
+        )
+        output = self._run(request, cancelled)
+        try:
+            result = ExtractionResult.model_validate_json(output)
+        except ValueError as exc:
+            raise ExecutorError("invalid_result") from exc
+        if result.source_sha256 != hashlib.sha256(data).hexdigest():
+            raise ExecutorError("source_mismatch")
+        return result
+
+    def convert_to_pdf(
+        self,
+        data: bytes,
+        format: ConvertFormat,
+        *,
+        cancelled: threading.Event | None = None,
+    ) -> tuple[bytes, ConversionResult]:
+        """LibreOffice → PDF inside the same one-slot isolated workload."""
+        if len(data) > MAX_INPUT_BYTES:
+            raise ExecutorError("input_limit")
+        request = ConversionRequest(
+            operation="convert_pdf", format=format, data_base64=base64.b64encode(data).decode()
+        )
+        output = self._run(request, cancelled)
+        try:
+            result = ConversionResult.model_validate_json(output)
+            pdf = base64.b64decode(result.pdf_base64, validate=True)
+        except ValueError as exc:
+            raise ExecutorError("invalid_result") from exc
+        if result.source_sha256 != hashlib.sha256(data).hexdigest():
+            raise ExecutorError("source_mismatch")
+        if hashlib.sha256(pdf).hexdigest() != result.pdf_sha256 or not pdf.startswith(b"%PDF-"):
+            raise ExecutorError("invalid_result")
+        return pdf, result
+
+    def _run(
+        self,
+        request: ExtractionRequest | ConversionRequest,
+        cancelled: threading.Event | None,
+    ) -> bytes:
         if cancelled is not None and cancelled.is_set():
             raise ExecutorError("cancelled")
         request_id = uuid.uuid4().hex
         self._recover_slot()
         container_id: str | None = None
-        request = ExtractionRequest(format=format, data_base64=base64.b64encode(data).decode())
         process: subprocess.Popen[bytes] | None = None
         try:
             try:
@@ -165,12 +213,6 @@ class IsolatedExecutor:
                 state = json.loads(self._docker("inspect", container_id))[0]["State"]
                 if state["Running"] or state["ExitCode"] != 0 or process.returncode != 0:
                     raise ExecutorError("processing_failed")
-                try:
-                    result = ExtractionResult.model_validate_json(output)
-                except ValueError as exc:
-                    raise ExecutorError("invalid_result") from exc
-                if result.source_sha256 != hashlib.sha256(data).hexdigest():
-                    raise ExecutorError("source_mismatch")
                 if cancelled is not None and cancelled.is_set():
                     raise ExecutorError("cancelled")
         finally:
@@ -201,7 +243,7 @@ class IsolatedExecutor:
         # Never acknowledge a successful result before that final check.
         if cancelled is not None and cancelled.is_set():
             raise ExecutorError("cancelled")
-        return result
+        return bytes(output)
 
     def _slot_id(self) -> str | None:
         value = (
