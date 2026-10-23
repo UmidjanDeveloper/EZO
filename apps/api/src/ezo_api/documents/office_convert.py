@@ -32,12 +32,12 @@ from xml.etree.ElementTree import ParseError
 from defusedxml.common import DefusedXmlException
 from defusedxml.ElementTree import fromstring
 
-from ezo_api.documents.isolation import native_fixtures_allowed
+from ezo_api.documents.isolation import native_execution_allowed
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.documents.process_limits import MAX_DIAGNOSTIC_BYTES, NativeOutputLimit, run_native
 
-SourceKind = Literal["docx", "xlsx"]
+SourceKind = Literal["docx", "xlsx", "pptx"]
 MAX_INPUT_BYTES = 50 * 1024 * 1024
 MAX_OUTPUT_BYTES = 200 * 1024 * 1024
 MAX_PAGES = 1_000
@@ -107,7 +107,7 @@ class OfficeConverter:
     def discover(
         cls, command: str = "soffice", timeout_seconds: float = 120.0
     ) -> OfficeConverter | None:
-        if not native_fixtures_allowed():
+        if not native_execution_allowed():
             return None
         binary = shutil.which(command) or (
             shutil.which("libreoffice") if command == "soffice" else None

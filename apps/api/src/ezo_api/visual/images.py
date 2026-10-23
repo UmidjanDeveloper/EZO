@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
+from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_execution_allowed
 
 MAX_INPUT_BYTES = 25 * 1024 * 1024
 MAX_PIXELS = 40_000_000
@@ -39,7 +39,7 @@ class NormalizedImage:
 
 def open_image(data: bytes) -> Image.Image:
     """Open and fully decode an image, refusing non-images and oversized ones."""
-    if not native_fixtures_allowed():
+    if not native_execution_allowed():
         raise ImageRejectedError(ISOLATION_MESSAGE)
     if not data:
         raise ImageRejectedError("The image is empty.")

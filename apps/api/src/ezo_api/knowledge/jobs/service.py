@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Literal, get_args
 
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +39,20 @@ ERRORS = {
     "resource_limit": "The document exceeded the processing resource budget.",
     "internal_error": "Processing failed. Contact the owner with the job identifier.",
     "attempts_exhausted": "The processing attempt limit was reached.",
+    "ocr_required": "No readable text layer; retry with OCR languages to read it as a scan.",
+    "ocr_incomplete": (
+        "OCR could not read this scan within the isolated limits "
+        "(page count, time or installed languages)."
+    ),
 }
+FailCode = Literal[
+    "transient",
+    "invalid_input",
+    "resource_limit",
+    "internal_error",
+    "ocr_required",
+    "ocr_incomplete",
+]
 
 
 class JobError(Exception):
@@ -345,9 +358,9 @@ class DocumentJobs:
     async def fail(
         self,
         lease: Lease,
-        code: Literal["transient", "invalid_input", "resource_limit", "internal_error"],
+        code: FailCode,
     ) -> None:
-        if code not in ("transient", "invalid_input", "resource_limit", "internal_error"):
+        if code not in get_args(FailCode):
             raise ValueError("Unrecognized safe failure category")
         async with self._transaction() as session:
             job = await self._leased(session, lease)
