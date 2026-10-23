@@ -30,8 +30,17 @@ from ezo_api.language.ielts import (
     format_cue_card,
     new_test,
 )
+from ezo_api.language.ielts_feedback import (
+    HEURISTIC_NOTICE_EN,
+    HEURISTIC_NOTICE_UZ,
+    Answer,
+    Measured,
+    answer_kind,
+    measure_group,
+)
 from ezo_api.language.voice_adapter import default_voice_adapter
 from ezo_api.schemas.ielts import (
+    AnswerMetricsOut,
     CueCardOut,
     IeltsAdvanceIn,
     IeltsAdvanceOut,
@@ -40,6 +49,9 @@ from ezo_api.schemas.ielts import (
     IeltsSessionCreate,
     IeltsSessionOut,
     IeltsStatsOut,
+    PartMetricsOut,
+    SessionMetricsOut,
+    TextStatsOut,
     VoiceStatusOut,
 )
 
@@ -91,6 +103,81 @@ def _session_out(s: LanguageSession) -> IeltsSessionOut:
         started_at=s.started_at,
         ended_at=s.ended_at,
     )
+
+
+def _stats(measured: Measured, answers: int) -> dict[str, Any]:
+    m = measured.metrics
+    return {
+        "answers": answers,
+        "words": m.words,
+        "unique_words": m.unique_words,
+        "lexical_diversity": m.lexical_diversity,
+        "sentences": m.sentences,
+        "words_per_sentence": m.words_per_sentence,
+        "fillers": m.fillers,
+        "filler_rate": m.filler_rate,
+        "repeated": [f"{w} x{n}" for w, n in m.repeated],
+        "reported_speech_seconds": m.speech_seconds,
+        "words_per_minute": m.words_per_minute,
+        "timing_source": measured.timing_source,
+    }
+
+
+def _answer_metrics(answer: Answer) -> AnswerMetricsOut:
+    measured = measure_group([answer])
+    notes = measured.notes
+    return AnswerMetricsOut(
+        **_stats(measured, 1),
+        part=answer.part,
+        answer_kind=answer.kind,
+        observations_uz=notes.uz,
+        observations_en=notes.en,
+        heuristic_notice_uz=HEURISTIC_NOTICE_UZ,
+        heuristic_notice_en=HEURISTIC_NOTICE_EN,
+    )
+
+
+def _session_metrics(answers: list[Answer]) -> SessionMetricsOut:
+    per_part: list[PartMetricsOut] = []
+    for part in (1, 2, 3):
+        group = [a for a in answers if a.part == part]
+        if not group:
+            continue
+        measured = measure_group(group)
+        notes = measured.notes
+        per_part.append(
+            PartMetricsOut(
+                **_stats(measured, len(group)),
+                part=part,
+                observations_uz=notes.uz,
+                observations_en=notes.en,
+            )
+        )
+    overall = measure_group(answers, with_notes=False)
+    return SessionMetricsOut(
+        overall=TextStatsOut(**_stats(overall, len(answers))),
+        per_part=per_part,
+        heuristic_notice_uz=HEURISTIC_NOTICE_UZ,
+        heuristic_notice_en=HEURISTIC_NOTICE_EN,
+    )
+
+
+async def _session_answers(db: Any, session_id: uuid.UUID) -> list[Answer]:
+    rows = (
+        await db.execute(
+            select(LanguageTurn.text, LanguageTurn.ielts_part, LanguageTurn.speech_seconds)
+            .where(LanguageTurn.session_id == session_id, LanguageTurn.role == "learner")
+            .order_by(LanguageTurn.position)
+        )
+    ).all()
+    seen: dict[int, int] = {}
+    answers: list[Answer] = []
+    for text, part, seconds in rows:
+        part = part or 1
+        index = seen.get(part, 0)
+        seen[part] = index + 1
+        answers.append(Answer(text, part, answer_kind(part, index), seconds))
+    return answers
 
 
 @router.get("/cue-cards")
@@ -191,6 +278,15 @@ async def advance_ielts_session(
         )
         or 0
     )
+    # The part (and position in it) this answer belongs to, captured before advance()
+    # moves the state on to the next question.
+    answered_part = state.part
+    answered = Answer(
+        payload.answer,
+        answered_part,
+        answer_kind(answered_part, state.answered.get(str(answered_part), 0)),
+        payload.speech_seconds,
+    )
     turn = LanguageTurn(
         id=uuid.uuid4(),
         session_id=session.id,
@@ -198,7 +294,7 @@ async def advance_ielts_session(
         role="learner",
         text=payload.answer,
         channel="text",
-        ielts_part=session.ielts_part or 1,
+        ielts_part=answered_part,
         word_count=words,
         speech_seconds=payload.speech_seconds,
         created_at=utcnow(),
@@ -216,6 +312,8 @@ async def advance_ielts_session(
     explanation_uz: str | None = None
     low: float | None = None
     high: float | None = None
+    metrics = _answer_metrics(answered)
+    session_metrics: SessionMetricsOut | None = None
 
     if step.finished:
         session.status = "completed"
@@ -225,6 +323,8 @@ async def advance_ielts_session(
         session.pronunciation_score = session.band_low = session.band_high = None
         feedback_text = "Text practice completed. No AI or speech assessment was performed."
         explanation_uz = "Matnli mashq yakunlandi. AI yoki talaffuz baholashi bajarilmadi."
+        await db.flush()
+        session_metrics = _session_metrics(await _session_answers(db, session.id))
         session.feedback = feedback_text
 
     await db.commit()
@@ -240,6 +340,8 @@ async def advance_ielts_session(
         estimated_band_high=high,
         feedback=feedback_text,
         explanation_uz=explanation_uz,
+        metrics=metrics,
+        session_metrics=session_metrics,
     )
 
 
@@ -247,9 +349,18 @@ async def advance_ielts_session(
 async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut:
     """Report observable text practice; never invent AI or pronunciation scores."""
     words = len(payload.answer.split())
+    # A standalone Part 2 answer is treated as the long turn.
+    metrics = _answer_metrics(Answer(payload.answer, payload.part, answer_kind(payload.part, 0)))
     return IeltsEvaluateOut(
-        constructive_feedback=f"Answer length: {words} words. No AI assessment was performed.",
-        explanation_uz=f"Javobda {words} ta so'z bor. AI va talaffuz baholashi bajarilmagan.",
+        constructive_feedback=(
+            f"Answer length: {words} words. No AI assessment was performed. "
+            + " ".join(metrics.observations_en)
+        ),
+        explanation_uz=(
+            f"Javobda {words} ta so'z bor. AI va talaffuz baholashi bajarilmagan. "
+            + " ".join(metrics.observations_uz)
+        ),
+        metrics=metrics,
     )
 
 
