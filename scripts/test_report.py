@@ -27,6 +27,8 @@ class Suite:
     failed: int = 0
     skipped: int = 0
     skip_reasons: Counter[str] = field(default_factory=Counter)
+    timings: list[tuple[str, str, str]] = field(default_factory=list)
+    """(test, property, value) for JUnit properties named *_seconds (measured evidence)."""
 
     @property
     def passed(self) -> int:
@@ -45,7 +47,26 @@ def read_suite(label: str, path: Path) -> Suite:
             suite.skipped += 1
             reason = (skipped.get("message") or skipped.text or "no reason given").strip()
             suite.skip_reasons[reason.splitlines()[0][:160]] += 1
+        for prop in case.iter("property"):
+            name = prop.get("name") or ""
+            if name.endswith("_seconds"):
+                suite.timings.append((case.get("name") or "", name, prop.get("value") or ""))
     return suite
+
+
+def annotations(suites: list[Suite]) -> list[str]:
+    """GitHub workflow notices: readable from the checks API without downloading logs."""
+    lines = [
+        f"::notice title=Tests {s.label}::collected {s.collected}, passed {s.passed}, "
+        f"failed {s.failed}, skipped {s.skipped}"
+        for s in suites
+    ]
+    lines += [
+        f"::notice title=Timing {s.label}::{test} {name}={value}"
+        for s in suites
+        for test, name, value in s.timings
+    ]
+    return lines
 
 
 def render(suites: list[Suite]) -> str:
@@ -79,6 +100,8 @@ def main(argv: list[str]) -> int:
     if missing:
         report += "\n\nMissing reports (suite did not run): " + "; ".join(missing)
     print(report)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print("\n".join(annotations(suites)))
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as handle:
