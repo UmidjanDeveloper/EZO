@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import AsyncIterator, Sequence
 from typing import Any, Literal
 
@@ -11,6 +12,7 @@ from ezo_api.providers.base import ModelProvider
 from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_status
 from ezo_api.providers.types import (
     Capability,
+    ChatMessage,
     ChatRequest,
     StreamEnd,
     StreamEvent,
@@ -24,7 +26,13 @@ class OpenAIProvider(ModelProvider):
     name = "openai"
     display_name = "OpenAI"
     capabilities = frozenset(
-        {Capability.CHAT, Capability.STREAMING, Capability.REASONING, Capability.EMBEDDINGS}
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.REASONING,
+            Capability.EMBEDDINGS,
+            Capability.VISION,
+        }
     )
 
     def __init__(
@@ -39,11 +47,12 @@ class OpenAIProvider(ModelProvider):
         )
 
     def _params(self, request: ChatRequest) -> dict[str, Any]:
-        messages: list[dict[str, str]] = []
+        messages: list[dict[str, Any]] = []
         if request.system:
             messages.append({"role": "system", "content": request.system})
         messages.extend(
-            {"role": m.role, "content": m.content} for m in normalize_turns(request.messages)
+            {"role": m.role, "content": _openai_content(m)}
+            for m in normalize_turns(request.messages)
         )
         params: dict[str, Any] = {
             "model": request.model,
@@ -104,3 +113,22 @@ class OpenAIProvider(ModelProvider):
             ) from exc
         rows = sorted(response.data, key=lambda item: item.index)
         return [list(row.embedding) for row in rows]
+
+
+def _openai_content(message: ChatMessage) -> str | list[dict[str, Any]]:
+    """Plain text, or text plus inline base64 images (never a fetched URL)."""
+    if not message.images:
+        return message.content
+    parts: list[dict[str, Any]] = [
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{image.mime_type};base64,"
+                + base64.b64encode(image.data).decode("ascii")
+            },
+        }
+        for image in message.images
+    ]
+    if message.content:
+        parts.append({"type": "text", "text": message.content})
+    return parts

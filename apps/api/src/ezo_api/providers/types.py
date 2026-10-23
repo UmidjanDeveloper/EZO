@@ -29,9 +29,18 @@ class Capability(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class ImageInput:
+    """An image the user supplied with a message (PNG or JPEG bytes, never a URL)."""
+
+    mime_type: Literal["image/png", "image/jpeg"]
+    data: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class ChatMessage:
     role: Role
     content: str
+    images: tuple[ImageInput, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +93,14 @@ def normalize_turns(messages: list[ChatMessage]) -> list[ChatMessage]:
     result: list[ChatMessage] = []
     for message in messages:
         text = message.content.strip()
-        if not text:
+        if not text and not message.images:
             continue
         if not result and message.role == "assistant":
             continue
         if result and result[-1].role == message.role:
-            result[-1] = ChatMessage(message.role, f"{result[-1].content}\n\n{text}")
+            previous = result[-1]
+            joined = "\n\n".join(part for part in (previous.content, text) if part)
+            result[-1] = ChatMessage(message.role, joined, previous.images + message.images)
         else:
-            result.append(ChatMessage(message.role, text))
+            result.append(ChatMessage(message.role, text, message.images))
     return result
