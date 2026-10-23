@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, apiUrl, storedToken } from "@/lib/api";
+import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
 import { MemoryList } from "./MemoryList";
@@ -50,6 +51,8 @@ interface PersonalProfile {
 
 export function MemoryPage() {
   const { m } = useI18n();
+  // Free beta refuses automatic capture (409), so consent there covers explicit saves only.
+  const freeBeta = useApp().status?.deployment_profile === "free-beta";
   const [activeTab, setActiveTab] = useState<Tab>("memories");
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -110,15 +113,16 @@ export function MemoryPage() {
     if (!profile) return;
     setConsentLoading(true);
     const nextConsent = !profile.memory_consent;
+    const nextAuto = nextConsent && !freeBeta;
     try {
       const res = await fetch(`${apiUrl()}/api/personal/consent`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ consent: nextConsent, auto_memory: nextConsent }),
+        body: JSON.stringify({ consent: nextConsent, auto_memory: nextAuto }),
       });
       if (res.ok) {
         setProfile((prev) =>
-          prev ? { ...prev, memory_consent: nextConsent, auto_memory: nextConsent } : null,
+          prev ? { ...prev, memory_consent: nextConsent, auto_memory: nextAuto } : null,
         );
       } else {
         setError(`Rozilik o‘zgarmadi (${res.status}).`);
