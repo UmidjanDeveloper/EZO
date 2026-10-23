@@ -3,202 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EZO OS JARVIS Companion</title>
+  <title>EZO OS JARVIS Companion (experimental)</title>
   <style>
     :root {
-      --bg: #0d1117;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --accent: #10b981;
-      --accent-glow: rgba(16, 185, 129, 0.2);
-      --text: #f0f6fc;
-      --text-muted: #8b949e;
-      --danger: #f85149;
+      --bg: #0d1117; --card-bg: #161b22; --border: #30363d; --accent: #10b981;
+      --text: #f0f6fc; --text-muted: #8b949e; --warn: #d29922;
     }
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
-    body {
-      width: 360px;
-      background-color: var(--bg);
-      color: var(--text);
-      padding: 16px;
-      font-size: 13px;
-    }
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 700;
-      font-size: 14px;
-      color: #fff;
-    }
-    .logo-badge {
-      background: linear-gradient(135deg, #10b981, #0b7a72);
-      color: #fff;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-    }
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 12px;
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--accent);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 6px var(--accent);
-    }
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-    }
-    .card-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-    }
-    .permission-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .site-domain {
-      font-weight: 600;
-      color: #fff;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .btn {
-      cursor: pointer;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-    .btn-primary {
-      background: #10b981;
-      color: #000;
-    }
-    .btn-primary:hover {
-      background: #059669;
-    }
-    .btn-danger {
-      background: rgba(248, 81, 73, 0.15);
-      color: var(--danger);
-      border: 1px solid rgba(248, 81, 73, 0.3);
-    }
-    .btn-danger:hover {
-      background: rgba(248, 81, 73, 0.25);
-    }
-    .task-instruction {
-      font-size: 12px;
-      color: #c9d1d9;
-      margin-bottom: 6px;
-      line-height: 1.4;
-    }
-    .task-step {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      color: var(--accent);
-      margin-top: 6px;
-    }
-    .input-group {
-      display: flex;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .input-text {
-      flex: 1;
-      background: #0d1117;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px;
-      color: #fff;
-      font-size: 12px;
-      outline: none;
-    }
-    .input-text:focus {
-      border-color: var(--accent);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { width: 360px; background: var(--bg); color: var(--text); padding: 16px; font-size: 13px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+    .badge { background: rgba(210, 153, 34, 0.15); color: var(--warn); border: 1px solid rgba(210, 153, 34, 0.4); padding: 2px 6px; border-radius: 4px; font-size: 10px; letter-spacing: 0.5px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; }
+    .muted { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+    .unavailable { color: var(--warn); font-size: 12px; line-height: 1.4; margin-top: 4px; }
+    .btn { cursor: pointer; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--accent); color: #000; margin-top: 8px; }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    #backendState[data-state="reachable"] { color: var(--accent); }
+    #backendState[data-state="unreachable"], #backendState[data-state="error"] { color: #f85149; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">
-      <span>EZO OS</span>
-      <span class="logo-badge">JARVIS</span>
+  <main>
+    <div class="header">
+      <h1 class="logo"><span>EZO OS</span><span class="badge">EXPERIMENTAL</span></h1>
     </div>
-    <div class="status-pill" id="backendStatus">
-      <div class="status-dot"></div>
-      <span id="statusText">Ulangan (Online)</span>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="card-title">Sayt Ruxsati (Site Permission)</div>
-    <div class="permission-row">
-      <div>
-        <div class="site-domain" id="currentDomain">Joriy sahifa aniqlanmoqda...</div>
-        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-          Cheklangan xavfsiz rejim
-        </div>
-      </div>
-      <button class="btn btn-primary" id="togglePermBtn">Ruxsat Berish</button>
-    </div>
-  </div>
+    <section class="card" aria-labelledby="backendTitle">
+      <h2 class="card-title" id="backendTitle">Backend (<span id="backendBase"></span>)</h2>
+      <p id="backendState" data-state="unknown"></p>
+      <p class="muted">Faqat GET /api/health. Bosganingizda shu manzilga ruxsat so'raladi.</p>
+      <button class="btn" id="checkBackendBtn" type="button">Backendni tekshirish</button>
+    </section>
 
-  <div class="card" id="taskCard">
-    <div class="card-title">Faol Topshiriq (Active Task)</div>
-    <div class="task-instruction" id="taskDesc">Ayni paytda faol vazifa yo'q</div>
-    <div class="task-step" id="taskStep">
-      <span>Holat: Bo'sh (Idle)</span>
-    </div>
-    <div style="margin-top: 10px; display: none;" id="taskActions">
-      <button class="btn btn-danger" id="cancelTaskBtn" style="width: 100%;">Vazifani Bekor Qilish</button>
-    </div>
-  </div>
+    <section class="card" aria-labelledby="pageTitle">
+      <h2 class="card-title" id="pageTitle">Joriy sahifa</h2>
+      <p class="muted">Faqat tugmani bosganingizda, shu bitta tab o'qiladi (activeTab). Hech narsa yuborilmaydi.</p>
+      <p id="pageState" class="muted" style="margin-top: 6px;"></p>
+      <button class="btn" id="readPageBtn" type="button">Sahifa sarlavhasini o'qish</button>
+    </section>
 
-  <div class="card">
-    <div class="card-title">Tezkor Buyruq (Quick Command)</div>
-    <div class="input-group">
-      <input type="text" id="commandInput" class="input-text" placeholder="Buyruqni kiriting..." />
-      <button class="btn btn-primary" id="sendCmdBtn">Yuborish</button>
-    </div>
-  </div>
-
-  <script src="popup.js"></script>
+    <section class="card" aria-labelledby="unavailTitle" id="unavailableCard">
+      <h2 class="card-title" id="unavailTitle">Mavjud emas</h2>
+      <p class="unavailable" id="pairingState"></p>
+      <p class="unavailable" id="taskState"></p>
+      <p class="unavailable" id="telegramState"></p>
+    </section>
+  </main>
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

@@ -275,7 +275,30 @@ async def proposals(
             .offset(offset)
         )
     ).all()
-    return [{"id": str(r.id), **r.details} for r in rows]
+    # Same shape as the create response, plus the latest decision on that exact snapshot.
+    hashes = {str(r.id): r.details["sha256"] for r in rows}
+    decisions: dict[str, str] = {}
+    if rows:
+        for row in await session.scalars(
+            select(AuditLog)
+            .where(
+                AuditLog.user_id == admin.id,
+                AuditLog.action == "governance.proposal_decision",
+                AuditLog.target_id.in_(list(hashes)),
+            )
+            .order_by(AuditLog.created_at, AuditLog.id)
+        ):
+            if row.details.get("sha256") == hashes.get(row.target_id or ""):
+                decisions[row.target_id or ""] = row.details["decision"]
+    return [
+        {
+            "id": str(r.id),
+            "sha256": r.details["sha256"],
+            **r.details["proposal"],
+            "decision": decisions.get(str(r.id)),
+        }
+        for r in rows
+    ]
 
 
 @router.post("/{proposal_id}/decision")

@@ -17,7 +17,7 @@ DISABLED = [
 ]
 # Full matches, not prefix allowlists. Existing endpoint dependencies still authorize owners.
 ROUTES = (
-    ("GET", r"/api/(health|status|me|beta-profile)"),
+    ("GET", r"/api/(health|status|me)"),
     ("PATCH", r"/api/me/preferences"),
     ("GET|POST", r"/api/(projects|conversations|memories)"),
     ("DELETE", r"/api/memories"),

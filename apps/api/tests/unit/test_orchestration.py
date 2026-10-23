@@ -342,6 +342,11 @@ def test_child_env_never_copies_secrets() -> None:
     }
 
 
+def test_child_env_never_passes_node_code_loading_options() -> None:
+    source = {"PATH": "/bin", "NODE_OPTIONS": "--require /tmp/evil.js"}
+    assert "NODE_OPTIONS" not in child_env(source=source)
+
+
 def _settings(**values: Any) -> Settings:
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]
 

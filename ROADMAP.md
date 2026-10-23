@@ -179,7 +179,7 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 
 ## Next (in this order)
 
-### Phase 3 — OCR + EZO Office ← current (alpha, partially complete — 2026-10-18)
+### Phase 3 — OCR + EZO Office ← current (alpha, partially complete — 2026-10-18; native OCR/Office disabled in the production image, see Known limitations)
 - **Done:** local Tesseract OCR (uzb, uzb_cyrl, rus, eng) for scans and photos with page
   numbers, line boxes, engine confidence (shown as an engine score), orientation and
   deskew; OCR in ingestion and citations; scan → editable / layout Word and searchable PDF
@@ -250,21 +250,31 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   mature; see [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
 ### Phase 15 — JARVIS Mode & OpenJarvis Local Device Companion
-- **Integrated (alpha, 2026-10-22):** Combines Microsoft JARVIS (HuggingGPT / TaskBench DAG planning)
-  and OpenJarvis (local-first desktop companion, token pairing, scoped sandbox isolation).
-- Governed execution across Chrome (Manifest V3 extension), Windows desktop daemon, and Telegram.
-- Human-in-the-loop explicit authorization gates before external dispatch.
-- Reference scenario verified end-to-end:
+- **Status (verified 2026-10-23): foundation only — the reference scenario does NOT run.**
+- Works: `/api/jarvis/capabilities` (real tool registry; every device feature reports its
+  missing prerequisites), `/api/jarvis/percentages` (exact decimal arithmetic on values the
+  owner enters, with a stored receipt that records no external delivery),
+  `/api/jarvis/receipts/{id}`, `/api/jarvis/inspect-plan` (static tool-graph check, nothing
+  executes), and a signed read-only Linux companion CLI that is not yet wired to the API.
+- Not implemented: device pairing/registry, stored or executed task plans, per-task
+  authorization, opening device files, document → PDF on a device, Telegram sending,
+  Windows/mobile companions, voice-to-task. The 2026-10-22 prototype that claimed these
+  (fabricated "delivered" receipts, hardcoded contacts and pairing token) was removed in
+  `2d15a12`; the web page and Chrome extension were corrected to the real API in
+  `claude/master-audit-remediation`.
+- Reference scenario (target, not yet working):
   `"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor."`
-- Complete implementation matrix for all 8 mandatory upstreams in [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
+- Upstream status per project: [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
 
 ## Known limitations (current)
 
 - Intent and language detection are rule-based (transparent, can misread unusual phrasing).
 - Semantic search and semantic memory need an OpenAI or Gemini key for embeddings; without one
   EZO uses keyword search and says so.
-- Images and scanned PDFs use installed Tesseract OCR; without the engine the API
-  reports that OCR is unavailable. OCR confidence is an engine score, not calibrated accuracy.
+- Images and scanned PDFs use Tesseract OCR only where the native tools are installed
+  and the test/development native exception is enabled. The production API image ships
+  without Tesseract/LibreOffice and refuses native processing until a reviewed isolated
+  executor handles it; the Student executor reads text PDF/DOCX/EPUB but has no OCR. OCR confidence is an engine score, not calibrated accuracy.
 - Image generation needs an OpenAI or Gemini key; EZO-drawn diagrams work without one.
 - Ingestion runs in the API process (resumed at startup); no separate worker yet.
 - Voice is turn-by-turn; realtime voice is Phase 8.

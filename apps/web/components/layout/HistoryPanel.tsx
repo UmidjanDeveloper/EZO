@@ -54,7 +54,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
   ].filter(
     (item) =>
       status?.deployment_profile !== "free-beta" ||
-      !["/student", "/presentations", "/language", "/translate", "/knowledge", "/jarvis"].includes(item.href)
+      !["/student", "/presentations", "/language", "/translate", "/knowledge", "/jarvis", "/admin"].includes(item.href)
   );
 
   return (

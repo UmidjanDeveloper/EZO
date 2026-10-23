@@ -43,16 +43,18 @@ jobs:
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           version: "0.11.32"
+      - name: Restore cached Ubuntu packages for the real OCR and Office tests
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/apt-archives
+          key: native-debs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/ci/native-packages.txt') }}-v1
+          restore-keys: native-debs-${{ runner.os }}-${{ runner.arch }}-
       - name: Tesseract OCR (uzb, uzb_cyrl, rus, eng) and LibreOffice (real OCR and PDF tests)
-        timeout-minutes: 15
-        run: |
-          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60)
-          sudo apt-get "${apt_options[@]}" update
-          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
-            tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
-            libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui \
-            fonts-liberation fonts-dejavu-core libseccomp2
-          tesseract --version && tesseract --list-langs && soffice --version
+        # Bounded download attempts with a mirror fallback (scripts/ci/install-native-deps.sh);
+        # a missing tool still fails the job, the tests are never skipped.
+        timeout-minutes: 30
+        working-directory: .
+        run: bash scripts/ci/install-native-deps.sh .github/ci/native-packages.txt "$HOME/apt-archives"
       - run: uv sync --frozen
       - run: uv run ruff check src tests migrations ../../scripts
       - run: uv run ruff format --check src tests migrations ../../scripts

@@ -62,6 +62,10 @@ async def test_owner_proposal_hash_bound_confirmation_is_not_execution(client, a
     )
     rows = (await client.get("/api/admin/governance/improvements")).json()
     assert rows[0]["id"] == p["id"] and rows[0]["sha256"] == p["sha256"]
+    # The list has the create response's flat shape plus the recorded decision.
+    assert rows[0]["goal"] == p["goal"] and rows[0]["status"] == "proposal_only"
+    assert rows[0]["decision"] == body["decision"]
+    assert rows[0]["execution_authorized"] is False
     async with app.state.services.db.sessionmaker() as session:
         records = (
             await session.scalars(

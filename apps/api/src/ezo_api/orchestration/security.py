@@ -70,9 +70,10 @@ RUFLO_TOOL_DENYLIST: frozenset[str] = frozenset(
 )
 
 # Environment a child process may inherit. Secrets are passed one by one, never by copying
-# the whole environment.
+# the whole environment. NODE_OPTIONS is excluded: it can make Node load arbitrary code
+# (--require/--import) into the orchestrator process.
 SAFE_ENV_KEYS: frozenset[str] = frozenset(
-    {"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "NODE_OPTIONS", "SYSTEMROOT"}
+    {"PATH", "HOME", "LANG", "LC_ALL", "TZ", "TMPDIR", "SYSTEMROOT"}
 )
 
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (

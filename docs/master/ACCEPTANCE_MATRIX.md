@@ -7,6 +7,9 @@ No merge or deployment is authorized or performed by this candidate.
 
 ## Authoritative P0–P9 mapping
 
+Statuses re-verified by the independent audit of 2026-10-23 at `38c752c`; evidence and
+findings are in [CLAUDE_MASTER_AUDIT.md](CLAUDE_MASTER_AUDIT.md) §6.
+
 The owner has now supplied [the actual master roadmap](OWNER_ROADMAP_P0_P9.md).
 The earlier missing-document gate is resolved. Its original DOCX hash is recorded
 with the extraction; historic technical claims remain historic. Additional owner
@@ -16,15 +19,15 @@ These statuses describe acceptance, not just whether source files exist.
 | Phase | Owner's scope | Current acceptance status / gate |
 |---|---|---|
 | P0 | Baseline and security | PARTIAL — local/hosted regression evidence exists; current changes need independent review; unresolved distro CVEs remain recorded. |
-| P1 | Student Deep Reading V1 | PARTIAL — owned/revision-bound ingestion and citations exist; selected native host and OCR/Office acceptance still pending. |
+| P1 | Student Deep Reading V1 | PARTIAL — text path and citations work; PDF/DOCX/EPUB need the dedicated Docker worker (its 17 executor tests skip without the pinned image); no OCR in any production path. |
 | P2 | Personal Intelligence K9 | PARTIAL — consent, memory, goals and routing exist; full owner journeys and reviewed multi-user readiness remain. |
 | P3 | Student V2/V3 | PARTIAL — cited synthesis/graphs/cards/recall progress exist; longitudinal adaptive tutor quality and integrated UI remain. |
 | P4 | K4 Secure Sandbox | BLOCKED — execution remains disabled without a validated separate Python-compatible trust boundary. |
 | P5 | K5/K6/K8 Admin Engine | PARTIAL — backend admin proposals/static drafts/reviews exist; sandbox tests and governed application PR promotion remain gated. |
 | P6 | K7 Knowledge Refresh | PARTIAL — durable permission-fenced refresh under implementation; verification and independent review required before acceptance. |
-| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — working routes/exports exist; full speaking quality, researched slides and isolated Office PDF/OCR remain. |
-| P8 | Premium UX and multi-user readiness | PARTIAL — existing desktop/mobile regressions and RBAC exist; Antigravity owns remaining UX and product role/limit integration. |
-| P9 | Final cloud integration | BLOCKED for live acceptance — preparation only is authorized; live E2E, cloud backup/rollback and owner release approval are not performed. |
+| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports work (deck layout bug fixed in PR #28); IELTS REST is text-only with no scoring; presentation intake is a fixed template; chat-driven Office/presentation tools are denied in production. |
+| P8 | Premium UX and multi-user readiness | PARTIAL — single owner only; multi-user accounts, tiers and quotas NOT STARTED; Admin/JARVIS/Student pages not internationalised. |
+| P9 | Final cloud integration | NOT STARTED / BLOCKED — preparation documents only; deployment needs separate owner approval. |
 
 No numerical completion percentage is invented. The following detailed rows retain
 specific implementation and quality limitations. The original roadmap is a floor,
@@ -51,7 +54,7 @@ not a waiver of later owner requirements or an assertion that these features wor
 | AI orchestrator | PR21 Gemini/OpenAI/optional Claude chat+embedding adapters, task routing/fallback/budgets; ElevenLabs STT/TTS and existing VoiceStudio interface preserved. | Process-local caps aren't a durable billing ledger; no hard dollar guarantee, live quality or realtime voice implementation. Cloud privacy allowlist per request not implemented. |
 | Personal Intelligence / IELTS / Presentation / Office / Admin | Prior routes retained, consent and owner scope preserved; honesty fixes stay in PR21. | Dedicated IELTS voice/scoring incomplete; presentation intake is a deterministic template, not researched AI output. Office PDF/OCR unavailable without reviewed worker integration. |
 | Supabase / persistence | Existing private server-only Storage adapter, TLS checks, pgvector, migrations, local durable full profile retained.0019 revokes PUBLIC/anon/authenticated table grants. | Full-profile remote object lifecycle/outbox and cleanup are not yet reviewed; full profile still refuses that storage mode. Backup restore not exercised against a real cloud project. |
-| Antigravity integration | Existing frontend untouched; additive MASTER_API_CONTRACT.md published for review. | No external review/acknowledgment received. New backend features have no newly integrated frontend. No connected Antigravity review channel is available; the contract is delivered in the repository. |
+| Antigravity integration | Existing frontend untouched; additive [docs/integration/MASTER_API_CONTRACT.md](../integration/MASTER_API_CONTRACT.md) published for review. | No external review/acknowledgment received. New backend features have no newly integrated frontend. No connected Antigravity review channel is available; the contract is delivered in the repository. |
 | Deployment / $10 / P9 preparation | Existing FULL_OWNER_BETA architecture, future owner guide and benchmark protocol retained; expanded gates below. No services created. | No actual4/8GB VM benchmarks, current vendor/tax quotes or safe two-host architecture certified within $10. No production-ready/full-roadmap verdict. |
 
 Final validation evidence and failures are recorded in VALIDATION.md. Passing CI

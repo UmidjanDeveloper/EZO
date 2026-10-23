@@ -320,11 +320,11 @@ export function AdminPage() {
                     )}
                   />
                   <span className="text-lg font-bold capitalize text-ink">
-                    {systemStatus?.database || "PostgreSQL"} ({healthStatus?.database || "Ulanmoqda"})
+                    {systemStatus?.database ?? "noma’lum"} ({healthStatus?.database ?? "javob yo‘q"})
                   </span>
                 </div>
                 <span className="text-xs text-ink-faint">
-                  Profil: <strong className="text-ink">{systemStatus?.deployment_profile || "Standart"}</strong>
+                  Profil: <strong className="text-ink">{systemStatus?.deployment_profile ?? "noma’lum"}</strong>
                 </span>
               </Card>
 
@@ -341,11 +341,11 @@ export function AdminPage() {
                     )}
                   />
                   <span className="text-lg font-bold uppercase text-ink">
-                    {healthStatus?.status || "Aktiv"}
+                    {healthStatus?.status ?? "javob yo‘q"}
                   </span>
                 </div>
                 <span className="text-xs text-ink-faint">
-                  Muhit: <strong className="text-ink">{systemStatus?.environment || "development"}</strong>
+                  Muhit: <strong className="text-ink">{systemStatus?.environment ?? "noma’lum"}</strong>
                 </span>
               </Card>
 
@@ -360,7 +360,7 @@ export function AdminPage() {
                     : `${systemStatus?.providers.filter((p) => p.configured).length || 0} ta sozlangan`}
                 </span>
                 <span className="text-xs text-ink-faint">
-                  {systemStatus?.providers.map((p) => p.name).join(", ") || "Mahalliy"}
+                  {systemStatus?.providers.map((p) => p.name).join(", ") || "—"}
                 </span>
               </Card>
 
@@ -370,7 +370,7 @@ export function AdminPage() {
                   <Activity size={16} className="text-primary" />
                 </div>
                 <span className="text-lg font-bold font-mono text-ink">
-                  v{systemStatus?.version || "0.2.0"}
+                  {systemStatus?.version ? `v${systemStatus.version}` : "noma’lum"}
                 </span>
                 <span className="text-xs text-ink-faint">
                   Xavfsizlik audit loglari: <strong>Durable</strong>

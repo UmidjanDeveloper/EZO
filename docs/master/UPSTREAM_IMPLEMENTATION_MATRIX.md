@@ -1,4 +1,4 @@
-# Mandatory upstream implementation matrix — eight repositories
+# Mandatory upstream implementation matrix — nine repositories
 
 Upstream integration landed through externally merged PR25 at
 `cd9bbd0633022885ef429929a52228146dc51408` (head6ab4a95, identical source tree).
@@ -18,6 +18,26 @@ relative to `apps/api/tests/` unless stated otherwise. All four new license noti
 are under `docs/third-party/`. Runtime copies (plus the existing LlamaIndex notice)
 ship in `apps/api/src/ezo_api/_third_party/` and are checked by
 `tests/unit/test_runtime_notices.py` and actual wheel/image probes.
+
+## Audit status, 2026-10-23 (supersedes the status column below where they differ)
+
+An independent read-only audit of `38c752c` checked each row against code and tests
+([CLAUDE_MASTER_AUDIT.md](CLAUDE_MASTER_AUDIT.md) §5). FastAPI is the ninth upstream and was
+missing from this matrix.
+
+| Upstream | Status | Correction |
+|---|---|---|
+| FastAPI | IMPLEMENTED | Direct dependency for the whole API (fastapi 0.143.3, MIT). |
+| LlamaIndex | PARTIAL (thin) | Only `TextNode` is built and serialised; no agent consumes `/api/student/context`. |
+| Ruflo | PARTIAL (concept port) | `NODE_OPTIONS` removed from the child env allowlist in PR #28. |
+| VoiceStudio | PARTIAL | Wire-format tests only; default OmniVoice weights are CC-BY-NC; image tag not pinned. |
+| APEX-UI | NOT STARTED | No APEX-derived code in `apps/web` or `packages`. |
+| REA | CONCEPT ONLY | A set difference in `planning_policy.availability`; every device feature reports unavailable. |
+| Supabase | PARTIAL | Mock-transport contract tests; no live project. |
+| Microsoft JARVIS | PARTIAL (concept) | Original EZO code; no upstream code or executor. |
+| OpenJarvis | PARTIAL | Linux CLI companion not wired to any API route. |
+
+Researching an upstream is not integrating it. The reference owner scenario remains BLOCKED.
 
 | Upstream feature | EZO implementation / source files | Working test evidence | License | Status and precise limits |
 |---|---|---|---|---|

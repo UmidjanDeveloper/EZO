@@ -6,9 +6,15 @@ EZO's own source code does not contain copied code from the projects reviewed in
 - APEX-UI
 - VoiceStudio
 - OpenMontage
-- REA
+- REA (no code copied; a small set-difference idea is reimplemented, see below)
 - open-higgsfield
-- Ruflo (audited; optional external MCP orchestrator, not installed, no code copied)
+- Ruflo (optional external MCP orchestrator, not installed, no code copied; the
+  capability-intersection/expiry idea from `capabilities.ts` is reimplemented in EZO's own code)
+
+Ideas reimplemented in EZO's own code, with the upstream licence texts kept in
+`apps/api/src/ezo_api/_third_party/` and `docs/third-party/`, are listed with exact
+sources in [`docs/third-party/UPSTREAM_ADAPTATIONS.md`](docs/third-party/UPSTREAM_ADAPTATIONS.md)
+(Microsoft JARVIS, OpenJarvis, LlamaIndex, REA, Ruflo).
 
 Projects that EZO only studied for ideas are not listed here. Optional external
 services such as VoiceStudio and OpenMontage are installed and run separately, under
@@ -74,6 +80,7 @@ installed package's metadata (2026-10-17).
 | defusedxml | 0.7.1 | Python Software Foundation License — bounded OOXML relationship parsing, DTD/entities disabled |
 | XlsxWriter (installed by python-pptx; EZO itself writes XLSX with openpyxl) | 3.2.9 | BSD-2-Clause |
 | python-multipart | 0.0.32 | Apache-2.0 |
+| llama-index-core (TextNode container for Student synthesis context) | 0.14.25 | MIT |
 | tzdata | 2026.5 | Apache-2.0 |
 
 ### Web (JavaScript)

@@ -17,6 +17,13 @@ it("shows structured safe API errors", async () => {
   await expect(studentRequest("student/uploads")).rejects.toThrow("Maximum 5 MiB.");
 });
 
+it("treats 204 No Content (a confirmed delete) as success without parsing a body", async () => {
+  const json = vi.fn();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 204, json }));
+  await expect(studentRequest("student/cards/1?confirm=true", { method: "DELETE" })).resolves.toBeUndefined();
+  expect(json).not.toHaveBeenCalled();
+});
+
 it("keeps the last page reachable when text contains astral Unicode", () => {
   expect(hasNextStudentPage({ offset: 0, text: "🙂".repeat(4000), total_chars: 4001 })).toBe(true);
   expect(hasNextStudentPage({ offset: 4000, text: "Ў", total_chars: 4001 })).toBe(false);
