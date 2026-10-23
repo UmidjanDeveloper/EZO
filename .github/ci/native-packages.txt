@@ -1,0 +1,14 @@
+# Ubuntu packages for the API job's real OCR and Office tests (one per line).
+# Changing this list changes the CI package-cache key.
+tesseract-ocr
+tesseract-ocr-osd
+tesseract-ocr-eng
+tesseract-ocr-rus
+tesseract-ocr-uzb
+tesseract-ocr-uzb-cyrl
+libreoffice-writer-nogui
+libreoffice-calc-nogui
+libreoffice-impress-nogui
+fonts-liberation
+fonts-dejavu-core
+libseccomp2
