@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery", "feat/student-v1-complete", "feat/zero-budget-private-beta", "feat/free-beta-storage-profile", "feat/full-owner-beta-budget", "feat/master-build-candidate", "feat/final-backend-completion", "feat/jarvis-eight-upstream-integration"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery", "feat/student-v1-complete", "feat/zero-budget-private-beta", "feat/free-beta-storage-profile", "feat/full-owner-beta-budget", "feat/master-build-candidate", "feat/final-backend-completion", "feat/jarvis-eight-upstream-integration", "feat/knowledge-refresh-governance", "feat/master-durable-refresh"]
   pull_request:
 
 permissions:
@@ -44,9 +44,11 @@ jobs:
         with:
           version: "0.11.32"
       - name: Tesseract OCR (uzb, uzb_cyrl, rus, eng) and LibreOffice (real OCR and PDF tests)
+        timeout-minutes: 15
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
+          apt_options=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60)
+          sudo apt-get "${apt_options[@]}" update
+          sudo apt-get "${apt_options[@]}" install -y --no-install-recommends tesseract-ocr tesseract-ocr-osd \
             tesseract-ocr-eng tesseract-ocr-rus tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
             libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui \
             fonts-liberation fonts-dejavu-core libseccomp2

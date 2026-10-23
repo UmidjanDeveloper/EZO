@@ -1,5 +1,10 @@
 # Master candidate verification
 
+The records below describe the earlier master candidate. For the 23 October
+continuation, see the latest section of IMPLEMENTATION_STATUS.md, the owner-supplied
+P0–P9 acceptance matrix, and the `ezo-master-completion-evidence` task handoff.
+Earlier historical counts and workflow links do not validate the continuation HEAD.
+
 Integration base: **c3303d94c128406dfd286168cd9dd02079c61f1a**.
 Preserved PR21 ancestor: **3ec6cf1cfc7e90588f8c3c2a033a255c3ff70c0b**.
 Backend source/test commit: **4af75877696bc82584bf3c8986ed2563d00abd2b**. Contract/research commit: **c43727df4e0d176854f84f9d3d46847f5b9de2c0**.

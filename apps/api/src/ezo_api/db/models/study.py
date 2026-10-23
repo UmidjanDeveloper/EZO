@@ -54,3 +54,30 @@ class StudyReview(UUIDPrimaryKey, Base):
     rating: Mapped[str] = mapped_column(String(8))
     result: Mapped[dict[str, Any]] = mapped_column(JSONType)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+
+
+class StudentLearningPath(UUIDPrimaryKey, Base):
+    """Owner-defined, source-bound checkpoints; recall evidence stays in StudyReview."""
+
+    __tablename__ = "student_learning_paths"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_id"),
+        Index("ix_student_learning_paths_scope", "user_id", "project_id", "state"),
+        CheckConstraint("version >= 0 AND version <= 10000", name="version"),
+        CheckConstraint("state IN ('active','paused','deleted')", name="state"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
+    )
+    goal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("personal_goals.id", ondelete="SET NULL"), nullable=True
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column()
+    definition_hash: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(200))
+    language: Mapped[str] = mapped_column(String(2))
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSONType)
+    state: Mapped[str] = mapped_column(String(8), default="active")
+    version: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)

@@ -29,7 +29,13 @@ from ezo_api.db.models.language import (
     LanguageTurn,
     LanguageVocabularyItem,
 )
-from ezo_api.db.models.learning import KnowledgeLibrary, LearnedSource
+from ezo_api.db.models.learning import (
+    KnowledgeLibrary,
+    LearnedSource,
+    SourceRefreshBlob,
+    SourceRefreshPolicy,
+    SourceRefreshRun,
+)
 from ezo_api.db.models.memory import Memory
 from ezo_api.db.models.observability import AgentRun, AuditLog, ToolCall
 from ezo_api.db.models.official import LegalDocument, LegalRevision, OfficialSyncRun
@@ -37,7 +43,7 @@ from ezo_api.db.models.organization import OrganizationAsset, OrganizationProfil
 from ezo_api.db.models.personal import PersonalGoal
 from ezo_api.db.models.project import Project
 from ezo_api.db.models.student import StudentRawRevision
-from ezo_api.db.models.study import StudyCard, StudyReview
+from ezo_api.db.models.study import StudentLearningPath, StudyCard, StudyReview
 from ezo_api.db.models.translation import GlossaryTerm
 from ezo_api.db.models.user import User
 
@@ -74,11 +80,15 @@ __all__ = [
     "OrganizationProfile",
     "PersonalGoal",
     "Project",
+    "SourceRefreshBlob",
+    "SourceRefreshPolicy",
+    "SourceRefreshRun",
     "StoryAsset",
     "StoryNarration",
     "StoryProject",
     "StoryScene",
     "StoryTimeline",
+    "StudentLearningPath",
     "StudentRawRevision",
     "StudyCard",
     "StudyReview",

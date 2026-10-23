@@ -210,3 +210,50 @@ compressed or redirect responses fail without returning partial success; provide
 fallback remains under existing configuration. Cancellation closes the stream.
 No new credential, consent, provider or dollar-cap claim. See
 `docs/master/VOICE_RESOURCE_LIMITS.md` for exact bounds and tests.
+
+### Learned-source interrupted index recovery (no API schema change)
+
+Identical content still resumes a queued/processing document whose index publication
+was interrupted. Healthy completed revisions and unchanged failed/needs_ocr states
+are preserved; no durable DocumentJob attempts are reset. This does not add a K7
+queue, schedule, permission grant or remote execution capability. See
+`docs/master/KNOWLEDGE_REFRESH_GOVERNANCE.md` for confirmed commit boundaries and
+the required staged/fenced publication design.
+
+Pending document ingestion is also serialized under database write locks across
+independent runners. A second worker reuses an already published result. Source
+ingestion binds the expected content hash; a superseded input aborts without
+marking the replacement failed. Explicit reindex still queues the document first.
+This introduces no new HTTP fields or durable scheduling/execution authority.
+Stored source bytes are verified against the registered hash before parsing;
+corruption fails ingestion without publishing quotes/chunks under a false hash.
+
+
+## P6 durable refresh continuation — additive backend contract
+
+Owner roadmap identity is now resolved by `docs/master/OWNER_ROADMAP_P0_P9.md`.
+The stable refresh permission/run/cancellation/freshness routes, state/manifest
+semantics and exact resource bounds are specified in
+`docs/master/K7_DURABLE_REFRESH.md`. Existing one-shot refresh adapts to the durable
+queue; registration/first reading and `/versions` entries remain compatible.
+A completed refresh run can have a partial source result. Never label it whole-book
+reading or imply an unfetched remote source is unchanged. Permission revocation
+fences fetch admission/publication and labels the owner's retained cached knowledge.
+
+Antigravity should retain one UUID request ID through network retries, render
+queued/running/failed/cancelled and partial states, request explicit recurring
+consent, and show the previous successful observation separately from current
+refresh progress. This publishes the backend contract; no frontend acceptance or
+external coordination acknowledgment is claimed. No UI files modified.
+
+
+## Student V3 individual recall paths — additive, no action authority
+
+`docs/master/STUDENT_ADAPTIVE_PATHS.md` freezes the `/api/student/learning-paths`
+contract: owner-defined source/card/revision-bound checkpoints, explicit UUID
+admission, real recent review evidence, source invalidation, bounded read-only
+recommendations, versioned pause/resume and confirmed deletion tombstones.
+Do not label checkpoints as measured mastery or automatically submit reviews.
+A prerequisite can become unsatisfied after a lapse or an overdue review.
+`project_id` remains exact; goal progress and memory consent are independent.
+UI integration/acceptance remains pending with Antigravity; no frontend changed.

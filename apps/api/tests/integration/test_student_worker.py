@@ -197,16 +197,21 @@ async def test_project_duplicate_deletion_keeps_other_project_file(client, app):
 
 
 def test_direct_official_html_parser_cannot_bypass_isolation():
-    from ezo_api.knowledge.parsers.base import ParseError
     from ezo_api.knowledge.parsers.html import parse_html
 
     token = isolation._FIXTURES.set(False)
     try:
-        with (
-            patch("trafilatura.extract", side_effect=AssertionError("Extractor reached")),
-            pytest.raises(ParseError) as error,
-        ):
-            parse_html(b"<html>untrusted website</html>", "official.html")
-        assert error.value.code == "isolation_unavailable"
+        # Plain body extraction is now explicitly supported without a native
+        # parser. Keep the actual native-call tripwire; never just remove the gate.
+        with patch(
+            "trafilatura.extract", side_effect=AssertionError("Extractor reached")
+        ) as native:
+            result = parse_html(b"<html>untrusted website</html>", "official.html")
+        native.assert_not_called()
+        assert result.text == "untrusted website"
+        assert result.metadata == {
+            "extraction": "bounded-html-text/v1",
+            "coverage": "body_text_only",
+        }
     finally:
         isolation._FIXTURES.reset(token)

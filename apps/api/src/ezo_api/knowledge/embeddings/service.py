@@ -8,7 +8,7 @@ would mix incompatible vectors).
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 from ezo_api.providers.base import ModelProvider
@@ -59,13 +59,21 @@ class EmbeddingService:
     def model_key(self) -> str | None:
         return self.active.key if self.active else None
 
-    async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        return await self._embed(texts, "document")
+    async def embed_documents(
+        self, texts: Sequence[str], *, before_batch: Callable[[], Awaitable[None]] | None = None
+    ) -> list[list[float]]:
+        return await self._embed(texts, "document", before_batch=before_batch)
 
     async def embed_query(self, text: str) -> list[float]:
         return (await self._embed([text], "query"))[0]
 
-    async def _embed(self, texts: Sequence[str], purpose: str) -> list[list[float]]:
+    async def _embed(
+        self,
+        texts: Sequence[str],
+        purpose: str,
+        *,
+        before_batch: Callable[[], Awaitable[None]] | None = None,
+    ) -> list[list[float]]:
         if self.active is None:
             raise EmbeddingError(
                 "No embedding provider is configured.",
@@ -74,6 +82,8 @@ class EmbeddingService:
         vectors: list[list[float]] = []
         for start in range(0, len(texts), BATCH_SIZE):
             batch = [text[:MAX_INPUT_CHARS] for text in texts[start : start + BATCH_SIZE]]
+            if before_batch is not None:
+                await before_batch()
             try:
                 result = await self.active.provider.embed(
                     batch,

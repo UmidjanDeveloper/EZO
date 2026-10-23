@@ -9,7 +9,39 @@ this is not a production-readiness declaration. Historical milestone counts belo
 must not be used as this branch's validation results.
 
 What is **verified** to work, how it was verified, and what is not done. Nothing is listed as
-working unless it was tested. The one roadmap is [ROADMAP.md](ROADMAP.md).
+working unless it was tested. The authoritative product scope is the
+[owner-supplied P0–P9 plan](docs/master/OWNER_ROADMAP_P0_P9.md); the legacy engineering
+catalog remains in [ROADMAP.md](ROADMAP.md).
+
+## Master continuation — 23 October 2026
+
+Branch `feat/master-durable-refresh`, implementation head
+`4352ed5b70f65c4a140dedae0152e4e3003b9030`, integration base
+`cd9bbd0633022885ef429929a52228146dc51408`. Existing PR21–25 work is preserved;
+this assistant has not merged or deployed this candidate.
+
+Implemented backend candidates: permission-fenced durable K7 refresh/schedules,
+atomic staged source publication, cleanup journal and truthful freshness; bounded
+non-native HTML text extraction; parser-version/historical-blob citation integrity;
+source-bound individual learning paths driven by real recall events. Contracts:
+[K7](docs/master/K7_DURABLE_REFRESH.md),
+[Student paths](docs/master/STUDENT_ADAPTIVE_PATHS.md). No frontend edits.
+
+Completed full suites at the preceding implementation head `f778bbe`:
+SQLite1209 passed/38 skipped; PostgreSQL1224 passed/23 skipped, zero failures.
+The standalone worker startup/freshness corrections add targeted regressions;
+full reruns for `4352ed5` and its hosted CI190/Security116 were in progress when
+this dated record was prepared. Their exact final results are in the task evidence
+handoff/GitHub Actions; do not relabel the older counts as final-head results.
+Ruff, formatting (498 files) and mypy (329 modules) passed on the latest source.
+Raw image scan retains44 HIGH/0 CRITICAL/0 fixable HIGH-or-CRITICAL; no suppression.
+Initial interrupted ENOSPC runs and the superseded native-HTML expectation failure
+are retained in the evidence, followed by the corrected native-call tripwire tests.
+
+[Current acceptance](docs/master/ACCEPTANCE_MATRIX.md) remains PARTIAL/BLOCKED.
+K4 execution is disabled; native hosting, remaining product work, Antigravity UX,
+live quality/cost evaluation, independent review and P9 cloud acceptance are open.
+This is not complete P0–P9 or production readiness.
 
 ## Coordinated P0/P1 review — 2026-10-20
 

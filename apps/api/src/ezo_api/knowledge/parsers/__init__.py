@@ -5,6 +5,7 @@ from __future__ import annotations
 from ezo_api.documents.isolation import ISOLATION_MESSAGE, native_fixtures_allowed
 from ezo_api.knowledge.parsers.base import ParsedDocument, ParseError, Parser, Section
 from ezo_api.knowledge.parsers.html import parse_html
+from ezo_api.knowledge.parsers.html_text import parse_html_text
 from ezo_api.knowledge.parsers.image import parse_image
 from ezo_api.knowledge.parsers.office import parse_docx, parse_xlsx
 from ezo_api.knowledge.parsers.pdf import parse_pdf
@@ -23,6 +24,8 @@ PARSERS: dict[str, Parser] = {
 
 
 def parse(category: str, data: bytes, filename: str) -> ParsedDocument:
+    if category == "html" and not native_fixtures_allowed():
+        return parse_html_text(data, filename)
     if category not in ("text", "markdown", "csv") and not native_fixtures_allowed():
         raise ParseError(ISOLATION_MESSAGE, "isolation_unavailable")
     parser = PARSERS.get(category)

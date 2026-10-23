@@ -5,15 +5,30 @@ Baseline integration **c3303d94c128406dfd286168cd9dd02079c61f1a**. Existing Draf
 **3ec6cf1cfc7e90588f8c3c2a033a255c3ff70c0b** is preserved as an ancestor.
 No merge or deployment is authorized or performed by this candidate.
 
-## Roadmap identity gate
+## Authoritative P0–P9 mapping
 
-The owner names a P0–P9 Master Roadmap, but the checked repository's ROADMAP.md
-explicitly calls itself the only roadmap and defines Phase 0–14 plus K1–K7.
-No P0–P9 master definitions were found in tracked docs or the five available
-pasted attachments. **P0–P9 numerical completion cannot be certified without that
-source of truth.** This matrix uses the master's explicit capability requirements
-instead of inventing a mapping. Historic phase completion and CI results are not
-proof of current release readiness. P9 stays preparation only.
+The owner has now supplied [the actual master roadmap](OWNER_ROADMAP_P0_P9.md).
+The earlier missing-document gate is resolved. Its original DOCX hash is recorded
+with the extraction; historic technical claims remain historic. Additional owner
+requirements (eight upstreams and governed device agents) remain in force.
+These statuses describe acceptance, not just whether source files exist.
+
+| Phase | Owner's scope | Current acceptance status / gate |
+|---|---|---|
+| P0 | Baseline and security | PARTIAL — local/hosted regression evidence exists; current changes need independent review; unresolved distro CVEs remain recorded. |
+| P1 | Student Deep Reading V1 | PARTIAL — owned/revision-bound ingestion and citations exist; selected native host and OCR/Office acceptance still pending. |
+| P2 | Personal Intelligence K9 | PARTIAL — consent, memory, goals and routing exist; full owner journeys and reviewed multi-user readiness remain. |
+| P3 | Student V2/V3 | PARTIAL — cited synthesis/graphs/cards/recall progress exist; longitudinal adaptive tutor quality and integrated UI remain. |
+| P4 | K4 Secure Sandbox | BLOCKED — execution remains disabled without a validated separate Python-compatible trust boundary. |
+| P5 | K5/K6/K8 Admin Engine | PARTIAL — backend admin proposals/static drafts/reviews exist; sandbox tests and governed application PR promotion remain gated. |
+| P6 | K7 Knowledge Refresh | PARTIAL — durable permission-fenced refresh under implementation; verification and independent review required before acceptance. |
+| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — working routes/exports exist; full speaking quality, researched slides and isolated Office PDF/OCR remain. |
+| P8 | Premium UX and multi-user readiness | PARTIAL — existing desktop/mobile regressions and RBAC exist; Antigravity owns remaining UX and product role/limit integration. |
+| P9 | Final cloud integration | BLOCKED for live acceptance — preparation only is authorized; live E2E, cloud backup/rollback and owner release approval are not performed. |
+
+No numerical completion percentage is invented. The following detailed rows retain
+specific implementation and quality limitations. The original roadmap is a floor,
+not a waiver of later owner requirements or an assertion that these features work.
 
 | Requirement | Actual implementation / candidate evidence | Unresolved acceptance gate |
 |---|---|---|
@@ -22,13 +37,13 @@ proof of current release readiness. P9 stays preparation only.
 | Student V2 retrieval / synthesis | Existing K1/K2 hybrid pgvector/keyword reuse; new bounded cross-document comparison with citations from every selected source. | Excerpt-based only. Whole-book completeness and contradiction entailment not established. Authorized website ingestion remains K1's existing bounded crawler. |
 | Student concept graphs | Typed bounded graph, unique nodes, valid edges, exact source quotes; real configured model request, no canned output. | Relationships/labels are generated interpretations; no live model quality evaluation, graph UI or persisted graph version history yet. |
 | LlamaIndex integration | Pinned core TextNode interop for validated, owned context; no external agent/loader/eval surface. | 35 extra distributions, measured import overhead, ongoing dependency/license review. Not a replacement of EZO ACLs/vector ownership. |
-| Personal tutoring / multilingual learning | Existing answer, guide, summary, quiz in uz/en/ru retained; new source-validated flashcard proposals. Provider errors/offline are explicit. | Adaptive curriculum and validated pedagogical quality not implemented. No model-generated mastery claims. |
+| Personal tutoring / multilingual learning | Existing answer, guide, summary, quiz in uz/en/ru retained; new source-validated flashcard proposals. Provider errors/offline are explicit. | Owner-defined source-bound recall paths now persist prerequisites and adapt to actual recent reviews. Automatic curriculum generation, validated diagnostics/pedagogical quality and Antigravity UX remain pending; no mastery claims. |
 | Durable flashcards / spaced repetition | Explicit source-bound cards, bounded-recall-v1 schedule, version fences, review event idempotency, real counters and user-confirmed deletion. | Backend only; Antigravity practice UI pending. Self-reported recall is not validated mastery. Revision invalidation and deletion apply. |
-| Student V4 advanced learning | Source/progress primitives now available without overwriting V1. | Curriculum sequencing, longitudinal evaluation and adaptive mastery remain incomplete; no V4 completion claim. |
+| Student V4 advanced learning | Source/progress primitives now available without overwriting V1. | Owner-defined prerequisite sequencing is implemented in Student paths. Longitudinal evaluation, validated adaptive tutoring and full multi-agent application workflows remain incomplete; no V4 completion claim. |
 | Safe inter-agent knowledge | Authenticated read-only, bounded context with immutable source IDs and explicit no-authority trust label. | Receiver must preserve its own authorization/consent gates. No claim of a fully integrated multi-agent runtime. |
 | Isolated OCR / Office | Student dedicated text-PDF/DOCX/EPUB parser retained; API native execution remains disabled. | Scanned OCR and Office-PDF are not implemented in that executor protocol. Do not enable legacy API native paths as a fallback. |
 | Knowledge K1–K3 | Existing source/library ownership, index, provenance, versions, citations and proposal-only analyzer reused. | Source coverage/freshness and model entailment have bounded guarantees. See existing tests, not documentation labels alone. |
-| Knowledge Refresh / K7 | Existing explicit owner refresh re-fetches through SafeFetcher/robots/budgets and records hash/changes; not rebuilt. | Runner remains process-local, not a durable refresh queue. Granular permission revocation and versioned refresh history are not complete. No autonomous refresh enabled. |
+| Knowledge Refresh / K7 | Migration0020 durable refresh runs, explicit permission generations/schedules, leased claims, atomic staged publication, bounded history, per-document stale labels and cleanup journal. See K7_DURABLE_REFRESH.md and actual regression evidence. | Independent review/hosting acceptance pending. Initial K1 first-read runner remains legacy; native PDF/OCR/Office still needs the separate reviewed executor. The new worker is explicit and is not auto-started. |
 | K4 general-code sandbox | **Not implemented/enabled.** Existing parser accepts a fixed data protocol, not generated programs. Design in EXECUTION_GATES.md. | Dedicated microVM/VM runtime, trusted build chain and adversarial containment evidence required. Missing /dev/kvm and no approved remote executor; no unsafe substitute. |
 | K5 Skill Builder | K3 and admin proposals remain non-executable data. | Code generation, isolated tests, signed skill artifacts and installation blocked on verified K4. No fake successful test/status. |
 | K6 branch/tests/PR workflow | This candidate itself uses reviewable commits and CI; proposed promotion contract documented. | General app-controlled skill PR workflow not implemented. No unattended git, merge, secret access or deployment. |

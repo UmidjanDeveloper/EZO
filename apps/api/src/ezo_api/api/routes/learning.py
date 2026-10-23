@@ -398,12 +398,17 @@ async def refresh_source(
         raise HTTPException(
             409, detail={"code": "busy", "message": "This source is being read already."}
         )
-    source.status = "queued"
-    source.error = None
-    audit(session, user.id, "learning.refresh", "learned_source", source.id, {})
-    await session.commit()
-    await runner.submit(source.id)
-    await session.refresh(source)
+    from ezo_api.api.routes.document_jobs import _call
+    from ezo_api.learning.refresh import RefreshQueue
+    from ezo_api.learning.refresh_worker import RefreshWorker
+
+    source_id, user_id = source.id, user.id
+    await session.rollback()
+    queue = RefreshQueue(services.db)
+    await _call(queue.enqueue(user_id, source_id, uuid.uuid4()))
+    if services.settings.ingestion_mode == "inline":
+        await RefreshWorker(queue, runner.service).process_one()
+    source = await _owned_source(session, user_id, source_id)
     return SourceOut.model_validate(source)
 
 

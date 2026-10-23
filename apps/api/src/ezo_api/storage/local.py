@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import tempfile
 from pathlib import Path
 
 from ezo_api.storage.base import (
@@ -34,9 +35,21 @@ class LocalStorageProvider(StorageProvider):
 
         def write() -> None:
             path.parent.mkdir(parents=True, exist_ok=True)
-            temp = path.with_name(path.name + ".tmp")
-            temp.write_bytes(data)
-            os.replace(temp, path)  # atomic on the same filesystem
+            temp: Path | None = None
+            try:
+                # A shared '<key>.tmp' lets concurrent puts consume each other's
+                # rename source. Each writer owns a private same-directory file.
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", dir=path.parent, prefix=".ezo-upload-", delete=False
+                ) as stream:
+                    temp = Path(stream.name)
+                    stream.write(data)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temp, path)  # atomic on the same filesystem
+            finally:
+                if temp is not None:
+                    temp.unlink(missing_ok=True)
 
         try:
             await asyncio.to_thread(write)

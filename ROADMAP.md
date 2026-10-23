@@ -8,9 +8,13 @@ live-provider quality evaluation and the documented dependency risks remain open
 this is not a production-readiness declaration. Historical milestone counts below
 must not be used as this branch's validation results.
 
-This is the **only** roadmap. Phase names here are the ones used in the code
-(`apps/api/src/ezo_api/agents/catalog.py`, `apps/api/src/ezo_api/maturity.py`; a test keeps
-them in sync) and in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md).
+The owner-supplied [P0–P9 master roadmap](docs/master/OWNER_ROADMAP_P0_P9.md)
+is now the authoritative product plan, supplemented by the eight-upstream/device
+requirements. [The acceptance matrix](docs/master/ACCEPTANCE_MATRIX.md) maps that
+scope to verified implementation and open gates. The historical Phase0–14 catalog
+below remains the naming convention in `apps/api/src/ezo_api/agents/catalog.py`,
+`apps/api/src/ezo_api/maturity.py` and older implementation records; it is not a
+competing declaration that P0–P9 is complete.
 
 Phase numbers follow the owner's *Universal Professional AI Robot* master prompt (2026-10-18):
 Phase 1 Language Coach, Phase 2 Visual Agent, Phase 3 OCR + EZO Office, … Phase 14 optional

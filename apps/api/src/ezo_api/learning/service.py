@@ -22,11 +22,19 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ezo_api.db.base import utcnow
-from ezo_api.db.models import KnowledgeDocument, KnowledgeLibrary, KnowledgeSource, LearnedSource
+from ezo_api.db.models import (
+    KnowledgeDocument,
+    KnowledgeLibrary,
+    KnowledgeSource,
+    LearnedSource,
+    SourceRefreshBlob,
+    SourceRefreshPolicy,
+    SourceRefreshRun,
+)
 from ezo_api.knowledge.fetch import SafeFetcher
 from ezo_api.knowledge.ingestion.service import KnowledgeService
 from ezo_api.knowledge.retrieval.keyword import SEARCHABLE_STATUSES
@@ -176,6 +184,15 @@ class LearningService:
 
     async def delete(self, session: AsyncSession, learned: LearnedSource) -> int:
         """Remove the source, its documents, chunks, vectors and stored files."""
+        await session.execute(
+            update(SourceRefreshBlob)
+            .where(
+                SourceRefreshBlob.run_id.in_(
+                    select(SourceRefreshRun.id).where(SourceRefreshRun.source_id == learned.id)
+                )
+            )
+            .values(published=False)
+        )
         documents = (
             await session.scalars(
                 select(KnowledgeDocument).where(
@@ -235,11 +252,13 @@ class LearningService:
     async def run(self, source_id: uuid.UUID) -> None:
         """Read and index one source. Never raises for source problems: the status and
         error tell what happened."""
+        if not self.enabled:
+            return
         async with self.sessionmaker() as session:
             try:
                 await self._run(session, source_id)
             except LookupError:
-                logger.info("Learned source %s was deleted while it was read", source_id)
+                logger.info("Learned source %s was deleted or superseded while read", source_id)
             except Exception:
                 logger.exception("Learning crashed for source %s", source_id)
                 await session.rollback()
@@ -255,6 +274,15 @@ class LearningService:
         learned = await session.get(LearnedSource, source_id)
         if learned is None:
             raise LookupError(source_id)
+        if (
+            await session.scalar(
+                select(SourceRefreshPolicy.id).where(SourceRefreshPolicy.source_id == source_id)
+            )
+            is not None
+        ):
+            # Once governed refresh is enabled, the legacy runner has no authority
+            # to bypass its generation/lease/publication fence.
+            raise LookupError("Source uses governed refresh")
         user_id = learned.user_id
         knowledge_source_id = learned.knowledge_source_id
         limits = Limits.model_validate(learned.limits or {})
@@ -300,7 +328,14 @@ class LearningService:
             await session.commit()
             if not result.duplicate:
                 changed += 1
-                await self.knowledge.ingest(session, document_id)
+            # Content deduplication does not prove index publication succeeded.
+            # A crash can follow file registration or the processing-status
+            # commit. Resume only those incomplete states; do not revive failed
+            # documents or reindex healthy unchanged revisions automatically.
+            if not result.duplicate or result.document.status in ("queued", "processing"):
+                await self.knowledge.ingest(
+                    session, document_id, expected_hash=result.document.content_hash
+                )
             indexed_document = await session.get(KnowledgeDocument, document_id)
             if indexed_document is None:
                 raise LookupError(source_id)
@@ -372,7 +407,7 @@ class LearningService:
         found_license = license_review["license"]
         learned.license = str(found_license)[:200] if found_license else None
         learned.profile = {
-            **(learned.profile or {}),
+            **{k: v for k, v in (learned.profile or {}).items() if k != "capability_analysis"},
             **inspection.profile,
             "license_review": license_review,
             "skipped": inspection.skipped[:100],
@@ -467,10 +502,15 @@ class LearningRunner:
         task.add_done_callback(self._tasks.discard)
 
     async def resume_unfinished(self) -> int:
+        if not self.service.enabled:
+            return 0
         async with self.service.sessionmaker() as session:
             ids = (
                 await session.scalars(
-                    select(LearnedSource.id).where(LearnedSource.status.in_(RUNNING))
+                    select(LearnedSource.id).where(
+                        LearnedSource.status.in_(RUNNING),
+                        ~exists().where(SourceRefreshPolicy.source_id == LearnedSource.id),
+                    )
                 )
             ).all()
         for source_id in ids:

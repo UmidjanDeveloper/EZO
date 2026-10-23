@@ -110,11 +110,38 @@ class SafeFetcher:
         allow_private_networks: bool = False,
         transport: httpx.AsyncBaseTransport | None = None,
         resolver: Callable[[str, int], Awaitable[list[str]]] | None = None,
+        before_request: Callable[[], Awaitable[None]] | None = None,
+        on_bytes: Callable[[int], None] | None = None,
     ) -> None:
+        self.before_request = before_request
+        self.on_bytes = on_bytes
         self.allow_private = allow_private_networks
         self._transport = transport
         self._resolve = resolver or self._default_resolve
         self._robots: dict[str, tuple[float, RobotFileParser | None]] = {}
+
+    def scoped(
+        self, before_request: Callable[[], Awaitable[None]], on_bytes: Callable[[int], None]
+    ) -> SafeFetcher:
+        """Independent run budget/cache; preserve the existing transport and SSRF policy."""
+
+        async def admit() -> None:
+            if self.before_request is not None:
+                await self.before_request()
+            await before_request()
+
+        def consume(size: int) -> None:
+            if self.on_bytes is not None:
+                self.on_bytes(size)
+            on_bytes(size)
+
+        return SafeFetcher(
+            allow_private_networks=self.allow_private,
+            transport=self._transport,
+            resolver=self._resolve,
+            before_request=admit,
+            on_bytes=consume,
+        )
 
     @staticmethod
     async def _default_resolve(host: str, port: int) -> list[str]:
@@ -216,6 +243,8 @@ class SafeFetcher:
                     # never to a host a redirect points to.
                     same_host = urlsplit(current).netloc == origin
                     extra = headers if headers and same_host else None
+                    if self.before_request is not None:
+                        await self.before_request()
                     async with client.stream("GET", current, headers=extra) as response:
                         self._check_peer(current, response)
                         if response.is_redirect:
@@ -240,6 +269,8 @@ class SafeFetcher:
                         chunks: list[bytes] = []
                         size = 0
                         async for chunk in response.aiter_bytes():
+                            if self.on_bytes is not None:
+                                self.on_bytes(len(chunk))
                             size += len(chunk)
                             if size > max_bytes:
                                 raise FetchError("too_large", "The page is too large to read.")

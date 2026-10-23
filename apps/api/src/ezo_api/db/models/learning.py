@@ -12,10 +12,19 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ezo_api.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
+from ezo_api.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey, utcnow
 from ezo_api.db.models.types import JSONType
 
 
@@ -65,3 +74,68 @@ class LearnedSource(UUIDPrimaryKey, Timestamps, Base):
     """Hash over the documents read, to notice changes on a later refresh."""
     last_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     indexed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class SourceRefreshPolicy(UUIDPrimaryKey, Timestamps, Base):
+    """Explicit fetch permission and recurrence consent; absent means legacy one-shot only."""
+
+    __tablename__ = "source_refresh_policies"
+    __table_args__ = (
+        CheckConstraint("generation >= 1", name="generation"),
+        CheckConstraint("interval_seconds IS NULL OR interval_seconds >= 3600", name="interval"),
+        Index("ix_source_refresh_due", "enabled", "next_run_at"),
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("learned_sources.id", ondelete="CASCADE"), unique=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    generation: Mapped[int] = mapped_column(Integer, default=1)
+    interval_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class SourceRefreshRun(UUIDPrimaryKey, Base):
+    """An immutable-input attempt lineage. Terminal runs are never reset."""
+
+    __tablename__ = "source_refresh_runs"
+    __table_args__ = (
+        UniqueConstraint("source_id", "request_id"),
+        CheckConstraint("attempts >= 0 AND attempts <= 3", name="attempts"),
+        CheckConstraint(
+            "state IN ('queued','running','completed','failed','cancelled')", name="state"
+        ),
+        Index("ix_source_refresh_queue", "state", "available_at", "created_at"),
+    )
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("learned_sources.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    request_id: Mapped[uuid.UUID] = mapped_column()
+    # Unique NULLs permit terminal history, exactly one active run per source.
+    active_key: Mapped[str | None] = mapped_column(String(36), unique=True, nullable=True)
+    generation: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(12), default="queued")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    input: Mapped[dict[str, Any]] = mapped_column(JSONType)
+    lease_token: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    available_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONType, nullable=True)
+
+
+class SourceRefreshBlob(UUIDPrimaryKey, Base):
+    """Pre-write cleanup journal; unpublished tombstones are retried after worker expiry."""
+
+    __tablename__ = "source_refresh_blobs"
+    __table_args__ = (Index("ix_source_refresh_blob_cleanup", "published", "next_cleanup_at"),)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("source_refresh_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    storage_key: Mapped[str] = mapped_column(String(512), unique=True)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    next_cleanup_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
