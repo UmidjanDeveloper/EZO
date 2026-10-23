@@ -635,34 +635,34 @@ async def test_deleting_other_source_preserves_shared_historical_revision_blob(
 async def test_production_like_website_initial_read_and_durable_refresh_use_no_native_parser(
     api, learning_app, web, monkeypatch
 ):
-    from ezo_api.knowledge.ingestion import service as ingestion_service
+    from ezo_api.documents import isolation
     from ezo_api.knowledge.parsers import html
-    from ezo_api.learning import refresh_worker
-
-    monkeypatch.setattr(ingestion_service, "native_fixtures_allowed", lambda: False)
-    monkeypatch.setattr(refresh_worker, "native_fixtures_allowed", lambda: False)
-    monkeypatch.setattr(html, "native_fixtures_allowed", lambda: False)
 
     def no_native(*args, **kwargs):
         raise AssertionError("Native HTML must not run in the API")
 
     monkeypatch.setattr(html.trafilatura, "extract", no_native)
-    source, user, q, worker = await setup(api, learning_app, web)
-    assert source["status"] == "indexed"
-    web.add(f"{DOCS}/guide/", page("New evidence", "O‘zbekiston 🙂 yangi dalil."))
-    run = await q.enqueue(user, uuid.UUID(source["id"]), uuid.uuid4())
-    assert await worker.process_one()
-    async with q.transaction(write=False) as session:
-        result = await session.get(SourceRefreshRun, uuid.UUID(run["id"]))
-        assert result.state == "completed"
-        document = await session.scalar(
-            select(KnowledgeDocument).where(
-                KnowledgeDocument.current_revision_id.is_not(None),
-                KnowledgeDocument.source_url == DOCS + "/guide/",
+    token = isolation._FIXTURES.set(False)
+    try:
+        source, user, q, worker = await setup(api, learning_app, web)
+        assert source["status"] == "indexed"
+        web.add(f"{DOCS}/guide/", page("New evidence", "O‘zbekiston 🙂 yangi dalil."))
+        run = await q.enqueue(user, uuid.UUID(source["id"]), uuid.uuid4())
+        assert await worker.process_one()
+        async with q.transaction(write=False) as session:
+            result = await session.get(SourceRefreshRun, uuid.UUID(run["id"]))
+            assert result.state == "completed"
+            document = await session.scalar(
+                select(KnowledgeDocument).where(
+                    KnowledgeDocument.current_revision_id.is_not(None),
+                    KnowledgeDocument.source_url == DOCS + "/guide/",
+                )
             )
-        )
-        revision = await session.get(DocumentRevision, document.current_revision_id)
-        assert "O‘zbekiston 🙂 yangi dalil." in revision.raw_text
+            revision = await session.get(DocumentRevision, document.current_revision_id)
+            assert "O‘zbekiston 🙂 yangi dalil." in revision.raw_text
+            assert document.meta["extraction"] == "bounded-html-text/v1"
+    finally:
+        isolation._FIXTURES.reset(token)
 
 
 async def test_new_source_url_is_published_and_withdrawn_url_can_return(api, learning_app, web):

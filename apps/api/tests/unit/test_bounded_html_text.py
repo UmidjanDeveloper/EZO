@@ -63,3 +63,20 @@ def test_production_html_dispatch_never_calls_trafilatura(monkeypatch):
         html.parse_html(b"<p>Authorized body text.</p>", "page.html").text
         == "Authorized body text."
     )
+
+
+def test_dispatcher_supports_only_bounded_html_when_all_native_exceptions_are_off(monkeypatch):
+    from ezo_api.documents import isolation
+    from ezo_api.knowledge import parsers
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("The registered native HTML parser must not be entered")
+
+    monkeypatch.setitem(parsers.PARSERS, "html", forbidden)
+    token = isolation._FIXTURES.set(False)
+    try:
+        result = parsers.parse("html", b"<p>Bounded source text.</p>", "web.html")
+        assert result.text == "Bounded source text."
+        assert result.metadata["extraction"] == "bounded-html-text/v1"
+    finally:
+        isolation._FIXTURES.reset(token)
