@@ -164,7 +164,9 @@ async def test_voice_language_hint_decides_ambiguous_turns(
     events = await stream_chat(client, message="2026", channel="voice", language_hint="ru")
     assert events[0][1]["language"] == "ru"
     # Clear words win over the hint, and typed text ignores it.
-    events = await stream_chat(client, message="Salom, qalaysan?", channel="voice", language_hint="en")
+    events = await stream_chat(
+        client, message="Salom, qalaysan?", channel="voice", language_hint="en"
+    )
     assert events[0][1]["language"] == "uz"
     events = await stream_chat(client, message="2026", channel="text", language_hint="ru")
     assert events[0][1]["language"] == "uz"
