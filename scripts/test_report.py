@@ -28,7 +28,7 @@ class Suite:
     skipped: int = 0
     skip_reasons: Counter[str] = field(default_factory=Counter)
     timings: list[tuple[str, str, str]] = field(default_factory=list)
-    """(test, property, value) for JUnit properties with "_seconds" in their name (measured evidence)."""
+    """(test, property, value) of JUnit "*_seconds*" properties (measured evidence)."""
 
     @property
     def passed(self) -> int:
