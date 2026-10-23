@@ -1,0 +1,25 @@
+{
+  "name": "@ezo/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EZO — Windows desktop companion (floating pill, voice, permitted local actions).",
+  "author": "EZO",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "pnpm build && electron .",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "dist:win": "pnpm build && electron-builder --win nsis --x64 --publish never",
+    "dist:dir": "pnpm build && electron-builder --dir --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

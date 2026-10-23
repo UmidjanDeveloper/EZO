@@ -1,0 +1,26 @@
+# Windows installer for the EZO desktop companion. Unsigned until the owner provides a
+# code-signing certificate (Windows SmartScreen will warn on first run).
+appId: uz.ezo.desktop
+productName: EZO
+copyright: EZO
+directories:
+  output: release
+files:
+  - dist/**
+  - assets/**
+  - package.json
+asar: true
+win:
+  target: [nsis]
+  icon: assets/icon.png
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: EZO
+  artifactName: EZO-Setup-${version}.${ext}
+linux:
+  target: [dir]
+  icon: assets/icon.png
