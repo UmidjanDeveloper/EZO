@@ -237,6 +237,7 @@ class RefreshWorker:
             ] or any(d.user_id != lease.user_id for d in docs):
                 raise JobError("input_changed", "Source documents changed during refresh.")
             indexed = {d.source_url: d for d in docs}
+            previous_hashes = {d.source_url: d.content_hash for d in docs if d.status != "removed"}
             changed = 0
             for stage in prepared:
                 document = indexed.get(stage.read.url)
@@ -354,7 +355,9 @@ class RefreshWorker:
                         )
                         removed += 1
             observation_time = (await self.queue.now(session)).isoformat()
-            changed_urls = {stage.read.url for stage in prepared}
+            changed_urls = {
+                url for url in seen_urls if previous_hashes.get(url) != indexed[url].content_hash
+            }
             for url, document in indexed.items():
                 prior_observation = (document.meta or {}).get("refresh_observation", {})
                 prior_observation = prior_observation if isinstance(prior_observation, dict) else {}
@@ -433,7 +436,7 @@ class RefreshWorker:
                 "requests": budget.requests,
                 "bytes": budget.bytes,
                 "stopped": inspection.stopped,
-                "content_changed": previous is not None and previous != digest,
+                "content_changed": bool(changed_urls or removed),
             }
             source.last_checked_at = source.indexed_at = await self.queue.now(session)
             ks = await session.get(KnowledgeSource, source.knowledge_source_id)

@@ -864,3 +864,42 @@ async def test_failed_refresh_remains_visible_to_legacy_ui_without_failing_cache
     assert detail["status"] == "indexed"  # cached data is healthy, the refresh failed
     assert detail["error"] and "refresh" in detail["error"].lower()
     assert await document_state(q, sid) == before
+
+
+async def test_swapped_url_contents_are_changed_even_when_legacy_collection_hash_is_equal(
+    api, learning_app, web
+):
+    from tests.learning_web import TEXT
+
+    web.add(DOCS + "/robots.txt", "User-agent: *\nAllow: /", TEXT)
+    web.add(DOCS + "/swap/", page("Root", "Common root evidence.", ["a.html", "b.html"]))
+    web.add(DOCS + "/swap/a.html", page("Alpha", "Unique quasar alpha evidence."))
+    web.add(DOCS + "/swap/b.html", page("Beta", "Unique pulsar beta evidence."))
+    source = await learn(api, DOCS + "/swap/")
+    q = RefreshQueue(learning_app.state.services.db)
+    worker = RefreshWorker(q, learning_app.state.services.learning.service)
+    sid = uuid.UUID(source["id"])
+    async with q.transaction(write=False) as session:
+        original = await session.get(LearnedSource, sid)
+        user, content_hash = original.user_id, original.content_hash
+    a, b = DOCS + "/swap/a.html", DOCS + "/swap/b.html"
+    web.routes[a], web.routes[b] = web.routes[b], web.routes[a]
+    await q.enqueue(user, sid, uuid.uuid4())
+    assert await worker.process_one()
+    detail = (await api.get(f"/api/learning/sources/{sid}")).json()
+    assert detail["stats"]["changed"] == 2
+    assert detail["stats"]["content_changed"] is True
+    async with q.transaction(write=False) as session:
+        current = await session.get(LearnedSource, sid)
+        assert current.content_hash == content_hash  # preserve existing hash semantics
+    hits = (
+        await api.post("/api/knowledge/search", json={"query": "Unique quasar alpha evidence"})
+    ).json()["results"]
+    assert any(h["url"] == b and h["freshness_status"] == "changed" for h in hits)
+
+    root_hits = (
+        await api.post("/api/knowledge/search", json={"query": "Common root evidence"})
+    ).json()["results"]
+    assert any(
+        h["url"] == DOCS + "/swap/" and h["freshness_status"] == "current" for h in root_hits
+    )

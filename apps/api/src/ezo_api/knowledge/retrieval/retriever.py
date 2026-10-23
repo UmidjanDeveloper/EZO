@@ -256,7 +256,11 @@ def _to_source(
                 f"EZO's copy was last checked on {day}, more than {STALE_AFTER_DAYS} days ago: "
                 "the source may have changed since."
             )
-        elif learned.stats and learned.stats.get("content_changed"):
+        elif (
+            observation.get("content_changed")
+            if isinstance(observation, dict) and observation.get("seen") is True
+            else bool(learned.stats and learned.stats.get("content_changed"))
+        ):
             freshness_status = "changed"
             freshness_note = (
                 f"The source had changed when EZO checked it on {day}; this is the updated text."
