@@ -1,236 +1,353 @@
 "use client";
 
-import { Button, Card, Spinner } from "@ezo/ui";
-import { CheckCircle2, ShieldAlert, XCircle } from "lucide-react";
+import { Button, Card, cn, Spinner } from "@ezo/ui";
+import { AlertTriangle, Ban, Plus, RefreshCw, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { apiUrl, storedToken } from "@/lib/api";
+import { fetchCapabilities, JarvisApiError, postPercentages } from "@/lib/jarvis-api";
+import {
+  buildPercentageRequest,
+  featureState,
+  MAX_PAIRS,
+  receiptShowsNoDelivery,
+  type Capabilities,
+  type PercentageMethod,
+  type PercentageResult,
+  type PercentageRowInput,
+} from "@/lib/jarvis-contract";
+import { useI18n } from "@/lib/i18n/context";
 import { PageFrame } from "./PageFrame";
 
+type CapabilityState =
+  | { status: "loading" }
+  | { status: "ready"; capabilities: Capabilities }
+  | { status: "error"; httpStatus: number | null; code: string };
+
+const FEATURE_LABEL_KEYS = {
+  windows_downloads: "featureWindowsDownloads",
+  chrome_actions: "featureChromeActions",
+  mobile_actions: "featureMobileActions",
+  office_pdf: "featureOfficePdf",
+  telegram_send: "featureTelegramSend",
+} as const;
+
+const INPUT_CLASS =
+  "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent";
+
 /**
- * JARVIS Mode — only what the backend actually does today (routes in
- * apps/api/src/ezo_api/api/routes/jarvis.py):
- *   GET  /api/jarvis/capabilities   real tool registry + device feature prerequisites
- *   POST /api/jarvis/percentages    exact decimal arithmetic with an owner-scoped receipt
- *   GET  /api/jarvis/receipts/{id}  the stored receipt
- * No device is paired, no file is opened and no message is sent from this page:
- * those features report their missing prerequisites instead of a simulated success.
+ * JARVIS page, honest edition.
+ *
+ * The canonical backend exposes only capability inspection, a deterministic percentage
+ * calculator with an owner-scoped receipt, receipt lookup and static plan inspection.
+ * It has no task planning/execution, device pairing, PDF or Telegram API, so this page
+ * has no execute/approve/paired/delivered UI. Every state shown here comes from a
+ * validated backend response; anything else is "not available" or "unknown".
  */
-
-interface Availability {
-  available: boolean;
-  missing_prerequisites: string[];
-  execution_authorized: boolean;
-}
-
-interface Capabilities {
-  tools: { name: string; description: string; requires_confirmation: boolean }[];
-  device_features: Record<string, Availability>;
-}
-
-interface PercentageResult {
-  method: string;
-  formula: string;
-  results: { id: string; previous: string; current: string; result_percent: string }[];
-  receipt: { id: string; outcome: string; external_delivery: string };
-}
-
-const FEATURE_LABELS: Record<string, string> = {
-  windows_downloads: "Windows: Downloads papkasidagi fayllar",
-  chrome_actions: "Chrome kengaytmasi amallari",
-  mobile_actions: "Telefon amallari",
-  office_pdf: "Hujjatni PDF'ga aylantirish (izolyatsiyalangan worker)",
-  telegram_send: "Telegram orqali yuborish",
-};
-
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  const token = storedToken.get().trim();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const response = await fetch(`${apiUrl()}/api/jarvis/${path}`, { ...init, headers, cache: "no-store" });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    const detail = body?.detail;
-    throw new Error(
-      (typeof detail === "string" ? detail : detail?.message ?? detail?.code) ?? `So‘rov bajarilmadi (${response.status}).`,
-    );
-  }
-  return body as T;
-}
-
-function parsePairs(text: string) {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [previous, current] = line.split(/[\s,;]+/);
-      return { id: `q${index + 1}`, previous, current };
-    });
-}
-
 export function JarvisPage() {
-  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
-  const [loadError, setLoadError] = useState("");
-  const [method, setMethod] = useState<"percent_change" | "percent_of">("percent_change");
-  const [pairsText, setPairsText] = useState("");
-  const [result, setResult] = useState<PercentageResult | null>(null);
-  const [calcError, setCalcError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { m } = useI18n();
+  const t = m.jarvis;
+  const [state, setState] = useState<CapabilityState>({ status: "loading" });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    let active = true;
-    request<Capabilities>("capabilities")
-      .then((data) => active && setCapabilities(data))
-      .catch((e: unknown) => active && setLoadError(e instanceof Error ? e.message : String(e)));
+    let alive = true;
+    fetchCapabilities()
+      .then((capabilities) => alive && setState({ status: "ready", capabilities }))
+      .catch((error: unknown) => {
+        if (!alive) return;
+        if (error instanceof JarvisApiError) setState({ status: "error", httpStatus: error.status, code: error.code });
+        else setState({ status: "error", httpStatus: null, code: "network_error" });
+      });
     return () => {
-      active = false;
+      alive = false;
     };
-  }, []);
+  }, [reloadKey]);
 
-  async function calculate() {
-    setBusy(true);
-    setCalcError("");
-    setResult(null);
-    try {
-      setResult(
-        await request<PercentageResult>("percentages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ method, pairs: parsePairs(pairsText), decimal_places: 2 }),
-        }),
-      );
-    } catch (e) {
-      setCalcError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const reload = () => {
+    setState({ status: "loading" });
+    setReloadKey((key) => key + 1);
+  };
 
   return (
     <PageFrame
-      title="JARVIS rejimi"
-      subtitle="Qurilma va xabar amallari hali ulanmagan. Bu sahifa faqat haqiqatda ishlaydigan qismlarni ko‘rsatadi."
+      title={t.title}
+      subtitle={t.subtitle}
+      actions={
+        <Button variant="secondary" size="sm" onClick={reload} disabled={state.status === "loading"} data-testid="jarvis-refresh">
+          <RefreshCw className={cn("mr-1.5 h-3.5 w-3.5", state.status === "loading" && "animate-spin")} />
+          {t.refresh}
+        </Button>
+      }
     >
-      <div className="grid gap-6">
-        <Card className="p-5">
-          <h2 className="flex items-center gap-2 font-semibold text-ink">
-            <ShieldAlert className="h-4 w-4 text-amber-500" aria-hidden />
-            Qurilma amallari holati
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Ovozli buyruq bilan fayl ochish, PDF tayyorlash va Telegram’da yuborish hali amalga oshirilmagan. Har bir
-            amal uchun yetishmayotgan shartlar backend’dan olinadi.
-          </p>
-          {loadError && (
-            <p role="alert" className="mt-3 text-sm text-danger">
-              Backend bilan bog‘lanib bo‘lmadi: {loadError}
-            </p>
-          )}
-          {!capabilities && !loadError && <Spinner className="mt-3" />}
-          {capabilities && (
-            <ul className="mt-3 grid gap-2">
-              {Object.entries(capabilities.device_features).map(([name, state]) => (
-                <li key={name} className="flex items-start gap-2 rounded-lg border border-line p-3 text-sm">
-                  {state.available ? (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-success" aria-hidden />
-                  ) : (
-                    <XCircle className="mt-0.5 h-4 w-4 text-danger" aria-hidden />
-                  )}
-                  <span>
-                    <span className="font-medium text-ink">{FEATURE_LABELS[name] ?? name}</span>
-                    <span className="block text-xs text-ink-muted">
-                      {state.available ? "Mavjud" : `Mavjud emas — kerak: ${state.missing_prerequisites.join(", ")}`}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
-        <Card className="p-5">
-          <h2 className="font-semibold text-ink">Foiz hisoblash (aniq o‘nlik arifmetika)</h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Har qatorga ikkita son kiriting: oldingi va joriy qiymat. Qiymatlarni o‘zingiz kiritasiz; hujjatdan avtomatik
-            o‘qish hali yo‘q. Natija va kvitansiya serverda saqlanadi.
-          </p>
-          <div className="mt-3 grid gap-3">
-            <label className="text-sm text-ink">
-              Usul{" "}
-              <select
-                className="ml-2 rounded-lg border border-line bg-surface-2 px-2 py-1"
-                value={method}
-                onChange={(e) => setMethod(e.target.value as typeof method)}
-              >
-                <option value="percent_change">O‘zgarish foizi: (joriy − oldingi) / oldingi × 100</option>
-                <option value="percent_of">Ulush: joriy / oldingi × 100</option>
-              </select>
-            </label>
-            <textarea
-              aria-label="Oldingi va joriy qiymatlar"
-              className="min-h-24 rounded-lg border border-line bg-surface-2 p-3 font-mono text-sm"
-              placeholder={"1200 1500\n80 72"}
-              value={pairsText}
-              onChange={(e) => setPairsText(e.target.value)}
-            />
-            <div>
-              <Button onClick={() => void calculate()} disabled={busy || !pairsText.trim()}>
-                {busy ? "Hisoblanmoqda…" : "Hisoblash"}
-              </Button>
-            </div>
-            {calcError && (
-              <p role="alert" className="text-sm text-danger">
-                {calcError}
-              </p>
-            )}
-            {result && (
-              <div aria-live="polite" className="grid gap-2 text-sm">
-                <p className="text-xs text-ink-muted">Formula: {result.formula}</p>
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs text-ink-muted">
-                      <th>Qator</th>
-                      <th>Oldingi</th>
-                      <th>Joriy</th>
-                      <th>Natija</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.results.map((row) => (
-                      <tr key={row.id}>
-                        <td>{row.id}</td>
-                        <td>{row.previous}</td>
-                        <td>{row.current}</td>
-                        <td className="font-semibold">{row.result_percent}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="text-xs text-ink-muted">
-                  Kvitansiya: <code>{result.receipt.id}</code> — hisoblash bajarildi; tashqi yuborish urinilmadi.
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {capabilities && (
+      <div className="space-y-6">
+        <section aria-labelledby="jarvis-features-title" data-testid="jarvis-features">
           <Card className="p-5">
-            <h2 className="font-semibold text-ink">Ro‘yxatdan o‘tgan vositalar</h2>
-            <p className="mt-1 text-xs text-ink-muted">
-              Bu ro‘yxat vosita ma’lumoti; u biror amalni bajarishga ruxsat bermaydi.
-            </p>
-            <ul className="mt-3 grid gap-1 text-sm">
-              {capabilities.tools.map((tool) => (
-                <li key={tool.name}>
-                  <code className="text-accent">{tool.name}</code>
-                  <span className="text-ink-muted"> — {tool.description}</span>
-                </li>
-              ))}
-            </ul>
+            <h2 id="jarvis-features-title" className="mb-3 text-sm font-semibold text-ink">
+              {t.featuresTitle}
+            </h2>
+            <FeatureList state={state} />
           </Card>
-        )}
+        </section>
+
+        <section aria-labelledby="jarvis-task-title" data-testid="jarvis-task-unavailable">
+          <Card className="border border-amber-500/40 bg-amber-500/5 p-5">
+            <div className="flex items-start gap-3">
+              <Ban className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden />
+              <div className="space-y-1.5">
+                <h2 id="jarvis-task-title" className="text-sm font-semibold text-ink">
+                  {t.taskTitle}: {t.notAvailable}
+                </h2>
+                <p className="text-sm text-ink-muted">{t.taskBody}</p>
+                <p className="text-sm text-ink-muted">{t.voiceBody}</p>
+              </div>
+            </div>
+          </Card>
+        </section>
+
+        <PercentageCalculator />
       </div>
     </PageFrame>
+  );
+}
+
+function FeatureList({ state }: { state: CapabilityState }) {
+  const { m } = useI18n();
+  const t = m.jarvis;
+  if (state.status === "loading") {
+    return (
+      <p className="flex items-center gap-2 text-sm text-ink-muted" data-testid="jarvis-loading">
+        <Spinner className="h-4 w-4" /> {t.loading}
+      </p>
+    );
+  }
+  if (state.status === "error") {
+    const unauthorized = state.httpStatus === 401 || state.httpStatus === 403;
+    return (
+      <p className="flex items-start gap-2 text-sm text-rose-500" role="alert" data-testid="jarvis-load-error">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>{unauthorized ? t.signInRequired : t.loadFailed}</span>
+      </p>
+    );
+  }
+  const entries = Object.entries(state.capabilities.device_features);
+  return (
+    <ul className="space-y-2">
+      {entries.map(([name, feature]) => {
+        const label =
+          name in FEATURE_LABEL_KEYS ? t[FEATURE_LABEL_KEYS[name as keyof typeof FEATURE_LABEL_KEYS]] : name;
+        const feat = featureState(feature);
+        const description =
+          feat === "not_available"
+            ? t.notAvailable
+            : feat === "authorized_by_backend"
+              ? t.authorizedByBackend
+              : t.reportedNotAuthorized;
+        return (
+          <li
+            key={name}
+            data-testid={`jarvis-feature-${name}`}
+            data-state={feat}
+            className="rounded-lg border border-line bg-surface-raised/50 p-3 text-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium text-ink">{label}</span>
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                  feat === "authorized_by_backend" ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500",
+                )}
+              >
+                <ShieldAlert className="h-3 w-3" aria-hidden />
+                {description}
+              </span>
+            </div>
+            {feature.missing_prerequisites.length > 0 ? (
+              <p className="mt-1.5 text-xs text-ink-muted">
+                {t.prerequisitesLabel}:{" "}
+                {feature.missing_prerequisites.map((code) => (
+                  <code key={code} className="mr-1 rounded bg-surface px-1 py-0.5 font-mono text-[11px]">
+                    {code}
+                  </code>
+                ))}
+              </p>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function PercentageCalculator() {
+  const { m } = useI18n();
+  const t = m.jarvis;
+  const [method, setMethod] = useState<PercentageMethod>("percent_change");
+  const [decimals, setDecimals] = useState(2);
+  const [rows, setRows] = useState<PercentageRowInput[]>([{ previous: "", current: "" }]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<PercentageResult | null>(null);
+
+  const updateRow = (index: number, patch: Partial<PercentageRowInput>) =>
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+
+  const submit = async () => {
+    setError(null);
+    setResult(null);
+    const built = buildPercentageRequest(method, rows, decimals);
+    if (!built.ok) {
+      setError(t.errValidation);
+      return;
+    }
+    setBusy(true);
+    try {
+      setResult(await postPercentages(built.body));
+    } catch (e) {
+      if (e instanceof JarvisApiError && e.code === "unexpected_response_shape") setError(t.errShape);
+      else if (e instanceof JarvisApiError) setError(`${t.errRequest} (${e.status}: ${e.code})`);
+      else setError(t.errRequest);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="jarvis-calc-title" data-testid="jarvis-calc">
+      <Card className="p-5">
+        <h2 id="jarvis-calc-title" className="text-sm font-semibold text-ink">
+          {t.calcTitle}
+        </h2>
+        <p className="mt-1 text-xs text-ink-muted">{t.calcNote}</p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs text-ink-muted">
+            {t.method}
+            <select
+              className={cn(INPUT_CLASS, "mt-1")}
+              value={method}
+              onChange={(e) => setMethod(e.target.value as PercentageMethod)}
+              data-testid="jarvis-method"
+            >
+              <option value="percent_change">{t.methodChange}</option>
+              <option value="percent_of">{t.methodOf}</option>
+            </select>
+          </label>
+          <label className="text-xs text-ink-muted">
+            {t.decimals}
+            <input
+              type="number"
+              min={0}
+              max={8}
+              step={1}
+              className={cn(INPUT_CLASS, "mt-1")}
+              value={decimals}
+              onChange={(e) => setDecimals(Number(e.target.value))}
+              data-testid="jarvis-decimals"
+            />
+          </label>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {rows.map((row, index) => (
+            <div key={index} className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+              <label className="text-xs text-ink-muted">
+                {t.previous}
+                <input
+                  inputMode="decimal"
+                  className={cn(INPUT_CLASS, "mt-1")}
+                  value={row.previous}
+                  onChange={(e) => updateRow(index, { previous: e.target.value })}
+                  data-testid={`jarvis-previous-${index}`}
+                />
+              </label>
+              <label className="text-xs text-ink-muted">
+                {t.current}
+                <input
+                  inputMode="decimal"
+                  className={cn(INPUT_CLASS, "mt-1")}
+                  value={row.current}
+                  onChange={(e) => updateRow(index, { current: e.target.value })}
+                  data-testid={`jarvis-current-${index}`}
+                />
+              </label>
+              <Button
+                variant="secondary"
+                size="sm"
+                aria-label={t.removeRow}
+                disabled={rows.length === 1}
+                onClick={() => setRows((current) => current.filter((_, i) => i !== index))}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={rows.length >= MAX_PAIRS}
+            onClick={() => setRows((current) => [...current, { previous: "", current: "" }])}
+            data-testid="jarvis-add-row"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            {t.addRow}
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => void submit()} disabled={busy} data-testid="jarvis-calculate">
+            {busy ? t.calculating : t.calculate}
+          </Button>
+        </div>
+
+        {error ? (
+          <p className="mt-3 flex items-start gap-2 text-xs text-rose-500" role="alert" data-testid="jarvis-calc-error">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            {error}
+          </p>
+        ) : null}
+
+        {result ? <CalculationResult result={result} /> : null}
+      </Card>
+    </section>
+  );
+}
+
+function CalculationResult({ result }: { result: PercentageResult }) {
+  const { m } = useI18n();
+  const t = m.jarvis;
+  const { receipt } = result;
+  return (
+    <div className="mt-4 space-y-3" data-testid="jarvis-result">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{t.result}</h3>
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="border-b border-line text-ink-muted">
+            <th className="pb-1.5 font-medium">{t.previous}</th>
+            <th className="pb-1.5 font-medium">{t.current}</th>
+            <th className="pb-1.5 font-medium">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {result.results.map((row) => (
+            <tr key={row.id} className="border-b border-line/40">
+              <td className="py-1.5 font-mono">{row.previous}</td>
+              <td className="py-1.5 font-mono">{row.current}</td>
+              <td className="py-1.5 font-mono font-semibold" data-testid="jarvis-result-percent">
+                {row.result_percent}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-[11px] text-ink-muted">
+        <code className="font-mono">{result.formula}</code> · {result.rounding} · {result.provenance}
+      </p>
+      <div className="rounded-lg border border-line bg-surface-raised/50 p-3 text-xs" data-testid="jarvis-receipt">
+        <p className="font-medium text-ink">{t.receiptTitle}</p>
+        <p className="mt-1 break-all font-mono text-[11px] text-ink-muted">{receipt.id}</p>
+        <p className="mt-1 text-ink-muted">
+          {receiptShowsNoDelivery(receipt) ? t.receiptNote : `${receipt.outcome} / ${receipt.external_delivery}`}
+        </p>
+      </div>
+    </div>
   );
 }

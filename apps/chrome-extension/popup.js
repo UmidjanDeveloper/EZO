@@ -1,75 +1,65 @@
-// EZO OS JARVIS status popup.
-// Calls only GET /api/jarvis/capabilities with the owner's bearer token and shows the
-// real answer. It reads no page content and sends no commands: the backend has no
-// task/plan/device endpoints yet, so nothing here pretends to run one.
-"use strict";
+import { DEFAULT_API_BASE, HEALTH_PATH, UNAVAILABLE, describeBackend, describePage, originPattern } from "./status.js";
 
-const apiUrlInput = document.getElementById("apiUrl");
-const tokenInput = document.getElementById("token");
-const statusEl = document.getElementById("status");
-const featuresEl = document.getElementById("features");
+// Everything here runs only after the user clicks. There is no polling, no background
+// worker, no content script, and no call to any planning/execution/pairing endpoint.
 
-function show(text) {
-  statusEl.textContent = text;
+const $ = (id) => document.getElementById(id);
+
+$("pairingState").textContent = UNAVAILABLE.pairing;
+$("taskState").textContent = UNAVAILABLE.tasks;
+$("telegramState").textContent = UNAVAILABLE.telegram;
+$("backendBase").textContent = DEFAULT_API_BASE;
+
+function renderBackend(result) {
+  const view = describeBackend(result);
+  const el = $("backendState");
+  el.textContent = view.text;
+  el.dataset.state = view.state;
 }
 
-function normalize(url) {
-  const parsed = new URL(url);
-  const local = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-  if (parsed.protocol !== "https:" && !(local && parsed.protocol === "http:")) {
-    throw new Error("Faqat https (yoki localhost) manzil qabul qilinadi.");
-  }
-  return parsed.origin;
-}
+renderBackend(null);
 
-async function check() {
-  featuresEl.textContent = "";
-  const { apiUrl, token } = await chrome.storage.local.get(["apiUrl", "token"]);
-  if (!apiUrl) {
-    show("API manzili kiritilmagan.");
-    return;
-  }
-  show("Tekshirilmoqda…");
-  let response;
+$("checkBackendBtn").addEventListener("click", async () => {
+  const button = $("checkBackendBtn");
+  button.disabled = true;
   try {
-    response = await fetch(`${apiUrl}/api/jarvis/capabilities`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
+    // User gesture: ask for exactly this one origin, then call exactly GET /api/health.
+    const granted = await chrome.permissions.request({ origins: [originPattern(DEFAULT_API_BASE)] });
+    if (!granted) return renderBackend({ ok: false, reason: "permission_denied" });
+    try {
+      const res = await fetch(`${DEFAULT_API_BASE}${HEALTH_PATH}`, { credentials: "omit", cache: "no-store" });
+      renderBackend(res.ok ? { ok: true, status: res.status } : { ok: false, reason: "http_error", status: res.status });
+    } catch {
+      renderBackend({ ok: false, reason: "unreachable" });
+    }
   } catch {
-    show("API’ga ulanib bo‘lmadi (tarmoq yoki CORS: kengaytma manzilini EZO_CORS_ORIGINS’ga qo‘shing).");
-    return;
-  }
-  if (response.status === 401) {
-    show("Token noto‘g‘ri yoki kiritilmagan (401).");
-    return;
-  }
-  if (!response.ok) {
-    show(`API xatosi: ${response.status}`);
-    return;
-  }
-  const data = await response.json();
-  show("Ulandi. Qurilma amallari holati:");
-  for (const [name, state] of Object.entries(data.device_features || {})) {
-    const li = document.createElement("li");
-    li.textContent = state.available
-      ? `${name}: mavjud`
-      : `${name}: mavjud emas (kerak: ${state.missing_prerequisites.join(", ")})`;
-    featuresEl.appendChild(li);
-  }
-}
-
-document.getElementById("save").addEventListener("click", async () => {
-  try {
-    const apiUrl = normalize(apiUrlInput.value.trim());
-    await chrome.storage.local.set({ apiUrl, token: tokenInput.value.trim() });
-    tokenInput.value = "";
-    await check();
-  } catch (error) {
-    show(error.message);
+    renderBackend({ ok: false, reason: "permission_denied" });
+  } finally {
+    button.disabled = false;
   }
 });
 
-chrome.storage.local.get(["apiUrl"]).then(({ apiUrl }) => {
-  if (apiUrl) apiUrlInput.value = apiUrl;
-  void check();
+$("readPageBtn").addEventListener("click", async () => {
+  const out = $("pageState");
+  out.textContent = "";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || tab.id === undefined) throw new Error("no_tab");
+    // activeTab grants access to this tab only, for this gesture. Nothing persistent is injected.
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => ({
+        ok: true,
+        title: document.title,
+        origin: location.origin,
+        selectionLength: (window.getSelection()?.toString() ?? "").length,
+      }),
+    });
+    const view = describePage(injection?.result);
+    out.textContent = view.ok
+      ? `${view.origin} — "${view.title}" — tanlangan matn: ${view.selectionLength} belgi`
+      : view.text;
+  } catch {
+    out.textContent = describePage(null).text;
+  }
 });

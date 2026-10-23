@@ -1,11 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "EZO OS — JARVIS status",
+  "name": "EZO OS — JARVIS Web Companion (experimental)",
   "version": "1.1.0",
-  "description": "Shows which EZO JARVIS capabilities your EZO API really provides. Reads no web pages and performs no actions.",
+  "description": "Experimental. Shows EZO backend reachability and reads the current tab only when you click. No pairing, no task execution, no background access.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EZO OS JARVIS"
+    "default_title": "EZO JARVIS (experimental)"
   },
-  "permissions": ["storage"]
+  "permissions": ["activeTab", "scripting"],
+  "optional_host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }

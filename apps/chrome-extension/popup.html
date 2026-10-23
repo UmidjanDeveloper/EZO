@@ -1,30 +1,56 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="uz">
-  <head>
-    <meta charset="utf-8" />
-    <title>EZO OS JARVIS</title>
-    <style>
-      body { font: 13px system-ui, sans-serif; width: 320px; margin: 12px; color: #1f2328; }
-      h1 { font-size: 15px; margin: 0 0 8px; }
-      label { display: block; margin-top: 8px; }
-      input { width: 100%; box-sizing: border-box; padding: 6px; margin-top: 2px; }
-      button { margin-top: 10px; padding: 6px 10px; }
-      #status { margin-top: 10px; }
-      .muted { color: #57606a; font-size: 12px; }
-      li { margin: 4px 0; }
-    </style>
-  </head>
-  <body>
-    <h1>EZO OS JARVIS</h1>
-    <p class="muted">
-      Bu kengaytma sahifalarni o‘qimaydi va hech qanday amal bajarmaydi. U faqat EZO API’dagi haqiqiy
-      imkoniyatlar holatini ko‘rsatadi.
-    </p>
-    <label>EZO API manzili (https)<input id="apiUrl" placeholder="https://api.example.com" /></label>
-    <label>API token<input id="token" type="password" autocomplete="off" /></label>
-    <button id="save">Saqlash va tekshirish</button>
-    <div id="status" role="status"></div>
-    <ul id="features"></ul>
-    <script src="popup.js"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EZO OS JARVIS Companion (experimental)</title>
+  <style>
+    :root {
+      --bg: #0d1117; --card-bg: #161b22; --border: #30363d; --accent: #10b981;
+      --text: #f0f6fc; --text-muted: #8b949e; --warn: #d29922;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { width: 360px; background: var(--bg); color: var(--text); padding: 16px; font-size: 13px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+    .badge { background: rgba(210, 153, 34, 0.15); color: var(--warn); border: 1px solid rgba(210, 153, 34, 0.4); padding: 2px 6px; border-radius: 4px; font-size: 10px; letter-spacing: 0.5px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; }
+    .muted { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
+    .unavailable { color: var(--warn); font-size: 12px; line-height: 1.4; margin-top: 4px; }
+    .btn { cursor: pointer; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--accent); color: #000; margin-top: 8px; }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    #backendState[data-state="reachable"] { color: var(--accent); }
+    #backendState[data-state="unreachable"], #backendState[data-state="error"] { color: #f85149; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="header">
+      <h1 class="logo"><span>EZO OS</span><span class="badge">EXPERIMENTAL</span></h1>
+    </div>
+
+    <section class="card" aria-labelledby="backendTitle">
+      <h2 class="card-title" id="backendTitle">Backend (<span id="backendBase"></span>)</h2>
+      <p id="backendState" data-state="unknown"></p>
+      <p class="muted">Faqat GET /api/health. Bosganingizda shu manzilga ruxsat so'raladi.</p>
+      <button class="btn" id="checkBackendBtn" type="button">Backendni tekshirish</button>
+    </section>
+
+    <section class="card" aria-labelledby="pageTitle">
+      <h2 class="card-title" id="pageTitle">Joriy sahifa</h2>
+      <p class="muted">Faqat tugmani bosganingizda, shu bitta tab o'qiladi (activeTab). Hech narsa yuborilmaydi.</p>
+      <p id="pageState" class="muted" style="margin-top: 6px;"></p>
+      <button class="btn" id="readPageBtn" type="button">Sahifa sarlavhasini o'qish</button>
+    </section>
+
+    <section class="card" aria-labelledby="unavailTitle" id="unavailableCard">
+      <h2 class="card-title" id="unavailTitle">Mavjud emas</h2>
+      <p class="unavailable" id="pairingState"></p>
+      <p class="unavailable" id="taskState"></p>
+      <p class="unavailable" id="telegramState"></p>
+    </section>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
 </html>
