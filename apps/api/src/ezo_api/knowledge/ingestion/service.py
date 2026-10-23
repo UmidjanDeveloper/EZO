@@ -16,7 +16,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, exists, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.core.language import detect_language
@@ -487,7 +487,7 @@ class KnowledgeService:
 
         # PARSE (CPU-bound: off the event loop)
         category = str((document.meta or {}).get("category", "text"))
-        if not native_fixtures_allowed() and category not in ("text", "markdown", "csv"):
+        if not native_fixtures_allowed() and category not in ("text", "markdown", "csv", "html"):
             raise ParseError(ISOLATION_MESSAGE, "isolation_unavailable")
         parsed = await asyncio.to_thread(parse, category, data, document.filename or "file")
 
@@ -722,7 +722,12 @@ class KnowledgeService:
                 continue
             # Content-addressed keys may be shared by another document of the same user.
             still_used = await session.scalar(
-                select(func.count()).where(KnowledgeDocument.storage_key == key)
+                select(
+                    or_(
+                        exists().where(KnowledgeDocument.storage_key == key),
+                        exists().where(DocumentRevision.storage_key == key),
+                    )
+                )
             )
             if not still_used:
                 try:

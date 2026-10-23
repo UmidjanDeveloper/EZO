@@ -227,3 +227,21 @@ marking the replacement failed. Explicit reindex still queues the document first
 This introduces no new HTTP fields or durable scheduling/execution authority.
 Stored source bytes are verified against the registered hash before parsing;
 corruption fails ingestion without publishing quotes/chunks under a false hash.
+
+
+## P6 durable refresh continuation — additive backend contract
+
+Owner roadmap identity is now resolved by `docs/master/OWNER_ROADMAP_P0_P9.md`.
+The stable refresh permission/run/cancellation/freshness routes, state/manifest
+semantics and exact resource bounds are specified in
+`docs/master/K7_DURABLE_REFRESH.md`. Existing one-shot refresh adapts to the durable
+queue; registration/first reading and `/versions` entries remain compatible.
+A completed refresh run can have a partial source result. Never label it whole-book
+reading or imply an unfetched remote source is unchanged. Permission revocation
+fences fetch admission/publication and labels the owner's retained cached knowledge.
+
+Antigravity should retain one UUID request ID through network retries, render
+queued/running/failed/cancelled and partial states, request explicit recurring
+consent, and show the previous successful observation separately from current
+refresh progress. This publishes the backend contract; no frontend acceptance or
+external coordination acknowledgment is claimed. No UI files modified.

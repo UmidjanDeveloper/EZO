@@ -52,6 +52,7 @@ _PUBLIC_META = (
     "sitename",
     "final_url",
     "ocr",
+    "refresh_observation",
 )
 
 

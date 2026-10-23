@@ -233,7 +233,21 @@ def _to_source(
     if learned is not None:
         checked = learned.last_checked_at
         day = checked.date().isoformat() if checked else None
-        if checked is None:
+        observation = doc_meta.get("refresh_observation")
+        if (learned.profile or {}).get("refresh_fetch_allowed") is False:
+            freshness_status = "permission_revoked"
+            freshness_note = (
+                "Source fetching is revoked. This is the owner's previously stored copy, "
+                "not a new verification."
+            )
+        elif isinstance(observation, dict) and observation.get("seen") is False:
+            freshness_status = "not_recently_checked"
+            last_checked = observation.get("last_seen_at")
+            freshness_note = (
+                "This document was not observed in the last partial refresh; "
+                "its stored content may be stale."
+            )
+        elif checked is None:
             freshness_status = "not_recently_checked"
             freshness_note = "EZO's stored copy; when it was last checked is unknown."
         elif (utcnow() - checked).total_seconds() > STALE_AFTER_DAYS * 86400:

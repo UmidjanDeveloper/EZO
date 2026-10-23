@@ -39,6 +39,7 @@ from ezo_api.api.routes import (
     personal,
     presentations,
     projects,
+    refresh,
     stories,
     student,
     student_study,
@@ -236,6 +237,7 @@ def create_app(
         conversations,
         memory,
         projects,
+        refresh,
         document_jobs,
         governance,
         improvements,
@@ -257,6 +259,7 @@ def create_app(
         academic,
         career,
         learning,
+        refresh,
     ):
         app.include_router(module.router)
 

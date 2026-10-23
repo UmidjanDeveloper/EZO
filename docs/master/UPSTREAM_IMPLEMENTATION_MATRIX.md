@@ -3,7 +3,7 @@
 Upstream integration landed through externally merged PR25 at
 `cd9bbd0633022885ef429929a52228146dc51408` (head6ab4a95, identical source tree).
 Its earlier base4ca3566/PR24 work is preserved. Codex did not merge PR24/25 or deploy.
-Current continuation: `feat/knowledge-refresh-governance`, based on cd9bbd0.
+Current continuation: `feat/master-durable-refresh`, based on cd9bbd0.
 Knowledge recovery, per-document publication serialization, input integrity and
 local atomic storage prerequisites are documented in KNOWLEDGE_REFRESH_GOVERNANCE.md.
 They do not complete K7 or waive any upstream gate. Independent-review evidence
