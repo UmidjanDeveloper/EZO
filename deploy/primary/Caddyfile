@@ -1,0 +1,24 @@
+# TLS terminates here; certificates come from Let's Encrypt for real public domains
+# (Caddy uses its internal CA automatically for *.localhost during local validation).
+{
+	email {$EZO_ACME_EMAIL}
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$EZO_WEB_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:3000
+}
+
+{$EZO_API_DOMAIN} {
+	# Request bodies are bounded again by the API edge guard; this is only an outer cap.
+	request_body {
+		max_size 32MB
+	}
+	reverse_proxy api:8000 {
+		# Chat replies stream; never buffer them.
+		flush_interval -1
+	}
+}
