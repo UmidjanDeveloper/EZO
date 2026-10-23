@@ -151,3 +151,11 @@ The whole-attempt async deadline fences publication and cancels awaited work;
 bounded pure-Python parser threads can finish cooperatively. It is not a hard
 OS CPU sandbox or a substitute for K4. Freshness distinguishes a failed first read
 (`not_indexed`) from an actual indexed observation.
+
+
+Legacy source cards retain their `indexed`, `keyword_only`, `failed`, `skipped`
+and duration counters for the observed manifest. A failed/cancelled refresh shows
+a safe notice in the existing source error field without marking healthy cached
+documents as failed. Thus existing UI consumers do not silently report a successful
+refresh or zero keyword-only documents; no frontend changes are required for this
+compatibility correction. New clients should still use explicit run/freshness state.

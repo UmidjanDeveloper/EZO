@@ -199,7 +199,13 @@ class RefreshQueue:
         run.lease_token = None
         run.lease_until = None
 
-    async def restore_status(self, session: AsyncSession, source: LearnedSource) -> None:
+    async def restore_status(
+        self,
+        session: AsyncSession,
+        source: LearnedSource,
+        *,
+        notice: str = "Refresh did not publish new content. Stored content was not replaced.",
+    ) -> None:
         statuses = set(
             (
                 await session.scalars(
@@ -217,6 +223,8 @@ class RefreshQueue:
             if statuses & {"indexed", "partial"}
             else "failed"
         )
+
+        source.error = notice
 
     async def configure(
         self, user: uuid.UUID, source_id: uuid.UUID, *, enabled: bool, interval_seconds: int | None
@@ -518,7 +526,7 @@ class RefreshQueue:
                 # Fixed whole-run deadline, no heartbeat can extend an attempt forever.
                 seconds = Limits.model_validate(run.input["limits"]).max_seconds
                 run.lease_until = now + timedelta(seconds=seconds + 30)
-                source.status = "reading"
+                source.status, source.error = "reading", None
                 audit(
                     session,
                     run.user_id,
@@ -590,9 +598,12 @@ class RefreshQueue:
                 run.state, run.lease_token, run.lease_until = "queued", None, None
                 run.available_at, run.error_code = now + timedelta(seconds=30), code
                 source.status = "queued"
+                source.error = "Refresh interrupted; a bounded retry is queued."
             else:
                 self.terminal(run, "failed", now, code)
-                await self.restore_status(session, source)
+                await self.restore_status(
+                    session, source, notice="Refresh failed. Stored content was not replaced."
+                )
             audit(
                 session,
                 lease.user_id,

@@ -7,6 +7,7 @@ import contextlib
 import hashlib
 import logging
 import math
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -418,6 +419,15 @@ class RefreshWorker:
             source.status, source.error = status, "; ".join(inspection.errors)[:2000] or None
             source.stats = {
                 "documents": len(manifest),
+                "indexed": sum(m["status"] == "indexed" for m in manifest),
+                "keyword_only": sum(m["status"] == "partial" for m in manifest),
+                "failed": len(manifest) - len(usable),
+                "skipped": len(inspection.skipped),
+                "seconds": round(time.monotonic() - budget.started, 1),
+                "scope": "observed_source_manifest",
+                "cached_unseen": sum(
+                    url not in seen_urls and d.status != "removed" for url, d in indexed.items()
+                ),
                 "changed": changed,
                 "removed": removed,
                 "requests": budget.requests,

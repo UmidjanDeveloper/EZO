@@ -834,3 +834,33 @@ async def test_failed_first_read_is_not_labelled_verified_indexed_knowledge(api,
     result = (await api.get(f"/api/learning/sources/{failed['id']}/freshness")).json()
     assert result["state"] == "not_indexed"
     assert result["last_indexed_at"] is None and result["remote_change_known"] is False
+
+
+async def test_legacy_source_card_keeps_truthful_keyword_only_statistics(api, learning_app, web):
+    source, user, q, worker = await setup(api, learning_app, web)
+    worker.learning.knowledge.embeddings.active = None
+    web.add(
+        DOCS + "/guide/",
+        page("Offline update", "This new source has real text but no semantic provider."),
+    )
+    await q.enqueue(user, uuid.UUID(source["id"]), uuid.uuid4())
+    assert await worker.process_one()
+    detail = (await api.get(f"/api/learning/sources/{source['id']}")).json()
+    assert detail["status"] == "partial"
+    assert detail["stats"]["keyword_only"] == 1
+    assert detail["stats"]["indexed"] == detail["stats"]["failed"] == 0
+
+
+async def test_failed_refresh_remains_visible_to_legacy_ui_without_failing_cached_data(
+    api, learning_app, web
+):
+    source, user, q, _worker = await setup(api, learning_app, web)
+    sid = uuid.UUID(source["id"])
+    before = await document_state(q, sid)
+    await q.enqueue(user, sid, uuid.uuid4())
+    lease = await q.claim()
+    await q.fail(lease, "resource_limit")
+    detail = (await api.get(f"/api/learning/sources/{sid}")).json()
+    assert detail["status"] == "indexed"  # cached data is healthy, the refresh failed
+    assert detail["error"] and "refresh" in detail["error"].lower()
+    assert await document_state(q, sid) == before
