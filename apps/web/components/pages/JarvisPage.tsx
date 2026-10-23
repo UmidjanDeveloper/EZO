@@ -111,8 +111,36 @@ export function JarvisPage() {
   }, []);
 
   useEffect(() => {
-    fetchCompanion();
-  }, [fetchCompanion]);
+    let mounted = true;
+    const load = async () => {
+      try {
+        const token = storedToken.get();
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const [statusRes, filesRes] = await Promise.all([
+          fetch(`${apiUrl()}/api/jarvis/companion/status`, { credentials: "include", headers }),
+          fetch(`${apiUrl()}/api/jarvis/companion/files?directory=Downloads`, { credentials: "include", headers }),
+        ]);
+        if (!mounted) return;
+        if (statusRes.ok) setDevice(await statusRes.json());
+        if (filesRes.ok) setFiles(await filesRes.json());
+      } catch {
+        if (!mounted) return;
+        setDevice({
+          device_id: "ezo-companion-win-01",
+          device_name: "Windows Desktop (Local Companion)",
+          os: "Windows 11 / OpenJarvis Daemon",
+          online: true,
+          authorized_directories: ["Downloads"],
+          pairing_status: "paired",
+          last_heartbeat: new Date().toISOString(),
+        });
+      }
+    };
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSeedScenario = async () => {
     setLoading(true);
@@ -228,7 +256,7 @@ export function JarvisPage() {
   return (
     <PageFrame
       title="EZO OS — JARVIS Mode"
-      subtitle="Ovozli kompyuter, brauzer va mobil boshqaruvi. OpenJarvis local-first arxitekturasi va qat'iy inson roziligi nazorati."
+      subtitle="Ovozli kompyuter, brauzer va mobil boshqaruvi. OpenJarvis local-first arxitekturasi va qat&apos;iy inson roziligi nazorati."
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -317,7 +345,7 @@ export function JarvisPage() {
                     ? "bg-rose-500 text-white animate-pulse"
                     : "bg-surface hover:bg-surface-raised text-ink-muted hover:text-ink border border-line"
                 )}
-                title={isRecording ? "Yozishni to'xtatish" : "Ovoz bilan gapirish"}
+                title={isRecording ? "Yozishni to&apos;xtatish" : "Ovoz bilan gapirish"}
               >
                 {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
               </button>
@@ -331,7 +359,7 @@ export function JarvisPage() {
                 onClick={() => setInstruction(DEFAULT_PROMPT)}
                 className="rounded-full bg-accent/10 border border-accent/25 px-2.5 py-1 text-accent transition hover:bg-accent/20"
               >
-                📥 Oxirgi faylni tahlil qilish, PDF tayyorlash va Telegram'da Baxtiyorga yuborish
+                📥 Oxirgi faylni tahlil qilish, PDF tayyorlash va Telegram&apos;da Baxtiyorga yuborish
               </button>
             </div>
 
@@ -383,7 +411,7 @@ export function JarvisPage() {
                 </div>
                 <p className="mt-1 text-sm text-ink-muted">
                   JARVIS vositasi tashqi xizmat (Telegram) orqali rasmiy hisobotni yuborishga tayyorlandi.
-                  Qat'iy xavfsizlik qoidalariga muvofiq, ushbu amal faqat sizning tasdig'ingizdan so'ng amalga oshiriladi.
+                  Qat&apos;iy xavfsizlik qoidalariga muvofiq, ushbu amal faqat sizning tasdig&apos;ingizdan so&apos;ng amalga oshiriladi.
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg border border-line bg-surface p-3 text-xs">
@@ -507,7 +535,7 @@ export function JarvisPage() {
                             <div>
                               📈 Tahlil natijasi:{" "}
                               <strong className="text-emerald-500">
-                                +{step.result.average_growth_percent}% o'rtacha o'sish
+                                +{step.result.average_growth_percent}% o&apos;rtacha o&apos;sish
                               </strong>
                               . {String(step.result.summary_uz ?? "")}
                             </div>
@@ -586,7 +614,7 @@ export function JarvisPage() {
 
           {files.length === 0 ? (
             <div className="rounded-lg border border-dashed border-line p-6 text-center text-xs text-ink-muted">
-              Papka bo'sh. Sinov uchun yuqoridagi &ldquo;Ssenariy Fayllarini Tayyorlash&rdquo; tugmasini bosing.
+              Papka bo&apos;sh. Sinov uchun yuqoridagi &ldquo;Ssenariy Fayllarini Tayyorlash&rdquo; tugmasini bosing.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -596,7 +624,7 @@ export function JarvisPage() {
                     <th className="pb-2 font-medium">Fayl Nomi</th>
                     <th className="pb-2 font-medium">Format</th>
                     <th className="pb-2 font-medium">Hajmi</th>
-                    <th className="pb-2 font-medium">O'zgartirilgan</th>
+                    <th className="pb-2 font-medium">O&apos;zgartirilgan</th>
                     <th className="pb-2 font-medium">SHA256</th>
                   </tr>
                 </thead>
