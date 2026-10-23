@@ -30,8 +30,10 @@ from ezo_api.language.ielts import (
     format_cue_card,
     new_test,
 )
+from ezo_api.language.ielts_feedback import measure_answers
 from ezo_api.language.voice_adapter import default_voice_adapter
 from ezo_api.schemas.ielts import (
+    AnswerMetricsOut,
     CueCardOut,
     IeltsAdvanceIn,
     IeltsAdvanceOut,
@@ -90,6 +92,24 @@ def _session_out(s: LanguageSession) -> IeltsSessionOut:
         feedback=s.feedback,
         started_at=s.started_at,
         ended_at=s.ended_at,
+    )
+
+
+def _metrics_out(answers: list[str], part: int, seconds: float | None) -> AnswerMetricsOut:
+    m, uz, en = measure_answers(answers, part, seconds)
+    return AnswerMetricsOut(
+        words=m.words,
+        unique_words=m.unique_words,
+        lexical_diversity=m.lexical_diversity,
+        sentences=m.sentences,
+        words_per_sentence=m.words_per_sentence,
+        fillers=m.fillers,
+        filler_rate=m.filler_rate,
+        repeated=[f"{w} x{n}" for w, n in m.repeated],
+        speech_seconds=m.speech_seconds,
+        words_per_minute=m.words_per_minute,
+        observations_uz=uz,
+        observations_en=en,
     )
 
 
@@ -216,6 +236,9 @@ async def advance_ielts_session(
     explanation_uz: str | None = None
     low: float | None = None
     high: float | None = None
+    metrics: AnswerMetricsOut | None = _metrics_out(
+        [payload.answer], session.ielts_part or 1, payload.speech_seconds
+    )
 
     if step.finished:
         session.status = "completed"
@@ -225,6 +248,14 @@ async def advance_ielts_session(
         session.pronunciation_score = session.band_low = session.band_high = None
         feedback_text = "Text practice completed. No AI or speech assessment was performed."
         explanation_uz = "Matnli mashq yakunlandi. AI yoki talaffuz baholashi bajarilmadi."
+        learner_texts = (
+            await db.scalars(
+                select(LanguageTurn.text)
+                .where(LanguageTurn.session_id == session.id, LanguageTurn.role == "learner")
+                .order_by(LanguageTurn.position)
+            )
+        ).all()
+        metrics = _metrics_out(list(learner_texts), 1, session.speaking_seconds or None)
         session.feedback = feedback_text
 
     await db.commit()
@@ -240,6 +271,7 @@ async def advance_ielts_session(
         estimated_band_high=high,
         feedback=feedback_text,
         explanation_uz=explanation_uz,
+        metrics=metrics,
     )
 
 
@@ -247,9 +279,17 @@ async def advance_ielts_session(
 async def evaluate_speaking_answer(payload: IeltsEvaluateIn) -> IeltsEvaluateOut:
     """Report observable text practice; never invent AI or pronunciation scores."""
     words = len(payload.answer.split())
+    metrics = _metrics_out([payload.answer], payload.part, None)
     return IeltsEvaluateOut(
-        constructive_feedback=f"Answer length: {words} words. No AI assessment was performed.",
-        explanation_uz=f"Javobda {words} ta so'z bor. AI va talaffuz baholashi bajarilmagan.",
+        constructive_feedback=(
+            f"Answer length: {words} words. No AI assessment was performed. "
+            + " ".join(metrics.observations_en)
+        ),
+        explanation_uz=(
+            f"Javobda {words} ta so'z bor. AI va talaffuz baholashi bajarilmagan. "
+            + " ".join(metrics.observations_uz)
+        ),
+        metrics=metrics,
     )
 
 

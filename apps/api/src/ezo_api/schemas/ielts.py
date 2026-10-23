@@ -38,6 +38,23 @@ class IeltsSessionOut(BaseModel):
     ended_at: datetime | None
 
 
+class AnswerMetricsOut(BaseModel):
+    """Exact measurements of the transcript; evidence only, never a band score."""
+
+    words: int
+    unique_words: int
+    lexical_diversity: float
+    sentences: int
+    words_per_sentence: float
+    fillers: int
+    filler_rate: float
+    repeated: list[str] = Field(default_factory=list)
+    speech_seconds: float | None = None
+    words_per_minute: float | None = None
+    observations_uz: list[str] = Field(default_factory=list)
+    observations_en: list[str] = Field(default_factory=list)
+
+
 class IeltsAdvanceIn(BaseModel):
     answer: str = Field(..., min_length=1, max_length=5000)
     speech_seconds: float | None = Field(default=None, ge=0.0, le=600.0)
@@ -53,6 +70,8 @@ class IeltsAdvanceOut(BaseModel):
     estimated_band_high: float | None = None
     feedback: str | None = None
     explanation_uz: str | None = None
+    metrics: AnswerMetricsOut | None = None
+    """Measurements of this answer, or of the whole session when it finishes."""
 
 
 class IeltsEvaluateIn(BaseModel):
@@ -71,6 +90,7 @@ class IeltsEvaluateOut(BaseModel):
     estimated_band: float | None = None
     constructive_feedback: str
     explanation_uz: str
+    metrics: AnswerMetricsOut | None = None
     disclaimer: str = (
         "Rasmiy IELTS sertifikati emas. AI yoki talaffuz baholashi bajarilmagan. "
         "Text practice only; not an AI assessment or IELTS band estimate."

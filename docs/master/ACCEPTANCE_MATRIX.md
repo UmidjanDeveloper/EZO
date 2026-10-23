@@ -25,7 +25,7 @@ These statuses describe acceptance, not just whether source files exist.
 | P4 | K4 Secure Sandbox | BLOCKED — execution remains disabled without a validated separate Python-compatible trust boundary. |
 | P5 | K5/K6/K8 Admin Engine | PARTIAL — backend admin proposals/static drafts/reviews exist; sandbox tests and governed application PR promotion remain gated. |
 | P6 | K7 Knowledge Refresh | PARTIAL — durable permission-fenced refresh under implementation; verification and independent review required before acceptance. |
-| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports work (deck layout bug fixed in PR #28); IELTS REST is text-only with no scoring; presentation intake is a fixed template; chat-driven Office/presentation tools are denied in production. |
+| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports work (deck layout bug fixed in PR #28); IELTS REST is text-only: per-answer and whole-session *computed* metrics (words, lexical diversity, fillers, repeats, measured WPM) with uz/en observations, but still no band, pronunciation or model scoring; presentation intake is a fixed template; chat-driven Office/presentation tools are denied in production. |
 | P8 | Premium UX and multi-user readiness | PARTIAL — single owner only; multi-user accounts, tiers and quotas NOT STARTED; Admin/JARVIS/Student pages not internationalised. |
 | P9 | Final cloud integration | NOT STARTED / BLOCKED — preparation documents only; deployment needs separate owner approval. |
 

@@ -88,3 +88,41 @@ async def test_ielts_full_session_lifecycle(client: AsyncClient) -> None:
     assert stats_resp.status_code == 200
     stats = stats_resp.json()
     assert stats["total_sessions"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_ielts_evaluate_returns_exact_metrics_without_band(client: AsyncClient) -> None:
+    answer = "Um, I like tea. Um, I like tea. Um, I like tea because tea is nice."
+    data = (await client.post("/api/ielts/evaluate", json={"answer": answer, "part": 2})).json()
+    m = data["metrics"]
+    assert m["words"] == 16
+    assert m["fillers"] == 3
+    assert m["words_per_minute"] is None  # no measured speaking time on this path
+    assert data["estimated_band"] is None and data["estimated_band_low"] is None
+    assert any("Short answer" in o for o in m["observations_en"])
+    assert any("To'ldiruvchi" in o for o in m["observations_uz"])
+
+
+@pytest.mark.asyncio
+async def test_ielts_session_summary_metrics_cover_all_answers(client: AsyncClient) -> None:
+    sid = (await client.post("/api/ielts/sessions", json={})).json()["id"]
+    answers = ["I live in a city near a river."] * 3
+    last = None
+    for _ in range(60):  # advance until the test finishes
+        r = await client.post(
+            f"/api/ielts/sessions/{sid}/advance",
+            json={"answer": answers[0], "speech_seconds": 6.0},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["metrics"] is not None
+        if body["finished"]:
+            last = body
+            break
+    assert last is not None
+    total = last["metrics"]
+    turns = (await client.get(f"/api/ielts/sessions/{sid}")).json()["answered_count"]
+    assert total["words"] == 8 * turns
+    assert total["words_per_minute"] == round(total["words"] / (6.0 * turns / 60), 1)
+    assert last["estimated_band_low"] is None and last["estimated_band_high"] is None
+    assert "No AI" in last["feedback"]
