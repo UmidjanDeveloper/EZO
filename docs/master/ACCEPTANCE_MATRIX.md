@@ -7,6 +7,9 @@ No merge or deployment is authorized or performed by this candidate.
 
 ## Authoritative P0–P9 mapping
 
+Statuses re-verified by the independent audit of 2026-10-23 at `38c752c`; evidence and
+findings are in [CLAUDE_MASTER_AUDIT.md](CLAUDE_MASTER_AUDIT.md) §6.
+
 The owner has now supplied [the actual master roadmap](OWNER_ROADMAP_P0_P9.md).
 The earlier missing-document gate is resolved. Its original DOCX hash is recorded
 with the extraction; historic technical claims remain historic. Additional owner
@@ -16,15 +19,15 @@ These statuses describe acceptance, not just whether source files exist.
 | Phase | Owner's scope | Current acceptance status / gate |
 |---|---|---|
 | P0 | Baseline and security | PARTIAL — local/hosted regression evidence exists; current changes need independent review; unresolved distro CVEs remain recorded. |
-| P1 | Student Deep Reading V1 | PARTIAL — owned/revision-bound ingestion and citations exist; selected native host and OCR/Office acceptance still pending. |
+| P1 | Student Deep Reading V1 | PARTIAL — text path and citations work; PDF/DOCX/EPUB need the dedicated Docker worker (its 17 executor tests skip without the pinned image); no OCR in any production path. |
 | P2 | Personal Intelligence K9 | PARTIAL — consent, memory, goals and routing exist; full owner journeys and reviewed multi-user readiness remain. |
 | P3 | Student V2/V3 | PARTIAL — cited synthesis/graphs/cards/recall progress exist; longitudinal adaptive tutor quality and integrated UI remain. |
 | P4 | K4 Secure Sandbox | BLOCKED — execution remains disabled without a validated separate Python-compatible trust boundary. |
 | P5 | K5/K6/K8 Admin Engine | PARTIAL — backend admin proposals/static drafts/reviews exist; sandbox tests and governed application PR promotion remain gated. |
 | P6 | K7 Knowledge Refresh | PARTIAL — durable permission-fenced refresh under implementation; verification and independent review required before acceptance. |
-| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — working routes/exports exist; full speaking quality, researched slides and isolated Office PDF/OCR remain. |
-| P8 | Premium UX and multi-user readiness | PARTIAL — existing desktop/mobile regressions and RBAC exist; Antigravity owns remaining UX and product role/limit integration. |
-| P9 | Final cloud integration | BLOCKED for live acceptance — preparation only is authorized; live E2E, cloud backup/rollback and owner release approval are not performed. |
+| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports work (deck layout bug fixed in PR #28); IELTS REST is text-only with no scoring; presentation intake is a fixed template; chat-driven Office/presentation tools are denied in production. |
+| P8 | Premium UX and multi-user readiness | PARTIAL — single owner only; multi-user accounts, tiers and quotas NOT STARTED; Admin/JARVIS/Student pages not internationalised. |
+| P9 | Final cloud integration | NOT STARTED / BLOCKED — preparation documents only; deployment needs separate owner approval. |
 
 No numerical completion percentage is invented. The following detailed rows retain
 specific implementation and quality limitations. The original roadmap is a floor,
