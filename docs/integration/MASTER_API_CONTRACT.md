@@ -245,3 +245,15 @@ queued/running/failed/cancelled and partial states, request explicit recurring
 consent, and show the previous successful observation separately from current
 refresh progress. This publishes the backend contract; no frontend acceptance or
 external coordination acknowledgment is claimed. No UI files modified.
+
+
+## Student V3 individual recall paths — additive, no action authority
+
+`docs/master/STUDENT_ADAPTIVE_PATHS.md` freezes the `/api/student/learning-paths`
+contract: owner-defined source/card/revision-bound checkpoints, explicit UUID
+admission, real recent review evidence, source invalidation, bounded read-only
+recommendations, versioned pause/resume and confirmed deletion tombstones.
+Do not label checkpoints as measured mastery or automatically submit reviews.
+A prerequisite can become unsatisfied after a lapse or an overdue review.
+`project_id` remains exact; goal progress and memory consent are independent.
+UI integration/acceptance remains pending with Antigravity; no frontend changed.
