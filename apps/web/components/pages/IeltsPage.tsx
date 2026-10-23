@@ -91,7 +91,8 @@ export function IeltsPage() {
   // Real voice and audio interaction
   const [isListening, setIsListening] = useState(false);
   const [stopListeningFn, setStopListeningFn] = useState<(() => void) | null>(null);
-  const [speechSeconds, setSpeechSeconds] = useState(30.0);
+  // Seconds measured by the speech recognizer for the current answer; typed answers have none.
+  const [speechSeconds, setSpeechSeconds] = useState<number | null>(null);
   const [speakingPrompt, setSpeakingPrompt] = useState(false);
 
   function toggleListening() {
@@ -214,6 +215,7 @@ export function IeltsPage() {
       if (advRes.ok) {
         const adv = await advRes.json();
         setAnswer("");
+        setSpeechSeconds(null);
         if (adv.feedback) {
           setStepFeedback({
             feedback: adv.feedback,
@@ -398,7 +400,9 @@ export function IeltsPage() {
                   <Award size={32} className="mx-auto mb-2" />
                   <p className="text-base font-semibold">Sinov muvaffaqiyatli yakunlandi!</p>
                   <p className="mt-1 text-sm text-ink-muted">
-                    Taxminiy natija: Band {session.band_low} - {session.band_high}
+                    {session.band_low != null && session.band_high != null
+                      ? `Taxminiy natija: Band ${session.band_low} - ${session.band_high}`
+                      : "Bu sessiya uchun ball hisoblanmadi: EZO rasmiy yoki tasdiqlangan IELTS bahosini bermaydi."}
                   </p>
                 </div>
               )}
@@ -410,8 +414,8 @@ export function IeltsPage() {
                 IELTS Speaking sinovini boshlang
               </h3>
               <p className="mt-1 max-w-md text-xs text-ink-muted">
-                Part 1, Part 2 (Cue Card) va Part 3 bosqichlarini to&apos;liq topshiring va
-                har bir mezon bo&apos;yicha mustaqil bahoni oling.
+                Part 1, Part 2 (Cue Card) va Part 3 bosqichlarini mashq qiling. Bu rasmiy IELTS
+                bahosi emas.
               </p>
               <Button
                 variant="primary"

@@ -12,7 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useCallback, useState, type FormEvent } from "react";
-import { apiUrl, storedToken } from "@/lib/api";
+import { api, apiUrl, storedToken } from "@/lib/api";
+import { saveBlob } from "@/lib/download";
 import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "./PageFrame";
@@ -92,6 +93,25 @@ export function PresentationsPage() {
   const [outline, setOutline] = useState<PresentationOutline | null>(null);
   const [generated, setGenerated] = useState<GeneratedArtifact | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** Downloads with the owner's bearer token (plain links get 401 in token mode). */
+  async function download(artifactId: string, format?: "pdf" | "html") {
+    try {
+      const detail = await api.getArtifact(artifactId);
+      const version = detail.current_version;
+      if (!version) throw new Error("Fayl versiyasi topilmadi.");
+      const result = format
+        ? await api.downloadExport(artifactId, version.version_number, format)
+        : await api.downloadArtifact(artifactId, version.version_number);
+      if (format === "html") {
+        window.open(URL.createObjectURL(result.blob), "_blank", "noopener");
+      } else {
+        saveBlob(result.blob, result.filename);
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
 
   async function handleGenerateOutline(e: FormEvent) {
     e.preventDefault();
@@ -287,32 +307,30 @@ export function PresentationsPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <a
-                  href={`${apiUrl()}${generated.pptx_download_url}`}
-                  download
+                <button
+                  type="button"
+                  onClick={() => void download(generated.artifact_id)}
                   className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                 >
                   <Download size={16} />
                   {m.presentations?.downloadPptx ?? "PPTX yuklab olish"}
-                </a>
-                <a
-                  href={`${apiUrl()}${generated.pdf_download_url}`}
-                  target="_blank"
-                  rel="noreferrer"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void download(generated.artifact_id, "pdf")}
                   className="flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <FileText size={16} />
                   {m.presentations?.downloadPdf ?? "PDF versiya"}
-                </a>
-                <a
-                  href={`${apiUrl()}${generated.html_preview_url}`}
-                  target="_blank"
-                  rel="noreferrer"
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void download(generated.artifact_id, "html")}
                   className="flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <Eye size={16} />
                   {m.presentations?.previewHtml ?? "Veb ko'rinish"}
-                </a>
+                </button>
               </div>
 
               {/* QA Badge */}

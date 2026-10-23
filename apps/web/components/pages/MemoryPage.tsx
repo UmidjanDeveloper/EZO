@@ -35,7 +35,7 @@ interface PersonalGoal {
   category: string;
   target_date: string | null;
   progress: number;
-  status: "active" | "completed" | "abandoned";
+  status: "active" | "completed" | "paused" | "archived";
   created_at: string;
 }
 
@@ -44,8 +44,8 @@ interface PersonalProfile {
   email: string;
   memory_consent: boolean;
   auto_memory: boolean;
-  memory_stats: { total: number };
-  goals_stats: { total: number; active: number; completed: number };
+  memory_stats: { total_count: number };
+  goals_stats: { total_count: number; active_count: number; completed_count: number };
 }
 
 export function MemoryPage() {
@@ -120,6 +120,8 @@ export function MemoryPage() {
         setProfile((prev) =>
           prev ? { ...prev, memory_consent: nextConsent, auto_memory: nextConsent } : null,
         );
+      } else {
+        setError(`Rozilik o‘zgarmadi (${res.status}).`);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -144,6 +146,8 @@ export function MemoryPage() {
       if (res.ok) {
         setNewGoalTitle("");
         refresh();
+      } else {
+        setError(`Maqsad saqlanmadi (${res.status}).`);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -320,7 +324,7 @@ export function MemoryPage() {
           <div>
             <p className="text-xs text-ink-muted">{m.personal?.totalMemories ?? "Xotiralar"}</p>
             <p className="text-lg font-semibold text-ink">
-              {profile?.memory_stats?.total ?? memories?.length ?? 0}
+              {profile?.memory_stats?.total_count ?? memories?.length ?? 0}
             </p>
           </div>
         </div>
@@ -331,7 +335,7 @@ export function MemoryPage() {
           <div>
             <p className="text-xs text-ink-muted">{m.personal?.activeGoals ?? "Faol maqsadlar"}</p>
             <p className="text-lg font-semibold text-ink">
-              {profile?.goals_stats?.active ?? (goals?.filter((g) => g.status === "active").length ?? 0)}
+              {profile?.goals_stats?.active_count ?? (goals?.filter((g) => g.status === "active").length ?? 0)}
             </p>
           </div>
         </div>
@@ -344,7 +348,7 @@ export function MemoryPage() {
               {m.personal?.learningScore ?? "Tugallangan maqsadlar"}
             </p>
             <p className="text-lg font-semibold text-ink">
-              {profile?.goals_stats?.completed ??
+              {profile?.goals_stats?.completed_count ??
                 (goals?.filter((g) => g.status === "completed").length ?? 0)}
             </p>
           </div>
@@ -477,11 +481,12 @@ export function MemoryPage() {
                   value={newGoalCategory}
                   onChange={(e) => setNewGoalCategory(e.target.value)}
                 >
+                  <option value="learning">Ta&apos;lim</option>
                   <option value="career">Karyera</option>
-                  <option value="education">Ta&apos;lim</option>
+                  <option value="language">Til</option>
+                  <option value="productivity">Samaradorlik</option>
                   <option value="personal">Shaxsiy</option>
-                  <option value="health">Salomatlik</option>
-                  <option value="finance">Moliya</option>
+                  <option value="other">Boshqa</option>
                 </SelectField>
               </div>
               <Button

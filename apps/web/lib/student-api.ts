@@ -6,10 +6,10 @@ export async function studentRequest<T>(path: string, init: RequestInit = {}): P
   const token = storedToken.get().trim();
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const response = await fetch(`${apiUrl()}/api/${path}`, { ...init, cache: "no-store", headers });
-  // 204 (e.g. a confirmed delete) has no body to parse.
-  const body = response.status === 204 ? "" : await response.text();
-  const value = body ? JSON.parse(body) : undefined;
-  if (!response.ok) throw new Error(value?.detail?.message ?? value?.error?.message ?? "So‘rov bajarilmadi. Qayta urinib ko‘ring.");
+  // 204 (e.g. a confirmed card delete) has no body to parse.
+  if (response.status === 204) return undefined as T;
+  const value = await response.json();
+  if (!response.ok) throw new Error(value.detail?.message ?? value.error?.message ?? "So‘rov bajarilmadi. Qayta urinib ko‘ring.");
   return value;
 }
 
