@@ -12,7 +12,9 @@ import os
 import signal
 
 from ezo_api.deployment import (
+    DeploymentError,
     check_database,
+    check_database_role,
     check_environment,
     configure_production_logging,
     validate_production,
@@ -25,6 +27,35 @@ from ezo_api.settings import Settings
 logger = logging.getLogger(__name__)
 
 
+def check_refresh_schema(settings: Settings) -> None:
+    """The API's migration owner runs migrations; workers must not race that owner."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from ezo_api.db.session import to_sync_url
+    from ezo_api.settings import API_DIR
+
+    expected = ScriptDirectory.from_config(Config(str(API_DIR / "alembic.ini"))).get_current_head()
+    engine = create_engine(to_sync_url(settings.database_url))
+    try:
+        with engine.connect() as connection:
+            if (
+                expected is None
+                or connection.scalar(text("SELECT version_num FROM alembic_version")) != expected
+            ):
+                raise DeploymentError(
+                    "Refresh requires the exact reviewed migration head before startup."
+                )
+    except SQLAlchemyError:
+        raise DeploymentError(
+            "Refresh schema preflight failed; run reviewed migrations before startup."
+        ) from None
+    finally:
+        engine.dispose()
+
+
 async def serve() -> None:
     settings = Settings()
     if settings.deployment_profile == "free-beta" or not settings.learning_enabled:
@@ -32,7 +63,9 @@ async def serve() -> None:
     check_environment(settings, os.environ)
     validate_production(settings)
     configure_production_logging(settings)
+    await asyncio.to_thread(check_database_role, settings)
     await asyncio.to_thread(check_database, settings)
+    await asyncio.to_thread(check_refresh_schema, settings)
     services = build_services(settings)
     assert services.learning is not None
     queue = RefreshQueue(services.db)

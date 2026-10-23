@@ -167,6 +167,8 @@ async def freshness(
             if latest and latest.state == "failed"
             else "check_due"
             if policy and policy.next_run_at and policy.next_run_at <= now
+            else "not_indexed"
+            if source.indexed_at is None
             else "not_checked"
             if not source.last_checked_at
             else "verified_at_last_check"
@@ -178,6 +180,7 @@ async def freshness(
             else None,
             "content_hash": source.content_hash,
             "remote_change_known": False,
-            "scope": "last_successful_source_observation",
+            "scope": "last_source_observation",
+            "last_indexed_at": source.indexed_at.isoformat() if source.indexed_at else None,
             "latest_run_id": str(latest.id) if latest else None,
         }

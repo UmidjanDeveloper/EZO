@@ -1,5 +1,11 @@
 # K7 refresh audit and recovery prerequisite
 
+Historical baseline audit below. The continuation now implements the durable
+refresh transaction/permission/schedule/journal design in
+[K7_DURABLE_REFRESH.md](K7_DURABLE_REFRESH.md); this historical list must not be
+read as a claim that all those implementation items are still absent. Independent
+review, actual hosting/backup acceptance and native worker gates remain open.
+
 Base: externally merged PR25, cd9bbd0633022885ef429929a52228146dc51408.
 This work preserves Student document jobs, all eight upstream requirements and
 existing knowledge citation/revision contracts. It is not a claim of durable K7.

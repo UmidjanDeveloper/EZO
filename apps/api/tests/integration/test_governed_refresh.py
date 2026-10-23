@@ -826,3 +826,11 @@ async def test_changed_html_extraction_preserves_old_revision_and_creates_new_pr
         assert (
             await session.get(DocumentRevision, current.current_revision_id)
         ).raw_text == expected
+
+
+async def test_failed_first_read_is_not_labelled_verified_indexed_knowledge(api, web):
+    failed = await learn(api, "pypi:does-not-exist")
+    assert failed["status"] == "failed"
+    result = (await api.get(f"/api/learning/sources/{failed['id']}/freshness")).json()
+    assert result["state"] == "not_indexed"
+    assert result["last_indexed_at"] is None and result["remote_change_known"] is False

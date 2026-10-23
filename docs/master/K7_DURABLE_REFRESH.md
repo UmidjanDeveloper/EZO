@@ -141,3 +141,13 @@ records the transform. A real trafilatura-to-bounded-HTML fixture regression fai
 before this correction. Explicit reindex/deletion and completed source reads
 invalidate K3's cached proposals, which must not outlive their actual evidence.
 K3 remains proposal-only; no generated instruction gains action authority.
+
+
+Standalone worker startup explicitly checks the application's non-privileged DB
+role before providers are built, verifies public-table restrictions and requires
+the exact migration head for its reviewed code. The API/migration owner performs
+the migration; a worker never auto-upgrades a shared database while polling.
+The whole-attempt async deadline fences publication and cancels awaited work;
+bounded pure-Python parser threads can finish cooperatively. It is not a hard
+OS CPU sandbox or a substitute for K4. Freshness distinguishes a failed first read
+(`not_indexed`) from an actual indexed observation.
