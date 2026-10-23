@@ -28,7 +28,7 @@ class Suite:
     skipped: int = 0
     skip_reasons: Counter[str] = field(default_factory=Counter)
     timings: list[tuple[str, str, str]] = field(default_factory=list)
-    """(test, property, value) for JUnit properties named *_seconds (measured evidence)."""
+    """(test, property, value) for JUnit properties with "_seconds" in their name (measured evidence)."""
 
     @property
     def passed(self) -> int:
@@ -49,7 +49,7 @@ def read_suite(label: str, path: Path) -> Suite:
             suite.skip_reasons[reason.splitlines()[0][:160]] += 1
         for prop in case.iter("property"):
             name = prop.get("name") or ""
-            if name.endswith("_seconds"):
+            if "_seconds" in name:
                 suite.timings.append((case.get("name") or "", name, prop.get("value") or ""))
     return suite
 
