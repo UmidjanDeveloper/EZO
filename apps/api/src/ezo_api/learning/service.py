@@ -22,7 +22,7 @@ import uuid
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ezo_api.db.base import utcnow
@@ -407,7 +407,7 @@ class LearningService:
         found_license = license_review["license"]
         learned.license = str(found_license)[:200] if found_license else None
         learned.profile = {
-            **(learned.profile or {}),
+            **{k: v for k, v in (learned.profile or {}).items() if k != "capability_analysis"},
             **inspection.profile,
             "license_review": license_review,
             "skipped": inspection.skipped[:100],
@@ -507,7 +507,10 @@ class LearningRunner:
         async with self.service.sessionmaker() as session:
             ids = (
                 await session.scalars(
-                    select(LearnedSource.id).where(LearnedSource.status.in_(RUNNING))
+                    select(LearnedSource.id).where(
+                        LearnedSource.status.in_(RUNNING),
+                        ~exists().where(SourceRefreshPolicy.source_id == LearnedSource.id),
+                    )
                 )
             ).all()
         for source_id in ids:

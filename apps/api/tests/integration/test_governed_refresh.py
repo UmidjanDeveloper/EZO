@@ -20,10 +20,29 @@ from ezo_api.knowledge.jobs.service import JobError
 from ezo_api.learning.base import Budget, Limits
 from ezo_api.learning.refresh import RefreshQueue
 from ezo_api.learning.refresh_worker import RefreshWorker
-from tests.integration.test_learning import learn
-from tests.learning_web import DOCS, docs_site, page
+from tests.integration.test_learning import build, learn
+from tests.learning_web import DOCS, FakeWeb, docs_site, page
 
-pytest_plugins = ("tests.integration.test_learning",)
+
+@pytest.fixture
+def web():
+    return FakeWeb()
+
+
+@pytest.fixture
+def learning_app(database_url, providers, web):
+    return build(database_url, providers, web)
+
+
+@pytest.fixture
+async def api(learning_app):
+    from httpx import ASGITransport, AsyncClient
+
+    async with AsyncClient(
+        transport=ASGITransport(app=learning_app), base_url="http://t"
+    ) as client:
+        yield client
+    await learning_app.state.services.db.dispose()
 
 
 async def setup(api, learning_app, web):
@@ -736,3 +755,74 @@ async def test_owner_history_quota_serializes_concurrent_different_source_admiss
     assert len(rejected) == 1 and rejected[0].code == "history_limit"
     async with q.transaction(write=False) as session:
         assert await session.scalar(select(func.count()).select_from(SourceRefreshRun)) == 1
+
+
+async def test_valid_json_with_invalid_snapshot_shape_does_not_poison_queue(api, learning_app, web):
+    source, user, q, _worker = await setup(api, learning_app, web)
+    first = await q.enqueue(user, uuid.UUID(source["id"]), uuid.uuid4())
+    other = await learn(api, DOCS + "/guide/", library_name="Healthy schema successor")
+    second = await q.enqueue(user, uuid.UUID(other["id"]), uuid.uuid4())
+    async with q.transaction() as session:
+        run = await session.get(SourceRefreshRun, uuid.UUID(first["id"]))
+        run.input = []  # valid JSON and all FKs valid, invalid persisted contract
+        run.created_at = await q.now(session) - timedelta(minutes=1)
+    claim = await q.claim()
+    assert claim is not None and str(claim.run_id) == second["id"]
+    async with q.transaction(write=False) as session:
+        invalid = await session.get(SourceRefreshRun, uuid.UUID(first["id"]))
+        assert invalid.state == "failed" and invalid.error_code == "invalid_snapshot"
+
+
+async def test_api_startup_recovery_does_not_spawn_legacy_tasks_for_durable_runs(
+    api, learning_app, web
+):
+    source, user, q, _worker = await setup(api, learning_app, web)
+    await q.enqueue(user, uuid.UUID(source["id"]), uuid.uuid4())
+    before = list(web.requests)
+    assert await learning_app.state.services.learning.resume_unfinished() == 0
+    assert web.requests == before
+    lease = await q.claim()
+    assert lease is not None and str(lease.source_id) == source["id"]
+
+
+async def test_changed_html_extraction_preserves_old_revision_and_creates_new_provenance(
+    api, learning_app, web, monkeypatch
+):
+    from ezo_api.knowledge.ingestion import service as ingestion_service
+    from ezo_api.knowledge.ingestion.normalize import normalize_text
+    from ezo_api.knowledge.parsers import html
+    from ezo_api.knowledge.parsers.html_text import parse_html_text
+
+    source, _user, q, worker = await setup(api, learning_app, web)
+    analyzed = await api.post(f"/api/learning/sources/{source['id']}/analyze")
+    assert analyzed.status_code == 200
+    async with q.transaction(write=False) as session:
+        document = await session.scalar(
+            select(KnowledgeDocument)
+            .join(LearnedSource, LearnedSource.knowledge_source_id == KnowledgeDocument.source_id)
+            .where(
+                LearnedSource.id == uuid.UUID(source["id"]),
+                KnowledgeDocument.source_url == DOCS + "/guide/",
+            )
+        )
+        old_id, old_hash = document.current_revision_id, document.content_hash
+        old_text = (await session.get(DocumentRevision, old_id)).raw_text
+        expected = normalize_text(
+            parse_html_text(
+                await worker.learning.knowledge.storage.get(document.storage_key), "page.html"
+            ).text
+        )
+        document_id = document.id
+    assert expected != old_text  # actual two extractors, not fake replacement bytes
+    monkeypatch.setattr(ingestion_service, "native_fixtures_allowed", lambda: False)
+    monkeypatch.setattr(html, "native_fixtures_allowed", lambda: False)
+    reindexed = await api.post(f"/api/knowledge/documents/{document_id}/reindex")
+    assert reindexed.status_code == 200, reindexed.text
+    async with q.transaction(write=False) as session:
+        current = await session.get(KnowledgeDocument, document_id)
+        assert current.current_revision_id != old_id
+        assert current.content_hash == old_hash
+        assert (await session.get(DocumentRevision, old_id)).raw_text == old_text
+        assert (
+            await session.get(DocumentRevision, current.current_revision_id)
+        ).raw_text == expected

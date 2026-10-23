@@ -680,15 +680,23 @@ class KnowledgeService:
             .order_by(DocumentRevision.revision_number.desc())
             .limit(1)
         )
-        if latest is not None and latest.content_hash == document.content_hash:
-            return latest  # re-index of unchanged content
+        if (
+            latest is not None
+            and latest.content_hash == document.content_hash
+            and latest.raw_text == raw_text
+        ):
+            return latest  # unchanged input AND unchanged extraction
         revision = DocumentRevision(
             document_id=document.id,
             revision_number=(latest.revision_number + 1) if latest else 1,
             content_hash=document.content_hash,
             storage_key=document.storage_key,
             raw_text=raw_text,
-            meta={"size_bytes": document.size_bytes},
+            meta={
+                "size_bytes": document.size_bytes,
+                "normalized_text_sha256": sha256_hex(raw_text.encode()),
+                "extraction": (document.meta or {}).get("extraction"),
+            },
         )
         session.add(revision)
         await session.flush()

@@ -12,8 +12,9 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +38,28 @@ ACTIVE = ("queued", "running")
 MAX_RUNS_PER_USER = 10_000
 
 
+class _InputDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: uuid.UUID
+    hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    revision: uuid.UUID | None
+    status: str = Field(min_length=1, max_length=20)
+    project_id: uuid.UUID | None
+    updated: AwareDatetime
+
+
+class _InputSnapshot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal["source-refresh-input/v1"]
+    project_id: uuid.UUID | None
+    kind: Literal["website", "github", "pypi", "npm"]
+    target: str = Field(min_length=1, max_length=1000)
+    title: str = Field(max_length=300)
+    limits: Limits
+    knowledge_source_id: uuid.UUID
+    documents: list[_InputDocument] = Field(max_length=200)
+
+
 def run_out(run: SourceRefreshRun) -> dict[str, Any]:
     return {
         "id": str(run.id),
@@ -58,7 +81,7 @@ def fingerprint(rows: list[KnowledgeDocument]) -> list[dict[str, Any]]:
         {
             "id": str(d.id),
             "hash": d.content_hash,
-            "revision": str(d.current_revision_id),
+            "revision": str(d.current_revision_id) if d.current_revision_id else None,
             "status": d.status,
             "project_id": str(d.project_id) if d.project_id else None,
             "updated": d.updated_at.isoformat(),
@@ -311,6 +334,7 @@ class RefreshQueue:
             raise JobError("scope_mismatch", "Source document ownership is inconsistent.")
         # Original source limits are immutable for this run, not model supplied.
         snapshot = {
+            "schema_version": "source-refresh-input/v1",
             "project_id": str(knowledge_source.project_id) if knowledge_source.project_id else None,
             "kind": source.kind,
             "target": source.target,
@@ -466,6 +490,12 @@ class RefreshQueue:
                     policy = await self.policy(session, source)
                 except JobError:
                     self.terminal(run, "failed", now, "scope_mismatch")
+                    continue
+                try:
+                    _InputSnapshot.model_validate(run.input)
+                except ValidationError:
+                    self.terminal(run, "failed", now, "invalid_snapshot")
+                    await self.restore_status(session, source)
                     continue
                 if (
                     run.input.get("knowledge_source_id") != str(source.knowledge_source_id)

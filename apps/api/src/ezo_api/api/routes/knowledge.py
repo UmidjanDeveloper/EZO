@@ -15,6 +15,7 @@ from ezo_api.db.models import (
     KnowledgeChunk,
     KnowledgeDocument,
     KnowledgeSource,
+    LearnedSource,
     OcrPage,
     Project,
 )
@@ -67,6 +68,20 @@ async def _check_project(
         project = await session.get(Project, project_id)
         if project is None or project.user_id != user_id:
             raise HTTPException(404, detail="Project not found.")
+
+
+async def _invalidate_source_analysis(session: AsyncSession, document: KnowledgeDocument) -> None:
+    # Source -> document, the same lock order as governed refresh publication.
+    source = await session.scalar(
+        select(LearnedSource)
+        .where(
+            LearnedSource.knowledge_source_id == document.source_id,
+            LearnedSource.user_id == document.user_id,
+        )
+        .with_for_update()
+    )
+    if source is not None and "capability_analysis" in (source.profile or {}):
+        source.profile = {k: v for k, v in source.profile.items() if k != "capability_analysis"}
 
 
 async def _document_out(session: AsyncSession, document: KnowledgeDocument) -> KnowledgeDocumentOut:
@@ -313,6 +328,7 @@ async def reindex_document(
         )
     if document.status in ("queued", "processing"):
         raise HTTPException(409, detail="The document is already being processed.")
+    await _invalidate_source_analysis(session, document)
     document.status = "queued"
     document.error = None
     audit(session, user.id, "knowledge.reindex", "document", document.id)
@@ -365,6 +381,7 @@ async def delete_document(
     document_id: uuid.UUID, session: SessionDep, user: CurrentUser, services: ServicesDep
 ) -> Response:
     document = await _owned(session, user.id, document_id)
+    await _invalidate_source_analysis(session, document)
     audit(session, user.id, "knowledge.delete", "document", document.id, {"title": document.title})
     await services.knowledge.delete_document(session, document)
     await session.commit()

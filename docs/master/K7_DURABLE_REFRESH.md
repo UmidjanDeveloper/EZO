@@ -129,3 +129,15 @@ an owner-authorized release. No automatic merge/deploy or live cloud acceptance.
 Regression files: `test_governed_refresh.py`, `test_refresh_poll.py`,
 `test_bounded_html_text.py` plus the preserved `test_learning.py` suite. Exact local
 and hosted results belong to the evidence report, not an assumed green label here.
+
+
+## Parser change and K3 cache integrity
+
+An unchanged raw input hash does not prove unchanged extraction. When a parser
+produces different normalized text, KnowledgeService creates a new revision and
+preserves the old text/chunks rather than binding new chunks to an old text body.
+The original byte hash stays unchanged; normalized text digest/extractor metadata
+records the transform. A real trafilatura-to-bounded-HTML fixture regression failed
+before this correction. Explicit reindex/deletion and completed source reads
+invalidate K3's cached proposals, which must not outlive their actual evidence.
+K3 remains proposal-only; no generated instruction gains action authority.

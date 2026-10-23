@@ -409,7 +409,7 @@ class RefreshWorker:
             review = assess_license(inspection.license)
             source.license = str(review["license"])[:200] if review["license"] else None
             source.profile = {
-                **(source.profile or {}),
+                **{k: v for k, v in (source.profile or {}).items() if k != "capability_analysis"},
                 **inspection.profile,
                 "license_review": review,
                 "skipped": inspection.skipped[:100],
