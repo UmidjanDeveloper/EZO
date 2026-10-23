@@ -61,6 +61,25 @@
       </section>
     </main>
 
+    <section id="voiceStage" class="stage" hidden aria-label="EZO bilan gaplashish">
+      <canvas id="avatar" aria-hidden="true"></canvas>
+      <div class="stage-top">
+        <div class="langs" role="group" aria-label="Nutq tili">
+          <button type="button" data-lang="auto" title="O‘zbekcha, inglizcha yoki ruscha — EZO o‘sha tilda javob beradi">Auto</button>
+          <button type="button" data-lang="uz">UZ</button>
+          <button type="button" data-lang="en">EN</button>
+          <button type="button" data-lang="ru">RU</button>
+        </div>
+        <button type="button" id="stageClose" class="round" aria-label="Yopish">✕</button>
+      </div>
+      <div class="stage-text">
+        <p id="stageStatus" class="stage-status" aria-live="polite"></p>
+        <p id="stageHeard" class="stage-heard"></p>
+        <p id="stageReply" class="stage-reply"></p>
+      </div>
+      <button type="button" id="stageMic" class="mic big" aria-label="Gapirish">🎤</button>
+    </section>
+
     <nav>
       <button data-go="chat">Suhbat</button>
       <button data-go="projects">Loyihalar</button>

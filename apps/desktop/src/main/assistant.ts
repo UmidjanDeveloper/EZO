@@ -4,10 +4,11 @@
  * normal EZO conversation through the API. The reply text is never executed.
  */
 import type { Actions } from "./actions";
-import { APP_NAMES_UZ, UnsupportedAction } from "./actions";
+import { UnsupportedAction } from "./actions";
 import type { EzoClient } from "./api";
 import type { FileHit } from "./files";
 import { parseIntent, type Intent } from "./intents";
+import { guessLanguage, replies, type Lang } from "./replies";
 import type { DesktopSettings } from "./settings";
 
 export interface TurnResult {
@@ -15,6 +16,8 @@ export interface TurnResult {
   reply: string;
   /** True when a local action really ran (not just a reply). */
   acted: boolean;
+  /** Language of `reply`, so it is read aloud with the right voice. */
+  language: Lang;
 }
 
 export interface AssistantDeps {
@@ -29,8 +32,6 @@ export interface AssistantDeps {
   saveConversation(id: string): void;
 }
 
-const NEED_PERMISSION = "Bu amal uchun ruxsat berilmagan. EZO sozlamalarida yoqing.";
-
 export function createAssistant(deps: AssistantDeps) {
   let lastResults: FileHit[] = [];
 
@@ -41,79 +42,71 @@ export function createAssistant(deps: AssistantDeps) {
       .join("\n");
   }
 
-  async function openHit(hit: FileHit): Promise<TurnResult> {
+  async function openHit(hit: FileHit, lang: Lang): Promise<TurnResult> {
     const settings = deps.settings();
+    const t = replies(lang);
     if (!(await deps.isInsideAllowed(hit.path, settings.allowedFolders))) {
-      return { intent: "open_file", reply: "Bu fayl ruxsat berilgan papkalardan tashqarida.", acted: false };
+      return { intent: "open_file", reply: t.outside, acted: false, language: lang };
     }
     await deps.actions.openFile(hit.path);
-    return { intent: "open_file", reply: `“${hit.name}” ochildi.`, acted: true };
+    return { intent: "open_file", reply: t.fileOpened(hit.name), acted: true, language: lang };
   }
 
-  async function handle(text: string): Promise<TurnResult> {
+  /** `heard`: the language the server recognised in the user's speech (null for typed text). */
+  async function handle(text: string, heard: Lang | null = null): Promise<TurnResult> {
     const intent = parseIntent(text);
     const settings = deps.settings();
+    const lang = heard ?? guessLanguage(text);
+    const t = replies(lang);
+    const say = (reply: string, acted = false): TurnResult => ({ intent: intent.kind, reply, acted, language: lang });
     try {
       switch (intent.kind) {
         case "open_app":
-          if (!settings.apps[intent.app]) return { intent: intent.kind, reply: NEED_PERMISSION, acted: false };
+          if (!settings.apps[intent.app]) return say(t.needPermission);
           await deps.actions.openApp(intent.app);
-          return { intent: intent.kind, reply: `${APP_NAMES_UZ[intent.app]} ochildi.`, acted: true };
+          return say(t.opened(t.app(intent.app)), true);
 
         case "volume":
-          if (!settings.allowVolume) return { intent: intent.kind, reply: NEED_PERMISSION, acted: false };
+          if (!settings.allowVolume) return say(t.needPermission);
           await deps.actions.changeVolume(intent.change);
-          return {
-            intent: intent.kind,
-            reply: { up: "Ovoz balandlatildi.", down: "Ovoz pasaytirildi.", mute: "Ovoz o‘chirildi/yoqildi." }[intent.change],
-            acted: true,
-          };
+          return say(t.volume[intent.change], true);
 
         case "dictate":
-          if (!settings.allowTyping) return { intent: intent.kind, reply: NEED_PERMISSION, acted: false };
+          if (!settings.allowTyping) return say(t.needPermission);
           await deps.actions.typeText(intent.text);
-          return { intent: intent.kind, reply: "Matn faol oynaga yozildi.", acted: true };
+          return say(t.typed, true);
 
         case "find_file":
         case "open_file": {
-          if (settings.allowedFolders.length === 0) {
-            return { intent: intent.kind, reply: "Avval sozlamalarda qidirish mumkin bo‘lgan papkani qo‘shing.", acted: false };
-          }
+          if (settings.allowedFolders.length === 0) return say(t.addFolder);
           lastResults = await deps.findFiles(intent.query, settings.allowedFolders);
-          if (lastResults.length === 0) {
-            return { intent: intent.kind, reply: `“${intent.query}” nomli fayl ruxsat berilgan papkalarda topilmadi.`, acted: false };
-          }
-          if (intent.kind === "open_file" && lastResults.length === 1) return openHit(lastResults[0]!);
-          return {
-            intent: intent.kind,
-            reply: `${lastResults.length} ta fayl topildi:\n${listHits(lastResults)}\nOchish uchun “birinchisini och” deng.`,
-            acted: false,
-          };
+          if (lastResults.length === 0) return say(t.notFound(intent.query));
+          if (intent.kind === "open_file" && lastResults.length === 1) return openHit(lastResults[0]!, lang);
+          return say(t.found(lastResults.length, listHits(lastResults)));
         }
 
         case "open_result": {
           const hit = lastResults[intent.index];
-          if (!hit) return { intent: intent.kind, reply: "Avval faylni qidiring.", acted: false };
-          return openHit(hit);
+          if (!hit) return say(t.searchFirst);
+          return openHit(hit, lang);
         }
 
         case "explain_screen": {
-          if (!settings.allowScreen) return { intent: intent.kind, reply: NEED_PERMISSION, acted: false };
-          const ok = await deps.confirm("EZO hozir ekraningiz rasmini olib, tahlil uchun EZO serveriga yuboradi. Davom etilsinmi?");
-          if (!ok) return { intent: intent.kind, reply: "Bekor qilindi. Ekran rasmi olinmadi.", acted: false };
+          if (!settings.allowScreen) return say(t.needPermission);
+          const ok = await deps.confirm(t.screenConfirm);
+          if (!ok) return say(t.cancelled);
           const png = await deps.captureScreen();
-          const reply = await deps.client().describeImage(png, intent.question);
-          return { intent: intent.kind, reply, acted: true };
+          return say(await deps.client().describeImage(png, intent.question, lang), true);
         }
 
         case "chat": {
-          const answer = await deps.client().chat(intent.text, settings.conversationId);
+          const answer = await deps.client().chat(intent.text, settings.conversationId, heard);
           deps.saveConversation(answer.conversationId);
-          return { intent: intent.kind, reply: answer.text, acted: false };
+          return { intent: intent.kind, reply: answer.text, acted: false, language: answer.language ?? lang };
         }
       }
     } catch (error) {
-      if (error instanceof UnsupportedAction) return { intent: intent.kind, reply: error.message, acted: false };
+      if (error instanceof UnsupportedAction) return say(error.message);
       throw error;
     }
   }

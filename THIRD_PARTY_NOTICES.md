@@ -3,7 +3,8 @@
 EZO's own source code does not contain copied code from the projects reviewed in
 [`docs/OPEN_SOURCE_AUDIT.md`](docs/OPEN_SOURCE_AUDIT.md):
 
-- APEX-UI
+- APEX-UI (the humanoid face in `packages/avatar` is EZO's own procedural code; the public
+  APEX-UI repository does not contain a humanoid, and no APEX-UI code, shaders, assets or branding are used)
 - VoiceStudio
 - OpenMontage
 - REA (no code copied; a small set-difference idea is reimplemented, see below)

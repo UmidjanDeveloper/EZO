@@ -26,6 +26,10 @@ Both apps need a running EZO API.
     is not configured on the server.
   - A Claude Pro/Max subscription is **not** an API key.
 
+**EZO's face and languages.** All three apps show EZO's humanoid face and talk in Uzbek,
+English and Russian. "Auto" is the default: speak any of the three and EZO answers in the
+same language. See [HUMANOID.md](HUMANOID.md).
+
 ## 2. Windows app
 
 **Installing:**
@@ -70,8 +74,10 @@ listed above, and only from your own words.
 3. Open EZO → **Sozlamalar** → enter the server URL and token → **Saqlash va ulanish**.
 
 **Using:**
-- **🎤:** tap, speak Uzbek, tap again. Android asks for the microphone the first time. EZO
-  answers in text and aloud.
+- **🎤:** opens EZO's full-screen face. Speak Uzbek, English or Russian, then tap ■.
+  - Android asks for the microphone the first time.
+  - EZO answers in your language, in text and aloud.
+  - **Auto/UZ/EN/RU** at the top pins a language if needed.
 - **📷:** take or choose a photo. EZO explains it. The photo is not stored.
 - **📄:** pick a TXT, MD or CSV file and EZO summarises it. **PDF and DOCX are not supported
   yet:** they need EZO's isolated document executor (separate host, PR #33).

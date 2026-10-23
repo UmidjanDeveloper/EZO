@@ -61,6 +61,7 @@ def _validate(body: ChatIn, services: Services) -> TurnInput:
         forced_agent=body.agent,
         channel=body.channel,
         speech_seconds=body.speech_seconds if body.channel == "voice" else None,
+        language_hint=body.language_hint if body.channel == "voice" else None,
         attachments=tuple(dict.fromkeys(body.attachments)),
     )
 

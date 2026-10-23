@@ -347,6 +347,8 @@ export interface ChatRequestBody {
   channel?: ChatChannel;
   /** Measured speaking time of a voice message, in seconds (Language Coach). */
   speech_seconds?: number | null;
+  /** Language the speech recogniser heard (voice turns); used when the words are ambiguous. */
+  language_hint?: LanguageCode | null;
   /** Uploaded documents this message is about, in the user's order (max 20). */
   attachments?: string[];
 }

@@ -1,0 +1,370 @@
+/**
+ * EzoAvatar: mounts the humanoid on a <canvas> and animates it.
+ *
+ *   const avatar = new EzoAvatar(canvas, { framing: "bust" });
+ *   avatar.setState("listening");
+ *   avatar.setLevel(0.4); // optional: live microphone / voice level
+ *   avatar.destroy();
+ *
+ * WebGL 1 with additive points; falls back to a still 2D drawing when WebGL is
+ * unavailable. Respects prefers-reduced-motion (renders still frames only) and
+ * pauses while the page is hidden.
+ */
+import { buildFigure, type Figure } from "./figure";
+import { followLevel, syntheticSpeech } from "./level";
+import { frameCamera, project, type Framing } from "./math";
+import { MASK_FRAGMENT, MASK_VERTEX, POINT_FRAGMENT, POINT_VERTEX } from "./shaders";
+import { easeLook, lookFor, type AvatarState, type Look } from "./states";
+
+export interface AvatarOptions {
+  framing?: Framing;
+  /** "auto" picks "low" for small views and dense phone screens. */
+  quality?: "high" | "low" | "auto";
+  /** Mountains behind the figure. Defaults to true for "bust", false for "head". */
+  terrain?: boolean;
+  /** Overrides the prefers-reduced-motion media query. */
+  reducedMotion?: boolean;
+}
+
+const UNIFORMS = ["uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef"] as const;
+type UniformName = (typeof UNIFORMS)[number];
+
+interface GlState {
+  gl: WebGLRenderingContext;
+  points: WebGLProgram;
+  mask: WebGLProgram;
+  uniforms: Record<UniformName, WebGLUniformLocation | null>;
+  maskVP: WebGLUniformLocation | null;
+  maskYaw: WebGLUniformLocation | null;
+  maskPitch: WebGLUniformLocation | null;
+  buffers: WebGLBuffer[];
+  attributes: { pos: number; data: number; extra: number; xy: number };
+  silhouetteVertices: number;
+}
+
+const STILL_TIME = 6.5; // the moment shown when motion is reduced
+
+function compile(gl: WebGLRenderingContext, vertex: string, fragment: string): WebGLProgram {
+  const program = gl.createProgram();
+  for (const [type, source] of [
+    [gl.VERTEX_SHADER, vertex],
+    [gl.FRAGMENT_SHADER, fragment],
+  ] as const) {
+    const shader = gl.createShader(type);
+    if (!shader) throw new Error("shader allocation failed");
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      throw new Error(`shader: ${gl.getShaderInfoLog(shader) ?? "compile failed"}`);
+    }
+    gl.attachShader(program, shader);
+  }
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    throw new Error(`program: ${gl.getProgramInfoLog(program) ?? "link failed"}`);
+  }
+  return program;
+}
+
+export class EzoAvatar {
+  readonly canvas: HTMLCanvasElement;
+  readonly framing: Framing;
+  /** "webgl", "2d" (still fallback) or "none". */
+  readonly renderer: "webgl" | "2d" | "none";
+
+  private figure: Figure;
+  private glState: GlState | null = null;
+  private state: AvatarState = "idle";
+  private look: Look = lookFor("idle");
+  private level = 0;
+  private levelTarget = 0;
+  private levelAt = -Infinity;
+  private time = 0;
+  private last = 0;
+  private frame = 0;
+  private running = false;
+  private destroyed = false;
+  private readonly reduced: boolean;
+  private readonly observer: ResizeObserver | null;
+  private readonly onVisibility = () => this.syncRunning();
+  private readonly onLost = (event: Event) => {
+    event.preventDefault();
+    this.glState = null;
+    this.stopLoop();
+  };
+  private readonly onRestored = () => {
+    this.glState = this.initGl();
+    this.syncRunning();
+  };
+
+  constructor(canvas: HTMLCanvasElement, options: AvatarOptions = {}) {
+    this.canvas = canvas;
+    this.framing = options.framing ?? "bust";
+    const media = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+    this.reduced = options.reducedMotion ?? media?.matches ?? false;
+    const rect = canvas.getBoundingClientRect();
+    const small = Math.max(rect.width, rect.height) < 260;
+    const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
+    const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
+    this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust" });
+
+    this.glState = this.initGl();
+    this.renderer = this.glState ? "webgl" : canvas.getContext("2d") ? "2d" : "none";
+    canvas.dataset.ezoAvatar = this.renderer;
+    canvas.dataset.state = this.state;
+    canvas.addEventListener("webglcontextlost", this.onLost);
+    canvas.addEventListener("webglcontextrestored", this.onRestored);
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.onVisibility);
+    this.observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => this.redrawIfStill()) : null;
+    this.observer?.observe(canvas);
+    this.syncRunning();
+  }
+
+  /** WebGL is usable on this device. */
+  static supported(): boolean {
+    if (typeof document === "undefined") return false;
+    try {
+      const canvas = document.createElement("canvas");
+      return Boolean(canvas.getContext("webgl") ?? canvas.getContext("experimental-webgl"));
+    } catch {
+      return false;
+    }
+  }
+
+  setState(state: AvatarState): void {
+    if (state === this.state) return;
+    this.state = state;
+    this.canvas.dataset.state = state;
+    if (this.reduced || !this.running) {
+      this.look = lookFor(state);
+      this.redrawIfStill();
+    }
+  }
+
+  /** Live voice level 0..1 (microphone while listening, EZO's voice while speaking). */
+  setLevel(level: number): void {
+    this.levelTarget = Math.min(1, Math.max(0, Number.isFinite(level) ? level : 0));
+    this.levelAt = this.time;
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    this.stopLoop();
+    this.observer?.disconnect();
+    this.canvas.removeEventListener("webglcontextlost", this.onLost);
+    this.canvas.removeEventListener("webglcontextrestored", this.onRestored);
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.onVisibility);
+    const glState = this.glState;
+    if (glState) {
+      const { gl } = glState;
+      glState.buffers.forEach((buffer) => gl.deleteBuffer(buffer));
+      gl.deleteProgram(glState.points);
+      gl.deleteProgram(glState.mask);
+    }
+    this.glState = null;
+  }
+
+  // --- setup -------------------------------------------------------------------------------
+
+  private initGl(): GlState | null {
+    let gl: WebGLRenderingContext | null = null;
+    try {
+      gl = (this.canvas.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: true, depth: true }) ??
+        this.canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
+    } catch {
+      gl = null;
+    }
+    if (!gl) return null;
+    try {
+      const points = compile(gl, POINT_VERTEX, POINT_FRAGMENT);
+      const mask = compile(gl, MASK_VERTEX, MASK_FRAGMENT);
+      const upload = (data: Float32Array) => {
+        const buffer = gl.createBuffer();
+        if (!buffer) throw new Error("buffer allocation failed");
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        return buffer;
+      };
+      const buffers = [upload(this.figure.positions), upload(this.figure.data), upload(this.figure.extra), upload(this.figure.silhouette)];
+      const uniforms = Object.fromEntries(UNIFORMS.map((name) => [name, gl.getUniformLocation(points, name)])) as GlState["uniforms"];
+      return {
+        gl,
+        points,
+        mask,
+        uniforms,
+        maskVP: gl.getUniformLocation(mask, "uVP"),
+        maskYaw: gl.getUniformLocation(mask, "uYaw"),
+        maskPitch: gl.getUniformLocation(mask, "uPitch"),
+        buffers,
+        attributes: {
+          pos: gl.getAttribLocation(points, "aPos"),
+          data: gl.getAttribLocation(points, "aData"),
+          extra: gl.getAttribLocation(points, "aExtra"),
+          xy: gl.getAttribLocation(mask, "aXY"),
+        },
+        silhouetteVertices: this.figure.silhouette.length / 2,
+      };
+    } catch (error) {
+      console.warn("EZO avatar: WebGL setup failed, using the still fallback.", error);
+      return null;
+    }
+  }
+
+  // --- loop ----------------------------------------------------------------------------------
+
+  private syncRunning(): void {
+    const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
+    if (!this.destroyed && !this.reduced && this.glState && visible) this.startLoop();
+    else {
+      this.stopLoop();
+      this.redrawIfStill();
+    }
+  }
+
+  private startLoop(): void {
+    if (this.running) return;
+    this.running = true;
+    this.last = performance.now();
+    const tick = (now: number) => {
+      if (!this.running) return;
+      const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
+      this.last = now;
+      this.step(dt);
+      this.draw();
+      this.frame = requestAnimationFrame(tick);
+    };
+    this.frame = requestAnimationFrame(tick);
+  }
+
+  private stopLoop(): void {
+    this.running = false;
+    if (this.frame) cancelAnimationFrame(this.frame);
+    this.frame = 0;
+  }
+
+  private step(dt: number): void {
+    this.time += dt;
+    this.look = easeLook(this.look, lookFor(this.state), dt);
+    // Without a live level (e.g. the browser's own voice), speech gets a speech-like rhythm.
+    const fresh = this.time - this.levelAt < 0.4;
+    const target = fresh ? this.levelTarget : this.state === "speaking" ? syntheticSpeech(this.time) : this.state === "listening" ? 0.08 : 0;
+    this.level = followLevel(this.level, target, dt);
+  }
+
+  private redrawIfStill(): void {
+    if (this.running || this.destroyed) return;
+    if (this.reduced || !this.glState) {
+      this.time = STILL_TIME;
+      this.level = this.state === "speaking" ? 0.5 : 0;
+    }
+    this.draw();
+  }
+
+  // --- drawing -------------------------------------------------------------------------------
+
+  private resize(): { width: number; height: number; cssHeight: number; dpr: number } {
+    const rect = this.canvas.getBoundingClientRect();
+    const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+    const width = Math.max(1, Math.round((rect.width || this.canvas.width) * dpr));
+    const height = Math.max(1, Math.round((rect.height || this.canvas.height) * dpr));
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+    }
+    return { width, height, cssHeight: height / dpr, dpr };
+  }
+
+  private motion(): { yaw: number; pitch: number } {
+    const t = this.time;
+    return { yaw: 0.1 * Math.sin(t * 0.23) + 0.04 * Math.sin(t * 0.61), pitch: 0.03 * Math.sin(t * 0.17) };
+  }
+
+  private draw(): void {
+    if (this.destroyed) return;
+    const { width, height, cssHeight, dpr } = this.resize();
+    const camera = frameCamera(this.framing, width / height);
+    if (!this.glState) {
+      this.drawStill(camera.viewProjection, width, height);
+      return;
+    }
+    const { gl, points, mask, uniforms: u, buffers, attributes, silhouetteVertices } = this.glState;
+    const { yaw, pitch } = this.motion();
+    gl.viewport(0, 0, width, height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearDepth(1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST);
+    gl.depthFunc(gl.LESS);
+
+    // 1. The silhouette writes depth only.
+    gl.useProgram(mask);
+    gl.colorMask(false, false, false, false);
+    gl.depthMask(true);
+    gl.disable(gl.BLEND);
+    gl.uniformMatrix4fv(this.glState.maskVP, false, camera.viewProjection);
+    gl.uniform1f(this.glState.maskYaw, yaw);
+    gl.uniform1f(this.glState.maskPitch, pitch);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers[3]!);
+    gl.enableVertexAttribArray(attributes.xy);
+    gl.vertexAttribPointer(attributes.xy, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, silhouetteVertices);
+    gl.disableVertexAttribArray(attributes.xy);
+
+    // 2. Glowing points, added together.
+    gl.useProgram(points);
+    gl.colorMask(true, true, true, true);
+    gl.depthMask(false);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    const look = this.look;
+    gl.uniformMatrix4fv(u.uVP, false, camera.viewProjection);
+    gl.uniform1f(u.uTime, this.time);
+    gl.uniform1f(u.uLevel, this.level);
+    gl.uniform1f(u.uEnergy, look.energy);
+    gl.uniform1f(u.uWarmth, look.warmth);
+    gl.uniform1f(u.uListen, look.listen);
+    gl.uniform1f(u.uThink, look.think);
+    gl.uniform1f(u.uSpeak, look.speak);
+    gl.uniform1f(u.uError, look.error);
+    gl.uniform1f(u.uYaw, yaw);
+    gl.uniform1f(u.uPitch, pitch);
+    // Point size follows the view size; small faces (pill, home screen) keep visible lines.
+    const reference = this.framing === "head" ? 380 : 720;
+    gl.uniform1f(u.uPx, dpr * Math.min(1.5, Math.max(0.6, cssHeight / reference)));
+    gl.uniform1f(u.uGlowPx, dpr * Math.min(1.5, Math.max(0.1, cssHeight / reference)));
+    gl.uniform1f(u.uRef, camera.distance);
+    const bind = (index: number, location: number, size: number) => {
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffers[index]!);
+      gl.enableVertexAttribArray(location);
+      gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+    };
+    bind(0, attributes.pos, 3);
+    bind(1, attributes.data, 4);
+    bind(2, attributes.extra, 2);
+    gl.drawArrays(gl.POINTS, 0, this.figure.count);
+    gl.disableVertexAttribArray(attributes.pos);
+    gl.disableVertexAttribArray(attributes.data);
+    gl.disableVertexAttribArray(attributes.extra);
+  }
+
+  /** No WebGL: a still drawing of the figure (no mountains), tinted by state. */
+  private drawStill(viewProjection: Float32Array, width: number, height: number): void {
+    const ctx = this.canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, width, height);
+    ctx.globalCompositeOperation = "lighter";
+    const tint = this.state === "error" ? "255,70,80" : "70,170,255";
+    const warm = this.state === "speaking" ? "255,170,60" : "255,110,30";
+    const { positions, data, count } = this.figure;
+    const dot = Math.max(1, height / 500);
+    for (let i = 0; i < count; i++) {
+      const kind = data[i * 4]!;
+      if (kind === 6 || kind === 3 || kind === 5) continue;
+      const [x, y] = project(viewProjection, positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!);
+      const w = data[i * 4 + 3]!;
+      ctx.fillStyle = `rgba(${w > 0.35 ? warm : tint},${0.25 + 0.5 * data[i * 4 + 2]!})`;
+      ctx.fillRect(((x + 1) / 2) * width, ((1 - y) / 2) * height, dot, dot);
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+}

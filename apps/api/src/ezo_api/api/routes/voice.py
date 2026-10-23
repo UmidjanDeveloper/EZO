@@ -13,7 +13,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, rate_limit
+from ezo_api.core.language import DEFAULT_LANGUAGE, Language, as_language, detect_language
 from ezo_api.schemas.voice import SpeakIn, TranscriptOut, VoiceAttemptOut, VoiceStatusOut
+from ezo_api.translation.translit import detect_script, to_latin
 from ezo_api.voice.audio import sniff_audio
 from ezo_api.voice.service import AllVoiceProvidersFailedError, VoiceAttempt
 
@@ -57,6 +59,21 @@ def _all_failed(exc: AllVoiceProvidersFailedError) -> HTTPException:
             "attempts": [a.model_dump() for a in _attempts(exc.attempts)],
         },
     )
+
+
+def heard_language(
+    text: str, reported: str | None, requested: Language | None
+) -> tuple[Language, str]:
+    """The transcript's language (always uz, en or ru) and its display text.
+
+    A provider's own detection wins when it names one of EZO's languages. Otherwise
+    (no detection, or a near miss such as "turkish" for Uzbek speech) the words decide.
+    Uzbek heard in Cyrillic is shown in EZO's Latin alphabet.
+    """
+    language = as_language(reported) or detect_language(text, requested or DEFAULT_LANGUAGE)
+    if language == "uz" and detect_script(text) == "cyrillic":
+        text = to_latin(text, apostrophe="modifier")
+    return language, text
 
 
 @router.get("/status", dependencies=[Depends(rate_limit("default"))])
@@ -107,9 +124,10 @@ async def transcribe(
     finally:
         del data  # never kept beyond this request
     transcript = result.value
+    heard, text = heard_language(transcript.text, transcript.language, language)
     return TranscriptOut(
-        text=transcript.text,
-        language=transcript.language,
+        text=text,
+        language=heard,
         provider=transcript.provider,
         attempts=_attempts(result.attempts),
     )

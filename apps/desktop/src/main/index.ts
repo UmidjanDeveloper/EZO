@@ -27,6 +27,7 @@ import { createActions } from "./actions";
 import { createEzoClient, EzoApiError } from "./api";
 import { createAssistant } from "./assistant";
 import { findFiles, isInsideAllowed } from "./files";
+import type { Lang } from "./replies";
 import { runSelfTest } from "./selftest";
 import { ALLOWED_SHORTCUTS, sanitizeSettings, type DesktopSettings } from "./settings";
 
@@ -145,12 +146,12 @@ interface TurnResponse {
   notice?: string;
 }
 
-async function respond(text: string): Promise<TurnResponse> {
-  const result = await assistant.handle(text);
+async function respond(text: string, heard: Lang | null = null): Promise<TurnResponse> {
+  const result = await assistant.handle(text, heard);
   const out: TurnResponse = { transcript: text, reply: result.reply, acted: result.acted };
   if (settings.speakReplies) {
     try {
-      out.audio = await createEzoClient(settings.apiUrl, readToken()).speak(result.reply);
+      out.audio = await createEzoClient(settings.apiUrl, readToken()).speak(result.reply, result.language);
     } catch (error) {
       out.notice = error instanceof EzoApiError ? error.message : "Javobni ovozda o‘qib bo‘lmadi.";
     }
@@ -228,9 +229,9 @@ function registerIpc(): void {
     }
     const type = typeof mimeType === "string" && /^audio\/[a-z0-9.+-]+(;.*)?$/i.test(mimeType) ? mimeType : "audio/webm";
     try {
-      const text = await createEzoClient(settings.apiUrl, readToken()).transcribe(new Uint8Array(audio), type.split(";")[0]!);
-      if (!text) return { error: "Hech narsa eshitilmadi. Qaytadan gapiring." };
-      return await respond(text);
+      const heard = await createEzoClient(settings.apiUrl, readToken()).transcribe(new Uint8Array(audio), type.split(";")[0]!);
+      if (!heard.text) return { error: "Hech narsa eshitilmadi. Qaytadan gapiring." };
+      return await respond(heard.text, heard.language);
     } catch (error) {
       return failure(error);
     }

@@ -81,21 +81,36 @@ export function createApi(baseUrl: string, token: string | null, fetchImpl: type
     projects: () => json<Project[]>("/api/projects"),
     memories: () => json<Memory[]>("/api/memories"),
     addMemory: (content: string) => json<Memory>("/api/memories", post({ content, category: "fact" })),
-    async chat(message: string, conversationId: string | null, projectId: string | null, channel: "text" | "voice") {
-      const body = await json<{ conversation_id: string; message: Message }>(
+    /** `languageHint`: what the recogniser heard, used by the server when the words are ambiguous. */
+    async chat(
+      message: string,
+      conversationId: string | null,
+      projectId: string | null,
+      channel: "text" | "voice",
+      languageHint: Lang | null = null,
+    ) {
+      const body = await json<{ conversation_id: string; message: Message; language?: string }>(
         "/api/chat",
-        post({ message, conversation_id: conversationId, project_id: projectId, channel }),
+        post({
+          message,
+          conversation_id: conversationId,
+          project_id: projectId,
+          channel,
+          ...(channel === "voice" && languageHint ? { language_hint: languageHint } : {}),
+        }),
       );
-      return { conversationId: body.conversation_id, reply: body.message };
+      return { conversationId: body.conversation_id, reply: body.message, language: asLang(body.language) };
     },
-    async transcribe(audio: Blob): Promise<string> {
+    /** `language` null = EZO recognises Uzbek, English or Russian by itself. */
+    async transcribe(audio: Blob, language: Lang | null = null): Promise<{ text: string; language: Lang | null }> {
       const form = new FormData();
       form.append("audio", audio, "speech.webm");
-      form.append("language", "uz");
-      return (await json<{ text: string }>("/api/voice/transcribe", { method: "POST", body: form })).text.trim();
+      if (language) form.append("language", language);
+      const body = await json<{ text: string; language: string | null }>("/api/voice/transcribe", { method: "POST", body: form });
+      return { text: body.text.trim(), language: asLang(body.language) ?? language };
     },
-    async speak(text: string): Promise<Blob> {
-      return (await call("/api/voice/speak", post({ text: text.slice(0, 2000), language: "uz" }))).blob();
+    async speak(text: string, language: Lang | null = "uz"): Promise<Blob> {
+      return (await call("/api/voice/speak", post({ text: text.slice(0, 2000), language }))).blob();
     },
     async describeImage(image: Blob, question: string): Promise<string> {
       const form = new FormData();
@@ -108,3 +123,8 @@ export function createApi(baseUrl: string, token: string | null, fetchImpl: type
 }
 
 export type Api = ReturnType<typeof createApi>;
+
+export type Lang = "uz" | "en" | "ru";
+export function asLang(value: string | null | undefined): Lang | null {
+  return value === "uz" || value === "en" || value === "ru" ? value : null;
+}

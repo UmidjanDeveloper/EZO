@@ -150,7 +150,12 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
     async (
       text: string,
       channel: ChatChannel = "text",
-      options: { speechSeconds?: number | null; attachments?: { id: string; name: string }[] } = {},
+      options: {
+        speechSeconds?: number | null;
+        /** Language the recogniser heard; the server uses it when the words are ambiguous. */
+        languageHint?: LanguageCode | null;
+        attachments?: { id: string; name: string }[];
+      } = {},
     ): Promise<UiMessage | null> => {
       if (streaming) return null;
       const controller = new AbortController();
@@ -186,6 +191,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
             library_id: libraryId,
             channel,
             speech_seconds: channel === "voice" ? (options.speechSeconds ?? null) : null,
+            ...(channel === "voice" && options.languageHint ? { language_hint: options.languageHint } : {}),
             ...(options.attachments?.length ? { attachments: options.attachments.map((a) => a.id) } : {}),
           },
           controller.signal,

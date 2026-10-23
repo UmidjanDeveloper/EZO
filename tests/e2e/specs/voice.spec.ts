@@ -51,7 +51,7 @@ test("voice: talk to EZO like to a person", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
   await expect(page.getByTestId("voice-stage")).toBeVisible();
-  await expect(page.getByTestId("voice-stage").getByTestId("ezo-robot")).toHaveAttribute("data-state", "idle");
+  await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "idle");
 
   await page.getByTestId("voice-toggle").click();
 

@@ -27,6 +27,19 @@ from ezo_api.voice.http_limits import BoundedAudioClient
 
 MAX_TTS_CHARS = 4000
 
+# Delivery notes for steerable TTS models (gpt-4o-*-tts). The voice itself is
+# multilingual; telling it the language keeps Uzbek from sounding Turkish or Russian.
+TTS_INSTRUCTIONS: dict[str, str] = {
+    "uz": (
+        "Speak natural, fluent Uzbek (O'zbek tili) like a native speaker from Tashkent. "
+        "Pronounce o', g', q, x, sh and ch the Uzbek way. Warm, calm and clear."
+    ),
+    "en": "Speak natural, fluent English. Warm, calm and clear.",
+    "ru": "Говори на естественном, беглом русском языке. Тепло, спокойно и чётко.",
+}
+# Spelling context for the recogniser: Uzbek is written in the Latin alphabet.
+UZ_TRANSCRIBE_PROMPT = "Assalomu alaykum! Bugun o'zbek tilida gaplashamiz. Rahmat, yaxshi."
+
 
 def _voice_error(exc: Exception, provider: str) -> VoiceError:
     if isinstance(exc, VoiceError):
@@ -61,6 +74,8 @@ class OpenAIAudioProvider(SpeechToTextProvider, TextToSpeechProvider):
         tts_model: str,
         voice: str,
         send_language_to_tts: bool = False,
+        steerable: bool = False,
+        spelling_prompt: bool = False,
         timeout: float = 60.0,
         client: Any = None,
         max_audio: int = 10 * 1024 * 1024,
@@ -75,6 +90,8 @@ class OpenAIAudioProvider(SpeechToTextProvider, TextToSpeechProvider):
         self.voice = voice
         # VoiceStudio accepts a `language` field on /v1/audio/speech; OpenAI does not.
         self.send_language_to_tts = send_language_to_tts
+        # gpt-4o-*-tts accepts delivery instructions; OpenAI transcription accepts a prompt.
+        self.steerable, self.spelling_prompt = steerable, spelling_prompt
         self._client: Any = client or openai.AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -96,6 +113,11 @@ class OpenAIAudioProvider(SpeechToTextProvider, TextToSpeechProvider):
                     model=self.stt_model,
                     file=(filename, audio, mime_type),
                     **({"language": language} if language else {}),
+                    **(
+                        {"prompt": UZ_TRANSCRIBE_PROMPT}
+                        if self.spelling_prompt and language == "uz"
+                        else {}
+                    ),
                 )
         except Exception as exc:
             raise _voice_error(exc, self.name) from exc
@@ -105,6 +127,7 @@ class OpenAIAudioProvider(SpeechToTextProvider, TextToSpeechProvider):
 
     async def synthesize(self, text: str, language: str | None) -> SpeechAudio:
         extra = {"language": language} if (self.send_language_to_tts and language) else None
+        steer = TTS_INSTRUCTIONS.get(language or "") if self.steerable else None
         try:
             async with asyncio.timeout(self.timeout):
                 response = await self._client.audio.speech.create(
@@ -113,6 +136,7 @@ class OpenAIAudioProvider(SpeechToTextProvider, TextToSpeechProvider):
                     input=text[:MAX_TTS_CHARS],
                     response_format="mp3",
                     **({"extra_body": extra} if extra else {}),
+                    **({"instructions": steer} if steer else {}),
                 )
                 data = response.content if hasattr(response, "content") else await response.aread()
         except Exception as exc:

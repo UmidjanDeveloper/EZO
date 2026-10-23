@@ -11,9 +11,11 @@ export interface Prefs {
   conversationId: string | null;
   projectId: string | null;
   speakReplies: boolean;
+  /** "auto": speak Uzbek, English or Russian and EZO answers in the same language. */
+  voiceLanguage: "auto" | "uz" | "en" | "ru";
 }
 
-const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true };
+const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto" };
 
 export function loadPrefs(): Prefs {
   try {

@@ -15,9 +15,9 @@ function setup(overrides: Partial<DesktopSettings> = {}, hits: FileHit[] = []) {
     openFile: async (file) => void log.push(`open:${file}`),
   };
   const client = {
-    chat: async (message: string, id: string | null) => {
-      log.push(`chat:${message}:${id}`);
-      return { conversationId: "11111111-1111-1111-1111-111111111111", text: "Model javobi: kalkulyatorni och" };
+    chat: async (message: string, id: string | null, hint: string | null = null) => {
+      log.push(hint ? `chat:${message}:${id}:${hint}` : `chat:${message}:${id}`);
+      return { conversationId: "11111111-1111-1111-1111-111111111111", text: "Model javobi: kalkulyatorni och", language: hint };
     },
     describeImage: async (png: Uint8Array) => {
       log.push(`vision:${png.length}`);
@@ -70,8 +70,29 @@ describe("assistant", () => {
       intent: "open_app",
       reply: "Kalkulyator ochildi.",
       acted: true,
+      language: "uz",
     });
     expect(log).toEqual(["app:calculator"]);
+  });
+
+  it("answers in the language the owner spoke", async () => {
+    const { assistant } = setup({ apps: { ...DEFAULT_SETTINGS.apps, calculator: true } });
+    expect(await assistant.handle("Открой калькулятор")).toMatchObject({ reply: "Калькулятор открыт.", language: "ru" });
+    expect(await assistant.handle("Open the calculator")).toMatchObject({ reply: "Calculator is open.", language: "en" });
+    // The language the server heard wins over the guess from the words.
+    expect(await assistant.handle("calculator", "ru")).toMatchObject({ language: "ru" });
+    const locked = setup();
+    expect(await locked.assistant.handle("Open the calculator")).toMatchObject({
+      reply: "This action is not allowed yet. Turn it on in EZO settings.",
+      acted: false,
+    });
+  });
+
+  it("chat replies keep the language the server chose", async () => {
+    const { assistant, log } = setup();
+    const result = await assistant.handle("Okay, thanks", "en");
+    expect(result.language).toBe("en");
+    expect(log[0]).toBe("chat:Okay, thanks:null:en");
   });
 
   it("a model reply is only text: it never triggers an action", async () => {

@@ -1,5 +1,6 @@
 // The floating pill: idle → listening → thinking → speaking, always with a visible state
 // and a stop button. Audio is recorded only while the red listening state is shown.
+import { createLevelMeter, EzoAvatar, type LevelMeter } from "@ezo/avatar";
 
 interface TurnResponse {
   transcript?: string;
@@ -40,6 +41,26 @@ let cancelled = false;
 let player: HTMLAudioElement | null = null;
 let recordingTimer: number | undefined;
 
+// EZO's humanoid face follows the microphone while listening and its own voice while speaking.
+const face: EzoAvatar | null = EzoAvatar.supported()
+  ? new EzoAvatar($<HTMLCanvasElement>("face"), { framing: "head", quality: "low", terrain: false })
+  : null;
+if (face) document.body.classList.add("has-face");
+let meter: LevelMeter | null = null;
+let meterFrame = 0;
+
+function followLevel(source: MediaStream | HTMLMediaElement | null): void {
+  cancelAnimationFrame(meterFrame);
+  meter?.close();
+  meter = face && source ? createLevelMeter(source) : null;
+  const tick = () => {
+    if (!meter) return;
+    face?.setLevel(meter.read());
+    meterFrame = requestAnimationFrame(tick);
+  };
+  if (meter) meterFrame = requestAnimationFrame(tick);
+}
+
 const LABELS: Record<State, [string, string]> = {
   idle: ["EZO", "Ctrl+Alt+Space — gapiring"],
   listening: ["Tinglayapman…", "Tugatish uchun yana bosing"],
@@ -51,6 +72,7 @@ const LABELS: Record<State, [string, string]> = {
 function setState(next: State, detail?: string): void {
   state = next;
   pill.className = `pill ${next}`;
+  face?.setState(next);
   const [title, sub] = LABELS[next];
   label.textContent = title;
   hint.textContent = detail ?? sub;
@@ -87,6 +109,7 @@ async function startListening(): Promise<void> {
   recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
   recorder.onstop = () => void finishRecording(mimeType);
   recorder.start();
+  followLevel(stream);
   setState("listening");
   recordingTimer = window.setTimeout(() => stopListening(), MAX_RECORDING_MS);
 }
@@ -94,6 +117,7 @@ async function startListening(): Promise<void> {
 function stopListening(cancel = false): void {
   cancelled = cancel;
   window.clearTimeout(recordingTimer);
+  followLevel(null);
   if (recorder && recorder.state !== "inactive") recorder.stop();
   stream?.getTracks().forEach((track) => track.stop()); // the OS mic indicator turns off here
   stream = null;
@@ -120,9 +144,12 @@ function handle(response: TurnResponse): void {
   showPanel(response.transcript ?? "", [response.reply, response.notice].filter(Boolean).join("\n\n"));
   if (response.audio && response.audio.data.byteLength > 0) {
     const url = URL.createObjectURL(new Blob([response.audio.data.slice()], { type: response.audio.mimeType }));
-    player = new Audio(url);
-    player.onended = () => {
+    const current = new Audio(url);
+    player = current;
+    current.onplaying = () => followLevel(current);
+    current.onended = () => {
       URL.revokeObjectURL(url);
+      followLevel(null);
       setState("idle");
     };
     setState("speaking");
@@ -133,6 +160,7 @@ function handle(response: TurnResponse): void {
 }
 
 function stopSpeaking(): void {
+  followLevel(null);
   if (player) {
     player.pause();
     player = null;

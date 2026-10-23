@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ezo/avatar": "workspace:*",
     "@ezo/shared": "workspace:*",
     "@ezo/ui": "workspace:*",
     "framer-motion": "14.3.0",
