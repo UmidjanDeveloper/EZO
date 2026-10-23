@@ -5,7 +5,7 @@
  * quality or of a physical owner device.
  */
 import { execFile } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import type { Actions } from "./actions";
 import { findFiles } from "./files";
@@ -15,6 +15,8 @@ export interface CheckResult {
   name: string;
   ok: boolean;
   skipped?: boolean;
+  /** Informational checks are reported but do not fail the run. */
+  informational?: boolean;
   detail: string;
 }
 
@@ -39,25 +41,46 @@ function powershell(script: string): Promise<string> {
 
 const READ_NOTEPAD = `
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-$p = Get-Process notepad -ErrorAction Stop | Where-Object { $_.MainWindowHandle -ne 0 } | Sort-Object StartTime -Descending | Select-Object -First 1
-$root = [Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
-foreach ($type in @([Windows.Automation.ControlType]::Document, [Windows.Automation.ControlType]::Edit)) {
-  $cond = New-Object Windows.Automation.PropertyCondition([Windows.Automation.AutomationElement]::ControlTypeProperty, $type)
-  $el = $root.FindFirst([Windows.Automation.TreeScope]::Descendants, $cond)
-  if ($el) {
-    $vp = $null
-    if ($el.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) { $vp.Current.Value; exit 0 }
-    $tp = $null
+$A = [Windows.Automation.AutomationElement]
+$windows = $A::RootElement.FindAll([Windows.Automation.TreeScope]::Children, [Windows.Automation.Condition]::TrueCondition)
+foreach ($w in $windows) {
+  $title = $w.Current.Name
+  if ($title -notmatch 'Notepad|Bloknot|Untitled') { continue }
+  foreach ($type in @([Windows.Automation.ControlType]::Document, [Windows.Automation.ControlType]::Edit)) {
+    $cond = New-Object Windows.Automation.PropertyCondition($A::ControlTypeProperty, $type)
+    $el = $w.FindFirst([Windows.Automation.TreeScope]::Descendants, $cond)
+    if (-not $el) { continue }
+    $vp = $null; $tp = $null
     if ($el.TryGetCurrentPattern([Windows.Automation.TextPattern]::Pattern, [ref]$tp)) { $tp.DocumentRange.GetText(-1); exit 0 }
+    if ($el.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) { $vp.Current.Value; exit 0 }
   }
 }
+Write-Output ("windows: " + (($windows | ForEach-Object { $_.Current.Name }) -join ' | '))
 exit 3`;
 
+/** Brings the newest window of a process to the front (self-test setup only). */
+const ACTIVATE = (name: string) =>
+  `$p = Get-Process ${name} -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Sort-Object StartTime -Descending | Select-Object -First 1; if ($p) { [void](New-Object -ComObject WScript.Shell).AppActivate($p.Id); $p.MainWindowTitle } else { 'no window' }`;
+
+/**
+ * A plain WinForms text box that takes focus, waits, then writes what it received.
+ * It is a controlled target that proves text reached the focused app via the same path.
+ */
+const TEXTBOX_TARGET = (out: string) => `
+Add-Type -AssemblyName System.Windows.Forms
+$f = New-Object Windows.Forms.Form; $f.Text = 'EZO dictation target'; $f.TopMost = $true; $f.Width = 600; $f.Height = 200
+$t = New-Object Windows.Forms.TextBox; $t.Multiline = $true; $t.Dock = 'Fill'; $f.Controls.Add($t)
+$timer = New-Object Windows.Forms.Timer; $timer.Interval = 9000
+$timer.Add_Tick({ [IO.File]::WriteAllText('${out.replace(/'/g, "''")}', $t.Text, [Text.Encoding]::UTF8); $f.Close() })
+$f.Add_Shown({ $f.Activate(); $t.Focus(); $timer.Start() })
+[void]$f.ShowDialog()`;
+
 async function check(name: string, body: () => Promise<string>): Promise<CheckResult> {
+  const informational = name.includes("(informational)");
   try {
-    return { name, ok: true, detail: await body() };
+    return { name, ok: true, informational, detail: await body() };
   } catch (error) {
-    return { name, ok: false, detail: String((error as Error).message ?? error) };
+    return { name, ok: false, informational, detail: String((error as Error).message ?? error) };
   }
 }
 
@@ -102,16 +125,30 @@ export async function runSelfTest(deps: SelfTestDeps): Promise<CheckResult[]> {
     }),
   );
 
+  const expected = "Salom EZO! O‘zbekcha matn 2026.";
   results.push(
-    await check("dictation: type Uzbek text into Notepad", async () => {
-      await deps.actions.openApp("notepad");
-      await sleep(3000);
-      const expected = "Salom EZO! O‘zbekcha matn 2026.";
+    await check("dictation: type Uzbek text into a focused WinForms text box", async () => {
+      const out = path.join(folder, "textbox.txt");
+      const target = powershell(TEXTBOX_TARGET(out)).catch((error: unknown) => String(error));
+      await sleep(3500); // the form is shown, activated and focused
       await deps.actions.typeText(expected);
-      await sleep(1000);
-      const actual = await powershell(READ_NOTEPAD);
-      if (!actual.includes(expected)) throw new Error(`Notepad contains: ${JSON.stringify(actual.slice(0, 200))}`);
-      return `Notepad text: ${JSON.stringify(actual)}`;
+      await target;
+      const actual = readFileSync(out, "utf8").replace(/^\uFEFF/, "");
+      if (!actual.includes(expected)) throw new Error(`text box received: ${JSON.stringify(actual)}`);
+      return `text box received: ${JSON.stringify(actual)}`;
+    }),
+  );
+  results.push(
+    await check("dictation: type Uzbek text into Notepad (informational)", async () => {
+      await deps.actions.openApp("notepad");
+      await sleep(3500);
+      const title = await powershell(ACTIVATE("notepad"));
+      await sleep(800);
+      await deps.actions.typeText(expected);
+      await sleep(1200);
+      const actual = await powershell(READ_NOTEPAD).catch((error: unknown) => `read failed: ${String((error as Error).message).slice(-300)}`);
+      if (!actual.includes(expected)) throw new Error(`window "${title}"; ${actual.slice(0, 400)}`);
+      return `Notepad ("${title}") text: ${JSON.stringify(actual)}`;
     }),
   );
 

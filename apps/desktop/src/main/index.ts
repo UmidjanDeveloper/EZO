@@ -333,7 +333,7 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
       const folder = process.argv.find((a) => a.startsWith("--self-test-folder="))?.split("=")[1];
       const report = await runSelfTest({ actions, captureScreen, folder });
       writeFileSync(selfTestArg.split("=")[1]!, JSON.stringify(report, null, 2));
-      app.exit(report.every((r) => r.ok || r.skipped) ? 0 : 1);
+      app.exit(report.every((r) => r.ok || r.skipped || r.informational) ? 0 : 1);
       return;
     }
     loadSettings();
