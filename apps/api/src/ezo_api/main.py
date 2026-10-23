@@ -261,7 +261,6 @@ def create_app(
         academic,
         career,
         learning,
-        refresh,
     ):
         app.include_router(module.router)
 

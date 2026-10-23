@@ -3,6 +3,7 @@
 import { cn } from "@ezo/ui";
 import {
   Award,
+  Bot,
   Brain,
   FileSpreadsheet,
   FileStack,
@@ -48,8 +49,13 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
+    { href: "/jarvis", label: m.nav.jarvis ?? "JARVIS", icon: Bot },
     { href: "/admin", label: m.nav.admin, icon: ShieldCheck },
-  ].filter((item) => status?.deployment_profile !== "free-beta" || !["/student", "/presentations", "/language", "/translate", "/knowledge"].includes(item.href));
+  ].filter(
+    (item) =>
+      status?.deployment_profile !== "free-beta" ||
+      !["/student", "/presentations", "/language", "/translate", "/knowledge", "/jarvis"].includes(item.href)
+  );
 
   return (
     <nav className="flex h-full flex-col gap-3 p-3" aria-label={m.nav.history}>
@@ -118,7 +124,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
         )}
       </div>
 
-      <div className="flex items-center justify-around border-t border-line pt-2">
+      <div className="flex flex-wrap items-center justify-around gap-0.5 border-t border-line pt-2">
         {footer.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -139,3 +145,4 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     </nav>
   );
 }
+
