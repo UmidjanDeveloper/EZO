@@ -1,30 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "EZO OS — JARVIS Web Companion",
-  "version": "1.0.0",
-  "description": "EZO OS permission-aware browser companion. Governed task execution, visible state, and explicit per-site grants.",
+  "name": "EZO OS — JARVIS status",
+  "version": "1.1.0",
+  "description": "Shows which EZO JARVIS capabilities your EZO API really provides. Reads no web pages and performs no actions.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EZO OS JARVIS Companion"
+    "default_title": "EZO OS JARVIS"
   },
-  "permissions": [
-    "activeTab",
-    "storage",
-    "notifications"
-  ],
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "permissions": ["storage"]
 }
