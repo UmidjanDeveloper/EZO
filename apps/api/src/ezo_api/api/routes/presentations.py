@@ -22,7 +22,7 @@ from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.artifacts.service import ArtifactError
 from ezo_api.db.models import Artifact, ArtifactVersion
 from ezo_api.documents.render.build import build_deck
-from ezo_api.documents.render.spec import DeckSpec, SlideSpec
+from ezo_api.documents.render.spec import LAYOUTS, DeckSpec, SlideSpec
 from ezo_api.documents.render.theme import THEMES
 from ezo_api.schemas.presentations import (
     PresentationArtifactOut,
@@ -173,7 +173,7 @@ async def generate_presentation(
         for item in payload.slides:
             slide_specs.append(
                 SlideSpec(
-                    layout=item.layout if item.layout in THEMES else "bullets",
+                    layout=item.layout if item.layout in LAYOUTS else "bullets",
                     title=item.title,
                     subtitle=item.summary,
                     bullets=item.bullet_hints or [item.summary],
@@ -210,6 +210,7 @@ async def generate_presentation(
 
     metadata: dict[str, Any] = {
         "slides": len(build.plans),
+        "layouts": [plan.layout for plan in build.plans],
         "theme": build.theme.name,
         "aspect_ratio": deck.aspect_ratio,
         "language": deck.language,

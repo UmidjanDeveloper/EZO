@@ -84,6 +84,35 @@ async def test_presentation_generation_and_export(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_generated_deck_keeps_the_intake_layouts(client: AsyncClient) -> None:
+    """Regression: layouts were checked against theme names, so every slide became bullets."""
+    brief = {
+        "title": "Layout regressiya",
+        "topic": "Maktablarda raqamli ta'lim",
+        "audience": "O'qituvchilar",
+        "slide_count": 6,
+        "theme": "ezo",
+        "language": "uz",
+        "key_points": ["Bir", "Ikki"],
+    }
+    outline = (await client.post("/api/presentations/intake", json=brief)).json()
+    expected = [slide["layout"] for slide in outline["slides"]]
+    assert len(set(expected)) > 2  # the outline really mixes layouts
+    resp = await client.post(
+        "/api/presentations/generate",
+        json={
+            "title": brief["title"],
+            "theme": "ezo",
+            "language": "uz",
+            "slides": outline["slides"],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    artifact = (await client.get(f"/api/artifacts/{resp.json()['artifact_id']}")).json()
+    assert artifact["current_version"]["generation_metadata"]["layouts"] == expected
+
+
+@pytest.mark.asyncio
 async def test_office_templates_and_document_creation(client: AsyncClient) -> None:
     # 1. List templates
     tmpl_resp = await client.get("/api/office/templates")
