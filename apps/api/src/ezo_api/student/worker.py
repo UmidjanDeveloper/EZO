@@ -15,11 +15,12 @@ import logging
 import signal
 import threading
 from contextlib import suppress
+from typing import cast
 
 from ezo_api.db.session import Database
 from ezo_api.documents.executor.controller import IsolatedExecutor
 from ezo_api.documents.executor.protocol import ExecutorError
-from ezo_api.knowledge.jobs.service import JobError
+from ezo_api.knowledge.jobs.service import FailCode, JobError
 from ezo_api.settings import Settings
 from ezo_api.student.ingestion import StudentIngestion
 
@@ -47,9 +48,15 @@ class StudentWorker:
         task = None
         try:
             async with asyncio.timeout(90):
-                data, format = await self.jobs.raw_input(lease)
+                data, format, languages = await self.jobs.raw_input(lease)
                 task = asyncio.create_task(
-                    asyncio.to_thread(self.executor.extract, data, format, cancelled=cancelled)
+                    asyncio.to_thread(
+                        self.executor.extract,
+                        data,
+                        format,
+                        ocr_languages=languages,
+                        cancelled=cancelled,
+                    )
                 )
                 while not task.done():
                     if stop is not None and stop.is_set():
@@ -91,6 +98,8 @@ class StudentWorker:
             with suppress(JobError):
                 if isinstance(exc, ExecutorError) and exc.code == "executor_busy":
                     await self.jobs.defer_admission(lease)
+                elif isinstance(exc, JobError) and exc.code in ("ocr_required", "ocr_incomplete"):
+                    await self.jobs.fail(lease, cast(FailCode, exc.code))
                 else:
                     await self.jobs.fail(lease, "transient" if transient else "invalid_input")
         except BaseException:

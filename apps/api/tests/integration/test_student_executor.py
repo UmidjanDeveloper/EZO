@@ -97,7 +97,7 @@ async def test_real_worker_revocation_removes_container_and_fences_publication(c
         pytest.skip("requires hostile fixture image")
 
     class StallExecutor(IsolatedExecutor):
-        def extract(self, data, format, *, cancelled=None):
+        def extract(self, data, format, *, ocr_languages=(), cancelled=None):
             # Trusted adversarial fixture, not a user-selectable execution mode.
             return super().extract(b"stall", "pdf", cancelled=cancelled)
 
@@ -143,3 +143,62 @@ async def test_real_worker_revocation_removes_container_and_fences_publication(c
     if action == "expire":
         assert await StudentWorker(jobs, IsolatedExecutor(IMAGE), "recovery").process_one()
         assert (await client.get(f"/api/student/readings/{job['id']}")).status_code == 200
+
+
+async def test_scanned_pdf_upload_is_ocrd_indexed_and_cited(client, app, fake_anthropic):
+    """Real isolated OCR → fenced publication → K2 retrieval → cited answer (mock model)."""
+    from ezo_api.documents.pdf import engine
+    from tests.ocr_fixtures import UZ_CYRILLIC, page_image, png, recall
+
+    scan = engine.images_to_pdf([png(page_image(UZ_CYRILLIC))]).data
+    response = await client.post(
+        "/api/student/uploads",
+        params={"filename": "qaror.pdf", "ocr": ["uzb_cyrl", "rus"]},
+        content=scan,
+    )
+    assert response.status_code == 201, response.text
+    job = response.json()
+    assert await StudentWorker(
+        StudentIngestion(app.state.services.db), IsolatedExecutor(IMAGE), "real-ocr"
+    ).process_one()
+    reading = await client.get(f"/api/student/readings/{job['id']}")
+    assert reading.status_code == 200, reading.text
+    text = reading.json()["text"]
+    assert recall(UZ_CYRILLIC, text) >= 0.9, text
+    structure = await client.get(f"/api/student/documents/{job['document_id']}/structure")
+    assert structure.json()["sections"][0]["page"] == 1
+    fake_anthropic.reply = "Таълим тизимини ривожлантириш [1]."
+    answer = await client.post(
+        f"/api/student/documents/{job['document_id']}/learn",
+        json={"kind": "answer", "question": "Таълим тизимини ривожлантириш"},
+    )
+    assert answer.status_code == 200, answer.text
+    citation = answer.json()["citations"][0]
+    assert text[citation["extra"]["start"] : citation["extra"]["end"]].startswith(
+        citation["excerpt"]
+    )
+
+
+async def test_scan_uploaded_without_ocr_fails_then_retry_with_ocr_succeeds(client, app):
+    from ezo_api.documents.pdf import engine
+    from tests.ocr_fixtures import ENGLISH, page_image, png
+
+    scan = engine.images_to_pdf([png(page_image(ENGLISH))]).data
+    job = (
+        await client.post(
+            "/api/student/uploads",
+            params={"filename": "scan.pdf", "no_ocr": "true"},
+            content=scan,
+        )
+    ).json()
+    worker = StudentWorker(
+        StudentIngestion(app.state.services.db), IsolatedExecutor(IMAGE), "real-ocr"
+    )
+    assert await worker.process_one()
+    failed = (await client.get("/api/student/library")).json()[0]["job"]
+    assert failed["id"] == job["id"] and failed["error_code"] == "ocr_required"
+    retry = await client.post(f"/api/student/readings/{job['id']}/retry", params={"ocr": ["eng"]})
+    assert retry.status_code == 201, retry.text
+    assert await worker.process_one()
+    reading = await client.get(f"/api/student/readings/{retry.json()['id']}")
+    assert reading.status_code == 200 and "quick brown fox" in reading.json()["text"].lower()

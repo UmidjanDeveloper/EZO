@@ -27,13 +27,57 @@ from ezo_api.db.models import (
 from ezo_api.db.session import Database
 from ezo_api.documents.executor.protocol import (
     MAX_INPUT_BYTES,
+    OCR_LANGUAGES,
     PROCESSOR_VERSION,
     ExtractionResult,
+    OcrLanguage,
 )
 from ezo_api.knowledge.jobs.service import DocumentJobs, JobError, Lease
 from ezo_api.knowledge.uploads import sanitize_filename
 
-NativeFormat = Literal["pdf", "docx", "epub"]
+NativeFormat = Literal["pdf", "docx", "epub", "png", "jpeg"]
+_EXTENSIONS: dict[str, NativeFormat] = {
+    "pdf": "pdf",
+    "docx": "docx",
+    "epub": "epub",
+    "png": "png",
+    "jpg": "jpeg",
+    "jpeg": "jpeg",
+}
+_SIGNATURES: dict[NativeFormat, tuple[bytes, ...]] = {
+    "pdf": (b"%PDF-",),
+    "docx": (b"PK",),
+    "epub": (b"PK",),
+    "png": (b"\x89PNG\r\n\x1a\n",),
+    "jpeg": (b"\xff\xd8\xff",),
+}
+_MIME: dict[NativeFormat, str] = {
+    "pdf": "application/pdf",
+    "epub": "application/epub+zip",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "png": "image/png",
+    "jpeg": "image/jpeg",
+}
+OCR_MESSAGES = {
+    "page_limit": "The scan has more pages than isolated OCR may read in one job.",
+    "deadline": "OCR did not finish within the isolated processing time limit.",
+    "unavailable": "The isolated executor has no OCR engine for these languages.",
+    "no_text": "OCR found no readable text.",
+}
+
+
+def ocr_languages(requested: list[str] | None) -> tuple[OcrLanguage, ...]:
+    """Requested OCR packs in a fixed order; None means all supported languages."""
+    if requested is None:
+        return OCR_LANGUAGES
+    unknown = sorted(set(requested) - set(OCR_LANGUAGES))
+    if unknown:
+        raise JobError(
+            "unsupported_ocr_language",
+            "Supported OCR languages: " + ", ".join(OCR_LANGUAGES) + ".",
+            422,
+        )
+    return tuple(lang for lang in OCR_LANGUAGES if lang in requested)
 
 
 class StudentIngestion(DocumentJobs):
@@ -46,15 +90,20 @@ class StudentIngestion(DocumentJobs):
         project_id: uuid.UUID | None,
         filename: str,
         data: bytes,
+        ocr: list[str] | None = None,
     ) -> DocumentJob:
+        """`ocr`: OCR languages for scans (None = all supported, [] = no OCR)."""
         filename = sanitize_filename(filename)
-        format = filename.rsplit(".", 1)[-1].lower()
-        if format not in ("pdf", "docx", "epub"):
-            raise JobError("unsupported_format", "Use PDF, DOCX or EPUB.", 422)
+        format = _EXTENSIONS.get(filename.rsplit(".", 1)[-1].lower())
+        if format is None:
+            raise JobError("unsupported_format", "Use PDF, DOCX, EPUB, PNG or JPEG.", 422)
+        languages = ocr_languages(ocr)
+        if format in ("png", "jpeg") and not languages:
+            raise JobError("ocr_required", "Images can only be read with OCR.", 422)
         if not data or len(data) > MAX_INPUT_BYTES:
             raise JobError("input_limit", "Document must be between 1 byte and 5 MiB.", 422)
-        # Only fixed signatures here; archive/XML inspection belongs in the cgroup.
-        if not data.startswith(b"%PDF-" if format == "pdf" else b"PK"):
+        # Only fixed signatures here; archive/XML/image inspection belongs in the cgroup.
+        if not data.startswith(_SIGNATURES[format]):
             raise JobError("invalid_input", "The document signature is invalid.", 422)
         digest = hashlib.sha256(data).hexdigest()
         async with self._transaction() as session:
@@ -96,13 +145,7 @@ class StudentIngestion(DocumentJobs):
                 source_id=source.id,
                 title=filename,
                 filename=filename,
-                mime_type={
-                    "pdf": "application/pdf",
-                    "epub": "application/epub+zip",
-                    "docx": (
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                }[format],
+                mime_type=_MIME[format],
                 size_bytes=len(data),
                 content_hash=digest,
                 status="queued",
@@ -115,7 +158,8 @@ class StudentIngestion(DocumentJobs):
                 revision_number=1,
                 content_hash=digest,
                 raw_text="",
-                meta={"raw_format": format},
+                # Immutable with the source revision: a retry copies, never edits it.
+                meta={"raw_format": format, "ocr_languages": list(languages)},
             )
             session.add(revision)
             await session.flush()
@@ -137,7 +181,7 @@ class StudentIngestion(DocumentJobs):
             await session.flush()
             return job
 
-    async def raw_input(self, lease: Lease) -> tuple[bytes, NativeFormat]:
+    async def raw_input(self, lease: Lease) -> tuple[bytes, NativeFormat, tuple[OcrLanguage, ...]]:
         async with self._transaction() as session:
             job = await self._leased(session, lease)
             raw = await session.get(StudentRawRevision, job.input_revision_id)
@@ -147,12 +191,17 @@ class StudentIngestion(DocumentJobs):
                 or hashlib.sha256(raw.data).hexdigest() != raw.sha256
             ):
                 raise JobError("revision_conflict", "The immutable source does not match.")
-            return raw.data, cast(NativeFormat, raw.format)
+            revision = await session.get(DocumentRevision, job.input_revision_id)
+            # Sources stored before OCR existed carry no choice: they never request OCR.
+            stored = (revision.meta or {}).get("ocr_languages", []) if revision else []
+            return raw.data, cast(NativeFormat, raw.format), ocr_languages(list(stored))
 
     async def publish_extraction(self, lease: Lease, result: ExtractionResult) -> None:
+        if result.ocr is not None and result.ocr.status != "completed":
+            raise JobError("ocr_incomplete", OCR_MESSAGES[result.ocr.status], 422)
         if not result.text.strip() or result.needs_ocr:
             raise JobError(
-                "ocr_required", "Readable text was not available; OCR is not supported.", 422
+                "ocr_required", "Readable text was not available and OCR was not requested.", 422
             )
         # The parser's exact NFC Unicode offsets are authoritative. Do not re-normalize
         # whitespace and thereby move citations after extraction.
@@ -190,6 +239,8 @@ class StudentIngestion(DocumentJobs):
                     "input_revision_id": str(job.input_revision_id),
                     "source_sha256": result.source_sha256,
                     "sections": [s.model_dump() for s in result.sections],
+                    # OCR text is machine-recognised; its confidence is an engine score.
+                    "ocr": result.ocr.model_dump() if result.ocr is not None else None,
                 },
             )
             session.add(output)
@@ -214,6 +265,7 @@ class StudentIngestion(DocumentJobs):
                                 "heading": section.heading,
                                 "member": section.member,
                                 "source_sha256": result.source_sha256,
+                                "ocr": result.ocr is not None,
                             },
                         )
                     )
@@ -253,7 +305,11 @@ class StudentIngestion(DocumentJobs):
             job.available_at = await self._now(session) + timedelta(seconds=2)
 
     async def retry(
-        self, user_id: uuid.UUID, project_id: uuid.UUID | None, job_id: uuid.UUID
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID | None,
+        job_id: uuid.UUID,
+        ocr: list[str] | None = None,
     ) -> DocumentJob:
         """Explicit new generation; at most 3 generations/3 attempts per document.
 
@@ -286,6 +342,15 @@ class StudentIngestion(DocumentJobs):
             raw = await session.get(StudentRawRevision, old.input_revision_id)
             if raw is None:
                 raise JobError("not_found", "Source no longer exists.", 404)
+            previous = await session.get(DocumentRevision, old.input_revision_id)
+            # Retrying may add OCR (e.g. after "ocr_required"); otherwise keep the choice.
+            languages = (
+                ocr_languages(ocr)
+                if ocr is not None
+                else ocr_languages(list((previous.meta or {}).get("ocr_languages", [])))
+                if previous is not None
+                else ()
+            )
             number = await session.scalar(
                 select(func.max(DocumentRevision.revision_number)).where(
                     DocumentRevision.document_id == old.document_id
@@ -296,7 +361,11 @@ class StudentIngestion(DocumentJobs):
                 revision_number=(number or 0) + 1,
                 content_hash=raw.sha256,
                 raw_text="",
-                meta={"retry_of": str(old.id)},
+                meta={
+                    "retry_of": str(old.id),
+                    "raw_format": raw.format,
+                    "ocr_languages": list(languages),
+                },
             )
             session.add(rev)
             await session.flush()
