@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#11131b" />
+    <title>EZO</title>
+  </head>
+  <body>
+    <header>
+      <span class="logo">EZO</span>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </header>
+
+    <main>
+      <section id="chatTab" data-tab="chat">
+        <div class="row">
+          <select id="conversation" aria-label="Suhbat"></select>
+          <button id="refresh" class="ghost" aria-label="Yangilash">⟳</button>
+        </div>
+        <div id="messages" class="messages"></div>
+        <form id="composer" class="composer">
+          <button type="button" id="document" class="ghost" aria-label="Hujjat">📄</button>
+          <button type="button" id="camera" class="ghost" aria-label="Kamera">📷</button>
+          <input id="input" placeholder="Yozing yoki 🎤 bosing" autocomplete="off" maxlength="4000" />
+          <button type="button" id="mic" class="mic" aria-label="Gapirish">🎤</button>
+        </form>
+      </section>
+
+      <section data-tab="projects" hidden>
+        <h2>Loyihalar</h2>
+        <p class="muted">Tanlangan loyiha ichida yangi suhbat boshlanadi (veb va desktop bilan bir xil).</p>
+        <ul id="projectList" class="list"></ul>
+      </section>
+
+      <section data-tab="memory" hidden>
+        <h2>Xotira</h2>
+        <form id="addMemory" class="row">
+          <input id="memoryInput" placeholder="EZO eslab qolsin: …" maxlength="1000" />
+          <button>Qo‘shish</button>
+        </form>
+        <ul id="memoryList" class="list"></ul>
+        <h2>Eslatma</h2>
+        <form id="reminder" class="stack">
+          <input id="reminderText" placeholder="Nimani eslatay?" maxlength="200" />
+          <input id="reminderAt" type="datetime-local" />
+          <button>Eslatma qo‘yish</button>
+        </form>
+      </section>
+
+      <section data-tab="settings" hidden>
+        <h2>Sozlamalar</h2>
+        <label>EZO server manzili <input id="apiUrl" inputmode="url" placeholder="https://api.sizning-domen.uz" /></label>
+        <label>Kirish tokeni <input id="token" type="password" autocomplete="off" placeholder="saqlangan bo‘lsa bo‘sh qoldiring" /></label>
+        <label class="check"><input id="speakReplies" type="checkbox" /> Ovozli savollarga ovozda javob berish</label>
+        <div class="row">
+          <button id="saveSettings">Saqlash va ulanish</button>
+          <button id="clearToken" class="ghost">Tokenni o‘chirish</button>
+        </div>
+        <p class="muted">Token telefonning shifrlangan xotirasida saqlanadi. Rasm va ovoz yozuvlari serverda saqlanmaydi.</p>
+      </section>
+    </main>
+
+    <nav>
+      <button data-go="chat">Suhbat</button>
+      <button data-go="projects">Loyihalar</button>
+      <button data-go="memory">Xotira</button>
+      <button data-go="settings">Sozlamalar</button>
+    </nav>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
