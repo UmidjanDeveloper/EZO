@@ -46,6 +46,7 @@ from ezo_api.api.routes import (
     student_study,
     system,
     translation,
+    vision,
     voice,
     writing,
 )
@@ -248,6 +249,7 @@ def create_app(
         student_paths,
         knowledge,
         voice,
+        vision,
         artifacts,
         stories,
         language,

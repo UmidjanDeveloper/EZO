@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; img-src 'self' data:"
+    />
+    <title>EZO</title>
+    <link rel="stylesheet" href="pill.css" />
+  </head>
+  <body>
+    <main id="pill" class="pill idle" aria-live="polite">
+      <button id="orb" class="orb" title="Gapirish (Ctrl+Alt+Space)" aria-label="Gapirishni boshlash yoki to‘xtatish">
+        <span class="ring"></span><span class="core"></span>
+      </button>
+      <div class="status">
+        <strong id="label">EZO</strong>
+        <span id="hint">Ctrl+Alt+Space — gapiring</span>
+      </div>
+      <button id="keyboard" class="icon" title="Yozib so‘rash" aria-label="Yozib so‘rash">⌨</button>
+      <button id="stop" class="icon" title="To‘xtatish" aria-label="To‘xtatish" hidden>■</button>
+      <button id="gear" class="icon" title="Sozlamalar" aria-label="Sozlamalar">⚙</button>
+    </main>
+    <section id="panel" class="panel" hidden>
+      <form id="ask">
+        <input id="question" maxlength="4000" placeholder="Masalan: Kalkulyatorni och" autocomplete="off" />
+      </form>
+      <p id="transcript" class="transcript"></p>
+      <p id="reply" class="reply"></p>
+    </section>
+    <script src="pill.js"></script>
+  </body>
+</html>

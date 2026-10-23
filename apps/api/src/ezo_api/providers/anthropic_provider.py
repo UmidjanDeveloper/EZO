@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -11,6 +12,7 @@ from ezo_api.providers.base import ModelProvider
 from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_status
 from ezo_api.providers.types import (
     Capability,
+    ChatMessage,
     ChatRequest,
     StreamEnd,
     StreamEvent,
@@ -31,7 +33,9 @@ SERVER_FALLBACK_BETA = "server-side-fallback-2026-07-01"
 class AnthropicProvider(ModelProvider):
     name = "anthropic"
     display_name = "Anthropic Claude"
-    capabilities = frozenset({Capability.CHAT, Capability.STREAMING, Capability.REASONING})
+    capabilities = frozenset(
+        {Capability.CHAT, Capability.STREAMING, Capability.REASONING, Capability.VISION}
+    )
 
     def __init__(self, api_key: str, timeout: float, client: Any | None = None) -> None:
         self._client: Any = client or anthropic.AsyncAnthropic(
@@ -40,7 +44,8 @@ class AnthropicProvider(ModelProvider):
 
     def _params(self, request: ChatRequest) -> dict[str, Any]:
         messages = [
-            {"role": m.role, "content": m.content} for m in normalize_turns(request.messages)
+            {"role": m.role, "content": _anthropic_content(m)}
+            for m in normalize_turns(request.messages)
         ]
         params: dict[str, Any] = {
             "model": request.model,
@@ -87,3 +92,23 @@ class AnthropicProvider(ModelProvider):
             # refused reply into a polite message.
             finish_reason=getattr(final, "stop_reason", None),
         )
+
+
+def _anthropic_content(message: ChatMessage) -> str | list[dict[str, Any]]:
+    """Plain text, or image blocks followed by the text (base64, never a fetched URL)."""
+    if not message.images:
+        return message.content
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": image.mime_type,
+                "data": base64.b64encode(image.data).decode("ascii"),
+            },
+        }
+        for image in message.images
+    ]
+    if message.content:
+        blocks.append({"type": "text", "text": message.content})
+    return blocks
