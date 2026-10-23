@@ -250,12 +250,17 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   mature; see [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
 ### Phase 15 — JARVIS Mode & OpenJarvis Local Device Companion
-- **Integrated (alpha, 2026-10-22):** Combines Microsoft JARVIS (HuggingGPT / TaskBench DAG planning)
-  and OpenJarvis (local-first desktop companion, token pairing, scoped sandbox isolation).
-- Governed execution across Chrome (Manifest V3 extension), Windows desktop daemon, and Telegram.
-- Human-in-the-loop explicit authorization gates before external dispatch.
-- Reference scenario verified end-to-end:
-  `"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor."`
+- Design inputs: Microsoft JARVIS (HuggingGPT / TaskBench DAG planning) and OpenJarvis (local-first
+  companion, scoped isolation). These inform the backend design; they are not an integrated, running system.
+- **Status: experimental, NOT operational.** Backend today: capability inspection, a deterministic
+  percentage calculator with an owner-scoped receipt, plan inspection, and a Linux metadata-only companion
+  protocol. The web page and Chrome extension only reflect that; see
+  [docs/master/JARVIS_FRONTEND_CONTRACT.md](docs/master/JARVIS_FRONTEND_CONTRACT.md).
+- Not built (backend-owned, no UI claims them): device pairing, task planning/execution, Windows Downloads,
+  Office→PDF worker, Telegram delivery, approval gates for external dispatch.
+- JARVIS Mode may be called operational only after a genuine device → PDF → Telegram acceptance test passes
+  against the canonical backend. The reference scenario has NOT been verified.
+
 - Complete implementation matrix for all 8 mandatory upstreams in [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
 
 ## Known limitations (current)
