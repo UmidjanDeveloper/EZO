@@ -27,20 +27,26 @@ type Learning = {
   provider: string | null;
   citations: Citation[];
   quiz: { items: Quiz[] } | null;
+  /** Proposed cards (kind "flashcards"); nothing is stored until the owner saves one. */
+  flashcards?: CardProposal[] | null;
 };
 
-interface StudyPlanItem {
-  day: number;
-  title: string;
-  description: string;
-  completed: boolean;
+/** A source-anchored card proposal; the exact body POST /student/cards accepts. */
+interface CardProposal {
+  document_id: string;
+  revision_id: string;
+  chunk_id: string;
+  project_id: string | null;
+  front: string;
+  back: string;
+  quote_start: number;
+  quote_end: number;
 }
 
-interface Flashcard {
-  id: number;
-  term: string;
-  definition: string;
-  known: boolean | null;
+/** GET /student/practice-plan: due cards from the real recall schedule, nothing generated. */
+interface PracticePlan {
+  items: { card_id: string; due_at: string; reason: string }[];
+  empty_reason: string | null;
 }
 
 interface StudyCardOut {
@@ -66,22 +72,26 @@ interface StudyProgressOut {
 }
 
 interface ConceptNode {
+  id: string;
   label: string;
-  quote: string;
   source: number;
+  quote: string;
 }
 
 interface ConceptEdge {
-  source: string;
-  target: string;
+  start: string;
+  end: string;
   label: string;
-  source_quote: string;
+  source: number;
+  quote: string;
 }
 
-interface SynthesisConceptGraph {
-  scope: string;
-  nodes: ConceptNode[];
-  edges: ConceptEdge[];
+/** POST /student/synthesize (kind "concept_graph"); graph is null without enough evidence. */
+interface SynthesisOut {
+  status: string;
+  generated: boolean;
+  scope?: string;
+  graph: { nodes: ConceptNode[]; edges: ConceptEdge[] } | null;
 }
 
 export function StudentPage() {
@@ -109,18 +119,14 @@ export function StudentPage() {
   const [activeTab, setActiveTab] = useState<"reader" | "plan" | "flashcards" | "concepts">("reader");
   const [fontSize, setFontSize] = useState<"sm" | "base" | "lg">("base");
   const [readerTheme, setReaderTheme] = useState<"default" | "sepia" | "contrast">("default");
-  const [flippedCards, setFlippedCards] = useState<Record<number, boolean>>({});
-  const [studyPlan, setStudyPlan] = useState<StudyPlanItem[]>([
-    { day: 1, title: "1-Bob bilan tanishuv", description: "Boshlang'ich tushunchalar va asosiy terminlarni o'qish", completed: true },
-    { day: 2, title: "Chuqurlashtirilgan o'qish", description: "O'rta qismlardagi dalillar va formulalarni ko'rib chiqish", completed: false },
-    { day: 3, title: "Test va o'z-o'zini sinash", description: "Bob bo'yicha testlar tuzish va xatolarni tahlil qilish", completed: false },
-    { day: 4, title: "Flesh-kartalar bilan takrorlash", description: "Murakkab terminlar bo'yicha xotirani mustahkamlash", completed: false },
-  ]);
+  const [flippedCards, setFlippedCards] = useState<Record<string, boolean>>({});
+  const [practicePlan, setPracticePlan] = useState<PracticePlan | null>(null);
+  const [proposals, setProposals] = useState<CardProposal[]>([]);
 
   // Real backend study cards, progress and synthesis
   const [cards, setCards] = useState<StudyCardOut[]>([]);
   const [progress, setProgress] = useState<StudyProgressOut | null>(null);
-  const [conceptGraph, setConceptGraph] = useState<SynthesisConceptGraph | null>(null);
+  const [conceptGraph, setConceptGraph] = useState<SynthesisOut | null>(null);
   const [conceptLoading, setConceptLoading] = useState(false);
 
   const loadCards = useCallback(async () => {
@@ -137,20 +143,22 @@ export function StudentPage() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "flashcards") return;
+    if (activeTab !== "flashcards" && activeTab !== "plan") return;
     let active = true;
     Promise.all([
       studentRequest<StudyCardOut[]>("student/cards"),
       studentRequest<StudyProgressOut>("student/progress"),
+      studentRequest<PracticePlan>("student/practice-plan"),
     ])
-      .then(([fetchedCards, fetchedProgress]) => {
+      .then(([fetchedCards, fetchedProgress, plan]) => {
         if (active) {
           setCards(fetchedCards);
           setProgress(fetchedProgress);
+          setPracticePlan(plan);
         }
       })
-      .catch(() => {
-        // Offline or empty
+      .catch((e) => {
+        if (active) setError(String(e));
       });
     return () => {
       active = false;
@@ -174,6 +182,26 @@ export function StudentPage() {
     }
   }
 
+  async function proposeCards() {
+    if (!selected) return;
+    const result = await studentRequest<Learning>(`student/documents/${selected.job.document_id}/learn`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "flashcards", question, language, section_start: sectionStart }),
+    });
+    setProposals(result.flashcards ?? []);
+  }
+
+  async function saveProposal(index: number) {
+    await studentRequest("student/cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(proposals[index]),
+    });
+    setProposals((current) => current.filter((_, i) => i !== index));
+    await loadCards();
+  }
+
   async function handleDeleteCard(cardId: string) {
     try {
       await studentRequest(`student/cards/${cardId}?confirm=true`, { method: "DELETE" });
@@ -187,7 +215,7 @@ export function StudentPage() {
     if (!documentId) return;
     setConceptLoading(true);
     try {
-      const res = await studentRequest<SynthesisConceptGraph>("student/synthesize", {
+      const res = await studentRequest<SynthesisOut>("student/synthesize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -288,6 +316,8 @@ export function StudentPage() {
     setIndexOffset(0);
     setIndexNotice("");
     setFlippedCards({});
+    setProposals([]);
+    setConceptGraph(null);
   }
 
   async function learn(kind: string) {
@@ -302,19 +332,6 @@ export function StudentPage() {
   }
 
   const button = "rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-40 transition-colors hover:bg-surface-2";
-
-  // Derive simple dynamic flashcards from sections or text
-  const flashcards: Flashcard[] = (sections.length > 0
-    ? sections.slice(0, 5).map((s, idx) => ({
-        id: idx + 1,
-        term: s.heading || `Bo'lim ${idx + 1}`,
-        definition: `${s.page ? `${s.page}-sahifadagi` : `${idx + 1}-bo'limdagi`} asosiy ma'lumot va tushunchalar`,
-        known: null,
-      }))
-    : [
-        { id: 1, term: "Fotosintez", definition: "Quyosh nuri yordamida organik moddalar sintezlanishi", known: null },
-        { id: 2, term: "Xlorofill", definition: "O'simliklardagi yashil pigment va yorug'lik yutuvchi apparat", known: null },
-      ]);
 
   const readPercent = page && page.total_chars > 0
     ? Math.min(100, Math.round(((page.offset + (page.text?.length || 0)) / page.total_chars) * 100))
@@ -797,49 +814,40 @@ export function StudentPage() {
                     </div>
                   )}
 
-                  {/* TAB 2: Personalized Study Plan */}
+                  {/* TAB 2: Due-recall plan from the real review schedule (GET /student/practice-plan) */}
                   {activeTab === "plan" && (
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-bold text-ink">7-Kunlik O‘quv Yo‘l xaritasi</h3>
-                          <p className="text-xs text-ink-muted">Ushbu kitobni o‘zlashtirish uchun tuzilgan tizimli reja</p>
-                        </div>
-                        <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent">
-                          {studyPlan.filter((p) => p.completed).length} / {studyPlan.length} yakunlandi
-                        </span>
+                      <div>
+                        <h3 className="font-bold text-ink">Bugungi takrorlash rejasi</h3>
+                        <p className="text-xs text-ink-muted">
+                          Saqlangan kartalaringizning haqiqiy takrorlash jadvalidan. Bu o‘zlashtirish bahosi yoki
+                          avtomatik tuzilgan o‘quv dasturi emas.
+                        </p>
                       </div>
-
-                      <div className="grid gap-3 pt-2">
-                        {studyPlan.map((planItem, idx) => (
-                          <div
-                            key={planItem.day}
-                            className={`flex items-start gap-3 rounded-xl border p-3.5 transition-colors ${
-                              planItem.completed
-                                ? "border-success/30 bg-success/5"
-                                : "border-line bg-surface-2/40 hover:bg-surface-2"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={planItem.completed}
-                              onChange={() => {
-                                const updated = [...studyPlan];
-                                updated[idx].completed = !updated[idx].completed;
-                                setStudyPlan(updated);
-                              }}
-                              className="mt-1 h-4 w-4 rounded border-line text-accent"
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-accent">Kun {planItem.day}</span>
-                                <h4 className="text-sm font-semibold text-ink">{planItem.title}</h4>
-                              </div>
-                              <p className="mt-0.5 text-xs text-ink-muted">{planItem.description}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      {!practicePlan ? (
+                        <p className="text-xs text-ink-muted">Yuklanmoqda…</p>
+                      ) : practicePlan.items.length === 0 ? (
+                        <p className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-ink-muted">
+                          {cards.length === 0
+                            ? "Hali saqlangan karta yo‘q. “Flash-kartalar” bo‘limida manbadan karta yarating."
+                            : "Hozir takrorlanadigan karta yo‘q."}
+                        </p>
+                      ) : (
+                        <ol className="grid gap-2">
+                          {practicePlan.items.map((item) => {
+                            const card = cards.find((c) => c.id === item.card_id);
+                            return (
+                              <li key={item.card_id} className="rounded-xl border border-line bg-surface-2/40 p-3 text-sm">
+                                <span className="font-semibold text-ink">{card?.front ?? "Karta"}</span>
+                                <span className="ml-2 text-xs text-ink-muted">
+                                  {item.reason === "scheduled_recall" ? "rejali takrorlash" : "birinchi yoki qayta takrorlash"} ·{" "}
+                                  {new Date(item.due_at).toLocaleString()}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      )}
                     </div>
                   )}
 
@@ -868,7 +876,7 @@ export function StudentPage() {
                       {cards.length > 0 ? (
                         <div className="grid gap-4 sm:grid-cols-2">
                           {cards.map((card) => {
-                            const isFlipped = !!flippedCards[card.id as unknown as number];
+                            const isFlipped = !!flippedCards[card.id];
                             return (
                               <div
                                 key={card.id}
@@ -879,7 +887,7 @@ export function StudentPage() {
                                   onClick={() =>
                                     setFlippedCards({
                                       ...flippedCards,
-                                      [card.id as unknown as number]: !isFlipped,
+                                      [card.id]: !isFlipped,
                                     })
                                   }
                                 >
@@ -947,41 +955,35 @@ export function StudentPage() {
                           })}
                         </div>
                       ) : (
-                        <div className="space-y-3">
-                          <div className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-ink-muted">
-                            <p className="font-medium text-ink">Hali saqlangan o‘quv kartalari yo‘q.</p>
-                            <p className="mt-1 text-ink-faint">
-                              Quyidagi dinamik namunaviy kartalar orqali tushunchalarni ko‘rib chiqishingiz mumkin:
-                            </p>
-                          </div>
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            {flashcards.map((card) => {
-                              const isFlipped = !!flippedCards[card.id];
-                              return (
-                                <div
-                                  key={card.id}
-                                  onClick={() => setFlippedCards({ ...flippedCards, [card.id]: !isFlipped })}
-                                  className="cursor-pointer rounded-2xl border border-line bg-surface-2/40 p-4 shadow-sm transition-all hover:border-accent hover:shadow-md"
-                                >
-                                  <div className="flex items-center justify-between text-xs text-ink-faint">
-                                    <span>Namuna #{card.id}</span>
-                                    <span className="text-[11px] font-medium text-accent">
-                                      {isFlipped ? "Ta'rif" : "Flip"}
-                                    </span>
-                                  </div>
-                                  <div className="my-3 min-h-[50px] flex items-center justify-center text-center">
-                                    {!isFlipped ? (
-                                      <h4 className="text-sm font-bold text-ink">{card.term}</h4>
-                                    ) : (
-                                      <p className="text-xs leading-relaxed text-ink-muted">{card.definition}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                        <p className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-ink-muted">
+                          Hali saqlangan o‘quv kartalari yo‘q.
+                        </p>
                       )}
+
+                      <div className="space-y-3 border-t border-line pt-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs text-ink-muted">
+                            AI manbadan iqtibosli karta taklif qiladi; siz saqlamaguningizcha hech narsa yozilmaydi.
+                          </p>
+                          <button
+                            type="button"
+                            className={button}
+                            disabled={busy || !provider}
+                            onClick={() => void perform(proposeCards)}
+                          >
+                            Manbadan karta taklif qilish (AI)
+                          </button>
+                        </div>
+                        {proposals.map((proposal, index) => (
+                          <div key={`${proposal.chunk_id}-${proposal.quote_start}`} className="rounded-xl border border-line bg-surface-2/40 p-3 text-sm">
+                            <p className="font-semibold text-ink">{proposal.front}</p>
+                            <p className="mt-1 text-xs text-ink-muted">{proposal.back}</p>
+                            <button type="button" className={`${button} mt-2`} onClick={() => void perform(() => saveProposal(index))}>
+                              Saqlash
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -1003,29 +1005,39 @@ export function StudentPage() {
                         </button>
                       </div>
 
-                      {conceptGraph && (
+                      {conceptGraph && !conceptGraph.graph && (
+                        <p role="status" className="rounded-xl border border-line p-3 text-xs text-ink-muted">
+                          Konsept grafi uchun yetarli manba topilmadi.
+                        </p>
+                      )}
+                      {conceptGraph?.graph && (
                         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-primary">AI Konsept Grafi</span>
-                            <span className="text-ink-faint">Ko‘lam: {conceptGraph.scope}</span>
+                            <span className="font-semibold text-primary">AI taklif qilgan konsept grafi</span>
+                            <span className="text-ink-faint">Model talqini; iqtiboslar manbaga tekshirilgan</span>
                           </div>
                           <div className="grid gap-2 sm:grid-cols-2">
-                            {conceptGraph.nodes.map((n, i) => (
-                              <div key={i} className="p-2.5 rounded-lg border border-line bg-surface text-xs space-y-1">
+                            {conceptGraph.graph.nodes.map((n) => (
+                              <div key={n.id} className="p-2.5 rounded-lg border border-line bg-surface text-xs space-y-1">
                                 <span className="font-bold text-ink">{n.label}</span>
                                 <p className="text-ink-muted italic">&ldquo;{n.quote}&rdquo;</p>
                               </div>
                             ))}
                           </div>
-                          {conceptGraph.edges.length > 0 && (
+                          {conceptGraph.graph.edges.length > 0 && (
                             <div className="pt-2 border-t border-line/60">
                               <h5 className="text-xs font-semibold text-ink mb-1.5">Bog‘liqliklar:</h5>
                               <ul className="text-xs space-y-1 text-ink-muted">
-                                {conceptGraph.edges.map((e, i) => (
-                                  <li key={i}>
-                                    <strong>{e.source}</strong> &rarr; <em>{e.label}</em> &rarr; <strong>{e.target}</strong>
-                                  </li>
-                                ))}
+                                {conceptGraph.graph.edges.map((e, i) => {
+                                  const label = (id: string) =>
+                                    conceptGraph.graph?.nodes.find((n) => n.id === id)?.label ?? id;
+                                  return (
+                                    <li key={i}>
+                                      <strong>{label(e.start)}</strong> &rarr; <em>{e.label}</em> &rarr;{" "}
+                                      <strong>{label(e.end)}</strong>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             </div>
                           )}
