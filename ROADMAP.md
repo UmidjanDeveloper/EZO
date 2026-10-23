@@ -249,6 +249,15 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 - Only after native missions, approvals, tool permissions and the developer sandbox are
   mature; see [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
+### Phase 15 — JARVIS Mode & OpenJarvis Local Device Companion
+- **Integrated (alpha, 2026-10-22):** Combines Microsoft JARVIS (HuggingGPT / TaskBench DAG planning)
+  and OpenJarvis (local-first desktop companion, token pairing, scoped sandbox isolation).
+- Governed execution across Chrome (Manifest V3 extension), Windows desktop daemon, and Telegram.
+- Human-in-the-loop explicit authorization gates before external dispatch.
+- Reference scenario verified end-to-end:
+  `"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor."`
+- Complete implementation matrix for all 8 mandatory upstreams in [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
+
 ## Known limitations (current)
 
 - Intent and language detection are rule-based (transparent, can misread unusual phrasing).
