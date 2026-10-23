@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">EZO</string>
+    <string name="title_activity_main">EZO</string>
+    <string name="package_name">uz.ezo.mobile</string>
+    <string name="custom_url_scheme">uz.ezo.mobile</string>
+</resources>

@@ -61,3 +61,43 @@ jobs:
             ${{ runner.temp }}/install.txt
             ${{ runner.temp }}/screen.png
           retention-days: 14
+
+  android-apk:
+    name: Android debug APK (installable test build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @ezo/mobile...
+      - name: Unit tests and type check
+        run: pnpm --filter @ezo/mobile test && pnpm --filter @ezo/mobile typecheck
+      - name: Build the web layer and sync it into the Android project
+        working-directory: apps/mobile
+        env:
+          EZO_ANDROID_ALLOW_LAN_HTTP: "1" # debug test build: may reach an EZO server on the LAN
+        run: pnpm build && pnpm exec cap sync android
+      - name: Gradle assembleDebug (JDK 21, runner's Android SDK)
+        working-directory: apps/mobile/android
+        run: |
+          export JAVA_HOME="$JAVA_HOME_21_X64"
+          ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Inspect the APK (package, SDK levels, permissions)
+        run: |
+          apk=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          ls -l "$apk"
+          aapt2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
+          "$aapt2" dump badging "$apk" | grep -E "^package|sdkVersion|uses-permission|application-label" | tee "$RUNNER_TEMP/apk-badging.txt"
+          sha256sum "$apk" | tee -a "$RUNNER_TEMP/apk-badging.txt"
+          cp "$apk" "$RUNNER_TEMP/EZO-debug.apk"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ezo-android
+          path: |
+            ${{ runner.temp }}/EZO-debug.apk
+            ${{ runner.temp }}/apk-badging.txt
+          retention-days: 14
