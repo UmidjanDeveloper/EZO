@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
+    <title>EZO sozlamalari</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <h1>EZO sozlamalari</h1>
+    <section>
+      <h2>EZO serveri</h2>
+      <label>Server manzili <input id="apiUrl" placeholder="https://api.sizning-domen.uz" /></label>
+      <label>Kirish tokeni <input id="token" type="password" autocomplete="off" placeholder="EZO_API_TOKEN" /></label>
+      <p id="tokenState" class="muted"></p>
+      <div class="row">
+        <button id="saveServer">Saqlash</button>
+        <button id="clearToken" class="secondary">Tokenni o‘chirish</button>
+        <button id="test" class="secondary">Ulanishni tekshirish</button>
+      </div>
+      <p id="testResult" role="status"></p>
+    </section>
+    <section>
+      <h2>Ruxsatlar <span class="muted">(hammasi boshida o‘chiq)</span></h2>
+      <label class="check"><input type="checkbox" data-app="calculator" /> Kalkulyatorni ochish</label>
+      <label class="check"><input type="checkbox" data-app="notepad" /> Bloknotni ochish</label>
+      <label class="check"><input type="checkbox" data-app="paint" /> Paint’ni ochish</label>
+      <label class="check"><input type="checkbox" data-app="explorer" /> Fayl menejerini ochish</label>
+      <label class="check"><input type="checkbox" id="allowVolume" /> Ovoz balandligini o‘zgartirish</label>
+      <label class="check"><input type="checkbox" id="allowTyping" /> Aytilgan matnni faol oynaga yozish (“Yoz: …”)</label>
+      <label class="check"><input type="checkbox" id="allowScreen" /> Ekranni tahlil qilish (har safar alohida so‘raladi)</label>
+      <label class="check"><input type="checkbox" id="speakReplies" /> Javoblarni ovozda o‘qish</label>
+      <label>Tugma
+        <select id="shortcut"></select>
+      </label>
+    </section>
+    <section>
+      <h2>Qidirish mumkin bo‘lgan papkalar</h2>
+      <p class="muted">EZO faqat shu papkalardagi fayl NOMLARINI qidiradi va faqat ulardan fayl ocha oladi.</p>
+      <ul id="folders"></ul>
+      <button id="addFolder" class="secondary">Papka qo‘shish…</button>
+    </section>
+    <section>
+      <h2>Suhbat</h2>
+      <p class="muted">Desktop suhbati EZO serverida saqlanadi va telefon/veb ilovada ham ko‘rinadi.</p>
+      <button id="newConversation" class="secondary">Yangi suhbat boshlash</button>
+    </section>
+    <script src="settings.js"></script>
+  </body>
+</html>

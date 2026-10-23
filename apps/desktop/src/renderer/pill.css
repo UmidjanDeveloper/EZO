@@ -1,0 +1,27 @@
+:root { color-scheme: dark; font-family: "Segoe UI", system-ui, sans-serif; }
+html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+.pill {
+  display: flex; align-items: center; gap: 10px; height: 56px; margin: 8px; padding: 0 12px 0 8px;
+  border-radius: 28px; background: rgba(18, 20, 28, 0.92); color: #f3f4f8;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); -webkit-app-region: drag;
+}
+button { -webkit-app-region: no-drag; cursor: pointer; }
+.orb { position: relative; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; padding: 0; }
+.orb .core { position: absolute; inset: 9px; border-radius: 50%; background: linear-gradient(135deg, #5b8cff, #a66bff); transition: transform .2s; }
+.orb .ring { position: absolute; inset: 2px; border-radius: 50%; border: 2px solid rgba(120, 150, 255, .35); }
+.listening .core { background: linear-gradient(135deg, #ff5b6e, #ff9b5b); animation: pulse 1s infinite; }
+.thinking .ring { border-color: #a66bff transparent #5b8cff transparent; animation: spin 1s linear infinite; }
+.speaking .core { animation: talk .5s ease-in-out infinite alternate; }
+.error .core { background: #c0392b; }
+@keyframes pulse { 50% { transform: scale(1.18); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes talk { to { transform: scale(1.12); } }
+.status { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.status strong { font-size: 14px; }
+.status span { font-size: 12px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.icon { width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(255,255,255,.08); color: inherit; font-size: 14px; }
+.icon:hover { background: rgba(255,255,255,.18); }
+.panel { margin: 0 8px 8px; padding: 10px 12px; border-radius: 16px; background: rgba(18, 20, 28, 0.94); color: #f3f4f8; user-select: text; }
+.panel input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid #3b4160; background: #0e1018; color: inherit; }
+.transcript { margin: 8px 0 0; font-size: 12px; opacity: .7; }
+.reply { margin: 6px 0 0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; max-height: 230px; overflow: auto; }

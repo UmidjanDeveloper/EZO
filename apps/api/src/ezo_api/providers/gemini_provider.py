@@ -32,7 +32,13 @@ class GeminiProvider(ModelProvider):
     name = "gemini"
     display_name = "Google Gemini"
     capabilities = frozenset(
-        {Capability.CHAT, Capability.STREAMING, Capability.REASONING, Capability.EMBEDDINGS}
+        {
+            Capability.CHAT,
+            Capability.STREAMING,
+            Capability.REASONING,
+            Capability.EMBEDDINGS,
+            Capability.VISION,
+        }
     )
 
     def __init__(self, api_key: str, timeout: float, client: Any | None = None) -> None:
@@ -45,7 +51,13 @@ class GeminiProvider(ModelProvider):
         return [
             genai_types.Content(
                 role="model" if m.role == "assistant" else "user",
-                parts=[genai_types.Part(text=m.content)],
+                parts=[
+                    *(
+                        genai_types.Part.from_bytes(data=image.data, mime_type=image.mime_type)
+                        for image in m.images
+                    ),
+                    *([genai_types.Part(text=m.content)] if m.content else []),
+                ],
             )
             for m in normalize_turns(request.messages)
         ]
