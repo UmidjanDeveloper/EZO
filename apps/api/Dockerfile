@@ -70,7 +70,7 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends \
         tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-rus \
         tesseract-ocr-uzb tesseract-ocr-uzb-cyrl \
-        libreoffice-writer-nogui libreoffice-calc-nogui libseccomp2 \
+        libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui libseccomp2 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/bin/uv /usr/local/bin/uv
 RUN --mount=type=secret,id=system_ca \

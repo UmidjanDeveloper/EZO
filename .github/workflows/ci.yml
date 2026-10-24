@@ -163,7 +163,7 @@ jobs:
               tests/unit/test_office_convert.py tests/unit/test_office_safety.py \
               tests/unit/test_process_limits.py tests/unit/test_ocr.py \
               tests/unit/test_native_execution.py tests/unit/test_office_parse_limits.py \
-              tests/integration/test_office_pdf.py"
+              tests/integration/test_office_pdf.py tests/unit/test_generated_files_open.py"
       - name: Native fixture children are reaped by tini
         run: |
           docker run --rm --memory=1536m --user 10001 \
