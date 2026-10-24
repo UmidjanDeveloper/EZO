@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EZO OS — Browser Companion",
-  "version": "1.2.0",
-  "description": "Click-only: summarise the current page or explain selected text with your own local EZO server. Shows what will be sent and asks first. No background access, no automatic collection.",
+  "version": "1.3.0",
+  "description": "Click-only: summarise the current page, explain selected text, or fill a form with values you approve, using your own local EZO server. Shows what will be sent and asks first. Never submits forms. No background access, no automatic collection.",
   "action": {
     "default_popup": "popup.html",
     "default_title": "EZO"

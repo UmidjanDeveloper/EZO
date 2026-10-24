@@ -3,6 +3,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 // Loads the REAL unpacked extension in Chromium. A throwaway `key` is injected into a temp COPY of the
 // manifest only to get a deterministic extension id; the shipped manifest is untouched.
@@ -118,9 +119,75 @@ test("extension: summary/explanation read nothing without a granted tab and send
   await page.getByRole("button", { name: "Sahifani qisqacha bayon qil" }).click();
   await expect(page.locator("#preview")).toContainText("o'qib bo'lmadi");
   await expect(page.locator("#sendBtn")).toBeHidden();
+  // Form filling fails closed the same way and offers nothing to send or write.
+  await page.locator("#readFormBtn").click();
+  await expect(page.locator("#formPreview")).toContainText("o'qib bo'lmadi");
+  await expect(page.locator("#askFillBtn")).toBeHidden();
+  await expect(page.locator("#applyFillBtn")).toBeHidden();
   // Only loopback EZO servers can be configured.
   await page.fill("#apiBase", "https://evil.example");
   await page.click("#saveServer");
   await expect(page.locator("#answer")).toContainText("localhost");
   expect(requests).toEqual([]);
+});
+
+test("extension: form filling reads labels only, skips secrets, types approved values and never submits", async () => {
+  // The extension ships plain ES modules without a package.json; import a .mjs copy in Node.
+  const copy = path.join(workDir, "forms.mjs");
+  cpSync(path.join(EXTENSION_SRC, "forms.js"), copy);
+  type ReadForm = { fields: { id: string; label: string }[]; skippedSensitive: number };
+  type Item = { id: string; index: number; fingerprint: string; value: string };
+  const forms = (await import(/* @vite-ignore */ pathToFileURL(copy).href)) as {
+    collectFormFields: () => ReadForm;
+    fillFormFields: (items: Item[]) => { filled: number; changed: string[] };
+    buildFormRequest: (form: ReadForm, instruction: string) => { message: string };
+    parseFillReply: (reply: string, form: ReadForm) => { values: Item[]; rejected: { id: string }[] };
+  };
+  const page = await context.newPage();
+  await page.setContent(`
+    <form id="f" onsubmit="window.submitted = true; return false;">
+      <label for="name">To'liq ism</label><input id="name" name="name" value="oldin-yozilgan-maxfiy">
+      <label for="email">Email</label><input id="email" name="email" type="email">
+      <label for="pw">Parol</label><input id="pw" name="pw" type="password">
+      <label for="cc">Raqam</label><input id="cc" name="num" autocomplete="cc-number">
+      <input type="hidden" name="csrf" value="tok">
+      <label for="city">Shahar</label>
+      <select id="city" name="city"><option value="">—</option><option value="tas">Toshkent</option><option value="sam">Samarqand</option></select>
+      <label for="about">O'zingiz haqingizda</label><textarea id="about" name="about"></textarea>
+      <button type="submit">Yuborish</button>
+    </form>`);
+  await page.evaluate(() => {
+    (window as unknown as { inputs: number }).inputs = 0;
+    document.addEventListener("input", () => (window as unknown as { inputs: number }).inputs++, true);
+  });
+  const read = await page.evaluate(forms.collectFormFields);
+  expect(read.fields.map((f) => f.label)).toEqual(["To'liq ism", "Email", "Shahar", "O'zingiz haqingizda"]);
+  expect(read.skippedSensitive).toBe(2);
+  expect(JSON.stringify(read)).not.toContain("oldin-yozilgan-maxfiy"); // typed values are never read
+  expect(JSON.stringify(read)).not.toContain("tok");
+
+  const request = forms.buildFormRequest(read, "Ismim Dilnoza Karimova, email dilnoza@example.com, Samarqandda yashayman");
+  expect(request.message).not.toContain("oldin-yozilgan-maxfiy");
+  // What a model might answer, including a field it must not touch.
+  const parsed = forms.parseFillReply(
+    '{"f1": "Dilnoza Karimova", "f2": "dilnoza@example.com", "f3": "Samarqand", "f4": "Talaba", "pw": "hunter2"}',
+    read,
+  );
+  expect(parsed.rejected.map((r) => r.id)).toEqual(["pw"]);
+  const chosen = parsed.values.filter((v) => v.id !== "f4"); // the user unticks one
+  const result = await page.evaluate(forms.fillFormFields, chosen);
+  expect(result).toEqual({ filled: 3, changed: [] });
+  expect(await page.inputValue("#name")).toBe("Dilnoza Karimova");
+  expect(await page.inputValue("#email")).toBe("dilnoza@example.com");
+  expect(await page.inputValue("#city")).toBe("sam");
+  expect(await page.inputValue("#about")).toBe("");
+  expect(await page.inputValue("#pw")).toBe("");
+  expect(await page.inputValue("#cc")).toBe("");
+  expect(await page.evaluate(() => (window as unknown as { inputs: number }).inputs)).toBe(3);
+  expect(await page.evaluate(() => (window as unknown as { submitted?: boolean }).submitted ?? false)).toBe(false);
+
+  // If the page changed since it was read, that field is not written.
+  await page.evaluate(() => document.getElementById("email")!.setAttribute("name", "other"));
+  const again = await page.evaluate(forms.fillFormFields, parsed.values);
+  expect(again.changed).toContain("f2");
 });
