@@ -27,7 +27,9 @@ acceptance still needs the owner's devices and credentials.
 | [#41](https://github.com/UmidjanDeveloper/EZO/pull/41) | draft | JARVIS governed task engine + desktop companion + web console | API suite, desktop 59, Playwright JARVIS 9/9 (browser pairing), cross-language signatures; CI + Devices + Security green |
 | [#48](https://github.com/UmidjanDeveloper/EZO/pull/48) | draft, stacked on #41 | Owner-managed accounts, hashed per-user tokens, tiers, durable quotas, per-user rate limits, admin panel | Full API suite 1290 passed / 101 skipped (SQLite); accounts 8/8 on SQLite and PostgreSQL 16; migration 0024 up/down/`alembic check` on both; Playwright admin 5/5 |
 | [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | draft | Android APK installed and driven on an emulator in CI | Devices run [40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627) passed |
-| [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | ready | Chrome extension: click-only page summary / selection explanation with preview + confirm | vitest 15/15; real Chromium extension load 4/4 |
+| [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | **merged** | Chrome extension: click-only page summary / selection explanation with preview + confirm | vitest 15/15; real Chromium extension load 4/4 |
+| [#49](https://github.com/UmidjanDeveloper/EZO/pull/49) | draft | Chrome extension form filling: labels only, secrets skipped, reviewed values typed, never submits | vitest 19/19; Chromium 5/5 on a real DOM |
+| [#50](https://github.com/UmidjanDeveloper/EZO/pull/50) | draft | Avatar performance on the voice stage; point-count docs corrected | Playwright 7/7 |
 | [#44](https://github.com/UmidjanDeveloper/EZO/pull/44) | draft | Phone PDF/DOCX/EPUB/scans through Student | mobile 12/12 |
 | [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | draft | IELTS server STT, long-answer VAD, examiner voice | IELTS e2e 5/5 |
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | draft | Generated DOCX/XLSX/PPTX open in real LibreOffice | 3/3 locally; added to CI office-tests |
@@ -41,7 +43,7 @@ acceptance still needs the owner's devices and credentials.
    - It conflicts with #39 in `security/edge.py`, `main.py` and `tests/unit/test_edge.py`.
    - Both sides are additive (#39's Origin check, #48's per-user identity).
    - The resolution keeps both and was verified (see §4).
-3. **#42–#47**, in any order. They merge cleanly on top.
+3. **#42, #44–#47, #49, #50**, in any order. They merge cleanly on top (#49 and #50 were cut from the integration branch after #43).
 4. **#40** last, so the documents describe what actually merged.
 
 Independent review is required before merging #39, #41 and #48 (consent, device

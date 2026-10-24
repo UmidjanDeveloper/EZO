@@ -11,7 +11,8 @@ the action it names**; nothing here is pre-authorized.
 | [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | Audit F18–F25 (memory recall consent, honest chat files, CSRF guard, quotas) | Changes consent semantics: memories saved without consent are no longer recalled unless recall is turned on. Needs independent review |
 | [#41](https://github.com/UmidjanDeveloper/EZO/pull/41) | JARVIS governed task engine | Device auth, approvals and external effects: needs independent security review |
 | [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | Android emulator acceptance in CI | CI-only change |
-| [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | Chrome extension summary/explanation | Adds the `storage` permission and page-text sending after confirmation |
+| [#49](https://github.com/UmidjanDeveloper/EZO/pull/49) | Chrome extension form filling | Types AI-suggested values into a page after per-field review; never submits |
+| [#50](https://github.com/UmidjanDeveloper/EZO/pull/50) | Avatar performance measurement | Test + docs; exposes static canvas data attributes |
 | [#44](https://github.com/UmidjanDeveloper/EZO/pull/44) | Mobile PDF/DOCX via Student | Depends on the executor host for live results |
 | [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | IELTS server speech recognition + examiner voice | Live quality needs your microphone and a voice key |
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | Generated Office files open in real LibreOffice (CI) | Adds `libreoffice-impress-nogui` to the test-only image stage |
@@ -90,4 +91,4 @@ Report anything that fails; real-hardware failures are the next engineering prio
 | Paid tiers and payment provider | No billing. Tiers (free/pro/premium) only change daily limits, and you set them by hand. Limits are in `apps/api/src/ezo_api/account/entitlements.py`. |
 | K6 (EZO opening GitHub PRs itself) | BLOCKED by design until K4/K5 exist (`docs/master/EXECUTION_GATES.md`); it would also need a GitHub token you issue. |
 
-Merged so far during this mission: [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) (security recovery).
+Merged so far during this mission: [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) (security recovery), [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) (Chrome extension summary/explanation).
