@@ -6,7 +6,7 @@ html, body { margin: 0; background: transparent; overflow: hidden; user-select: 
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); -webkit-app-region: drag;
 }
 button { -webkit-app-region: no-drag; cursor: pointer; }
-.orb { position: relative; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; padding: 0; }
+.orb { position: relative; width: 48px; height: 48px; flex: none; border: 0; border-radius: 50%; background: transparent; padding: 0; }
 .orb .core { position: absolute; inset: 9px; border-radius: 50%; background: linear-gradient(135deg, #5b8cff, #a66bff); transition: transform .2s; }
 .orb .ring { position: absolute; inset: 2px; border-radius: 50%; border: 2px solid rgba(120, 150, 255, .35); }
 .listening .core { background: linear-gradient(135deg, #ff5b6e, #ff9b5b); animation: pulse 1s infinite; }
@@ -25,3 +25,9 @@ button { -webkit-app-region: no-drag; cursor: pointer; }
 .panel input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; border: 1px solid #3b4160; background: #0e1018; color: inherit; }
 .transcript { margin: 8px 0 0; font-size: 12px; opacity: .7; }
 .reply { margin: 6px 0 0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; max-height: 230px; overflow: auto; }
+/* EZO's humanoid face; the CSS orb above stays as the fallback when WebGL is unavailable. */
+.face { position: absolute; inset: 0; width: 48px; height: 48px; border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 38%, #0b1a3a 0%, #050c1f 60%, #01040c 100%); display: none; }
+.has-face .face { display: block; }
+.has-face .orb .core, .has-face .orb .ring { display: none; }
+.listening .face { box-shadow: 0 0 0 2px rgba(255, 91, 110, .8); }

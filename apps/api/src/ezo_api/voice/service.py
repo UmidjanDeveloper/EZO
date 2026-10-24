@@ -141,6 +141,8 @@ def build_voice_service(settings: Settings) -> VoiceService:
             stt_model=settings.openai_stt_model,
             tts_model=settings.openai_tts_model,
             voice=settings.openai_tts_voice,
+            steerable=settings.openai_tts_model.startswith("gpt-4o"),
+            spelling_prompt=True,
             timeout=settings.voice_timeout_seconds,
             max_audio=settings.voice_max_audio_mb * 1024 * 1024,
         )

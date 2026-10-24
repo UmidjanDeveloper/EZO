@@ -34,13 +34,6 @@ const VOLUME_KEYS: Record<VolumeChange, { key: number; times: number }> = {
 const POWERSHELL = "powershell.exe";
 const PS_ARGS = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"] as const;
 
-export const APP_NAMES_UZ: Record<AppId, string> = {
-  calculator: "Kalkulyator",
-  notepad: "Bloknot",
-  paint: "Paint",
-  explorer: "Fayl menejeri",
-};
-
 export function createActions(deps: ActionDeps) {
   const windowsOnly = () => {
     if (deps.platform !== "win32") throw new UnsupportedAction("Bu amal hozircha faqat Windows’da ishlaydi.");

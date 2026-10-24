@@ -6,6 +6,11 @@ export class Recorder {
   private stream: MediaStream | null = null;
   private chunks: Blob[] = [];
 
+  /** The live microphone while recording (for the avatar's level meter). */
+  get liveStream(): MediaStream | null {
+    return this.stream;
+  }
+
   get active(): boolean {
     return this.recorder?.state === "recording";
   }

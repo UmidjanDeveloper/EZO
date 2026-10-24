@@ -510,6 +510,8 @@ const uz = {
     unsupported: "Bu brauzer ovozni tanimaydi",
     unsupportedHint: "Chrome, Edge yoki Safari’da oching yoki yozib gaplashing.",
     serverFallback: "Server ovozi hozir ishlamayapti — brauzer ovozidan foydalanaman. Qayta gapiring.",
+    auto: "Auto",
+    autoHint: "O‘zbekcha, inglizcha yoki ruscha gapiring — EZO o‘sha tilda javob beradi",
     languages: { uz: "o‘zbekcha", en: "inglizcha", ru: "ruscha" },
   },
   personal: {
@@ -1149,6 +1151,8 @@ const en: Messages = {
     unsupported: "This browser cannot recognise speech",
     unsupportedHint: "Open EZO in Chrome, Edge or Safari, or type instead.",
     serverFallback: "The server voice is not working right now — I’m switching to the browser’s voice. Please speak again.",
+    auto: "Auto",
+    autoHint: "Speak Uzbek, English or Russian — EZO answers in the language you use",
     languages: { uz: "Uzbek", en: "English", ru: "Russian" },
   },
   personal: {
@@ -1786,6 +1790,8 @@ const ru: Messages = {
     unsupported: "Этот браузер не распознаёт речь",
     unsupportedHint: "Откройте EZO в Chrome, Edge или Safari или пишите текстом.",
     serverFallback: "Серверный голос сейчас не работает — переключаюсь на голос браузера. Повторите, пожалуйста.",
+    auto: "Авто",
+    autoHint: "Говорите по-узбекски, по-английски или по-русски — EZO ответит на вашем языке",
     languages: { uz: "узбекский", en: "английский", ru: "русский" },
   },
   personal: {

@@ -20,17 +20,18 @@ import {
 } from "@/lib/voice/engine";
 import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
-import { EzoPresence } from "../robot/EzoPresence";
+import { EzoHumanoid } from "../robot/EzoHumanoid";
 import type { useChatSession } from "./useChatSession";
 
 type Session = ReturnType<typeof useChatSession>;
 
 
-const LANGUAGES: LanguageCode[] = ["uz", "en", "ru"];
-const storedVoiceLanguage = createStoredValue<LanguageCode | "">(
+type VoiceLanguage = "auto" | LanguageCode;
+const LANGUAGES: VoiceLanguage[] = ["auto", "uz", "en", "ru"];
+const storedVoiceLanguage = createStoredValue<VoiceLanguage | "">(
   "ezo-voice-language",
   "",
-  (value): value is LanguageCode | "" => value === "" || value === "uz" || value === "en" || value === "ru",
+  (value): value is VoiceLanguage | "" => value === "" || value === "auto" || value === "uz" || value === "en" || value === "ru",
 );
 
 /**
@@ -40,7 +41,9 @@ const storedVoiceLanguage = createStoredValue<LanguageCode | "">(
 export function VoiceStage({ session }: { session: Session }) {
   const { m, f, language: uiLanguage } = useI18n();
   const storedLanguage = storedVoiceLanguage.useValue();
-  const language: LanguageCode = storedLanguage || uiLanguage;
+  // "auto": EZO hears uz, en or ru and answers in the language it heard.
+  const choice: VoiceLanguage = storedLanguage || "auto";
+  const lastHeardRef = useRef<LanguageCode | null>(null);
 
   const [phase, setPhase] = useState<VoicePhase>("idle");
   const [heard, setHeard] = useState("");
@@ -85,13 +88,16 @@ export function VoiceStage({ session }: { session: Session }) {
     if (!useServer) setNotice((current) => (serverFailedRef.current ? current : null));
     else setNotice(null);
     const listenFn = useServer ? listenWithServer : listenWithBrowser;
-    stopListeningRef.current = listenFn(language, {
+    // The server recogniser can take any of the three languages; the browser's needs one.
+    const listenLanguage = choice !== "auto" ? choice : useServer ? null : (lastHeardRef.current ?? uiLanguage);
+    stopListeningRef.current = listenFn(listenLanguage, {
       onInterim: (text) => turn === turnRef.current && setHeard(text),
       onFinal: (text, info) => {
         if (turn !== turnRef.current) return;
         gotText = true;
         setHeard(text);
-        void respond(text, turn, info?.speechSeconds ?? null);
+        const heardLanguage = info?.language ?? (choice !== "auto" ? choice : listenLanguage);
+        void respond(text, turn, info?.speechSeconds ?? null, heardLanguage ?? null);
       },
       onEnd: (error) => {
         stopListeningRef.current = null;
@@ -111,15 +117,16 @@ export function VoiceStage({ session }: { session: Session }) {
       },
     });
 
-    async function respond(text: string, currentTurn: number, speechSeconds: number | null) {
+    async function respond(text: string, currentTurn: number, speechSeconds: number | null, heardLanguage: LanguageCode | null) {
       setPhase("thinking");
-      const reply = await send(text, "voice", { speechSeconds });
+      const reply = await send(text, "voice", { speechSeconds, languageHint: heardLanguage });
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
       if (!reply || !reply.content) {
         setPhase("idle");
         return;
       }
-      const replyLanguage = reply.language ?? language;
+      const replyLanguage = reply.language ?? heardLanguage ?? uiLanguage;
+      lastHeardRef.current = replyLanguage;
       const serverSpeech = (voiceStatus?.text_to_speech.length ?? 0) > 0;
       if (!serverSpeech && !hasVoiceFor(replyLanguage)) {
         setNotice(f(m.voice.noVoice, { language: m.voice.languages[replyLanguage] }));
@@ -129,7 +136,7 @@ export function VoiceStage({ session }: { session: Session }) {
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
       listenRef.current(); // keep the conversation going
     }
-  }, [errorNotice, f, language, m.voice, send, voiceStatus]);
+  }, [choice, errorNotice, f, m.voice, send, uiLanguage, voiceStatus]);
 
   useEffect(() => {
     listenRef.current = listen;
@@ -174,35 +181,40 @@ export function VoiceStage({ session }: { session: Session }) {
           : m.voice.idle;
 
   return (
-    <div className="flex h-full flex-col items-center px-4 pb-6 pt-2" data-testid="voice-stage" data-engine={engine ?? "none"}>
-      <div className="flex w-full max-w-2xl justify-end gap-1" role="group" aria-label={m.voice.language}>
+    <div
+      className="ezo-night relative flex h-full flex-col items-center px-4 pb-6 pt-2"
+      data-testid="voice-stage"
+      data-engine={engine ?? "none"}
+    >
+      <EzoHumanoid state={visible} framing="bust" label={status} className="absolute inset-0" />
+      <div className="relative z-10 flex w-full max-w-2xl justify-end gap-1" role="group" aria-label={m.voice.language}>
         {LANGUAGES.map((code) => (
           <button
             key={code}
             type="button"
             onClick={() => storedVoiceLanguage.set(code)}
-            aria-pressed={language === code}
+            aria-pressed={choice === code}
+            title={code === "auto" ? m.voice.autoHint : m.voice.languages[code]}
             className={cn(
               "rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wider transition-colors",
-              language === code ? "bg-accent/15 text-accent" : "text-ink-faint hover:text-ink",
+              choice === code ? "bg-sky-400/20 text-sky-200" : "text-slate-400 hover:text-slate-100",
             )}
           >
-            {code}
+            {code === "auto" ? m.voice.auto : code}
           </button>
         ))}
       </div>
 
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4">
-        <button
-          type="button"
-          onClick={toggle}
-          className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
-          aria-label={status}
-        >
-          <EzoPresence state={visible} size={290} className="max-h-[44vh] max-w-[72vw]" />
-        </button>
+      {/* The whole stage is the talk button: tap EZO to talk, interrupt or stop. */}
+      <button
+        type="button"
+        onClick={toggle}
+        className="relative z-10 min-h-0 w-full flex-1 rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300"
+        aria-label={status}
+      />
 
-        <p className="text-sm font-medium tracking-wide text-ink-muted" aria-live="polite" data-testid="voice-status">
+      <div className="relative z-10 flex w-full flex-col items-center gap-3">
+        <p className="text-sm font-medium tracking-wide text-sky-100/80" aria-live="polite" data-testid="voice-status">
           {status}
         </p>
 
@@ -213,7 +225,7 @@ export function VoiceStage({ session }: { session: Session }) {
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="max-w-xl text-center text-base text-ink-faint"
+              className="max-w-xl text-center text-base text-slate-300"
               data-testid="voice-heard"
             >
               “{heard}”
@@ -223,14 +235,14 @@ export function VoiceStage({ session }: { session: Session }) {
 
         {caption && phase !== "listening" ? (
           <div
-            className="max-h-[22vh] w-full max-w-2xl overflow-y-auto text-center text-lg leading-relaxed text-ink"
+            className="max-h-[18vh] w-full max-w-2xl overflow-y-auto text-center text-lg leading-relaxed text-slate-50 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]"
             data-testid="voice-caption"
           >
             {toSpeakableText(caption)}
           </div>
         ) : null}
 
-        {notice ? <p className="max-w-md text-center text-sm text-warning" role="status">{notice}</p> : null}
+        {notice ? <p className="max-w-md text-center text-sm text-amber-300" role="status">{notice}</p> : null}
       </div>
 
       <button
@@ -240,15 +252,15 @@ export function VoiceStage({ session }: { session: Session }) {
         data-testid="voice-toggle"
         aria-label={phase === "idle" ? m.voice.start : m.voice.stop}
         className={cn(
-          "flex h-16 w-16 items-center justify-center rounded-full transition-all disabled:opacity-40",
+          "relative z-10 flex h-16 w-16 items-center justify-center rounded-full transition-all disabled:opacity-40",
           phase === "idle"
             ? "bg-accent text-on-accent shadow-[0_0_30px_-4px_var(--accent)] hover:scale-105"
-            : "border border-line-strong bg-surface text-ink hover:border-danger hover:text-danger",
+            : "border border-slate-500 bg-slate-900/70 text-slate-100 hover:border-red-400 hover:text-red-300",
         )}
       >
         {phase === "idle" ? <Mic size={26} /> : <Square size={20} className="fill-current" />}
       </button>
-      <p className="mt-2 text-xs text-ink-faint">{supported ? m.voice.hint : m.voice.unsupportedHint}</p>
+      <p className="relative z-10 mt-2 text-xs text-slate-400">{supported ? m.voice.hint : m.voice.unsupportedHint}</p>
     </div>
   );
 }

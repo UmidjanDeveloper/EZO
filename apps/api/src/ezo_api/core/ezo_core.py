@@ -33,7 +33,12 @@ from ezo_api.agents.registry import AgentRegistry, AgentSelection
 from ezo_api.agents.student_adapter import STUDENT_SPEC, StudentAdapterAgent, wants_student
 from ezo_api.core import messages
 from ezo_api.core.intent import Intent, IntentResult, classify_intent
-from ezo_api.core.language import SUPPORTED_LANGUAGES, detect_language
+from ezo_api.core.language import (
+    DEFAULT_LANGUAGE,
+    SUPPORTED_LANGUAGES,
+    Language,
+    detect_language,
+)
 from ezo_api.core.text import normalize
 from ezo_api.core.trace import Tracer
 from ezo_api.db.base import utcnow
@@ -106,6 +111,8 @@ class TurnInput:
     channel: Literal["text", "voice"] = "text"
     speech_seconds: float | None = None
     attachments: tuple[uuid.UUID, ...] = ()
+    # Language the speech recogniser heard; used when the words themselves are ambiguous.
+    language_hint: Language | None = None
 
 
 @dataclass(slots=True)
@@ -249,7 +256,8 @@ class EzoCore:
                 language, language_is_fixed = str(fixed), True
                 step.summary = f"{language} (user preference)"
             else:
-                language, language_is_fixed = detect_language(turn.text), False
+                fallback = turn.language_hint or DEFAULT_LANGUAGE
+                language, language_is_fixed = detect_language(turn.text, fallback), False
                 step.summary = language
 
         with tracer.step("classify_intent") as step:

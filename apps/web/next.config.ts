@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Workspace packages are shipped as TypeScript source.
-  transpilePackages: ["@ezo/ui", "@ezo/shared"],
+  transpilePackages: ["@ezo/ui", "@ezo/shared", "@ezo/avatar"],
   // Produces a small self-contained server for the Docker image.
   output: "standalone",
   poweredByHeader: false,

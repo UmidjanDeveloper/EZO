@@ -205,3 +205,9 @@ body {
   --robot-shell-edge: #4b5568;
   --robot-visor: #03060b;
 }
+
+/* EZO's humanoid always glows on its own night sky, in light and dark themes alike. */
+.ezo-night {
+  background: radial-gradient(ellipse at 50% 32%, #0b1a3a 0%, #050c1f 55%, #01040c 100%);
+  color: #dbeafe;
+}

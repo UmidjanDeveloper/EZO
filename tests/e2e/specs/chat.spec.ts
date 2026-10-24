@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("home shows only the EZO robot and conversation history", async ({ page }) => {
+test("home shows only EZO's humanoid face and conversation history", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator("main").getByTestId("ezo-robot")).toBeVisible();
+  await expect(page.locator("main").getByTestId("ezo-humanoid")).toBeVisible();
   await expect(page.getByText("Salom! Men EZO.")).toBeVisible();
   await expect(page.getByTestId("new-chat")).toBeVisible();
   // No agent or module menus.

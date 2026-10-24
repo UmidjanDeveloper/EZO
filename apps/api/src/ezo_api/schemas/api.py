@@ -124,6 +124,11 @@ class ChatIn(BaseModel):
         le=600,
         description="Measured speaking time of a voice message (used by the Language Coach)",
     )
+    language_hint: Literal["uz", "en", "ru"] | None = Field(
+        default=None,
+        description="Language the speech recogniser reported for a voice message; used only "
+        "when the transcript itself is ambiguous (e.g. 'Ok')",
+    )
     attachments: list[uuid.UUID] = Field(
         default_factory=list,
         max_length=20,

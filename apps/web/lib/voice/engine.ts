@@ -15,12 +15,21 @@ import type { LanguageCode, VoiceStatus } from "@ezo/shared";
 import { ApiError } from "@ezo/shared";
 import { api } from "../api";
 import { listenOnce, speak as browserSpeak, speechRecognitionSupported, stopSpeaking, type ListenHandlers } from "../speech";
+import { createLevelMeter, levelFromSamples } from "@ezo/avatar";
+import { publishVoiceLevel } from "./level";
 import { DEFAULT_VAD, rmsOf, speakingSeconds, vadStart, vadStep } from "./vad";
 
 export type EngineKind = "server" | "browser";
 
-/** Start listening; returns a function that cancels (discarding the recording). */
-export type Listen = (language: LanguageCode, handlers: ListenHandlers) => () => void;
+/**
+ * Start listening; returns a function that cancels (discarding the recording).
+ * `language` null means "any of EZO's languages" (server recognition only).
+ */
+export type Listen = (language: LanguageCode | null, handlers: ListenHandlers) => () => void;
+
+const LANGUAGES: readonly string[] = ["uz", "en", "ru"];
+const asLanguage = (value: string | null | undefined): LanguageCode | null =>
+  value && LANGUAGES.includes(value) ? (value as LanguageCode) : null;
 
 export function serverRecordingSupported(): boolean {
   return (
@@ -91,6 +100,7 @@ export const listenWithServer: Listen = (language, handlers) => {
 
     const timer = window.setInterval(() => {
       analyser.getFloatTimeDomainData(samples);
+      publishVoiceLevel(levelFromSamples(samples));
       const [next, action] = vadStep(vad, rmsOf(samples), performance.now(), DEFAULT_VAD);
       vad = next;
       if (vad.speechAt !== null && !heardSpeech) {
@@ -102,6 +112,7 @@ export const listenWithServer: Listen = (language, handlers) => {
 
     cleanup = () => {
       window.clearInterval(timer);
+      publishVoiceLevel(0);
       if (recorder.state === "recording") recorder.stop();
       stream.getTracks().forEach((track) => track.stop());
       void context.close().catch(() => undefined);
@@ -123,7 +134,7 @@ export const listenWithServer: Listen = (language, handlers) => {
         const result = await api.transcribe(blob, `speech.${extensionFor(mime)}`, language);
         if (cancelled) return;
         const text = result.text.trim();
-        if (text) handlers.onFinal(text, { speechSeconds: speakingSeconds(vad) });
+        if (text) handlers.onFinal(text, { speechSeconds: speakingSeconds(vad), language: asLanguage(result.language) });
         end(text ? null : "no-speech");
       } catch (error) {
         if (cancelled) return;
@@ -142,7 +153,8 @@ export const listenWithServer: Listen = (language, handlers) => {
   };
 };
 
-export const listenWithBrowser: Listen = listenOnce;
+/** The browser recogniser needs one fixed language; callers resolve "auto" before this. */
+export const listenWithBrowser: Listen = (language, handlers) => listenOnce(language ?? "uz", handlers);
 
 let currentAudio: HTMLAudioElement | null = null;
 let currentRequest: AbortController | null = null;
@@ -188,7 +200,23 @@ function playBlob(blob: Blob): Promise<void> {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
     currentAudio = audio;
+    let frame = 0;
+    let meter: ReturnType<typeof createLevelMeter> = null;
+    audio.onplaying = () => {
+      // EZO's humanoid follows its own voice (where the browser can measure it).
+      meter ??= createLevelMeter(audio);
+      const tick = () => {
+        if (!meter) return;
+        publishVoiceLevel(meter.read());
+        frame = requestAnimationFrame(tick);
+      };
+      if (meter && !frame) frame = requestAnimationFrame(tick);
+    };
     const done = (error?: unknown) => {
+      cancelAnimationFrame(frame);
+      meter?.close();
+      meter = null;
+      publishVoiceLevel(0);
       URL.revokeObjectURL(url);
       if (currentAudio === audio) currentAudio = null;
       if (error) reject(error);

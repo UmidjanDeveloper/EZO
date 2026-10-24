@@ -109,12 +109,13 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
 
   await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 10_000 });
   // The measured speaking time travels with the voice message (the fake microphone speaks 0.7 s).
-  const sent = (await chatRequest).postDataJSON() as { channel: string; speech_seconds: number };
+  const sent = (await chatRequest).postDataJSON() as { channel: string; speech_seconds: number; language_hint?: string };
   expect(sent.channel).toBe("voice");
+  expect(sent.language_hint).toBe("uz"); // the language the recogniser heard
   expect(sent.speech_seconds).toBeGreaterThan(0.3);
   expect(sent.speech_seconds).toBeLessThan(1.2);
   await expect(page.getByTestId("voice-caption")).toContainText("oflayn rejimda");
-  await expect(stage.getByTestId("ezo-presence")).toHaveAttribute("data-state", "speaking");
+  await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "speaking");
   expect(speakRequests).toBe(1);
 
   // Barge-in: tap the robot while EZO speaks → it stops and listens.
@@ -149,4 +150,34 @@ test("server voice failure falls back to the browser for listening and speaking"
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __ezoSpoken: string[] }).__ezoSpoken.length))
     .toBeGreaterThan(0); // the reply was read by the browser voice after the server voice failed
+});
+
+test("auto language: EZO hears Russian and answers with a Russian voice", async ({ page }) => {
+  await fakeMicrophoneAndBrowserSpeech(page);
+  const transcribeFields: string[] = [];
+  const spokenLanguages: (string | null)[] = [];
+  await page.route("**/api/voice/transcribe", async (route) => {
+    const body = (route.request().postDataBuffer() ?? Buffer.alloc(0)).toString("latin1");
+    transcribeFields.push(body.includes('name="language"') ? "language" : "auto");
+    const first = transcribeFields.length === 1;
+    await route.fulfill({
+      json: { text: first ? "Привет, как дела?" : "", language: first ? "ru" : null, provider: "openai", attempts: [] },
+    });
+  });
+  await page.route("**/api/voice/speak", async (route) => {
+    spokenLanguages.push((route.request().postDataJSON() as { language: string | null }).language);
+    await route.fulfill({ body: silentWav(1), contentType: "audio/wav", headers: { "X-EZO-Voice-Provider": "openai" } });
+  });
+
+  await page.goto("/");
+  await page.getByTestId("mode-voice").click();
+  await expect(page.getByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true"); // the default
+  const chatRequest = page.waitForRequest((request) => request.url().includes("/api/chat/stream"));
+  await page.getByTestId("voice-toggle").click();
+
+  await expect(page.getByTestId("voice-heard")).toContainText("Привет, как дела?", { timeout: 10_000 });
+  const sent = (await chatRequest).postDataJSON() as { language_hint?: string };
+  expect(sent.language_hint).toBe("ru");
+  await expect.poll(() => spokenLanguages).toEqual(["ru"]);
+  expect(transcribeFields[0]).toBe("auto"); // no language forced on the recogniser
 });

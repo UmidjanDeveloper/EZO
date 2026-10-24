@@ -104,7 +104,9 @@ class ElevenLabsProvider(SpeechToTextProvider, TextToSpeechProvider):
             text = result.get("text")
             if not isinstance(text, str) or not text.strip():
                 raise ValueError
-            return Transcript(text.strip(), language, self.name)
+            detected = result.get("language_code")
+            heard = detected if isinstance(detected, str) and detected else language
+            return Transcript(text.strip(), heard, self.name)
         except (ValueError, AttributeError):
             raise VoiceError("failed", "ElevenLabs returned an invalid transcript.") from None
 

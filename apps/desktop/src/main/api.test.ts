@@ -13,10 +13,10 @@ function recorder(respond: (url: string, init: RequestInit) => Response) {
 describe("createEzoClient", () => {
   it("sends the bearer token and the conversation id to /api/chat", async () => {
     const { calls, fetchImpl } = recorder(() =>
-      Response.json({ conversation_id: "c-1", message: { content: "Salom!" } }),
+      Response.json({ conversation_id: "c-1", language: "uz", message: { content: "Salom!" } }),
     );
     const reply = await createEzoClient("https://api.example.com/", "secret-token", fetchImpl).chat("Salom", "c-0");
-    expect(reply).toEqual({ conversationId: "c-1", text: "Salom!" });
+    expect(reply).toEqual({ conversationId: "c-1", text: "Salom!", language: "uz" });
     expect(calls[0]!.url).toBe("https://api.example.com/api/chat");
     expect(new Headers(calls[0]!.init.headers).get("Authorization")).toBe("Bearer secret-token");
     expect(JSON.parse(String(calls[0]!.init.body))).toEqual({
@@ -26,17 +26,26 @@ describe("createEzoClient", () => {
     });
   });
 
-  it("uploads audio as multipart with the Uzbek language hint", async () => {
-    const { calls, fetchImpl } = recorder(() => Response.json({ text: " Kalkulyatorni och " }));
-    const text = await createEzoClient("http://localhost:8000", null, fetchImpl).transcribe(
+  it("uploads audio as multipart and lets the server tell which of the three languages it heard", async () => {
+    const { calls, fetchImpl } = recorder(() => Response.json({ text: " Открой калькулятор ", language: "ru" }));
+    const heard = await createEzoClient("http://localhost:8000", null, fetchImpl).transcribe(
       new Uint8Array([1, 2, 3]),
       "audio/webm",
     );
-    expect(text).toBe("Kalkulyatorni och");
+    expect(heard).toEqual({ text: "Открой калькулятор", language: "ru" });
     const form = calls[0]!.init.body as FormData;
-    expect(form.get("language")).toBe("uz");
+    expect(form.get("language")).toBeNull(); // auto: no language forced on the recogniser
     expect((form.get("audio") as Blob).size).toBe(3);
     expect(new Headers(calls[0]!.init.headers).has("Authorization")).toBe(false);
+  });
+
+  it("passes the heard language with the turn and asks for speech in the reply's language", async () => {
+    const { calls, fetchImpl } = recorder(() => Response.json({ conversation_id: "c", language: "en", message: { content: "Hi" } }));
+    const client = createEzoClient("http://x", "t", fetchImpl);
+    await client.chat("Okay", null, "en");
+    expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ language_hint: "en" });
+    await client.speak("Hi", "en").catch(() => undefined);
+    expect(JSON.parse(String(calls[1]!.init.body))).toMatchObject({ language: "en" });
   });
 
   it("turns API errors into honest Uzbek messages", async () => {

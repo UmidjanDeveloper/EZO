@@ -155,3 +155,20 @@ async def test_voice_channel_asks_for_spoken_replies(
 async def test_unknown_channel_is_rejected(client: AsyncClient) -> None:
     response = await client.post("/api/chat/stream", json={"message": "hi", "channel": "fax"})
     assert response.status_code == 422
+
+
+async def test_voice_language_hint_decides_ambiguous_turns(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    # "2026" carries no language; the recogniser heard Russian, so EZO answers in Russian.
+    events = await stream_chat(client, message="2026", channel="voice", language_hint="ru")
+    assert events[0][1]["language"] == "ru"
+    # Clear words win over the hint, and typed text ignores it.
+    events = await stream_chat(
+        client, message="Salom, qalaysan?", channel="voice", language_hint="en"
+    )
+    assert events[0][1]["language"] == "uz"
+    events = await stream_chat(client, message="2026", channel="text", language_hint="ru")
+    assert events[0][1]["language"] == "uz"
+    bad = await client.post("/api/chat", json={"message": "x", "language_hint": "de"})
+    assert bad.status_code == 422

@@ -2,7 +2,8 @@ import "./styles.css";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
-import { ApiError, createApi, type Api, type Message } from "./api";
+import { createLevelMeter, EzoAvatar, type AvatarState, type LevelMeter } from "@ezo/avatar";
+import { ApiError, createApi, type Api, type Lang, type Message } from "./api";
 import { documentPrompt } from "./documents";
 import { Recorder } from "./recorder";
 import { loadPrefs, normalizeApiUrl, readToken, savePrefs, writeToken, type Prefs } from "./store";
@@ -88,60 +89,139 @@ async function refreshConversations(): Promise<void> {
   }
 }
 
-async function speak(text: string): Promise<void> {
-  if (!api || !prefs.speakReplies) return;
-  try {
-    const audio = await api.speak(text);
-    player?.pause();
-    player = new Audio(URL.createObjectURL(audio));
-    await player.play();
-  } catch (error) {
-    setStatus(`Javob matnda. ${errorText(error)}`, "error");
+// --- voice stage: EZO's humanoid, full screen ------------------------------------------------
+
+let avatar: EzoAvatar | null = null;
+let meter: LevelMeter | null = null;
+let meterFrame = 0;
+let voiceBusy = false;
+
+function stageState(state: AvatarState, status: string): void {
+  avatar?.setState(state);
+  $("stageStatus").textContent = status;
+  $("stageMic").textContent = state === "listening" ? "■" : "🎤";
+  $("stageMic").setAttribute("aria-label", state === "listening" ? "Tugatish" : "Gapirish");
+}
+
+function followLevel(source: MediaStream | HTMLMediaElement | null): void {
+  cancelAnimationFrame(meterFrame);
+  meter?.close();
+  meter = source ? createLevelMeter(source) : null;
+  const tick = () => {
+    if (!meter) return;
+    avatar?.setLevel(meter.read());
+    meterFrame = requestAnimationFrame(tick);
+  };
+  if (meter) meterFrame = requestAnimationFrame(tick);
+}
+
+function renderLanguage(): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".langs button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.lang === prefs.voiceLanguage));
   }
 }
 
-async function ask(text: string, channel: "text" | "voice"): Promise<void> {
-  if (!api) return setStatus("Avval Sozlamalarda serverni kiriting.", "error");
+function openStage(): void {
+  $("voiceStage").hidden = false;
+  avatar ??= new EzoAvatar($<HTMLCanvasElement>("avatar"), { framing: "bust" });
+  renderLanguage();
+  stageState("idle", "Gapirish uchun 🎤 bosing");
+}
+
+function closeStage(): void {
+  if (recorder.active) void recorder.stop();
+  player?.pause();
+  followLevel(null);
+  avatar?.destroy(); // frees the GPU while the stage is closed
+  avatar = null;
+  $("voiceStage").hidden = true;
+}
+
+/** Plays EZO's reply in the reply's language; resolves when it has finished. */
+async function speak(text: string, language: Lang | null): Promise<void> {
+  if (!api || !prefs.speakReplies) return;
+  try {
+    const audio = await api.speak(text, language);
+    player?.pause();
+    const current = new Audio(URL.createObjectURL(audio));
+    player = current;
+    await new Promise<void>((resolve) => {
+      current.onplaying = () => followLevel(current);
+      current.onended = current.onpause = current.onerror = () => resolve();
+      current.play().catch(() => resolve());
+    });
+  } catch (error) {
+    setStatus(`Javob matnda. ${errorText(error)}`, "error");
+  } finally {
+    followLevel(null);
+  }
+}
+
+async function ask(text: string, channel: "text" | "voice", heard: Lang | null = null): Promise<{ content: string; language: Lang | null } | null> {
+  if (!api) {
+    setStatus("Avval Sozlamalarda serverni kiriting.", "error");
+    return null;
+  }
   appendMessage("user", text);
   setStatus("EZO o‘ylayapti…", "busy");
   try {
-    const { conversationId, reply } = await api.chat(text, prefs.conversationId, prefs.projectId, channel);
+    const { conversationId, reply, language } = await api.chat(text, prefs.conversationId, prefs.projectId, channel, heard);
     if (prefs.conversationId !== conversationId) {
       prefs = { ...prefs, conversationId };
       savePrefs(prefs);
     }
     appendMessage("assistant", reply.content);
     setStatus("Tayyor");
-    if (channel === "voice") await speak(reply.content);
+    return { content: reply.content, language: language ?? heard };
   } catch (error) {
     setStatus(errorText(error), "error");
+    return null;
   }
 }
 
-async function toggleMic(): Promise<void> {
-  const mic = $("mic");
-  if (recorder.active) {
-    mic.classList.remove("recording");
-    const audio = await recorder.stop();
-    if (!audio || !api) return setStatus("Hech narsa yozilmadi.", "error");
-    setStatus("Nutq matnga aylantirilmoqda…", "busy");
-    try {
-      const text = await api.transcribe(audio);
-      if (!text) return setStatus("Hech narsa eshitilmadi. Qaytadan gapiring.", "error");
-      await ask(text, "voice");
-    } catch (error) {
-      setStatus(errorText(error), "error");
-    }
+async function startListening(): Promise<void> {
+  player?.pause();
+  try {
+    await recorder.start();
+  } catch {
+    stageState("error", "Mikrofonga ruxsat berilmadi (Android sozlamalari → Ilovalar → EZO → Ruxsatlar).");
     return;
   }
+  followLevel(recorder.liveStream);
+  $("stageHeard").textContent = "";
+  stageState("listening", "Tinglayapman… tugatgach ■ ni bosing");
+}
+
+async function finishListening(): Promise<void> {
+  if (!api || voiceBusy) return;
+  voiceBusy = true;
+  followLevel(null);
   try {
-    player?.pause();
-    await recorder.start();
-    mic.classList.add("recording");
-    setStatus("Tinglayapman… tugatish uchun yana bosing", "busy");
-  } catch {
-    setStatus("Mikrofonga ruxsat berilmadi (Android sozlamalari → Ilovalar → EZO → Ruxsatlar).", "error");
+    const audio = await recorder.stop();
+    if (!audio) return stageState("idle", "Hech narsa yozilmadi. Qaytadan 🎤 bosing.");
+    stageState("thinking", "Eshitganimni matnga aylantiryapman…");
+    const fixed = prefs.voiceLanguage === "auto" ? null : prefs.voiceLanguage;
+    const { text, language } = await api.transcribe(audio, fixed);
+    if (!text) return stageState("idle", "Hech narsa eshitilmadi. Qaytadan gapiring.");
+    $("stageHeard").textContent = text;
+    stageState("thinking", "O‘ylayapman…");
+    const reply = await ask(text, "voice", language);
+    if (!reply) return stageState("error", $("status").textContent ?? "Xatolik");
+    $("stageReply").textContent = reply.content;
+    stageState("speaking", "Gapiryapman… (bo‘lish uchun 🎤)");
+    await speak(reply.content, reply.language);
+    if (!$("voiceStage").hidden && !recorder.active) stageState("idle", "Yana gapirish uchun 🎤 bosing");
+  } catch (error) {
+    stageState("error", errorText(error));
+  } finally {
+    voiceBusy = false;
   }
+}
+
+async function toggleStageMic(): Promise<void> {
+  if (recorder.active) return finishListening();
+  if (voiceBusy && !player?.paused) player?.pause(); // interrupt EZO and talk
+  if (!voiceBusy || player?.paused) await startListening();
 }
 
 async function explainPhoto(): Promise<void> {
@@ -167,7 +247,7 @@ async function explainPhoto(): Promise<void> {
     const answer = await api.describeImage(new Blob([bytes], { type: mime }), question);
     appendMessage("assistant", answer);
     setStatus("Tayyor (rasm saqlanmadi)");
-    await speak(answer);
+    await speak(answer, "uz");
   } catch (error) {
     if ((error as Error).message?.toLowerCase().includes("cancel")) return;
     setStatus(errorText(error), "error");
@@ -182,7 +262,8 @@ async function summarizeDocument(): Promise<void> {
     const result = documentPrompt(file.name, file.data);
     if (!result.ok) return setStatus(result.reason, "error");
     if (result.truncated) setStatus("Hujjat uzun: faqat boshi yuborildi.", "info");
-    await ask(result.prompt, "voice");
+    const reply = await ask(result.prompt, "voice");
+    if (reply) await speak(reply.content, reply.language);
   } catch (error) {
     if ((error as Error).message?.toLowerCase().includes("cancel")) return;
     setStatus(errorText(error), "error");
@@ -280,7 +361,19 @@ function wire(): void {
     $<HTMLInputElement>("input").value = "";
     void ask(text, "text");
   });
-  $("mic").addEventListener("click", () => void toggleMic());
+  $("mic").addEventListener("click", () => {
+    openStage();
+    void startListening();
+  });
+  $("stageMic").addEventListener("click", () => void toggleStageMic());
+  $("stageClose").addEventListener("click", closeStage);
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".langs button")) {
+    button.addEventListener("click", () => {
+      prefs = { ...prefs, voiceLanguage: (button.dataset.lang ?? "auto") as Prefs["voiceLanguage"] };
+      savePrefs(prefs);
+      renderLanguage();
+    });
+  }
   $("camera").addEventListener("click", () => void explainPhoto());
   $("document").addEventListener("click", () => void summarizeDocument());
   $("conversation").addEventListener("change", async () => {

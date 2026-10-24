@@ -3,6 +3,7 @@
  * the web and mobile apps. Runs in the main process, so the owner token never reaches
  * a renderer, a webpage or a log line.
  */
+import type { Lang } from "./replies";
 
 export class EzoApiError extends Error {
   constructor(
@@ -17,7 +18,13 @@ export class EzoApiError extends Error {
 export interface ChatReply {
   conversationId: string;
   text: string;
+  /** The reply's language as the server decided it (uz, en or ru). */
+  language: Lang | null;
 }
+
+export type { Lang };
+const asLang = (value: string | null | undefined): Lang | null =>
+  value === "uz" || value === "en" || value === "ru" ? value : null;
 
 type Fetch = typeof fetch;
 
@@ -67,31 +74,38 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       return (await request("/api/me", {}, 15_000)).json() as Promise<{ email?: string; display_name?: string }>;
     },
 
-    async transcribe(audio: Uint8Array, mimeType: string, language: "uz" | "en" | "ru" = "uz"): Promise<string> {
+    /** `language` null: the server recognises Uzbek, English or Russian and reports which. */
+    async transcribe(audio: Uint8Array, mimeType: string, language: Lang | null = null): Promise<{ text: string; language: Lang | null }> {
       const form = new FormData();
       form.append("audio", new Blob([audio.slice()], { type: mimeType }), "speech.webm");
-      form.append("language", language);
+      if (language) form.append("language", language);
       const body = (await (await request("/api/voice/transcribe", { method: "POST", body: form })).json()) as {
         text: string;
+        language?: string | null;
       };
-      return body.text.trim();
+      return { text: body.text.trim(), language: asLang(body.language) ?? language };
     },
 
-    async chat(message: string, conversationId: string | null): Promise<ChatReply> {
+    async chat(message: string, conversationId: string | null, languageHint: Lang | null = null): Promise<ChatReply> {
       const response = await request(
         "/api/chat",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, conversation_id: conversationId, channel: "voice" }),
+          body: JSON.stringify({
+            message,
+            conversation_id: conversationId,
+            channel: "voice",
+            ...(languageHint ? { language_hint: languageHint } : {}),
+          }),
         },
         180_000,
       );
-      const body = (await response.json()) as { conversation_id: string; message: { content: string } };
-      return { conversationId: body.conversation_id, text: body.message.content };
+      const body = (await response.json()) as { conversation_id: string; message: { content: string }; language?: string };
+      return { conversationId: body.conversation_id, text: body.message.content, language: asLang(body.language) };
     },
 
-    async speak(text: string, language: "uz" | "en" | "ru" = "uz"): Promise<{ mimeType: string; data: Uint8Array }> {
+    async speak(text: string, language: Lang = "uz"): Promise<{ mimeType: string; data: Uint8Array }> {
       const response = await request("/api/voice/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -103,11 +117,11 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       };
     },
 
-    async describeImage(png: Uint8Array, question: string): Promise<string> {
+    async describeImage(png: Uint8Array, question: string, language: Lang = "uz"): Promise<string> {
       const form = new FormData();
       form.append("image", new Blob([png.slice()], { type: "image/png" }), "screen.png");
       form.append("question", question.slice(0, 1000));
-      form.append("language", "uz");
+      form.append("language", language);
       const body = (await (await request("/api/vision/describe", { method: "POST", body: form }, 120_000)).json()) as {
         text: string;
       };

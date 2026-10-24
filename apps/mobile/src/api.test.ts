@@ -22,10 +22,27 @@ describe("createApi", () => {
     expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ conversation_id: "c1", channel: "voice" });
   });
 
-  it("sends audio for Uzbek transcription", async () => {
-    const { calls, impl } = fakeFetch(() => Response.json({ text: " salom " }));
-    expect(await createApi("https://x", "t", impl).transcribe(new Blob(["a"]))).toBe("salom");
-    expect((calls[0]!.init.body as FormData).get("language")).toBe("uz");
+  it("lets the server recognise Uzbek, English or Russian (auto) and reports what it heard", async () => {
+    const { calls, impl } = fakeFetch(() => Response.json({ text: " Привет ", language: "ru" }));
+    const api = createApi("https://x", "t", impl);
+    expect(await api.transcribe(new Blob(["a"]))).toEqual({ text: "Привет", language: "ru" });
+    expect((calls[0]!.init.body as FormData).get("language")).toBeNull();
+    await api.transcribe(new Blob(["a"]), "uz");
+    expect((calls[1]!.init.body as FormData).get("language")).toBe("uz");
+  });
+
+  it("passes the heard language with a voice turn and speaks the reply in the reply's language", async () => {
+    const { calls, impl } = fakeFetch(() =>
+      Response.json({ conversation_id: "c1", language: "en", message: { id: "m", role: "assistant", content: "Hi", created_at: "" } }),
+    );
+    const api = createApi("https://x", "t", impl);
+    const out = await api.chat("Okay", null, null, "voice", "en");
+    expect(out.language).toBe("en");
+    expect(JSON.parse(String(calls[0]!.init.body))).toMatchObject({ channel: "voice", language_hint: "en" });
+    await api.chat("Salom", null, null, "text", "uz");
+    expect(JSON.parse(String(calls[1]!.init.body))).not.toHaveProperty("language_hint");
+    await api.speak("Hi", "en").catch(() => undefined);
+    expect(JSON.parse(String(calls[2]!.init.body))).toMatchObject({ language: "en" });
   });
 
   it("explains missing server features in Uzbek", async () => {

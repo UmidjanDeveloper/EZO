@@ -2,14 +2,18 @@
 
 import { motion } from "framer-motion";
 import { useI18n } from "@/lib/i18n/context";
-import { EzoPresence } from "../robot/EzoPresence";
+import { EzoHumanoid } from "../robot/EzoHumanoid";
 
 export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   const { m } = useI18n();
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
       <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}>
-        <EzoPresence state="idle" size={230} className="max-h-[36vh] max-w-[62vw]" />
+        <EzoHumanoid
+          state="idle"
+          framing="head"
+          className="relative aspect-square w-[min(230px,36vh,62vw)] rounded-full shadow-[0_0_60px_-10px_rgba(56,189,248,0.55)]"
+        />
       </motion.div>
       <motion.h1
         className="mt-4 text-2xl font-semibold sm:text-3xl"
