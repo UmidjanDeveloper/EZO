@@ -17,6 +17,7 @@ export type Intent =
   | { kind: "open_result"; index: number }
   | { kind: "dictate"; text: string }
   | { kind: "explain_screen"; question: string }
+  | { kind: "jarvis_task"; text: string }
   | { kind: "chat"; text: string };
 
 // \p{L} instead of \w and look-behind instead of \b, so Cyrillic words match too.
@@ -69,6 +70,11 @@ export function parseIntent(input: string): Intent {
   if (dictate) {
     const body = original.slice(dictate[0].length).trim();
     if (body) return { kind: "dictate", text: body };
+  }
+
+  // A governed multi-step task on the authorised Downloads folder (validated by the server).
+  if (/(downloads?|yuklab olingan|загрузк)/.test(text) && /(pdf|telegram|телеграм|foiz|percent|процент)/.test(text)) {
+    return { kind: "jarvis_task", text: original };
   }
 
   if (word(`ekran${W}|screen|экран${W}`).test(text) && /(tushuntir|nima|ko'r|o'qi|explain|what|tahlil|объясн|что)/.test(text)) {

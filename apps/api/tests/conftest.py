@@ -66,6 +66,7 @@ def make_settings(database_url: str, **overrides: object) -> Settings:
         "EZO_AUTH_MODE": "local",
         "EZO_API_TOKEN": "",
         "VOICESTUDIO_URL": "",
+        "EZO_TELEGRAM_BOT_TOKEN": "",
         "EZO_VOICE_PROVIDERS": "auto",
         # Deterministic by default; OCR tests opt in (tests/integration/test_ocr.py).
         "EZO_OCR_PROVIDER": "none",

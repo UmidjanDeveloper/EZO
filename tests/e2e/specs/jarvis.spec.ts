@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-// Real browser against the real e2e API (offline mode, no provider credentials). The canonical
-// backend has no device pairing / task / PDF / Telegram routes, so none of that may appear as available.
+// Real browser against the real e2e API (offline mode, no provider credentials, no paired
+// device, no Telegram configuration): nothing may appear connected, paired or delivered.
 
 const JARVIS_API = /\/api\/jarvis\//;
 
@@ -18,8 +18,9 @@ test("jarvis: shows real backend capabilities as not available, never connected/
   await expect(features).toContainText("paired_windows_companion");
   await expect(features).toContainText("configured_telegram_integration");
 
-  const unavailable = page.getByTestId("jarvis-task-unavailable");
-  await expect(unavailable).toContainText("Mavjud emas");
+  const consoleBox = page.getByTestId("jarvis-console");
+  await expect(consoleBox.getByTestId("jarvis-devices")).toContainText("Hali qurilma yo‘q");
+  await expect(page.getByTestId("jarvis-approval")).toHaveCount(0);
 
   // Prerequisite codes such as `paired_windows_companion` name what is MISSING, so scan prose only.
   const body = (
@@ -33,9 +34,8 @@ test("jarvis: shows real backend capabilities as not available, never connected/
   for (const forbidden of ["paired", "connected", "delivered", "yetkazildi", "ulangan (", "approve", "tasdiqlash va"]) {
     expect(body, `forbidden claim "${forbidden}"`).not.toContain(forbidden);
   }
-  // No task execution controls exist at all.
-  await expect(page.getByRole("button", { name: /bajarish|execute|approve|tasdiqlash|yuborish|send/i })).toHaveCount(0);
-  await expect(page.locator("textarea")).toHaveCount(0);
+  // Without a pending device or a task awaiting approval there is nothing to confirm or send.
+  await expect(page.getByRole("button", { name: /execute|approve|tasdiqlash|ruxsat beraman|yuborish|send/i })).toHaveCount(0);
 });
 
 test("jarvis: only supported canonical endpoints are ever requested", async ({ page }) => {
@@ -51,7 +51,13 @@ test("jarvis: only supported canonical endpoints are ever requested", async ({ p
   await expect(page.getByTestId("jarvis-result")).toBeVisible();
 
   const unique = [...new Set(requested)].sort();
-  expect(unique).toEqual(["GET /api/jarvis/capabilities", "POST /api/jarvis/percentages"]);
+  expect(unique).toEqual([
+    "GET /api/jarvis/capabilities",
+    "GET /api/jarvis/devices",
+    "GET /api/jarvis/tasks",
+    "GET /api/jarvis/telegram/recipients",
+    "POST /api/jarvis/percentages",
+  ]);
 });
 
 test("jarvis: percentage calculation returns the backend result and an honest receipt", async ({ page }) => {
@@ -114,4 +120,34 @@ test("jarvis: existing navigation is preserved and the JARVIS link still works",
   await page.getByRole("link", { name: "JARVIS Rejimi" }).click();
   await expect(page).toHaveURL(/\/jarvis$/);
   await expect(page.getByRole("heading", { level: 1, name: /JARVIS/ })).toBeVisible();
+});
+
+test("jarvis: a device is paired only after the owner types the code shown on the device", async ({ page, request }) => {
+  const { generateKeyPairSync, randomBytes, sign } = await import("node:crypto");
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const spki = publicKey.export({ format: "der", type: "spki" });
+  const publicHex = Buffer.from(spki.subarray(spki.length - 32)).toString("hex");
+  const name = `E2E PC ${randomBytes(3).toString("hex")}`;
+  const nonce = randomBytes(16).toString("hex");
+  const message = "ezo-jarvis-device-pairing-v1\u0000" + JSON.stringify({ name, nonce, platform: "windows" });
+  const signature = sign(null, Buffer.from(message), privateKey).toString("hex");
+  const pairing = await request.post("http://localhost:8100/api/jarvis/devices/pairing", {
+    data: { name, platform: "windows", public_key: publicHex, nonce, signature, capabilities: ["files.latest_documents"] },
+  });
+  expect(pairing.status()).toBe(201);
+  const { code } = (await pairing.json()) as { code: string };
+
+  await page.goto("/jarvis");
+  const devices = page.getByTestId("jarvis-devices");
+  const row = devices.locator("li", { hasText: name });
+  await expect(row).toContainText("tasdiq kutmoqda");
+  await row.getByLabel("Qurilmadagi kod").fill(code === "000000" ? "111111" : "000000");
+  await row.getByRole("button", { name: "Tasdiqlash" }).click();
+  await expect(page.getByTestId("jarvis-console").getByRole("alert")).toContainText("does not match");
+  await expect(row).toContainText("tasdiq kutmoqda");
+  await row.getByLabel("Qurilmadagi kod").fill(code);
+  await row.getByRole("button", { name: "Tasdiqlash" }).click();
+  await expect(row).toContainText("ulangan");
+  await row.getByRole("button", { name: "Bekor qilish" }).click();
+  await expect(row).toContainText("bekor qilingan");
 });

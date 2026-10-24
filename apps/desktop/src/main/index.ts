@@ -27,12 +27,15 @@ import { createActions } from "./actions";
 import { createEzoClient, EzoApiError } from "./api";
 import { createAssistant } from "./assistant";
 import { findFiles, isInsideAllowed } from "./files";
+import { buildResult, generateDeviceKey, latestDocuments, pairingRequest, validWork, type DeviceKey } from "./jarvis";
 import type { Lang } from "./replies";
 import { runSelfTest } from "./selftest";
 import { ALLOWED_SHORTCUTS, sanitizeSettings, type DesktopSettings } from "./settings";
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const TOKEN_FILE = () => path.join(app.getPath("userData"), "token.bin");
+const JARVIS_KEY_FILE = () => path.join(app.getPath("userData"), "jarvis-key.bin");
+const JARVIS_POLL_MS = 5_000;
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 let pill: BrowserWindow | null = null;
@@ -71,6 +74,99 @@ function writeToken(token: string | null): boolean {
   if (!safeStorage.isEncryptionAvailable()) return false;
   writeFileSync(TOKEN_FILE(), safeStorage.encryptString(token), { mode: 0o600 });
   return true;
+}
+
+/** The JARVIS device key, encrypted by the OS like the token; never sent anywhere. */
+function readDeviceKey(): DeviceKey | null {
+  if (!existsSync(JARVIS_KEY_FILE()) || !safeStorage.isEncryptionAvailable()) return null;
+  try {
+    return JSON.parse(safeStorage.decryptString(readFileSync(JARVIS_KEY_FILE()))) as DeviceKey;
+  } catch {
+    return null;
+  }
+}
+
+function writeDeviceKey(key: DeviceKey | null): void {
+  if (!key) {
+    if (existsSync(JARVIS_KEY_FILE())) writeFileSync(JARVIS_KEY_FILE(), Buffer.alloc(0));
+    return;
+  }
+  writeFileSync(JARVIS_KEY_FILE(), safeStorage.encryptString(JSON.stringify(key)), { mode: 0o600 });
+}
+
+let jarvisBusy = false;
+const trackedTasks = new Set<string>();
+const askedSteps = new Set<string>();
+
+/** Native approval for the exact external action the server computed (recipient + file
+ * hashes); the decision echoes the server's scope hash so nothing else can be approved. */
+async function followTasks(): Promise<void> {
+  const client = createEzoClient(settings.apiUrl, readToken());
+  for (const taskId of [...trackedTasks]) {
+    const task = await client.jarvisTask(taskId);
+    const step = task.steps.find((s) => s.state === "awaiting_authorization" && s.scope_sha256);
+    if (step && !askedSteps.has(step.id)) {
+      askedSteps.add(step.id);
+      const files = (step.output.documents ?? []).map((d) => `• ${d.filename} (${d.sha256.slice(0, 12)}…)`).join("\n");
+      const { response } = await dialog.showMessageBox({
+        type: "warning",
+        buttons: ["Yuborishga ruxsat beraman", "Rad etish"],
+        defaultId: 1,
+        cancelId: 1,
+        title: "EZO JARVIS — tasdiq",
+        message: `Telegram’da ${step.output.recipient ?? "?"}${step.output.telegram_name ? ` (${step.output.telegram_name})` : ""}ga yuborilsinmi?`,
+        detail: files,
+      });
+      await client.decideJarvisStep(task.id, step.id, step.scope_sha256!, response === 0);
+      continue;
+    }
+    if (["completed", "failed", "cancelled"].includes(task.state)) {
+      trackedTasks.delete(taskId);
+      pill?.webContents.send("notice", task.report);
+    }
+  }
+}
+
+/** Poll the owner's EZO server for this device's JARVIS work; ask the owner before
+ * any file leaves the computer; sign and return the result. */
+async function pollJarvis(): Promise<void> {
+  const deviceId = settings.jarvisDeviceId;
+  const key = readDeviceKey();
+  if (jarvisBusy || !deviceId || !key) return;
+  jarvisBusy = true;
+  try {
+    const client = createEzoClient(settings.apiUrl, readToken());
+    for (const item of await client.deviceWork(deviceId)) {
+      if (!validWork(item, deviceId, Math.floor(Date.now() / 1000))) continue;
+      let outcome: Parameters<typeof buildResult>[2];
+      if (!settings.jarvisFolder) {
+        outcome = { refused: "No folder is allowed for JARVIS on this computer." };
+      } else {
+        const latest = await latestDocuments(settings.jarvisFolder, item.count, item.extensions);
+        const names = latest.files.map((f) => `• ${f.name}`).join("\n") || "(mos fayl topilmadi)";
+        const { response } = await dialog.showMessageBox({
+          type: "question",
+          buttons: ["Yuborish", "Rad etish"],
+          defaultId: 1,
+          cancelId: 1,
+          title: "EZO JARVIS",
+          message: "EZO vazifasi shu fayllarni sizning EZO serveringizga yuborishni so‘rayapti:",
+          detail: `${names}\n\nPapka: ${settings.jarvisFolder}\nTashqariga yuborish (masalan, Telegram) alohida tasdiqlanadi.`,
+        });
+        outcome = response === 0 ? latest : { refused: "The owner declined on the device." };
+      }
+      const result = await buildResult(item, key, outcome);
+      const task = await client.submitDeviceResult(deviceId, result);
+      pill?.webContents.send("notice", task.report || `JARVIS vazifasi: ${task.state}`);
+    }
+    await followTasks();
+  } catch (error) {
+    if (error instanceof EzoApiError && (error.code === "not_paired" || error.status === 404)) {
+      saveSettings({ ...settings, jarvisDeviceId: null });
+    }
+  } finally {
+    jarvisBusy = false;
+  }
 }
 
 const GUI_APPS = new Set(["calc.exe", "notepad.exe", "mspaint.exe", "explorer.exe"]);
@@ -135,6 +231,7 @@ const assistant = createAssistant({
   },
   captureScreen,
   saveConversation: (id) => saveSettings({ ...settings, conversationId: id }),
+  trackTask: (id) => trackedTasks.add(id),
 });
 
 interface TurnResponse {
@@ -265,7 +362,14 @@ function registerIpc(): void {
     platform: process.platform,
   }));
   ipcMain.handle("settings:save", (_event, next: unknown) => {
-    const merged = sanitizeSettings({ ...settings, ...(next as object), allowedFolders: settings.allowedFolders });
+    const merged = sanitizeSettings({
+      ...settings,
+      ...(next as object),
+      // Folder grants and pairing change only through their own explicit flows.
+      allowedFolders: settings.allowedFolders,
+      jarvisFolder: settings.jarvisFolder,
+      jarvisDeviceId: settings.jarvisDeviceId,
+    });
     saveSettings(merged);
     registerShortcut();
     return settings;
@@ -286,6 +390,58 @@ function registerIpc(): void {
   ipcMain.handle("settings:forget-conversation", () => {
     saveSettings({ ...settings, conversationId: null });
     return settings;
+  });
+  ipcMain.handle("jarvis:choose-folder", async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+      title: "JARVIS faqat shu papkadagi eng yangi hujjatlarni o‘qiy oladi (masalan, Downloads)",
+      defaultPath: app.getPath("downloads"),
+    });
+    const folder = result.filePaths[0];
+    if (!result.canceled && folder) saveSettings({ ...settings, jarvisFolder: folder });
+    return settings;
+  });
+  ipcMain.handle("jarvis:clear-folder", () => {
+    saveSettings({ ...settings, jarvisFolder: null });
+    return settings;
+  });
+  ipcMain.handle("jarvis:pair", async () => {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, message: "Tizimning shifrlangan saqlash joyi yo‘q: kalitni saqlab bo‘lmaydi." };
+    }
+    const key = generateDeviceKey();
+    try {
+      const client = createEzoClient(settings.apiUrl, readToken());
+      const body = pairingRequest(key, `EZO — ${process.env.COMPUTERNAME ?? "kompyuter"}`.slice(0, 80), process.platform === "win32" ? "windows" : "linux");
+      const paired = await client.requestPairing(body);
+      writeDeviceKey(key);
+      saveSettings({ ...settings, jarvisDeviceId: paired.device.id });
+      return { ok: true, code: paired.code, message: "Shu kodni EZO ilovasidagi JARVIS sahifasiga kiriting (10 daqiqa amal qiladi)." };
+    } catch (error) {
+      return { ok: false, message: error instanceof EzoApiError ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle("jarvis:unpair", async () => {
+    if (settings.jarvisDeviceId) {
+      try {
+        await createEzoClient(settings.apiUrl, readToken()).revokeDevice(settings.jarvisDeviceId);
+      } catch {
+        // offline: the local key is still destroyed, so this PC can no longer sign results
+      }
+    }
+    writeDeviceKey(null);
+    saveSettings({ ...settings, jarvisDeviceId: null });
+    return settings;
+  });
+  ipcMain.handle("jarvis:status", async () => {
+    if (!settings.jarvisDeviceId) return { paired: false, status: "none" };
+    try {
+      const devices = await createEzoClient(settings.apiUrl, readToken()).devices();
+      const me = devices.find((d) => d.id === settings.jarvisDeviceId);
+      return { paired: me?.status === "paired", status: me?.status ?? "unknown" };
+    } catch (error) {
+      return { paired: false, status: "error", message: error instanceof EzoApiError ? error.message : String(error) };
+    }
   });
   ipcMain.handle("settings:test", async () => {
     const client = createEzoClient(settings.apiUrl, readToken());
@@ -343,6 +499,7 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
     createPill();
     createTray();
     registerShortcut();
+    setInterval(() => void pollJarvis(), JARVIS_POLL_MS);
     if (!readToken() && settings.apiUrl.startsWith("https:")) openSettings();
   });
   app.on("will-quit", () => globalShortcut.unregisterAll());

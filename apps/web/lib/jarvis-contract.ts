@@ -2,9 +2,9 @@
  * Client-side mirror of the CANONICAL backend JARVIS contract
  * (apps/api/src/ezo_api/api/routes/jarvis.py, docs/integration/MASTER_API_CONTRACT.md).
  *
- * The backend exposes exactly four JARVIS routes. None of them plans, executes,
- * pairs a device, reads a file, makes a PDF or sends a Telegram message. This module
- * therefore only models those four routes. Do not add endpoints here until the
+ * Capability, calculation and receipt routes are modelled here; governed tasks,
+ * devices and recipients use `jarvisCall` in jarvis-api.ts with literal routes.
+ * Do not add endpoints until the
  * canonical backend (Codex/Claude) ships and documents them; `jarvis-contract.test.ts`
  * fails if the frontend references a route the backend does not declare.
  */

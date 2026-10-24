@@ -257,3 +257,13 @@ Do not label checkpoints as measured mastery or automatically submit reviews.
 A prerequisite can become unsatisfied after a lapse or an overdue review.
 `project_id` remains exact; goal progress and memory consent are independent.
 UI integration/acceptance remains pending with Antigravity; no frontend changed.
+
+## JARVIS governed tasks (added by `feat/jarvis-task-engine`)
+
+Routes under `/api/jarvis`: `POST /devices/pairing`, `POST /devices/{id}/confirm`,
+`DELETE /devices/{id}`, `GET /devices`, `GET /devices/{id}/work`,
+`POST /devices/{id}/results`, `POST|GET /telegram/recipients`,
+`POST /telegram/recipients/{id}/verify`, `POST|GET /tasks`, `GET /tasks/{id}`,
+`POST /tasks/{id}/steps/{step_id}/decision`, `POST /tasks/{id}/cancel`,
+`POST /tasks/{id}/retry`. Errors use `{"error": {"code", "message"}}`. Semantics,
+signatures and approval binding: [JARVIS_TASK_ENGINE.md](../master/JARVIS_TASK_ENGINE.md).
