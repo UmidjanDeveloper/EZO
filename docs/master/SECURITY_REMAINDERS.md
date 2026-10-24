@@ -42,3 +42,53 @@ independent review. Deployment still requires external review and owner approval
 
 No live cloud backup, production tenant probe, provider quality assessment, VM
 escape test or4/8GB benchmark was performed. These remain explicit release gates.
+
+## Final Master Mission security status (2026-10-24)
+
+Fixed and merged:
+- pypdf 6.21.1 → 6.21.2: CVE-2026-115572, -115580, -115585 (#37).
+- The container gate now names each fixable HIGH/CRITICAL finding.
+
+No scan threshold was changed and no ignore entry was added.
+
+Fixed in drafts that still need independent review:
+- **#39 (audit F18–F25)**
+  - memory recall honours consent;
+  - chat file tools report failures honestly;
+  - presentation images and Office conversion are refused without verified isolation;
+  - Student raw-upload quotas;
+  - local-mode Origin check;
+  - typed spreadsheet cells.
+- **#41 (JARVIS)**
+  - devices pair with Ed25519 proof of possession plus an owner-typed code;
+  - device results are signed;
+  - approvals are bound to a SHA-256 step scope and used once;
+  - untrusted documents are parsed only in a separate worker process;
+  - no AI text becomes a shell command;
+  - Telegram sends count only with a receipt, and `delivery_unknown` is never retried;
+  - the bot cannot message arbitrary contacts: a recipient must press Start.
+- **#48 (accounts)**
+  - per-user tokens are stored as SHA-256 and shown once;
+  - revoked, expired and disabled tokens are refused at the edge before the body is read;
+  - a token-store outage fails closed (503);
+  - rate limits are per caller;
+  - quotas are durable and checked under a row lock;
+  - tiers never grant authority.
+
+  A fresh-agent read found seven defects, all fixed before the PR was opened. That read
+  does **not** replace the independent review.
+- **#43 (Chrome extension)**
+  - page text leaves the page only after the user sees a preview and confirms;
+  - permissions are limited to activeTab, scripting and storage;
+  - the token is kept in session storage.
+
+Still open:
+- distro HIGHs listed above;
+- the dev-only `braces` advisory;
+- F27 (VoiceStudio image pinned to a tag, not a digest);
+- F26 (i18n; not a security issue);
+- K4 sandbox absent, so general code execution stays disabled;
+- the executor host is not provisioned, so native document paths stay disabled.
+
+No API keys are shipped in desktop, mobile or extension packages. Keys live only in the
+server `.env`.

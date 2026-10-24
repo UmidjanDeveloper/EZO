@@ -115,7 +115,8 @@ Merged by the owner during the mission: [#37](https://github.com/UmidjanDevelope
 
 ## Checkpoint (resume here)
 
-- **Active workstream:** final release audit and acceptance documents (#40).
+- **Active workstream:** release documents are written (`EZO_FINAL_RELEASE_AUDIT.md`, acceptance, approvals, matrices, security status, install guides). Keep them current as PRs merge.
+- **Merge order and conflicts:** see the release audit §2. Only #48 conflicts, with #39; the resolution keeps both sides and the combined suite passes (1305 passed, 101 skipped).
 - **Next actionable steps (code-side, no owner needed):**
   1. #42 passes on the emulator. Re-check it after merges.
   2. After the owner merges #41, retarget #48 to the integration branch.
