@@ -12,7 +12,7 @@
 | Artifact | Evidence |
 |---|---|
 | `EZO-Setup-0.1.0.exe` (Windows x64, NSIS, **unsigned**) | Size 114.9 MB. Installed with `/S` to `C:\Users\runneradmin\AppData\Local\Programs\EZO\EZO.exe`. Artifact `ezo-windows`. |
-| `EZO-debug.apk` (Android, package `uz.ezo.mobile`, minSdk 24, target 36) | Built with Gradle `assembleDebug`, label "EZO", sha256 `7a960b608ea9e18ae991c71408cc18551f39f20dfd0d99ab99106624fd410d6f`. Artifact `ezo-android`. **Not installed on any device or emulator yet.** |
+| `EZO-debug.apk` (Android, package `uz.ezo.mobile`, minSdk 24, target 36) | Built with Gradle `assembleDebug`, label "EZO", sha256 `7a960b608ea9e18ae991c71408cc18551f39f20dfd0d99ab99106624fd410d6f`. Artifact `ezo-android`. Installed and driven on an Android 14 emulator in CI (see below); **not yet installed on a physical phone.** |
 
 ## WORKING ON A REAL OS (Windows runner, the installed app's `--self-test`)
 
@@ -24,6 +24,23 @@
 | Volume keys | ok: SendKeys media keys completed (the runner has no audio device, so the volume change itself is not observable) |
 | E (capture half). Screenshot | ok: 156,367-byte PNG of the primary screen. The *explanation* half needs an AI key; see below. |
 | Uzbek command parsing | ok: "Kalkulyatorni och" → `open_app/calculator` |
+
+## WORKING ON AN ANDROID EMULATOR (Devices run [40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627), PR #42)
+
+The debug APK from the same run was installed with `adb install` on a headless Android 14
+emulator (`sdk_gphone64_x86_64`, KVM, `ubuntu-latest`) and driven through its own WebView
+(Playwright `_android`) against a real EZO API (token mode, offline AI, SQLite):
+
+| Step | Result |
+|---|---|
+| App launch | WebView attached at `https://localhost/` |
+| First-run settings | Server `http://10.0.2.2:8000` and token entered like a user; status "Ulandi" |
+| Shared history | A conversation created by another client (desktop) was listed and opened on the phone with its message |
+| Continue from phone | The phone's message was stored by the server in the same conversation |
+| Crash check | No `FATAL EXCEPTION` for `uz.ezo.mobile` in logcat |
+
+An emulator is not the owner's phone: no real Wi‑Fi/LAN, microphone, camera or voice key was
+involved. Scenario F on a physical phone is still pending.
 
 ## WORKING AGAINST A REAL EZO API (local, offline mode, no AI keys)
 
@@ -54,8 +71,8 @@
   - The pipeline is built and unit-tested; no live provider call was made.
 - **E. Screen explanation.** Needs `GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
   on the server.
-- **F. Install the APK and have an Uzbek voice conversation.** Needs a physical Android phone
-  (or emulator) and a voice key.
+- **F. Install the APK and have an Uzbek voice conversation.** Install and shared history pass on
+  an emulator (above); a physical phone on real Wi‑Fi and a voice key are still needed.
 - **G. Summarise a picked document.**
   - Implemented for TXT, MD and CSV; needs a phone and an AI key.
   - PDF and DOCX are **BLOCKED** until the isolated document executor is deployed (PR #33).

@@ -39,6 +39,27 @@ missing from this matrix.
 
 Researching an upstream is not integrating it. The reference owner scenario remains BLOCKED.
 
+## Final Master Mission update, 2026-10-24 (supersedes the audit table where they differ)
+
+No upstream source code was copied in this mission. The JARVIS engine is original EZO code.
+It adopts the upstream patterns named below and links to no upstream runtime.
+
+| Upstream | Status | What changed / still missing |
+|---|---|---|
+| FastAPI | IMPLEMENTED | Unchanged. |
+| LlamaIndex | PARTIAL (thin) | Unchanged. |
+| Ruflo | PARTIAL (concept port) | Unchanged. Unrestricted Ruflo execution is still not imported (owner rule). |
+| VoiceStudio | PARTIAL | Unchanged. AGPL code and noncommercial weights are not copied. Image tag pin (F27) is open because the registry is blocked from this session. Needs an owner licensing decision before any deeper use. |
+| APEX-UI | NOT STARTED | Unchanged; needs Antigravity coordination. |
+| REA | PARTIAL (adapted) | JARVIS `/capabilities` reports device features from **verified prerequisites**: a paired device, a configured Telegram bot, a verified recipient, an executor for Office files. Draft #41. Still no RE engine. |
+| Supabase | PARTIAL | Unchanged. New tables (JARVIS 0023, accounts 0024) get the same PUBLIC/anon/authenticated `REVOKE`. |
+| Microsoft JARVIS | PARTIAL (adapted) | Task-planning pattern adopted as a durable **fixed-rule** planner: task → ordered steps with explicit states, approvals bound to the exact step scope (SHA-256), exact Decimal percentages. Draft #41. No model-driven planning, no upstream code. |
+| OpenJarvis | PARTIAL (adapted) | Typed fixed operations and signed traces extended to Windows: Ed25519 pairing with proof of possession plus an owner-typed code, signed device results, a desktop companion with consent dialogs, Telegram delivery counted only with a `message_id` receipt. Draft #41. No unrestricted shell, REPL, installer or self-improvement imported. |
+
+The reference owner scenario (Downloads → PDF → percentages → Telegram) is implemented
+end to end over HTTP with real keys and signatures. Live acceptance is still BLOCKED on the
+owner's paired PC, a Telegram bot token, a recipient who presses Start, and the executor host.
+
 | Upstream feature | EZO implementation / source files | Working test evidence | License | Status and precise limits |
 |---|---|---|---|---|
 | **LlamaIndex** — typed, provenance-preserving knowledge nodes | Existing `student/synthesis.py` (`llama_nodes`, context), `student/provenance.py`, routes `student_study.py`; pinned core0.14.25 TextNode interchange for real owned excerpts | `tests/integration/test_student_synthesis.py`: real installed TextNode interchange, current owned source/quote validation, comparison/graph model-schema rejection. Part of retained-upstreams.xml run | MIT; LLAMAINDEX_LICENSE.txt | **PARTIAL IMPLEMENTED**. Real context interchange; EZO K2 does retrieval. Not upstream agent/query-engine integration; no whole-book entailment or live model quality proof. |
