@@ -7,6 +7,7 @@ from collections.abc import Awaitable
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from ezo_api.account.http import require_quota
 from ezo_api.api.deps import CurrentUser, ServicesDep, rate_limit
 from ezo_api.knowledge.jobs.service import DocumentJobs, JobError
 from ezo_api.schemas.document_jobs import JobCreate, JobOut, PublicationOut
@@ -23,7 +24,12 @@ async def _call[T](operation: Awaitable[T]) -> T:
         raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
 
 
-@router.post("/documents/{document_id}/jobs", response_model=JobOut, status_code=201)
+@router.post(
+    "/documents/{document_id}/jobs",
+    response_model=JobOut,
+    status_code=201,
+    dependencies=[Depends(require_quota("document_jobs_per_day"))],
+)
 async def enqueue(
     document_id: uuid.UUID, body: JobCreate, user: CurrentUser, services: ServicesDep
 ) -> JobOut:
