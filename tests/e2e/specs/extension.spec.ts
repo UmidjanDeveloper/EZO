@@ -5,6 +5,14 @@ import path from "node:path";
 import { chromium, expect, test } from "@playwright/test";
 
 // Loads the real unpacked MV3 extension in Chromium and checks what it can do by default.
+
+/** The few extension APIs evaluated inside the popup page. */
+declare const chrome: {
+  permissions: { getAll(): Promise<{ permissions?: string[]; origins?: string[] }> };
+  runtime: {
+    getManifest(): { manifest_version: number; background?: unknown; content_scripts?: unknown };
+  };
+};
 const EXT = path.resolve(__dirname, "../../../apps/chrome-extension");
 
 /** Chrome's id for an unpacked extension: sha256 of its absolute path, hex digits a–p. */
