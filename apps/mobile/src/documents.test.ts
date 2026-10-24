@@ -19,15 +19,32 @@ describe("documentPrompt", () => {
     expect(result.ok && result.truncated).toBe(true);
   });
 
-  it("is honest that PDF and DOCX are not supported on the phone yet", () => {
+  it("never parses PDF and DOCX on the phone (EZO Student's isolated worker does)", () => {
     for (const name of ["shartnoma.pdf", "xat.docx"]) {
       const result = documentPrompt(name, b64("x"));
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.reason).toContain("TXT, MD va CSV");
+      if (!result.ok) expect(result.reason).toContain("PDF/DOCX/EPUB");
     }
   });
 
   it("decodes base64 as UTF-8", () => {
     expect(decodeBase64Utf8(b64("Салом ўзбек"))).toBe("Салом ўзбек");
+  });
+});
+
+describe("Student documents on the phone", () => {
+  it("routes PDF/DOCX/EPUB and scans to EZO Student, text files stay on the phone", async () => {
+    const { isStudentDocument, documentPrompt } = await import("./documents");
+    for (const name of ["a.pdf", "b.DOCX", "c.epub", "scan.jpg", "photo.jpeg", "page.png"]) expect(isStudentDocument(name)).toBe(true);
+    for (const name of ["notes.txt", "data.csv", "app.exe", "x.xlsx"]) expect(isStudentDocument(name)).toBe(false);
+    expect(documentPrompt("app.exe", "eA==").ok).toBe(false);
+  });
+
+  it("never invents progress: queued too long says the worker is not running", async () => {
+    const { jobMessage } = await import("./documents");
+    expect(jobMessage("queued", 5)).toBe("Hujjat navbatda…");
+    expect(jobMessage("running", 5)).toBe("Hujjat o‘qilmoqda…");
+    expect(jobMessage("queued", 95)).toContain("ishchisi hozir ishlamayapti");
+    expect(jobMessage("failed", 0, "OCR could not read this scan")).toContain("OCR could not read this scan");
   });
 });

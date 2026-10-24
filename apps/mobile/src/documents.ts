@@ -1,5 +1,6 @@
-// Documents picked on the phone are read ON the phone; only their text is sent to EZO.
-// PDF/DOCX need EZO's isolated document executor, which is not available yet.
+// TXT/MD/CSV picked on the phone are read ON the phone; only their text is sent to EZO.
+// PDF/DOCX/EPUB and scans (PNG/JPEG) go to EZO Student: the server stores the bytes and
+// its isolated document worker reads them (never the API process, never the phone).
 
 export const MAX_DOCUMENT_CHARS = 12_000;
 const TEXT_TYPES = /\.(txt|md|markdown|csv)$/i;
@@ -12,12 +13,37 @@ export function decodeBase64Utf8(base64: string): string {
   return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 }
 
+const STUDENT_TYPES = /\.(pdf|docx|epub|png|jpe?g)$/i;
+export const MAX_STUDENT_BYTES = 5 * 1024 * 1024;
+
+/** Files EZO Student reads in its isolated worker (scans and photos with OCR). */
+export function isStudentDocument(name: string): boolean {
+  return STUDENT_TYPES.test(name);
+}
+
+export function base64Bytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+
+export type JobState = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+/** Honest Uzbek status for a Student job (no progress is invented). */
+export function jobMessage(state: JobState, waitedSeconds: number, error?: string | null): string {
+  if (state === "completed") return "Hujjat o‘qildi. Qisqacha mazmun tayyorlanmoqda…";
+  if (state === "failed") return `Hujjatni o‘qib bo‘lmadi: ${error ?? "noma’lum xato"}`;
+  if (state === "cancelled") return "O‘qish bekor qilindi.";
+  if (waitedSeconds >= 90) {
+    return "Hujjat navbatda turibdi: EZO’ning izolyatsiyalangan hujjat ishchisi hozir ishlamayapti. Tayyor bo‘lganda Student bo‘limida ko‘rinadi.";
+  }
+  return state === "running" ? "Hujjat o‘qilmoqda…" : "Hujjat navbatda…";
+}
+
 export function documentPrompt(name: string, base64: string | undefined): DocumentResult {
   if (!TEXT_TYPES.test(name)) {
     return {
       ok: false,
-      reason:
-        "Hozircha telefonda faqat TXT, MD va CSV hujjatlarni o‘qiy olaman. PDF/DOCX uchun EZO’ning alohida, izolyatsiyalangan hujjat serveri hali ishga tushirilmagan.",
+      reason: "Bu turdagi faylni telefonda o‘qib bo‘lmaydi. TXT/MD/CSV yoki PDF/DOCX/EPUB/rasm tanlang.",
     };
   }
   if (!base64) return { ok: false, reason: "Faylni o‘qib bo‘lmadi." };

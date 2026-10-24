@@ -112,6 +112,22 @@ export function createApi(baseUrl: string, token: string | null, fetchImpl: type
     async speak(text: string, language: Lang | null = "uz"): Promise<Blob> {
       return (await call("/api/voice/speak", post({ text: text.slice(0, 2000), language }))).blob();
     },
+    /** Raw bytes to EZO Student; parsing happens only in the isolated worker. */
+    async uploadStudent(name: string, bytes: Uint8Array): Promise<StudentJob> {
+      return json<StudentJob>(`/api/student/uploads?filename=${encodeURIComponent(name)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: new Blob([bytes.slice()], { type: "application/octet-stream" }),
+      });
+    },
+    studentJob: (jobId: string) => json<StudentJob>(`/api/knowledge/document-jobs/${encodeURIComponent(jobId)}`),
+    async studentSummary(documentId: string): Promise<{ text: string; citations: number }> {
+      const body = await json<{ answer?: string; text?: string; citations?: unknown[] }>(
+        `/api/student/documents/${encodeURIComponent(documentId)}/learn`,
+        post({ kind: "summary", language: "uz" }),
+      );
+      return { text: body.answer ?? body.text ?? "", citations: body.citations?.length ?? 0 };
+    },
     async describeImage(image: Blob, question: string): Promise<string> {
       const form = new FormData();
       form.append("image", image, image.type === "image/png" ? "photo.png" : "photo.jpg");
@@ -123,6 +139,14 @@ export function createApi(baseUrl: string, token: string | null, fetchImpl: type
 }
 
 export type Api = ReturnType<typeof createApi>;
+
+export interface StudentJob {
+  id: string;
+  document_id: string;
+  state: "queued" | "running" | "completed" | "failed" | "cancelled";
+  error_code: string | null;
+  error_message: string | null;
+}
 
 export type Lang = "uz" | "en" | "ru";
 export function asLang(value: string | null | undefined): Lang | null {
