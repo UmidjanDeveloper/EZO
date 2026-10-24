@@ -77,10 +77,14 @@ Fixed in drafts that still need independent review:
 
   A fresh-agent read found seven defects, all fixed before the PR was opened. That read
   does **not** replace the independent review.
-- **#43 (Chrome extension)**
+- **#43 (Chrome extension, merged since)**
   - page text leaves the page only after the user sees a preview and confirms;
   - permissions are limited to activeTab, scripting and storage;
   - the token is kept in session storage.
+- **#49 (extension form filling)**
+  - only field labels are sent; typed values and password/payment/one-time-code/hidden fields are never read;
+  - the AI reply is strictly validated, and every value is shown as text and ticked by the user;
+  - a changed field is not written, the form is never submitted and nothing is clicked.
 
 Still open:
 - distro HIGHs listed above;
