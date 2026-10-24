@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds only (merged over src/main): the private test build may reach an EZO
-     server on the home/office LAN or the emulator host (10.0.2.2) over plain HTTP.
-     Release builds keep Android's default: no cleartext traffic. -->
+<!-- Debug/test builds only: allow plain HTTP to an EZO server on the local network. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:networkSecurityConfig="@xml/network_security_config_debug" />
+    <application android:usesCleartextTraffic="true" />
 </manifest>
