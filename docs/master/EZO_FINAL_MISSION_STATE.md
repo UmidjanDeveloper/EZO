@@ -15,11 +15,19 @@ No completion percentages.
 
 ## Open mission PRs
 
-| PR | Branch | Scope | State |
+| PR | Branch | Scope | Evidence |
 |---|---|---|---|
-| [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) | `feat/security-recovery` | pypdf 6.21.2 (3 CVEs); fixable container CVEs named as annotations | CI + Security all green; awaiting review |
-| [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | `feat/p0-audit-findings` | Audit F18–F25 code fixes + regression tests | Local 1272 passed; CI pending; needs independent review (auth/consent) |
-| #36 | dependabot | 6 Python minor/patch bumps | Not touched; owner/reviewer decision |
+| [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) | `feat/security-recovery` | pypdf 6.21.2 (3 CVEs); container gate names fixable CVEs | CI + Security green; Trivy now passes |
+| [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | `feat/p0-audit-findings` | Audit F18–F25 | 1272 API tests; CI green (Security pending #37) |
+| [#41](https://github.com/UmidjanDeveloper/EZO/pull/41) | `feat/jarvis-task-engine` | JARVIS governed task engine, desktop companion, web console | 1282 API tests; desktop 59; Playwright JARVIS 9/9; CI + Devices + Security green |
+| [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | `feat/android-emulator-acceptance` | Install the APK on an emulator and drive it against a real API | Run in progress (first run hung at boot; bounded and re-run) |
+| [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | `feat/chrome-extension-assist` | Click-only page summary / selection explanation | vitest 15/15; Chromium extension spec 4/4 |
+| [#44](https://github.com/UmidjanDeveloper/EZO/pull/44) | `feat/mobile-student-documents` | Phone PDF/DOCX/EPUB/scans via Student | mobile 12/12 |
+| [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | `feat/ielts-server-voice` | IELTS server STT, long-answer VAD, examiner voice | IELTS e2e 5/5 |
+| [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | `feat/office-artifacts-open-in-libreoffice` | Generated DOCX/XLSX/PPTX open in real LibreOffice | 3/3 locally; added to CI office-tests |
+| [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | `feat/presentation-model-intake` | Model-planned intake; templates labelled | API 7/7; e2e 4/4 |
+| [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | `docs/ezo-final-mission-state` | This file, install guides (UZ), approvals, acceptance | Docs |
+| #36 | dependabot | 6 Python minor/patch bumps | Not touched |
 
 ## Phase status
 
@@ -30,7 +38,7 @@ No completion percentages.
 | 3 Core agent reliability | PARTIAL | F18/F19 fixes in #39. Cross-device conversation proven against local API (Devices run 39988632939). |
 | 4 Student + Office + Presentation | PARTIAL | Isolated OCR/Office executor (PR #33) not deployed/activated; chat Office creation fixed in #39. |
 | 5 IELTS + Personal Intelligence | PARTIAL | Exact text metrics (PR #32); cue card (#39); consent/recall (#39). No live STT scoring. |
-| 6 JARVIS action engine | NOT STARTED (beyond foundation) | Foundation routes only; no durable tasks, pairing, Telegram. |
+| 6 JARVIS action engine | PARTIAL | Engine, pairing, approvals, Telegram contract, desktop companion (#41); live acceptance BLOCKED on owner PC, bot token, executor host. |
 | 7 K4/K5/K6/K8 + multi-user | BLOCKED / PARTIAL | K4 blocked on a verified sandbox host; P8 multi-user not started. |
 | 8 Premium UX + upstreams | PARTIAL | Procedural humanoid (PR #35); APEX-UI not integrated. |
 | 9 Verification + packaging | PARTIAL | Windows NSIS + Android debug APK built in CI (unsigned). |
@@ -72,7 +80,7 @@ No completion percentages.
 | Windows desktop (`apps/desktop`, Electron) | PARTIAL | Unsigned NSIS `EZO-Setup-0.1.0.exe` built and silently installed on `windows-latest`; self-test: open Calculator, scoped file find, dictation into a focused box, screenshot (Devices run 39988632939) | Owner-PC test with mic/speakers + keys; signing; updater |
 | Android (`apps/mobile`, Capacitor) | PARTIAL | Debug APK built (sha256 in `docs/devices/ACCEPTANCE.md`) | Never installed on an emulator/device; Student PDF/DOCX |
 | Web (`apps/web`) | PARTIAL | Playwright 54/54 e2e in CI | — |
-| Chrome extension (`apps/chrome-extension`, MV3) | PARTIAL | Reachability + click-to-read tab only | Approved browser tasks |
+| Chrome extension (`apps/chrome-extension`, MV3) | PARTIAL | Click-only summary/explanation via `/api/chat` with preview + confirm (#43); loads in Chromium with activeTab/scripting/storage only | Form filling / navigation not started |
 | iOS | BLOCKED | No macOS/Xcode host, no Apple account | — |
 
 ## Scenario acceptance (owner's §20)
@@ -86,8 +94,8 @@ No completion percentages.
 | E Real DOCX/XLSX/PPTX/PDF | PARTIAL | REST + chat (#39) produce real files; viewer check pending in release audit |
 | F Android install + shared history | BLOCKED | Emulator/phone |
 | G IELTS evidence-based feedback | PARTIAL | Text metrics; voice needs keys |
-| H Browser capability | NOT STARTED | Extension task flow |
-| I JARVIS document workflow | NOT STARTED | Durable task engine |
+| H Browser capability | PARTIAL | #43; owner Chrome round trip with an AI key |
+| I JARVIS document workflow | PARTIAL | #41; owner PC + executor host for live run |
 | J Downloads → PDF → Telegram | BLOCKED | Paired companion, Telegram provider + recipient authorization |
 
 ## Completed fixes in this mission
@@ -105,12 +113,14 @@ No completion percentages.
 
 ## Checkpoint (resume here)
 
-- **Active workstream:** Phase 3/6 — JARVIS durable governed task engine (task #4).
-- **Next actionable step:** design durable task tables (queued / awaiting_authorization /
-  running / completed / failed / cancelled) + device pairing on top of
-  `api/routes/jarvis.py` and `companion/protocol.py`; Telegram provider adapter that
-  records only real provider receipts.
-- **Then:** Android emulator job in `devices.yml`; Chrome extension approved
-  summarize/explain flow; release audit docs.
+- **Active workstream:** Android emulator acceptance (#42) re-run; then final release audit.
+- **Next actionable steps (code-side, no owner needed):**
+  1. Read #42's annotations (`Android emulator`, `Android step`) and fix any app/test defect it shows.
+  2. Rebase open PRs after the owner merges #37 so Security runs go green.
+  3. Remaining code work: K6 governed PR workflow (contract + approval binding), P8 multi-user
+     accounts/roles/quotas (needs a design decision on sign-up), avatar performance measurement,
+     F26 (i18n of Admin/JARVIS/Student pages), Chrome extension form filling.
+- **Blocked on the owner:** see `EZO_REMAINING_EXTERNAL_APPROVALS.md`.
 - **Commands:** `git fetch origin && git checkout -B <branch> origin/claude/gifted-goodall-bpf01s`;
-  API tests `cd apps/api && uv run pytest -q`; web `pnpm -C apps/web lint typecheck test`.
+  API `cd apps/api && uv run pytest -q`; web `pnpm -C apps/web lint typecheck test`;
+  e2e `pnpm --filter @ezo/e2e exec playwright test specs/<name>.spec.ts`.
