@@ -77,6 +77,8 @@ async def test_semantic_memory_vectors_follow_memories(client: AsyncClient, app:
 async def test_semantic_memory_retrieval_is_selective(
     client: AsyncClient, fake_anthropic: FakeProvider
 ) -> None:
+    # Saved memories are only recalled with explicit recall permission (F18).
+    await client.patch("/api/me/preferences", json={"memory_recall": True})
     await client.post(
         "/api/memories", json={"content": "Yashil choy ichishni yaxshi ko'raman", "importance": 0.6}
     )

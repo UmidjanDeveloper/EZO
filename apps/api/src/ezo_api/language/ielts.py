@@ -166,12 +166,20 @@ class IeltsState:
         )
 
 
-def new_test(seed: str) -> IeltsState:
-    """Pick Part 1 questions and a cue card (deterministic per session)."""
+def new_test(seed: str, card_id: str | None = None) -> IeltsState:
+    """Pick Part 1 questions and a cue card (deterministic per session).
+
+    `card_id` is the Part 2 card the learner chose; unknown ids raise ValueError.
+    """
     rng = random.Random(seed)  # noqa: S311 - question choice, not security
     topics = rng.sample(sorted(PART1_TOPICS), 2)
     questions = PART1_TOPICS[topics[0]] + PART1_TOPICS[topics[1]][:2]
     card = rng.choice(CUE_CARDS)
+    if card_id is not None:
+        chosen = next((c for c in CUE_CARDS if c.id == card_id), None)
+        if chosen is None:
+            raise ValueError("Unknown cue card")
+        card = chosen
     return IeltsState(part1=questions[:PART1_QUESTIONS_PER_TEST], cue_card=card.id)
 
 

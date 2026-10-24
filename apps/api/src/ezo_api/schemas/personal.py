@@ -50,6 +50,10 @@ class PersonalGoalOut(BaseModel):
 class MemoryConsentUpdate(BaseModel):
     consent: bool = Field(description="Explicit consent to capture memories from interactions")
     auto_memory: bool = Field(default=False, description="Enable automatic memory suggestions")
+    recall: bool | None = Field(
+        default=None,
+        description="Use saved memories in replies. Omitted: follows consent (revoking stops it).",
+    )
 
 
 class PersonalIntelligenceProfile(BaseModel):
@@ -59,6 +63,7 @@ class PersonalIntelligenceProfile(BaseModel):
     role: str
     memory_consent: bool
     auto_memory: bool
+    memory_recall: bool
     preferences: Preferences
     memory_stats: dict[str, Any]
     goals_stats: dict[str, Any]
