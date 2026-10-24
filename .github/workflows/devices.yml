@@ -5,9 +5,9 @@ name: Devices
 on:
   push:
     branches: ["claude/**"]
-    paths: ["apps/desktop/**", "apps/mobile/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]
+    paths: ["apps/desktop/**", "apps/mobile/**", "tests/e2e/devices/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]
   pull_request:
-    paths: ["apps/desktop/**", "apps/mobile/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]
+    paths: ["apps/desktop/**", "apps/mobile/**", "tests/e2e/devices/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]
   workflow_dispatch:
 
 permissions:
@@ -63,9 +63,11 @@ jobs:
           retention-days: 14
 
   android-apk:
-    name: Android debug APK (installable test build)
+    name: Android debug APK (build, then install and drive it on an emulator)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 70
+    env:
+      EZO_TOKEN: emulator-ci-token-not-a-secret-0123456789
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
@@ -101,3 +103,91 @@ jobs:
             ${{ runner.temp }}/EZO-debug.apk
             ${{ runner.temp }}/apk-badging.txt
           retention-days: 14
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.32"
+      - name: Install the Playwright Android driver
+        run: pnpm install --frozen-lockfile --filter @ezo/e2e...
+      - name: Start a real EZO API (token mode, offline AI, SQLite)
+        working-directory: apps/api
+        env:
+          DATABASE_URL: sqlite:///${{ runner.temp }}/emulator.db
+          EZO_STORAGE_DIR: ${{ runner.temp }}/storage
+          EZO_ENV: test
+          EZO_AUTH_MODE: token
+          EZO_API_TOKEN: ${{ env.EZO_TOKEN }}
+          EZO_CORS_ORIGINS: https://localhost
+        run: |
+          uv sync --frozen
+          uv run alembic upgrade head
+          nohup uv run uvicorn ezo_api.main:create_app --factory --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/api.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8000/api/health && break; sleep 2; done
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Boot an Android 34 emulator (headless)
+        run: |
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" > /dev/null
+          echo no | avdmanager create avd -n ezo -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force
+          nohup emulator -avd ezo -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          adb wait-for-device
+          for i in $(seq 1 120); do
+            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
+            sleep 3
+          done
+          adb shell getprop ro.build.version.release
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+      - name: Install the APK built by the previous job
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          adb install -r "$RUNNER_TEMP/EZO-debug.apk"
+          adb shell pm list packages | grep uz.ezo.mobile
+      - name: Drive the real app (connect, shared conversation, send from phone)
+        env:
+          EZO_API: http://127.0.0.1:8000
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          mkdir -p "$RUNNER_TEMP/android-shots"
+          node tests/e2e/devices/android-smoke.mjs "$RUNNER_TEMP/android-report.json" "$RUNNER_TEMP/android-shots"
+      - name: Crash check (logcat)
+        if: always()
+        run: |
+          export PATH="$ANDROID_HOME/platform-tools:$PATH"
+          adb logcat -d > "$RUNNER_TEMP/logcat.txt" || true
+          if grep -E "FATAL EXCEPTION.*|Process: uz.ezo.mobile" "$RUNNER_TEMP/logcat.txt" | grep -q "uz.ezo.mobile"; then
+            grep -A20 "FATAL EXCEPTION" "$RUNNER_TEMP/logcat.txt" | head -60
+            exit 1
+          fi
+      - name: Report
+        if: always()
+        run: |
+          cat "$RUNNER_TEMP/android-report.json" || true
+          python3 - <<'PY'
+          import json, os
+          path = os.path.join(os.environ["RUNNER_TEMP"], "android-report.json")
+          try:
+              report = json.load(open(path))
+          except Exception:
+              report = {"ok": False, "steps": []}
+          print(f"::notice title=Android emulator::ok={report['ok']} steps={len(report['steps'])}")
+          for s in report["steps"]:
+              print(f"::notice title=Android step::{s['name']} {s.get('detail','')}"[:900])
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: ezo-android-emulator
+          path: |
+            ${{ runner.temp }}/android-report.json
+            ${{ runner.temp }}/android-shots/
+            ${{ runner.temp }}/logcat.txt
+            ${{ runner.temp }}/api.log
+            ${{ runner.temp }}/emulator.log
+          retention-days: 14
+
