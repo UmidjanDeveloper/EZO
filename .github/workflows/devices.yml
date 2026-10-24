@@ -131,22 +131,40 @@ jobs:
         timeout-minutes: 20
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
+          # avdmanager and the emulator must agree on where AVDs live.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
           note() { echo "::notice title=Android emulator::$*"; }
-          fail() { echo "::error title=Android emulator::$*"; tail -40 "$RUNNER_TEMP/emulator.log" 2>/dev/null || true; exit 1; }
+          # Logs are not always readable, so the evidence goes into annotations too.
+          fail() {
+            echo "::error title=Android emulator::$*"
+            for f in sdkmanager.log avdmanager.log emulator.log; do
+              [ -s "$RUNNER_TEMP/$f" ] || continue
+              tail -12 "$RUNNER_TEMP/$f" | tr -d '\r' | grep -v '^[[:space:]]*$' | while IFS= read -r line; do
+                echo "::warning title=$f::${line:0:400}"
+              done
+            done
+            exit 1
+          }
           ls -l /dev/kvm || fail "no /dev/kvm on this runner"
           yes | sdkmanager --licenses > /dev/null || true
           timeout 600 sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" \
             > "$RUNNER_TEMP/sdkmanager.log" 2>&1 || { tail -20 "$RUNNER_TEMP/sdkmanager.log"; fail "sdkmanager install failed"; }
           note "system image installed"
-          echo no | avdmanager create avd -n ezo -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force > /dev/null \
-            || fail "avdmanager could not create the AVD"
+          echo no | avdmanager create avd -n ezo -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force \
+            > "$RUNNER_TEMP/avdmanager.log" 2>&1 || fail "avdmanager could not create the AVD"
+          emulator -list-avds | grep -qx ezo || fail "the emulator does not see the AVD (found: $(emulator -list-avds | tr '\n' ' '))"
           nohup emulator -avd ezo -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel on \
             > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator_pid=$!
+          sleep 10
+          kill -0 "$emulator_pid" 2>/dev/null || fail "the emulator process exited right after start"
           timeout 300 adb wait-for-device || fail "emulator did not appear in adb within 5 minutes"
           note "emulator visible to adb"
           booted=""
           for i in $(seq 1 120); do
-            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then booted=1; break; fi
+            if [ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then booted=1; break; fi
             sleep 5
           done
           [ -n "$booted" ] || fail "Android did not finish booting within 10 minutes"
@@ -168,9 +186,12 @@ jobs:
           node tests/e2e/devices/android-smoke.mjs "$RUNNER_TEMP/android-report.json" "$RUNNER_TEMP/android-shots"
       - name: Crash check (logcat)
         if: always()
+        timeout-minutes: 3
         run: |
           export PATH="$ANDROID_HOME/platform-tools:$PATH"
-          adb logcat -d > "$RUNNER_TEMP/logcat.txt" || true
+          # adb waits forever for a device; skip when the emulator never came up.
+          if ! adb devices | grep -q "device$"; then echo "No emulator attached; nothing to check."; exit 0; fi
+          timeout 60 adb logcat -d > "$RUNNER_TEMP/logcat.txt" || true
           if grep -E "FATAL EXCEPTION.*|Process: uz.ezo.mobile" "$RUNNER_TEMP/logcat.txt" | grep -q "uz.ezo.mobile"; then
             grep -A20 "FATAL EXCEPTION" "$RUNNER_TEMP/logcat.txt" | head -60
             exit 1
