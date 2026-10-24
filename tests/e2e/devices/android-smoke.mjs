@@ -54,14 +54,33 @@ try {
   await device.screenshot({ path: path.join(shotsDir, "2-connected.png") });
 
   // 3. The desktop's conversation is listed and opens with its message.
-  const select = page.locator("#conversation");
-  await page.waitForFunction(
-    (id) => [...document.querySelectorAll("#conversation option")].some((o) => o.value === id),
-    desktop.conversation_id,
-    { timeout: 60_000 },
-  );
-  await select.selectOption(desktop.conversation_id);
-  await page.getByText("bu desktopdan yozilgan xabar").first().waitFor({ timeout: 60_000 });
+  const phoneState = () =>
+    page.evaluate(() => ({
+      chatHidden: document.getElementById("chatTab")?.hidden,
+      status: document.getElementById("status")?.textContent,
+      selected: document.querySelector("#conversation")?.value,
+      options: [...document.querySelectorAll("#conversation option")].map((o) => o.value).slice(0, 5),
+      bubbles: [...document.querySelectorAll("#messages .bubble")].map((b) => b.textContent?.slice(0, 60)),
+    }));
+  try {
+    await page.waitForFunction(
+      (id) => [...document.querySelectorAll("#conversation option")].some((o) => o.value === id),
+      desktop.conversation_id,
+      { timeout: 60_000 },
+    );
+    step("desktop conversation listed on the phone");
+    await page.locator("#conversation").selectOption(desktop.conversation_id);
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll("#messages .bubble")].some((b) =>
+          b.textContent?.includes("bu desktopdan yozilgan xabar"),
+        ),
+      undefined,
+      { timeout: 60_000 },
+    );
+  } catch (error) {
+    throw new Error(`${String(error).split("\n")[0]} | phone state: ${JSON.stringify(await phoneState())}`);
+  }
   step("desktop conversation visible on the phone");
 
   // 4. The phone continues it; the server stores the phone's message in the same thread.

@@ -210,6 +210,9 @@ jobs:
           print(f"::notice title=Android emulator::ok={report['ok']} steps={len(report['steps'])}")
           for s in report["steps"]:
               print(f"::notice title=Android step::{s['name']} {s.get('detail','')}"[:900])
+          if report.get("error"):
+              first = " ".join(report["error"].split())
+              print(f"::error title=Android smoke failed::{first}"[:1800])
           PY
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
