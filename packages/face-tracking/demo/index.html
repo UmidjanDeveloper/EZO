@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>EZO permissioned tracking acceptance</title>
+<h1>EZO camera tracking</h1><p>Local head pose and face position, not physical eye gaze. Camera off until Enable. No recording or upload.</p>
+<button id="enable">Enable camera</button><button id="disable">Disable camera</button><p id="indicator" role="status">Camera off</p><p id="error" role="alert"></p>
+<video id="video" width="320" height="240" muted playsinline></video><pre id="output">No camera data</pre>
+<script type="module">
+import {CameraTracker,mediaPipeEstimator} from './build/index.js';
+const tracker=new CameraTracker({video:document.querySelector('#video'),indicator:document.querySelector('#indicator'),onStatus:(s,e)=>{document.querySelector('#error').textContent=e??'';},onFrame:f=>{document.querySelector('#output').textContent=f?JSON.stringify(f,null,2):'No reliable tracking — use avatar idle motion';},createEstimator:async()=>{
+ const {FilesetResolver,FaceLandmarker}=await import('./assets/vision_bundle.mjs');
+ const files=await FilesetResolver.forVisionTasks('./assets/wasm');
+ // CPU is the conservative default; no GPU required, no automatic CDN resolution.
+ return mediaPipeEstimator(await FaceLandmarker.createFromOptions(files,{baseOptions:{modelAssetPath:'./assets/face_landmarker.task',delegate:'CPU'},runningMode:'VIDEO',numFaces:1,outputFacialTransformationMatrixes:true,minFaceDetectionConfidence:0.6,minFacePresenceConfidence:0.6,minTrackingConfidence:0.6}));
+}});
+document.querySelector('#enable').onclick=()=>void tracker.start();document.querySelector('#disable').onclick=()=>tracker.stop();window.addEventListener('pagehide',()=>tracker.stop());
+</script></html>
