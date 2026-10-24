@@ -128,18 +128,29 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Boot an Android 34 emulator (headless)
+        timeout-minutes: 20
         run: |
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$PATH"
-          yes | sdkmanager --licenses > /dev/null
-          sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" > /dev/null
-          echo no | avdmanager create avd -n ezo -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force
-          nohup emulator -avd ezo -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
-          adb wait-for-device
+          note() { echo "::notice title=Android emulator::$*"; }
+          fail() { echo "::error title=Android emulator::$*"; tail -40 "$RUNNER_TEMP/emulator.log" 2>/dev/null || true; exit 1; }
+          ls -l /dev/kvm || fail "no /dev/kvm on this runner"
+          yes | sdkmanager --licenses > /dev/null || true
+          timeout 600 sdkmanager --install "emulator" "platform-tools" "system-images;android-34;google_apis;x86_64" \
+            > "$RUNNER_TEMP/sdkmanager.log" 2>&1 || { tail -20 "$RUNNER_TEMP/sdkmanager.log"; fail "sdkmanager install failed"; }
+          note "system image installed"
+          echo no | avdmanager create avd -n ezo -k "system-images;android-34;google_apis;x86_64" -d pixel_6 --force > /dev/null \
+            || fail "avdmanager could not create the AVD"
+          nohup emulator -avd ezo -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel on \
+            > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          timeout 300 adb wait-for-device || fail "emulator did not appear in adb within 5 minutes"
+          note "emulator visible to adb"
+          booted=""
           for i in $(seq 1 120); do
-            [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break
-            sleep 3
+            if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then booted=1; break; fi
+            sleep 5
           done
-          adb shell getprop ro.build.version.release
+          [ -n "$booted" ] || fail "Android did not finish booting within 10 minutes"
+          note "booted Android $(adb shell getprop ro.build.version.release | tr -d '\r')"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
