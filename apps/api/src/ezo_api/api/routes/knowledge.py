@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ezo_api.account.http import require_quota
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.models import (
     DocumentRevision,
@@ -55,6 +56,8 @@ _PUBLIC_META = (
     "ocr",
     "refresh_observation",
 )
+# Counted per user and day for owner-managed accounts (the owner is unlimited).
+DOCUMENT_QUOTA = [Depends(require_quota("document_jobs_per_day"))]
 
 
 def _rejected(exc: UploadRejectedError | FetchError) -> HTTPException:
@@ -192,7 +195,7 @@ async def list_documents(
     return [await _document_out(session, d) for d in documents]
 
 
-@router.post("/documents", status_code=201)
+@router.post("/documents", status_code=201, dependencies=DOCUMENT_QUOTA)
 async def upload_document(
     session: SessionDep,
     user: CurrentUser,
@@ -240,7 +243,7 @@ async def upload_document(
     )
 
 
-@router.post("/urls", status_code=201)
+@router.post("/urls", status_code=201, dependencies=DOCUMENT_QUOTA)
 async def add_url(
     body: UrlIn, session: SessionDep, user: CurrentUser, services: ServicesDep, response: Response
 ) -> UploadOut:
@@ -313,7 +316,7 @@ async def get_document(
     )
 
 
-@router.post("/documents/{document_id}/reindex")
+@router.post("/documents/{document_id}/reindex", dependencies=DOCUMENT_QUOTA)
 async def reindex_document(
     document_id: uuid.UUID, session: SessionDep, user: CurrentUser, services: ServicesDep
 ) -> KnowledgeDocumentOut:

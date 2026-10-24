@@ -312,7 +312,10 @@ class JarvisService:
         idempotency_key: str,
         device_id: uuid.UUID | None = None,
         language: str = "uz",
+        admit: Callable[[], Awaitable[None]] | None = None,
     ) -> JarvisTask:
+        """`admit` runs only when a new task is about to be stored (quota accounting), so
+        an idempotent retry or a refused request never counts."""
         existing = await self.session.scalar(
             select(JarvisTask).where(
                 JarvisTask.user_id == user_id, JarvisTask.idempotency_key == idempotency_key
@@ -336,6 +339,8 @@ class JarvisService:
             raise JarvisError("too_many_tasks", "Finish or cancel open tasks first.", 429)
         device = await self._choose_device(user_id, device_id)
         recipient = await self._resolve_recipient(user_id, plan)
+        if admit is not None:
+            await admit()
         task = JarvisTask(
             user_id=user_id,
             device_id=device.id,

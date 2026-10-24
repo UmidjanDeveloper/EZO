@@ -52,7 +52,7 @@ from ezo_api.db.models.project import Project
 from ezo_api.db.models.student import StudentRawRevision
 from ezo_api.db.models.study import StudentLearningPath, StudyCard, StudyReview
 from ezo_api.db.models.translation import GlossaryTerm
-from ezo_api.db.models.user import User
+from ezo_api.db.models.user import UsageEvent, User, UserToken
 
 __all__ = [
     "AgentRun",
@@ -105,6 +105,8 @@ __all__ = [
     "StudyReview",
     "TelegramRecipient",
     "ToolCall",
+    "UsageEvent",
     "User",
+    "UserToken",
     "VectorEntry",
 ]

@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -21,6 +21,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from ezo_api import __version__
 from ezo_api.api.routes import (
     academic,
+    accounts,
     artifacts,
     career,
     chat,
@@ -93,6 +94,20 @@ def _error(status: int, code: str, message: str, **extra: object) -> JSONRespons
     return JSONResponse(
         status_code=status, content={"error": {"code": code, "message": message, **extra}}
     )
+
+
+def _user_token_validator(services: Services) -> Callable[[str], Awaitable[str | None]]:
+    """Edge check for owner-issued per-user tokens (hash lookup, no body read).
+
+    Returns the rate-limit key of the token's user, or None when the token is invalid."""
+    from ezo_api.auth.local import user_for_token
+
+    async def validate(token: str) -> str | None:
+        async with services.db.sessionmaker() as session:
+            user = await user_for_token(session, token)
+            return None if user is None else f"user:{user.id}"
+
+    return validate
 
 
 def create_app(
@@ -177,6 +192,7 @@ def create_app(
         if settings.deployment_profile == "free-beta"
         else settings.max_upload_bytes + 2 * 1024 * 1024,
         free_beta=settings.deployment_profile == "free-beta",
+        token_validator=_user_token_validator(services),
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
@@ -263,6 +279,7 @@ def create_app(
         academic,
         career,
         learning,
+        accounts,
     ):
         app.include_router(module.router)
 

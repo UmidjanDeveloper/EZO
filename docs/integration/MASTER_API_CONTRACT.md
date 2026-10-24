@@ -267,3 +267,38 @@ Routes under `/api/jarvis`: `POST /devices/pairing`, `POST /devices/{id}/confirm
 `POST /tasks/{id}/steps/{step_id}/decision`, `POST /tasks/{id}/cancel`,
 `POST /tasks/{id}/retry`. Errors use `{"error": {"code", "message"}}`. Semantics,
 signatures and approval binding: [JARVIS_TASK_ENGINE.md](../master/JARVIS_TASK_ENGINE.md).
+
+## Owner-managed accounts and quotas (added by `feat/p8-multi-user`)
+
+No self-signup, no billing. In local mode the only caller is the installation owner.
+In token mode a request is authenticated by the owner token **or** a per-user token
+(`ezo_u_…`, random, shown once, stored only as SHA-256, revocable, default expiry 90 days).
+The edge guard validates both before any body is read.
+
+| Route | Caller | Notes |
+|---|---|---|
+| `GET /api/account/usage` | any user | `{tier, unlimited, usage:[{quota, used, limit}]}`, counted server-side |
+| `GET /api/admin/users` | Super Admin | list accounts |
+| `POST /api/admin/users` | Super Admin | `{email, display_name, tier}` → 201; duplicate email → 409 |
+| `PATCH /api/admin/users/{id}` | Super Admin | `{tier?, status?}`; disabling revokes every token; own account → 409 |
+| `POST /api/admin/users/{id}/tokens` | Super Admin | `{label, expires_in_days?}` → 201 with `token` (the only time it is returned); at most 10 active |
+| `GET /api/admin/users/{id}/tokens` | Super Admin | metadata only, never the secret |
+| `DELETE /api/admin/users/{id}/tokens/{token_id}` | Super Admin | revoke |
+
+Tiers (`free`/`pro`/`premium`) only set daily limits; they never grant authority and roles
+cannot be changed through these routes (`ezo_api.owner_admin` stays offline-only).
+Daily limits (rolling 24 hours), free/pro/premium:
+
+| Quota | Counted on | free | pro | premium |
+|---|---|---|---|---|
+| `chat_messages_per_day` | `POST /api/chat`, `/api/chat/stream` | 50 | 300 | 1000 |
+| `document_jobs_per_day` | Student uploads, readings, retries; knowledge documents, URLs, reindex; document jobs | 5 | 30 | 100 |
+| `jarvis_tasks_per_day` | a newly stored JARVIS task (idempotent retries and refused requests do not count) | 3 | 20 | 100 |
+
+Exceeding one returns `429 {"error":{"code":"quota_exceeded"}}`. The installation owner
+(configured owner email) and the Super Admin are unlimited. Uses are stored in
+`usage_events` (not derived from content), so deleting a conversation or document does not
+give quota back; rows older than two days are pruned. Each authenticated caller has their
+own per-minute and daily rate-limit key (`owner` or `user:<id>`), so one user cannot use up
+another's budget. Every user's data is scoped by `user_id`; cross-user reads return 404 or
+empty.
