@@ -8,13 +8,15 @@ the action it names**; nothing here is pre-authorized.
 
 | PR | What | Why it needs you |
 |---|---|---|
-| [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) | pypdf 6.21.2 (3 CVEs) + named container findings | Fixes the failing Security run; merge first, because other branches' Security runs fail until it lands |
 | [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | Audit F18–F25 (memory recall consent, honest chat files, CSRF guard, quotas) | Changes consent semantics: memories saved without consent are no longer recalled unless recall is turned on. Needs independent review |
 | [#41](https://github.com/UmidjanDeveloper/EZO/pull/41) | JARVIS governed task engine | Device auth, approvals and external effects: needs independent security review |
 | [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | Android emulator acceptance in CI | CI-only change |
 | [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | Chrome extension summary/explanation | Adds the `storage` permission and page-text sending after confirmation |
 | [#44](https://github.com/UmidjanDeveloper/EZO/pull/44) | Mobile PDF/DOCX via Student | Depends on the executor host for live results |
 | [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | IELTS server speech recognition + examiner voice | Live quality needs your microphone and a voice key |
+| [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | Generated Office files open in real LibreOffice (CI) | Adds `libreoffice-impress-nogui` to the test-only image stage |
+| [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | Model-planned presentation intake | Changes what the presentation outline is based on |
+| [#48](https://github.com/UmidjanDeveloper/EZO/pull/48) | Owner-managed accounts, per-user tokens, tiers, quotas (stacked on #41) | Authentication and authorization change: needs independent security review; merge after #41 |
 | [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | Mission state + release documents | Docs |
 | #36 | Dependabot Python bumps | Not reviewed by this mission; decide separately |
 
@@ -79,3 +81,13 @@ Budget target: about $10/month infrastructure, excluding AI APIs. Get real, incl
 9. Pair JARVIS, link a recipient, and run the reference sentence; approve on the PC (I, J).
 
 Report anything that fails; real-hardware failures are the next engineering priority.
+
+## F. Product decisions (only the owner can make them)
+
+| Decision | Current behaviour until you decide |
+|---|---|
+| Self-signup for other people | Off. Only you create accounts (Super Admin page or `/api/admin/users`) and hand each person a token. |
+| Paid tiers and payment provider | No billing. Tiers (free/pro/premium) only change daily limits, and you set them by hand. Limits are in `apps/api/src/ezo_api/account/entitlements.py`. |
+| K6 (EZO opening GitHub PRs itself) | BLOCKED by design until K4/K5 exist (`docs/master/EXECUTION_GATES.md`); it would also need a GitHub token you issue. |
+
+Merged so far during this mission: [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) (security recovery).

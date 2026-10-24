@@ -17,29 +17,31 @@ No completion percentages.
 
 | PR | Branch | Scope | Evidence |
 |---|---|---|---|
-| [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) | `feat/security-recovery` | pypdf 6.21.2 (3 CVEs); container gate names fixable CVEs | CI + Security green; Trivy now passes |
-| [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | `feat/p0-audit-findings` | Audit F18–F25 | 1272 API tests; CI green (Security pending #37) |
+| [#39](https://github.com/UmidjanDeveloper/EZO/pull/39) | `feat/p0-audit-findings` | Audit F18–F25 | 1272 API tests; CI green; integration (with #37) merged in |
 | [#41](https://github.com/UmidjanDeveloper/EZO/pull/41) | `feat/jarvis-task-engine` | JARVIS governed task engine, desktop companion, web console | 1282 API tests; desktop 59; Playwright JARVIS 9/9; CI + Devices + Security green |
-| [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | `feat/android-emulator-acceptance` | Install the APK on an emulator and drive it against a real API | Run in progress (first run hung at boot; bounded and re-run) |
+| [#42](https://github.com/UmidjanDeveloper/EZO/pull/42) | `feat/android-emulator-acceptance` | Install the APK on an emulator and drive it against a real API | PASSING: Devices run [40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627) — APK installed on an Android 14 emulator, connected to a real API, desktop conversation opened on the phone, phone message stored in the same conversation, no crash. Earlier failures fixed: unbounded boot, logcat hang without a device, a test matching the hidden `<option>` text |
 | [#43](https://github.com/UmidjanDeveloper/EZO/pull/43) | `feat/chrome-extension-assist` | Click-only page summary / selection explanation | vitest 15/15; Chromium extension spec 4/4 |
 | [#44](https://github.com/UmidjanDeveloper/EZO/pull/44) | `feat/mobile-student-documents` | Phone PDF/DOCX/EPUB/scans via Student | mobile 12/12 |
 | [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | `feat/ielts-server-voice` | IELTS server STT, long-answer VAD, examiner voice | IELTS e2e 5/5 |
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | `feat/office-artifacts-open-in-libreoffice` | Generated DOCX/XLSX/PPTX open in real LibreOffice | 3/3 locally; added to CI office-tests |
 | [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | `feat/presentation-model-intake` | Model-planned intake; templates labelled | API 7/7; e2e 4/4 |
+| [#48](https://github.com/UmidjanDeveloper/EZO/pull/48) | `feat/p8-multi-user` (stacked on #41) | Owner-managed accounts, hashed per-user tokens, tiers, durable per-user quotas, per-user rate-limit keys, admin panel | API accounts 8/8 (SQLite + PostgreSQL); edge 6/6; migration 0024 up/down/check on both; Playwright admin 5/5. Needs independent auth review |
 | [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | `docs/ezo-final-mission-state` | This file, install guides (UZ), approvals, acceptance | Docs |
 | #36 | dependabot | 6 Python minor/patch bumps | Not touched |
+
+Merged by the owner during the mission: [#37](https://github.com/UmidjanDeveloper/EZO/pull/37) security recovery (pypdf 6.21.2, gate annotations). The integration branch was then merged into every open mission branch (no force-push).
 
 ## Phase status
 
 | Phase | Status | Evidence / next step |
 |---|---|---|
-| 1 Security recovery | PARTIAL | #37 green (pip-audit, Trivy, pnpm, gitleaks). Becomes COMPLETE when merged. |
-| 2 Desktop + Android usability | PARTIAL | Installers exist (see Platforms). Android never run on an emulator/device. |
+| 1 Security recovery | COMPLETE | #37 merged by the owner; Security (pip-audit, Trivy, pnpm, gitleaks) green on it. Remaining audit items F26/F27 are tracked under P0. |
+| 2 Desktop + Android usability | PARTIAL | Windows installer self-tested on a CI VM; Android APK driven on an emulator ([40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627)). Owner PC and phone runs pending. |
 | 3 Core agent reliability | PARTIAL | F18/F19 fixes in #39. Cross-device conversation proven against local API (Devices run 39988632939). |
 | 4 Student + Office + Presentation | PARTIAL | Isolated OCR/Office executor (PR #33) not deployed/activated; chat Office creation fixed in #39. |
 | 5 IELTS + Personal Intelligence | PARTIAL | Exact text metrics (PR #32); cue card (#39); consent/recall (#39). No live STT scoring. |
 | 6 JARVIS action engine | PARTIAL | Engine, pairing, approvals, Telegram contract, desktop companion (#41); live acceptance BLOCKED on owner PC, bot token, executor host. |
-| 7 K4/K5/K6/K8 + multi-user | BLOCKED / PARTIAL | K4 blocked on a verified sandbox host; P8 multi-user not started. |
+| 7 K4/K5/K6/K8 + multi-user | PARTIAL | K4 BLOCKED (no verified sandbox host); K5 and K6 BLOCKED behind K4 (`EXECUTION_GATES.md`: only K4-tested, signed artifacts may be promoted to a PR — promoting untested drafts would bypass the gate); multi-user foundation in #48. |
 | 8 Premium UX + upstreams | PARTIAL | Procedural humanoid (PR #35); APEX-UI not integrated. |
 | 9 Verification + packaging | PARTIAL | Windows NSIS + Android debug APK built in CI (unsigned). |
 | 10 Owner production readiness | PARTIAL | P9 preparation docs (PR #31); nothing provisioned. |
@@ -56,7 +58,7 @@ No completion percentages.
 | P5 K5/K6/K8 Admin Engine | PARTIAL | Proposals/reviews backend | Needs K4 for tests; PR promotion gated |
 | P6 K7 Knowledge Refresh | PARTIAL | Durable refresh (migration 0020) | Independent review / hosting |
 | P7 IELTS / Presentation / Office 2.0 | PARTIAL | REST exports; chat creation in production (#39); IELTS metrics | Live voice IELTS; researched presentations |
-| P8 Premium UX + multi-user | PARTIAL / NOT STARTED | Single owner; humanoid | Accounts, roles, quotas, entitlements |
+| P8 Premium UX + multi-user | PARTIAL | Humanoid (PR #35); owner-managed accounts, tokens, tiers, quotas (#48) | Independent auth review; no self-signup or billing by design (needs owner product + payment decisions) |
 | P9 Cloud integration | NOT STARTED (prep only) | `docs/deployment/*` | Owner approval for any provisioning |
 
 ## K1–K9
@@ -68,7 +70,7 @@ No completion percentages.
 | K3 Capability analysis | PARTIAL | Read-only proposals |
 | K4 Code sandbox | BLOCKED | No verified isolation host |
 | K5 Skill Builder | BLOCKED | Depends on K4 |
-| K6 Governed GitHub PR workflow | NOT STARTED | Contract only |
+| K6 Governed GitHub PR workflow | BLOCKED | Contract only; depends on K4/K5-tested artifacts (`EXECUTION_GATES.md`) |
 | K7 Durable refresh | PARTIAL | Migration 0020, leased claims |
 | K8 Super Admin self-improvement | PARTIAL | Proposals + hash-bound reviews; no execution |
 | K9 Personal Intelligence | PARTIAL | See P2 |
@@ -78,7 +80,7 @@ No completion percentages.
 | Platform | Status | Evidence | Missing |
 |---|---|---|---|
 | Windows desktop (`apps/desktop`, Electron) | PARTIAL | Unsigned NSIS `EZO-Setup-0.1.0.exe` built and silently installed on `windows-latest`; self-test: open Calculator, scoped file find, dictation into a focused box, screenshot (Devices run 39988632939) | Owner-PC test with mic/speakers + keys; signing; updater |
-| Android (`apps/mobile`, Capacitor) | PARTIAL | Debug APK built (sha256 in `docs/devices/ACCEPTANCE.md`) | Never installed on an emulator/device; Student PDF/DOCX |
+| Android (`apps/mobile`, Capacitor) | PARTIAL | Debug APK built and driven on an Android 14 emulator against a real API: connect, shared history, send ([40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627), #42) | Physical phone on real Wi‑Fi; voice key; Student PDF/DOCX (#44); release signing |
 | Web (`apps/web`) | PARTIAL | Playwright 54/54 e2e in CI | — |
 | Chrome extension (`apps/chrome-extension`, MV3) | PARTIAL | Click-only summary/explanation via `/api/chat` with preview + confirm (#43); loads in Chromium with activeTab/scripting/storage only | Form filling / navigation not started |
 | iOS | BLOCKED | No macOS/Xcode host, no Apple account | — |
@@ -92,7 +94,7 @@ No completion percentages.
 | C Authorized folder find/open | PARTIAL | Verified on CI VM; owner PC pending |
 | D Document → grounded answer | PARTIAL | Works for text/legacy uploads; Student native needs executor host |
 | E Real DOCX/XLSX/PPTX/PDF | PARTIAL | REST + chat (#39) produce real files; viewer check pending in release audit |
-| F Android install + shared history | BLOCKED | Emulator/phone |
+| F Android install + shared history | PARTIAL | Passes on an emulator (#42); physical phone pending |
 | G IELTS evidence-based feedback | PARTIAL | Text metrics; voice needs keys |
 | H Browser capability | PARTIAL | #43; owner Chrome round trip with an AI key |
 | I JARVIS document workflow | PARTIAL | #41; owner PC + executor host for live run |
@@ -113,14 +115,19 @@ No completion percentages.
 
 ## Checkpoint (resume here)
 
-- **Active workstream:** Android emulator acceptance (#42) re-run; then final release audit.
+- **Active workstream:** final release audit and acceptance documents (#40).
 - **Next actionable steps (code-side, no owner needed):**
-  1. Read #42's annotations (`Android emulator`, `Android step`) and fix any app/test defect it shows.
-  2. Rebase open PRs after the owner merges #37 so Security runs go green.
-  3. Remaining code work: K6 governed PR workflow (contract + approval binding), P8 multi-user
-     accounts/roles/quotas (needs a design decision on sign-up), avatar performance measurement,
-     F26 (i18n of Admin/JARVIS/Student pages), Chrome extension form filling.
+  1. #42 passes on the emulator. Re-check it after merges.
+  2. After the owner merges #41, retarget #48 to the integration branch.
+  3. Remaining code work:
+     - avatar performance measurement;
+     - F26 (i18n of the Admin/JARVIS/Student pages), deferred until #41/#45/#47 merge to avoid conflicts;
+     - Chrome extension form filling.
+
+     K6 stays BLOCKED behind K4/K5 by design.
 - **Blocked on the owner:** see `EZO_REMAINING_EXTERNAL_APPROVALS.md`.
-- **Commands:** `git fetch origin && git checkout -B <branch> origin/claude/gifted-goodall-bpf01s`;
-  API `cd apps/api && uv run pytest -q`; web `pnpm -C apps/web lint typecheck test`;
-  e2e `pnpm --filter @ezo/e2e exec playwright test specs/<name>.spec.ts`.
+- **Commands:**
+  - `git fetch origin && git checkout -B <branch> origin/claude/gifted-goodall-bpf01s`
+  - API: `cd apps/api && uv run pytest -q`
+  - Web: `pnpm -C apps/web lint typecheck test`
+  - e2e: `pnpm --filter @ezo/e2e exec playwright test specs/<name>.spec.ts`

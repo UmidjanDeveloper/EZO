@@ -5,7 +5,7 @@
 | Narsa | Holat |
 |---|---|
 | `EZO-debug.apk` (paket `uz.ezo.mobile`, Android 7.0+ / minSdk 24) | GitHub Actions’da quriladi; **debug imzo** bilan (Play Store emas) |
-| Emulyatorda sinov | CI’da Android 34 emulyatoriga o‘rnatilib, haqiqiy EZO serveriga ulanadi va desktopda boshlangan suhbatni davom ettiradi (Devices ish jarayoni, `ezo-android-emulator` artefakti) |
+| Emulyatorda sinov | O‘TDI: CI’da Android 14 emulyatoriga o‘rnatildi, haqiqiy EZO serveriga ulandi, desktopda boshlangan suhbatni ochdi va telefondan yuborilgan xabar o‘sha suhbatda saqlandi ([40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627)). Haqiqiy telefonda hali sinalmagan. |
 | Haqiqiy telefonda | **Hali sinalmagan** — mikrofon, kamera va sizning tarmog‘ingiz faqat telefonda tekshiriladi |
 | iPhone (iOS) | **Mavjud emas** — macOS/Xcode va Apple Developer hisobi kerak |
 
