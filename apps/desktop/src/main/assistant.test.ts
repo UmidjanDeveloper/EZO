@@ -147,3 +147,55 @@ describe("assistant", () => {
     expect(on.log).toEqual(["type:Salom, dunyo!"]);
   });
 });
+
+describe("JARVIS tasks from speech", () => {
+  const REFERENCE =
+    "Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini undan oldingi faylga o'xshatib tayyorla va Telegram'da Baxtiyorga yubor.";
+
+  function jarvisSetup(paired: boolean, create: (text: string) => Promise<{ id: string; state: string; report: string }>) {
+    const tracked: string[] = [];
+    const settings: DesktopSettings = {
+      ...DEFAULT_SETTINGS,
+      jarvisDeviceId: paired ? "33333333-3333-4333-8333-333333333333" : null,
+    };
+    const client = { createJarvisTask: create, chat: async () => ({ conversationId: "x", text: "chat" }) } as unknown as EzoClient;
+    const deps: AssistantDeps = {
+      settings: () => settings,
+      client: () => client,
+      actions: {} as Actions,
+      findFiles: async () => [],
+      isInsideAllowed: async () => false,
+      confirm: async () => true,
+      captureScreen: async () => new Uint8Array(),
+      saveConversation: () => undefined,
+      trackTask: (id) => tracked.push(id),
+    };
+    return { assistant: createAssistant(deps), tracked };
+  }
+
+  it("is a governed task, not 'open a file named Downloads'", async () => {
+    const { assistant, tracked } = jarvisSetup(true, async () => ({ id: "t1", state: "running", report: "" }));
+    const turn = await assistant.handle(REFERENCE);
+    expect(turn.intent).toBe("jarvis_task");
+    expect(turn.reply).toContain("Vazifa boshlandi");
+    expect(tracked).toEqual(["t1"]);
+  });
+
+  it("asks to pair first instead of pretending", async () => {
+    const { assistant } = jarvisSetup(false, async () => {
+      throw new Error("must not be called");
+    });
+    expect((await assistant.handle(REFERENCE)).reply).toContain("ulanmagan");
+  });
+
+  it("reports the server's reason when a prerequisite is missing", async () => {
+    const refusal = Object.assign(new Error("“Baxtiyor” is not a linked Telegram recipient."), { code: "recipient_not_linked" });
+    const { assistant, tracked } = jarvisSetup(true, async () => {
+      throw refusal;
+    });
+    const turn = await assistant.handle(REFERENCE);
+    expect(turn.reply).toContain("not a linked Telegram recipient");
+    expect(turn.acted).toBe(false);
+    expect(tracked).toEqual([]);
+  });
+});

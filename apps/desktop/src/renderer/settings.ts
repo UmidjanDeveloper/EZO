@@ -12,6 +12,8 @@ interface DesktopSettings {
   speakReplies: boolean;
   shortcut: string;
   conversationId: string | null;
+  jarvisFolder: string | null;
+  jarvisDeviceId: string | null;
 }
 
 interface SettingsBridge {
@@ -22,6 +24,11 @@ interface SettingsBridge {
   removeFolder(folder: string): Promise<DesktopSettings>;
   forgetConversation(): Promise<DesktopSettings>;
   test(): Promise<{ ok: boolean; message: string }>;
+  jarvisChooseFolder(): Promise<DesktopSettings>;
+  jarvisClearFolder(): Promise<DesktopSettings>;
+  jarvisPair(): Promise<{ ok: boolean; code?: string; message: string }>;
+  jarvisUnpair(): Promise<DesktopSettings>;
+  jarvisStatus(): Promise<{ paired: boolean; status: string; message?: string }>;
 }
 
 const bridge = (window as unknown as { ezoSettings: SettingsBridge }).ezoSettings;
@@ -55,6 +62,22 @@ function tokenState(hasToken: boolean, secure: boolean): void {
     : hasToken
       ? "Token shifrlangan holda saqlangan (qayta ko‘rsatilmaydi)."
       : "Token kiritilmagan (faqat mahalliy rejimdagi server uchun yetarli).";
+}
+
+async function renderJarvis(settings: DesktopSettings): Promise<void> {
+  byId("jarvisFolder").textContent = settings.jarvisFolder ?? "Tanlanmagan — JARVIS fayl o‘qiy olmaydi.";
+  const state = byId("jarvisState");
+  if (!settings.jarvisDeviceId) {
+    state.textContent = "Bu kompyuter ulanmagan.";
+    return;
+  }
+  const status = await bridge.jarvisStatus();
+  state.textContent =
+    status.status === "paired"
+      ? "Ulangan ✓ (vazifalar har safar sizdan so‘raladi)."
+      : status.status === "pending"
+        ? "Kutilmoqda: kodni EZO ilovasida tasdiqlang."
+        : status.message ?? `Holat: ${status.status}`;
 }
 
 async function init(): Promise<void> {
@@ -109,6 +132,20 @@ async function init(): Promise<void> {
     out.className = result.ok ? "ok" : "bad";
   });
   byId("addFolder").addEventListener("click", async () => renderFolders(await bridge.addFolder()));
+  void renderJarvis(settings);
+  byId("jarvisChoose").addEventListener("click", async () => void renderJarvis(await bridge.jarvisChooseFolder()));
+  byId("jarvisClear").addEventListener("click", async () => void renderJarvis(await bridge.jarvisClearFolder()));
+  byId("jarvisPair").addEventListener("click", async () => {
+    const out = byId("jarvisCode");
+    out.textContent = "Ulanmoqda…";
+    const result = await bridge.jarvisPair();
+    out.textContent = result.ok ? `Kod: ${result.code} — ${result.message}` : result.message;
+    void renderJarvis((await bridge.get()).settings);
+  });
+  byId("jarvisUnpair").addEventListener("click", async () => {
+    byId("jarvisCode").textContent = "";
+    void renderJarvis(await bridge.jarvisUnpair());
+  });
   byId("newConversation").addEventListener("click", async () => {
     await bridge.forgetConversation();
     byId("testResult").textContent = "Keyingi gap yangi suhbatda boshlanadi.";

@@ -30,6 +30,8 @@ export interface AssistantDeps {
   confirm(message: string): Promise<boolean>;
   captureScreen(): Promise<Uint8Array>;
   saveConversation(id: string): void;
+  /** Watch a JARVIS task so its approvals and final report reach the owner. */
+  trackTask?(taskId: string): void;
 }
 
 export function createAssistant(deps: AssistantDeps) {
@@ -97,6 +99,19 @@ export function createAssistant(deps: AssistantDeps) {
           if (!ok) return say(t.cancelled);
           const png = await deps.captureScreen();
           return say(await deps.client().describeImage(png, intent.question, lang), true);
+        }
+
+        case "jarvis_task": {
+          if (!settings.jarvisDeviceId) return say(t.jarvisNotPaired);
+          try {
+            const task = await deps.client().createJarvisTask(intent.text, lang);
+            deps.trackTask?.(task.id);
+            return say(task.state === "failed" ? task.report : t.jarvisStarted, true);
+          } catch (error) {
+            // The server explains what is missing (recipient not linked, no device, …).
+            if (error instanceof Error && "code" in error) return say(error.message);
+            throw error;
+          }
         }
 
         case "chat": {

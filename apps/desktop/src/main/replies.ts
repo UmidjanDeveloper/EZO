@@ -40,6 +40,8 @@ const TEXT = {
     fileOpened: (name: string) => `“${name}” ochildi.`,
     screenConfirm: "EZO hozir ekraningiz rasmini olib, tahlil uchun EZO serveriga yuboradi. Davom etilsinmi?",
     cancelled: "Bekor qilindi. Ekran rasmi olinmadi.",
+    jarvisNotPaired: "Bu kompyuter JARVIS’ga ulanmagan. Sozlamalar → JARVIS bo‘limida ulang va papkani tanlang.",
+    jarvisStarted: "Vazifa boshlandi. Fayllarni yuborishdan va Telegram’ga jo‘natishdan oldin sizdan so‘rayman.",
   },
   en: {
     needPermission: "This action is not allowed yet. Turn it on in EZO settings.",
@@ -54,6 +56,8 @@ const TEXT = {
     fileOpened: (name: string) => `Opened “${name}”.`,
     screenConfirm: "EZO will take a screenshot now and send it to the EZO server for analysis. Continue?",
     cancelled: "Cancelled. No screenshot was taken.",
+    jarvisNotPaired: "This computer is not paired with JARVIS. Pair it and choose the folder in Settings → JARVIS.",
+    jarvisStarted: "Task started. I will ask you before any file is sent and before anything goes to Telegram.",
   },
   ru: {
     needPermission: "Это действие не разрешено. Включите его в настройках EZO.",
@@ -68,6 +72,8 @@ const TEXT = {
     fileOpened: (name: string) => `Открыт «${name}».`,
     screenConfirm: "EZO сделает снимок экрана и отправит его на сервер EZO для анализа. Продолжить?",
     cancelled: "Отменено. Снимок экрана не сделан.",
+    jarvisNotPaired: "Этот компьютер не подключён к JARVIS. Подключите его и выберите папку в Настройки → JARVIS.",
+    jarvisStarted: "Задача начата. Я спрошу вас перед отправкой файлов и перед отправкой в Telegram.",
   },
 };
 
