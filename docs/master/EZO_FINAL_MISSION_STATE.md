@@ -27,6 +27,7 @@ No completion percentages.
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | `feat/office-artifacts-open-in-libreoffice` | Generated DOCX/XLSX/PPTX open in real LibreOffice | 3/3 locally; added to CI office-tests |
 | [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | `feat/presentation-model-intake` | Model-planned intake; templates labelled | API 7/7; e2e 4/4 |
 | [#48](https://github.com/UmidjanDeveloper/EZO/pull/48) | `feat/p8-multi-user` (stacked on #41) | Owner-managed accounts, hashed per-user tokens, tiers, durable per-user quotas, per-user rate-limit keys, admin panel | API accounts 8/8 (SQLite + PostgreSQL); edge 6/6; migration 0024 up/down/check on both; Playwright admin 5/5. Needs independent auth review |
+| [#51](https://github.com/UmidjanDeveloper/EZO/pull/51) | `fix/voicestudio-digest-pin` | Audit F27: optional VoiceStudio image pinned by verified digest | `docker compose config` passes |
 | [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | `docs/ezo-final-mission-state` | This file, install guides (UZ), approvals, acceptance | Docs |
 | #36 | dependabot | 6 Python minor/patch bumps | Not touched |
 

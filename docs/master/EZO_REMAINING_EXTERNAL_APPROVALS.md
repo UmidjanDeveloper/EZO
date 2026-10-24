@@ -18,6 +18,7 @@ the action it names**; nothing here is pre-authorized.
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | Generated Office files open in real LibreOffice (CI) | Adds `libreoffice-impress-nogui` to the test-only image stage |
 | [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | Model-planned presentation intake | Changes what the presentation outline is based on |
 | [#48](https://github.com/UmidjanDeveloper/EZO/pull/48) | Owner-managed accounts, per-user tokens, tiers, quotas (stacked on #41) | Authentication and authorization change: needs independent security review; merge after #41 |
+| [#51](https://github.com/UmidjanDeveloper/EZO/pull/51) | VoiceStudio image pinned by digest | Freezes the optional voice image; licence decision unchanged |
 | [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | Mission state + release documents | Docs |
 | #36 | Dependabot Python bumps | Not reviewed by this mission; decide separately |
 

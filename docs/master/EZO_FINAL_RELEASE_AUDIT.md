@@ -34,6 +34,7 @@ acceptance still needs the owner's devices and credentials.
 | [#45](https://github.com/UmidjanDeveloper/EZO/pull/45) | draft | IELTS server STT, long-answer VAD, examiner voice | IELTS e2e 5/5 |
 | [#46](https://github.com/UmidjanDeveloper/EZO/pull/46) | draft | Generated DOCX/XLSX/PPTX open in real LibreOffice | 3/3 locally; added to CI office-tests |
 | [#47](https://github.com/UmidjanDeveloper/EZO/pull/47) | draft | Presentation outline planned by the model; template fallback labelled | API 7/7; e2e 4/4 |
+| [#51](https://github.com/UmidjanDeveloper/EZO/pull/51) | draft | Audit F27: VoiceStudio image pinned by digest | compose config |
 | [#40](https://github.com/UmidjanDeveloper/EZO/pull/40) | draft | This audit, mission state, install guides (UZ), approvals, acceptance | Docs |
 
 ### Recommended merge order (checked by test-merging every branch in sequence)
@@ -43,7 +44,7 @@ acceptance still needs the owner's devices and credentials.
    - It conflicts with #39 in `security/edge.py`, `main.py` and `tests/unit/test_edge.py`.
    - Both sides are additive (#39's Origin check, #48's per-user identity).
    - The resolution keeps both and was verified (see §4).
-3. **#42, #44–#47, #49, #50**, in any order. They merge cleanly on top (#49 and #50 were cut from the integration branch after #43).
+3. **#42, #44–#47, #49, #50, #51**, in any order. They merge cleanly on top (#49 and #50 were cut from the integration branch after #43).
 4. **#40** last, so the documents describe what actually merged.
 
 Independent review is required before merging #39, #41 and #48 (consent, device
@@ -78,7 +79,7 @@ Findings and their state:
 | pypdf CVEs | Fixed and merged (#37) |
 | Audit F18–F25 | Fixed (#39, needs review) |
 | F26 i18n of the Admin/JARVIS/Student pages | Open (deferred until #41/#45/#47 merge, to avoid conflicts) |
-| F27 VoiceStudio image pinned only by tag | Open (registry blocked here; licensing decision needed) |
+| F27 VoiceStudio image pinned only by tag | Fixed in draft #51 (digest verified against the manifest bytes). The licensing decision is still the owner's. |
 | JARVIS device and approval model | Implemented (#41): Ed25519 pairing with an owner-typed code; signed results; single-use approvals bound to SHA-256 of the exact step scope; Telegram only to recipients who pressed Start; delivery counted only with a receipt |
 | Multi-user (#48) | A fresh-agent read found 7 defects, all fixed before the PR opened: a shared rate-limit key, a quota race, uncounted upload paths, JARVIS retries using quota, a CORS-less 500, double-prefixed constraint names, an unbounded table. I also found and fixed the installation owner being held to free-tier limits. **Not independently reviewed.** |
 | #39 × #48 combination | Test-merged on top of the integration branch with the conflict resolved. Ruff, format and mypy clean (346 files). Full API suite: 1305 passed, 101 skipped |

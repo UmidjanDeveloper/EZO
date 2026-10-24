@@ -89,7 +89,7 @@ Fixed in drafts that still need independent review:
 Still open:
 - distro HIGHs listed above;
 - the dev-only `braces` advisory;
-- F27 (VoiceStudio image pinned to a tag, not a digest);
+- F27 (VoiceStudio image tag): fixed in draft #51 by a verified digest pin;
 - F26 (i18n; not a security issue);
 - K4 sandbox absent, so general code execution stays disabled;
 - the executor host is not provisioned, so native document paths stay disabled.
