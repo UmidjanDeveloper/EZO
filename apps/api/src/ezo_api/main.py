@@ -177,6 +177,7 @@ def create_app(
         if settings.deployment_profile == "free-beta"
         else settings.max_upload_bytes + 2 * 1024 * 1024,
         free_beta=settings.deployment_profile == "free-beta",
+        allowed_origins=settings.cors_origins,
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(

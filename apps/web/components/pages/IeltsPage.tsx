@@ -179,7 +179,8 @@ export function IeltsPage() {
       const res = await fetch(`${apiUrl()}/api/ielts/sessions`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ target_band: 7.0 }),
+        // The Part 2 card the learner picked in the bank (F25); otherwise EZO chooses.
+        body: JSON.stringify({ target_band: 7.0, cue_card: selectedCard?.id ?? null }),
       });
       if (res.ok) {
         const data = (await res.json()) as IeltsSession;

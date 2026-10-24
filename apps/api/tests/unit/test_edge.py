@@ -111,3 +111,32 @@ async def test_public_paths_preflight_and_local_mode_pass() -> None:
     local = guard(Probe(), token=None)
     status, _, _ = await call(local)
     assert status == 200
+
+
+async def test_local_mode_refuses_cross_site_state_changes_before_the_route() -> None:
+    """F23: a page on another site cannot make the owner's browser POST to a local API."""
+    probe = Probe()
+    edge = EdgeGuardMiddleware(
+        probe, token=None, max_body_bytes=1000, allowed_origins=["http://localhost:3000/"]
+    )
+    for origin in ("https://evil.example", "null", "http://localhost:3001"):
+        for method in ("POST", "PUT", "PATCH", "DELETE"):
+            status, sent, reads = await call(
+                edge,
+                path="/api/student/uploads",
+                method=method,
+                headers={"Origin": origin, "Content-Type": "text/plain"},
+            )
+            assert status == 403 and reads == 0 and not probe.called
+            assert b"cross_site" in sent[1]["body"]
+    # The configured web app, non-browser clients (no Origin) and reads still work.
+    assert (await call(edge, headers={"Origin": "http://localhost:3000"}))[0] == 200
+    assert (await call(edge))[0] == 200
+    assert (await call(edge, method="GET", headers={"Origin": "https://evil.example"}))[0] == 200
+
+
+async def test_token_mode_does_not_need_the_origin_check() -> None:
+    probe = Probe()
+    edge = guard(probe)
+    owner = {"Authorization": f"Bearer {TOKEN}", "Origin": "capacitor://localhost"}
+    assert (await call(edge, headers=owner))[0] == 200
