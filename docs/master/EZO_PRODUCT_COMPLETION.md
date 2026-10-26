@@ -1,6 +1,6 @@
 # EZO OS — product completion report (owner-facing)
 
-Branch `product/ezo-completion`, draft PR [#53](https://github.com/UmidjanDeveloper/EZO/pull/53),
+Branch `product/ezo-completion` (head `5250b68`), draft PR [#53](https://github.com/UmidjanDeveloper/EZO/pull/53),
 built on integration `e8febe6` (2026-10-26). Statuses: **COMPLETE / PARTIAL / BLOCKED /
 NOT STARTED**. No percentages. "Works" below means *verified by a real run* (a real browser,
 a real OS on a CI machine, a real emulator, a real API); anything verified only on CI hardware
@@ -109,7 +109,8 @@ iOS: BLOCKED. No macOS/Xcode/Apple account here. Plan: Capacitor already targets
 ## 9. Evidence and commands
 
 - Branch commits: see PR #53. CI/Devices/Security runs on each push; Devices artifacts `ezo-windows` (installer + `selftest.json`), `ezo-android` (APK + badging), `ezo-android-emulator` (report, screenshots, logcat).
-- Final CI on this branch: all nine checks green on `0cf1fb9` (CI run 40312655594, Devices 40312655648, Security 40312655790). The Web job's Playwright suite (69 tests) failed one test on three other heads of the same code (baf7736, 0684521, 0c869c4) and passed on 0cf1fb9 — a CI-timing flake; `scripts/test_report.py` now names failed tests in check annotations and the job keeps `playwright-failure` (junit + traces), so the next failure is attributable.
+- Final CI on this branch, head `5250b68`: all nine checks green — CI run 40317006462 (API, Web with 80/80 Playwright + 97 web unit + 10 shared unit, Docker), Devices run 40317006425 (Windows installer + installed self-test + silent uninstall check; Android APK built, installed and driven on the emulator), Security run 40317006320 (gitleaks, pip-audit, pnpm audit, Trivy). Artifacts: `ezo-windows` (installer, `selftest.json`, `install.txt`), `ezo-android`, `ezo-android-emulator`.
+- Earlier heads of the same code flaked one Playwright test (a 700 ms "recognizing" window raced on the runner; a late stage event in the pill) — both were real timing defects in the tests/renderer, fixed in `c9a61b7`, not retried into green. `scripts/test_report.py` now names failed assertions in the check annotations and the Web job keeps `playwright-failure` (junit + traces).
 - Local: `pnpm -C apps/desktop test && pnpm -C apps/desktop build`; `pnpm -C apps/mobile test && pnpm -C apps/mobile build`; `pnpm -C packages/avatar test`; `pnpm -C apps/web test`; `pnpm --filter @ezo/e2e exec playwright test specs/desktop-pill.spec.ts specs/voice-server.spec.ts specs/student-paths.spec.ts specs/accessibility.spec.ts`.
 
 ## 10. What is not claimed
