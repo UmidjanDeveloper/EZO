@@ -40,9 +40,31 @@ in Next.js, Electron and the Android WebView.
 - Pulses travel up the veins. An error tints the figure red.
 
 **States** (`states.ts`)
-- `idle`, `listening`, `thinking`, `speaking`, `error`.
-- Every app state maps onto one of these; for example, searching shows the thinking look.
+- Nine looks: `idle`, `listening` (halo drawn in, head leans towards you), `recognizing`
+  (the recording is over and the server is turning it into words), `thinking` (slow scan),
+  `working` (a tool or device is doing real work: fast two-way scan, gold chest light,
+  quick pulses up the veins), `speaking` (face ripples with the voice), `success` (a gold
+  ring leaves the chest; returns to idle by itself after 1.6 s), `error` (red), `offline`
+  (grey, dim, still).
+- Every app state maps onto one of these; server-reported tool stages (searching,
+  reading, coding, creating) show the working look, not the thinking look.
 - The look eases smoothly from one state to the next.
+
+**Gaze** (`avatar.ts`)
+- `setGaze({yaw, pitch})` turns the head (±0.35 rad) towards a normalised point: the
+  pointer over the figure on the web voice stage, or a `packages/face-tracking` frame
+  through `setHeadAim()`. A gaze older than 1.5 s drifts back to the idle sway, so a
+  stale camera frame never looks like attention.
+
+**Voice frame** (`frame.ts`)
+- A thin ring, an equaliser and a state word around the figure, framework-free SVG. The
+  equaliser follows the level the figure is actually drawing (a real measurement where one
+  exists; drawn fainter when it is the animated speech rhythm). Pattern adapted from the
+  MIT-licensed APEX-UI orb; see `packages/avatar/NOTICE.md`.
+
+**Accessibility**
+- With `describe`, the canvas gets `role="img"` and an `aria-label` in the app's language
+  that changes with the state; the web, desktop and Android apps pass their own words.
 
 **Voice level** (`level.ts`)
 - The microphone level drives the face while EZO listens, and EZO's own voice drives it

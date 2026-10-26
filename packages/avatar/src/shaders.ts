@@ -38,6 +38,9 @@ uniform float uListen;
 uniform float uThink;
 uniform float uSpeak;
 uniform float uError;
+uniform float uWork;
+uniform float uSuccess;
+uniform float uOffline;
 uniform float uPx;
 uniform float uGlowPx;
 uniform float uRef;
@@ -50,6 +53,7 @@ const vec3 WARM = vec3(1.0, 0.33, 0.05);
 const vec3 GOLD = vec3(1.0, 0.78, 0.32);
 const vec3 VIOLET = vec3(0.55, 0.5, 1.0);
 const vec3 RED = vec3(1.0, 0.16, 0.2);
+const vec3 GREY = vec3(0.3, 0.36, 0.46);
 
 void main() {
   float kind = aData.x;
@@ -62,8 +66,11 @@ void main() {
   float size = 2.0;
   float t = uTime;
   float breath = sin(t * 1.25) * 0.006 * (0.6 + uEnergy);
-  float scanY = 1.5 - fract(t * 0.32) * 3.4;
-  float scan = uThink * exp(-pow((p.y - scanY) * 7.0, 2.0));
+  // Thinking scans slowly down the figure; real work scans fast and in both directions.
+  float scanY = 1.5 - fract(t * (0.32 + 0.9 * uWork)) * 3.4;
+  float scan = max(uThink, uWork) * exp(-pow((p.y - scanY) * 7.0, 2.0));
+  // Success: a ring of light leaves the chest and travels outwards for a moment.
+  float burst = uSuccess * exp(-pow((length(p.xy - vec2(0.0, 0.15)) - fract(t * 0.9) * 1.6) * 6.0, 2.0));
 
   if (kind < 0.5) {
     // Head contour rings; the face carries the warm voice light and ripples as EZO talks.
@@ -95,7 +102,7 @@ void main() {
   } else if (kind < 3.5) {
     // Halo: drifts outwards, is drawn in while listening, swirls while thinking.
     float life = fract(t * (0.05 + 0.08 * uEnergy + seed * 0.04) + seed * 13.0);
-    float reach = (0.12 + 0.3 * uEnergy) * (1.0 - 1.6 * uListen);
+    float reach = (0.12 + 0.3 * uEnergy) * (1.0 - 1.6 * uListen) + 0.35 * uSuccess;
     p.xy += aExtra * life * reach;
     vec2 c = vec2(0.0, 0.62);
     vec2 d = p.xy - c;
@@ -108,7 +115,7 @@ void main() {
   } else if (kind < 4.5) {
     // Warm veins with pulses travelling up towards the face.
     p.y += breath;
-    float pulse = smoothstep(0.82, 1.0, fract(aExtra.x * 1.4 - t * (0.35 + 0.5 * uEnergy) + seed * 0.05));
+    float pulse = smoothstep(0.82, 1.0, fract(aExtra.x * 1.4 - t * (0.35 + 0.5 * uEnergy + 1.2 * uWork) + seed * 0.05));
     col = mix(WARM, GOLD, pulse);
     alpha = bright * (0.25 + 0.75 * pulse) * (0.45 + 0.55 * uWarmth) + uLevel * uSpeak * 0.25;
     size = 2.2 + pulse * 1.4;
@@ -126,16 +133,20 @@ void main() {
     alpha = (bright * 1.1 + warm * 0.8) * twinkle * (0.8 + 0.25 * uLevel);
     size = 3.6 + warm * 1.6;
   } else {
-    // Chest light.
+    // Chest light: beats faster and brighter while EZO works.
     p.y += breath;
-    col = mix(CYAN, vec3(1.0), warm);
-    alpha = bright * (0.6 + 0.4 * sin(t * 2.2)) * (0.7 + 0.3 * uEnergy);
-    size = 2.6 + warm * 3.0;
+    col = mix(mix(CYAN, vec3(1.0), warm), GOLD, uWork * 0.5);
+    alpha = bright * (0.6 + 0.4 * sin(t * (2.2 + 4.0 * uWork))) * (0.7 + 0.3 * uEnergy + 0.5 * uWork);
+    size = 2.6 + warm * 3.0 + uWork * 1.5;
   }
 
   if (abs(kind - 6.0) > 0.5) p = turn(p);
   col = mix(col, VIOLET, uThink * 0.18);
+  col = mix(col, GOLD, burst + uSuccess * 0.25);
+  alpha += burst * 0.8;
   col = mix(col, RED, uError * 0.75);
+  col = mix(col, GREY, uOffline * 0.85);
+  alpha *= 1.0 - 0.55 * uOffline;
   vec4 clip = uVP * vec4(p, 1.0);
   gl_Position = clip;
   // Glow sprites scale strictly with the view; lines keep a minimum size in small views.

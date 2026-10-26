@@ -92,6 +92,7 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
     uploads += 1;
     const body = route.request().postDataBuffer() ?? Buffer.alloc(0);
     expect(body.includes(Buffer.from('name="audio"'))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 700)); // a real recogniser takes a moment
     await route.fulfill({ json: { text: transcripts.shift() ?? "", language: "uz", provider: "voicestudio", attempts: [] } });
   });
   await page.route("**/api/voice/speak", async (route) => {
@@ -106,6 +107,11 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   const chatRequest = page.waitForRequest((request) => request.url().includes("/api/chat/stream"));
   await page.getByTestId("voice-toggle").click();
   await expect(page.getByTestId("voice-status")).toHaveText("Tinglayapman…");
+  await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "listening");
+  await expect(stage.getByTestId("voice-frame").locator("svg")).toHaveAttribute("data-state", "listening");
+  // The recording ended; the server is turning it into words: an honest in-between state.
+  await expect(page.getByTestId("voice-status")).toHaveText("Eshitganimni matnga aylantiryapman…", { timeout: 10_000 });
+  await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "recognizing");
 
   await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 10_000 });
   // The measured speaking time travels with the voice message (the fake microphone speaks 0.7 s).
