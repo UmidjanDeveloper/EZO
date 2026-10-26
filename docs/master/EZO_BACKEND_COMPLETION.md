@@ -38,7 +38,7 @@ repeat approval/send. Uncertain outcomes require human inspection, not a retry b
 |---|---|---|
 | P0 | auth edge, owner-managed tokens, RBAC, account quotas; new JARVIS delivery regressions | PARTIAL: independent review and current vulnerability scan evidence required; do not equate green gates with zero risk |
 | P1 | `student/`, `documents/executor/`, migration0022, real native tests in CI | PARTIAL: OCR/Office is implemented (older matrix saying absent is stale); selected host acceptance, large-scan batching/resume still incomplete |
-| P2 | `personal_intelligence/`, consent/recall changes preserved from PR39 | PARTIAL: per-user persistence exists; full retention/revocation/failure drills need further acceptance |
+| P2 | `memory/`, `api/routes/personal.py`, consent/recall changes preserved from PR39 | PARTIAL: per-user persistence exists; full retention/revocation/failure drills need further acceptance |
 | P3 | `student/paths.py`, cited comparison/graphs/cards, immutable revisions | PARTIAL: paths use actual reviews; automatic tutor quality/longitudinal evaluation and integrated journeys incomplete |
 | P4 | `EXECUTION_GATES.md` and disabled execution boundaries | BLOCKED: no /dev/kvm or approved separate general-code executor; fixed-function document containers are not K4 |
 | P5 | proposal/review APIs, protected admin scope | PARTIAL: proposals/static review only; generated-code tests/signing/promotion cannot be enabled without K4 and independent containment review |
