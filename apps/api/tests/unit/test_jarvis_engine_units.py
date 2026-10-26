@@ -176,3 +176,20 @@ async def test_recipient_is_found_only_by_exact_start_code_in_a_private_chat() -
     found = await _client(handler).find_start("abc")
     assert found is not None and found.chat_id == "3" and found.name == "Baxtiyor K"
     assert await _client(handler).find_start("zzz") is None
+
+
+async def test_read_error_send_is_unknown_and_httpx_logs_redact_token(caplog):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="httpx")
+    await _client(
+        lambda r: httpx.Response(200, json={"ok": True, "result": {"username": "test"}})
+    ).bot_username()
+    assert TOKEN not in caplog.text
+
+    def broken(request):
+        raise httpx.ReadError("connection closed after write", request=request)
+
+    with pytest.raises(TelegramError) as caught:
+        await _client(broken).send_document("555", b"%PDF-", "x.pdf", "")
+    assert caught.value.outcome_unknown is True

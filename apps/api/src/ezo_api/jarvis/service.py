@@ -669,7 +669,34 @@ class JarvisService:
                 task.state = "running"
                 return task
             if step.state == "running":
-                return task  # another process holds it
+                if (
+                    step.action == "telegram.send"
+                    and step.started_at
+                    and step.started_at < utcnow() - timedelta(minutes=2)
+                ):
+                    locked_task = await self.session.scalar(
+                        select(JarvisTask)
+                        .where(JarvisTask.id == task.id)
+                        .with_for_update(skip_locked=True)
+                        .execution_options(populate_existing=True)
+                    )
+                    if locked_task is None or locked_task.state != "running":
+                        return task
+                    locked = await self.session.scalar(
+                        select(JarvisTaskStep)
+                        .where(JarvisTaskStep.id == step.id, JarvisTaskStep.state == "running")
+                        .with_for_update(skip_locked=True)
+                        .execution_options(populate_existing=True)
+                    )
+                    if locked is not None:
+                        await self._fail(
+                            locked,
+                            "delivery_unknown",
+                            "Delivery was interrupted; inspect recorded receipts. "
+                            "It will not be retried.",
+                        )
+                        return await self._finish_failed(task, locked)
+                return task  # active dispatch or another process holds it
             if not await self._claim(step):
                 return task
             task.state = "running"
@@ -854,13 +881,44 @@ class JarvisService:
             return "wait"
         if approval.used_at is not None:
             raise JarvisError("approval_used", "This approval was already used.")
+        # Freeze and verify the entire approved batch before the first external effect.
+        payloads = []
+        for document in documents:
+            data = await self._artifact_bytes(task, document["artifact_id"])
+            if hashlib.sha256(data).hexdigest() != document["sha256"]:
+                raise JarvisError("artifact_changed", "The approved document content changed.")
+            payloads.append(data)
         approval.used_at = utcnow()
-        await self.session.flush()
+        step.receipt = {"delivery_state": "dispatching", "delivered": []}
+        self._audit(task.user_id, "jarvis.delivery.admitted", step.id, {"scope_sha256": scope})
+        # External delivery has no distributed transaction/idempotency API. Persist
+        # consumed authority BEFORE network I/O. Rollback must never authorize resend.
+        await self.session.commit()
         receipts = []
+        approved_chat_id = recipient.chat_id
         try:
             telegram = self._telegram()
-            for document in documents:
-                artifact_bytes = await self._artifact_bytes(task, document["artifact_id"])
+            for index, (document, artifact_bytes) in enumerate(
+                zip(documents, payloads, strict=True)
+            ):
+                # Serialize cancellation/revocation with each bounded send; release
+                # locks between documents. Already in-flight messages cannot be unsent.
+                await self.session.refresh(task, with_for_update=True)
+                await self.session.refresh(step, with_for_update=True)
+                await self.session.refresh(recipient, with_for_update=True)
+                if task.state == "cancelled":
+                    step.state, step.finished_at = "cancelled", utcnow()
+                    await self.session.commit()
+                    return "wait"
+                if (
+                    task.state != "running"
+                    or step.state != "running"
+                    or recipient.status != "verified"
+                    or recipient.chat_id != approved_chat_id
+                ):
+                    raise JarvisError(
+                        "delivery_stopped", "Delivery permission was revoked or cancelled."
+                    )
                 receipt = await telegram.send_document(
                     recipient.chat_id or "",
                     artifact_bytes,
@@ -868,6 +926,13 @@ class JarvisService:
                     caption="EZO",
                 )
                 receipts.append(receipt.to_dict())
+                step.receipt = {
+                    "delivery_state": "confirmed" if index == len(documents) - 1 else "dispatching",
+                    "delivered": list(receipts),
+                }
+                if index == len(documents) - 1:
+                    step.state, step.finished_at = "completed", utcnow()
+                await self.session.commit()
         except TelegramError as exc:
             step.receipt = {"delivered": receipts}
             code = "delivery_unknown" if exc.outcome_unknown else "delivery_failed"
