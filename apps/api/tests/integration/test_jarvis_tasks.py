@@ -416,3 +416,93 @@ async def test_tasks_and_devices_are_owner_scoped(
             assert caught.value.status == 404
         assert await service.tasks(other.id) == []
         assert json.dumps(await service.recipients(other.id), default=str) == "[]"
+
+
+async def test_changed_artifact_bytes_are_not_sent(client, telegram, monkeypatch):
+    device = Device()
+    await pair(client, device)
+    await link_recipient(client, telegram)
+    task = await start(client)
+    task = await deliver_files(client, device, [("b.txt", CURRENT, 2), ("a.txt", PREVIOUS, 1)])
+    send = step(task, "telegram.send")
+
+    async def changed(self, task, artifact_id):
+        return b"%PDF-1.7 UNAPPROVED replacement"
+
+    monkeypatch.setattr(jarvis_service.JarvisService, "_artifact_bytes", changed)
+    result = await client.post(
+        f"/api/jarvis/tasks/{task['id']}/steps/{send['id']}/decision",
+        json={"scope_sha256": send["scope_sha256"], "approve": True},
+    )
+    assert result.json()["state"] == "failed"
+    assert telegram.sent == []
+
+
+async def test_crash_after_remote_send_cannot_reconsume_approval(
+    client, app, telegram, monkeypatch
+):
+    device = Device()
+    await pair(client, device)
+    await link_recipient(client, telegram)
+    task = await start(client)
+    task = await deliver_files(client, device, [("b.txt", CURRENT, 2), ("a.txt", PREVIOUS, 1)])
+    send = step(task, "telegram.send")
+    original = TelegramClient.send_document
+
+    async def crash(self, *args, **kwargs):
+        await original(self, *args, **kwargs)
+        raise RuntimeError("simulated process failure after remote acceptance")
+
+    monkeypatch.setattr(TelegramClient, "send_document", crash)
+    endpoint = f"/api/jarvis/tasks/{task['id']}/steps/{send['id']}/decision"
+    body = {"scope_sha256": send["scope_sha256"], "approve": True}
+    with pytest.raises(RuntimeError):
+        await client.post(endpoint, json=body)
+    monkeypatch.setattr(TelegramClient, "send_document", original)
+    again = await client.post(endpoint, json=body)
+    assert again.status_code == 409
+    assert len(telegram.sent) == 1
+
+    from datetime import timedelta
+
+    from ezo_api.db.base import utcnow
+    from ezo_api.db.models import JarvisTaskStep
+
+    async with app.state.services.db.sessionmaker() as session:
+        row = await session.get(JarvisTaskStep, uuid.UUID(send["id"]))
+        row.started_at = utcnow() - timedelta(minutes=3)
+        await session.commit()
+    recovered = (await client.get(f"/api/jarvis/tasks/{task['id']}")).json()
+    assert recovered["state"] == "failed"
+    assert recovered["error_code"] == "delivery_unknown"
+    assert len(telegram.sent) == 1
+
+
+async def test_opt_in_signed_work_requires_server_configuration(client, app, monkeypatch):
+    from cryptography.hazmat.primitives.serialization import NoEncryption, PrivateFormat
+    from pydantic import SecretStr
+
+    from ezo_api.jarvis.device_protocol import SignedDeviceWork, verify_work
+
+    device = Device()
+    await pair(client, device)
+    await start(client, text="Downloads eng oxirgi faylni PDF qil")
+    url = f"/api/jarvis/devices/{device.id}/work-signed"
+    assert (await client.get(url)).status_code == 503
+    key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(
+        app.state.services.settings,
+        "jarvis_work_signing_key",
+        SecretStr(key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex()),
+    )
+    response = await client.get(url)
+    assert response.status_code == 200
+    [work] = response.json()
+    verify_work(
+        SignedDeviceWork.model_validate(work),
+        key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex(),
+        device_id=uuid.UUID(device.id),
+        now=int(time.time()),
+    )
+    monkeypatch.setattr(app.state.services.settings, "jarvis_work_signing_key", SecretStr("bad"))
+    assert (await client.get(url)).status_code == 503

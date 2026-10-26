@@ -4,7 +4,7 @@ name: Devices
 # happened there. Nothing is published, signed with production keys or deployed.
 on:
   push:
-    branches: ["claude/**"]
+    branches: ["claude/**", "feat/final-backend-acceptance"]
     paths: ["apps/desktop/**", "apps/mobile/**", "tests/e2e/devices/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]
   pull_request:
     paths: ["apps/desktop/**", "apps/mobile/**", "tests/e2e/devices/**", ".github/workflows/devices.yml", "pnpm-lock.yaml"]

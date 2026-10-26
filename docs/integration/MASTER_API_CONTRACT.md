@@ -302,3 +302,35 @@ give quota back; rows older than two days are pruned. Each authenticated caller 
 own per-minute and daily rate-limit key (`owner` or `user:<id>`), so one user cannot use up
 another's budget. Every user's data is scoped by `user_id`; cross-user reads return 404 or
 empty.
+
+### Delivery admission / crash recovery addendum (2026-10-26 candidate)
+
+Approval consumption and dispatch intent commit before Telegram I/O. Exact produced
+artifact SHA256 must match all loaded bytes before the first document is sent.
+`receipt.delivery_state: "dispatching"` is not a successful delivery. Verified
+`receipt.delivered[]` entries persist independently. An interrupted dispatch older
+than2min becomes terminal `delivery_unknown` on worker/poll recovery; no resend.
+`artifact_changed` sends nothing. Cancellation/revocation is checked between
+bounded sends; already in-flight messages cannot be recalled. After HTTP500 or a
+lost connection, fetch task status rather than reapprove or create a new task.
+No frontend/provider edits are part of this contract change.
+
+### Opt-in server-signed work (2026-10-26)
+
+`GET /api/jarvis/devices/{device_id}/work-signed` returns typed
+`SignedDeviceWork[] = {payload: DeviceWork, signature: 128-hex}[]`, derived only
+from the existing owned paired-device queue. No caller-provided arbitrary payload
+is signed. Config requires `EZO_JARVIS_WORK_SIGNING_KEY` (32-byte Ed25519 private
+key represented as hex, server-side operator secret). No key is generated here.
+Missing/invalid config returns503; this endpoint never falls back to unsigned work.
+Legacy `/work` remains unchanged for coordinated client migration.
+
+Signature domain: UTF8 `ezo-jarvis-server-work-v1` followed by NUL, then canonical
+payload JSON: sorted keys, compact separators, Unicode preserved, UTF8. Pin the
+trusted server public key out-of-band, not from an untrusted work envelope. Verify
+signature and expected device ID, future deadline <=300 seconds, root/capability
+policy, and durable request-id replay/cancellation journal **before** filesystem
+access. `device_protocol.verify_work` verifies signature/device/deadline; it does
+not pretend to own a receiver's replay journal. Rotation requires explicit re-pin;
+never silently trust an unknown key or fall back on signature failure. Claude owns
+client wiring, Windows/Android secure key storage and physical-device acceptance.

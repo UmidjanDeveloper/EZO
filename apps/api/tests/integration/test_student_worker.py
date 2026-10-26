@@ -69,7 +69,9 @@ async def test_worker_whole_job_deadline_revokes_publication(db, monkeypatch):
         return TEXT
 
     monkeypatch.setattr(jobs, "read_input", stalled_read)
-    assert await StoredTextWorker(jobs, "worker", deadline_seconds=0.1).process_one()
+    # The deadline also covers claim(): leave a slow CI database time to claim, so the
+    # deadline fires in the stalled read (10 s) as intended, not during the claim.
+    assert await StoredTextWorker(jobs, "worker", deadline_seconds=1.0).process_one()
     state = await jobs.get(scope.user, scope.project, job.id)
     assert state.state == "queued" and state.error_code == "transient" and state.attempts == 1
     assert await jobs.claim("too-early") is None
