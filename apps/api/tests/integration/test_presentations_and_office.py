@@ -164,3 +164,55 @@ async def test_office_templates_and_document_creation(client: AsyncClient) -> No
     assert len(artifacts) >= 2
     assert any(a["artifact_id"] == doc_art["artifact_id"] for a in artifacts)
     assert any(a["artifact_id"] == sheet_art["artifact_id"] for a in artifacts)
+
+
+# --- model-planned intake vs labelled template ------------------------------------------
+
+BRIEF = {
+    "title": "Raqamli xizmatlar",
+    "topic": "Tuman hokimligida raqamli xizmatlarni joriy etish",
+    "audience": "Hokimlik xodimlari",
+    "slide_count": 5,
+    "theme": "ezo",
+    "language": "uz",
+}
+
+
+async def test_intake_uses_the_models_validated_plan_and_builds_it_unflattened(
+    client: AsyncClient, fake_anthropic
+) -> None:
+    import json
+
+    from tests.integration.test_presentation_agent import deck
+
+    fake_anthropic.replies = ["Reja:\n```json\n" + json.dumps(deck(), ensure_ascii=False) + "\n```"]
+    outline = (await client.post("/api/presentations/intake", json=BRIEF)).json()
+    assert outline["source"] == "model" and outline["notice"] == ""
+    layouts = [s["layout"] for s in outline["slides"]]
+    assert layouts == [s["layout"] for s in deck()["slides"]]
+    assert "chart" in layouts  # richer than the template's bullets/two_column
+    assert "Asosiy yo'nalish" not in json.dumps(outline, ensure_ascii=False)  # no placeholders
+    built = await client.post(
+        "/api/presentations/generate",
+        json={"title": BRIEF["title"], "theme": "ezo", "language": "uz", "deck": outline["deck"]},
+    )
+    assert built.status_code == 200, built.text
+    meta = (await client.get(f"/api/artifacts/{built.json()['artifact_id']}")).json()
+    assert meta["current_version"]["generation_metadata"]["layouts"] == layouts
+
+
+async def test_invalid_model_plans_fall_back_to_a_labelled_template(
+    client: AsyncClient, fake_anthropic
+) -> None:
+    fake_anthropic.replies = ["not json", "still not json"]
+    outline = (await client.post("/api/presentations/intake", json=BRIEF)).json()
+    assert outline["source"] == "template" and outline["deck"] is None
+    assert "andoza" in outline["notice"] and "tadqiq qilingan taqdimot emas" in outline["notice"]
+
+
+async def test_tampered_deck_is_rejected(client: AsyncClient) -> None:
+    bad = await client.post(
+        "/api/presentations/generate",
+        json={"title": "X", "theme": "ezo", "language": "uz", "deck": {"slides": "nope"}},
+    )
+    assert bad.status_code == 422
