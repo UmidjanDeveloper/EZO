@@ -40,11 +40,14 @@ Telefon serverga tarmoq orqali ulanadi, shuning uchun:
 
 ## 4. Birinchi ishga tushirish
 
-1. EZO’ni oching → **Sozlamalar** bo‘limi ochiladi.
-2. **EZO server manzili:** `http://192.168.1.20:8000` (o‘z IP’ingiz).
+1. EZO’ni oching → **kirish sahifasi** chiqadi: EZO nima, nima kerakligi va mikrofon/kamera
+   qachon ishlatilishi yoziladi. Shu yerda ilova tilini (o‘zbek/ingliz/rus) tanlang va **Boshlash**ni bosing.
+2. **Yana → Sozlamalar** ochiladi. **EZO server manzili:** `http://192.168.1.20:8000` (o‘z IP’ingiz).
    Debug build LAN’dagi `http://` manzilga ulana oladi; release build faqat `https://` ishlatadi.
 3. **Kirish tokeni:** serverdagi `EZO_API_TOKEN`. Telefonning shifrlangan xotirasida saqlanadi.
-4. **Saqlash va ulanish** → “Suhbat” bo‘limi ochilsa, ulandingiz.
+4. **Saqlash va ulanish** → “Suhbat” bo‘limi ochilsa, ulandingiz. Tepadagi nuqta serverning
+   haqiqiy holatini ko‘rsatadi: yashil — AI tayyor, sariq — server bor, AI kaliti yo‘q (javoblar
+   oflayn), qizil — serverga ulanib bo‘lmayapti.
 
 ## 5. Foydalanish
 
@@ -56,7 +59,16 @@ Telefon serverga tarmoq orqali ulanadi, shuning uchun:
   - TXT/MD/CSV — telefon o‘zi o‘qiydi, mazmunini so‘raydi;
   - PDF/DOCX/EPUB/rasm — EZO Student’ga yuboriladi va serverdagi izolyatsiyalangan
     hujjat ishchisi o‘qiydi. Ishchi ishlamayotgan bo‘lsa, ilova buni ochiq aytadi va hujjat navbatda qoladi.
-- **Loyihalar / Xotira / Eslatmalar** — eslatmalar uchun bildirishnoma ruxsati so‘raladi.
+- **Vazifalar** — serverdagi JARVIS vazifalari: joriy qadam ko‘rinadi, tasdiq kutayotgan qadamni
+  telefondan **Ruxsat beraman / Rad etish** qilasiz, vazifani bekor qilasiz yoki yangi vazifa berasiz
+  (buning uchun Windows’dagi EZO JARVIS’ga ulangan bo‘lishi kerak — ilova buni ochiq aytadi).
+- **IELTS** — Speaking mashqi: mavzu tanlang, savolga yozib yoki 🎤 bilan gapirib javob bering.
+  EZO javobni matn sifatida o‘lchaydi (so‘zlar, takrorlar, to‘ldiruvchi so‘zlar); **band bali
+  qo‘yilmaydi, talaffuz baholanmaydi** — bu ochiq yoziladi.
+- **Fayllar** — EZO yaratgan DOCX/XLSX/PPTX/PDF fayllar; **Ochish / ulashish** telefoningizdagi
+  ilovani (Word, PDF o‘quvchi, Telegram…) tanlashni so‘raydi. Fayl ilovaning o‘z keshiga yoziladi.
+- **Yana:** Loyihalar (yaratish/tanlash), Xotira (qo‘shish/o‘chirish), Eslatmalar (bildirishnoma
+  ruxsati so‘raladi), Sozlamalar (til, server, token).
 
 ## 6. Muammolar
 

@@ -92,6 +92,7 @@ export function VoiceStage({ session }: { session: Session }) {
     const listenLanguage = choice !== "auto" ? choice : useServer ? null : (lastHeardRef.current ?? uiLanguage);
     stopListeningRef.current = listenFn(listenLanguage, {
       onInterim: (text) => turn === turnRef.current && setHeard(text),
+      onRecognizing: () => turn === turnRef.current && setPhase("recognizing"),
       onFinal: (text, info) => {
         if (turn !== turnRef.current) return;
         gotText = true;
@@ -172,6 +173,8 @@ export function VoiceStage({ session }: { session: Session }) {
     ? m.voice.unsupported
     : phase === "listening"
       ? m.voice.listening
+      : phase === "recognizing"
+        ? m.voice.recognizing
       : phase === "thinking"
         ? visible === "thinking"
           ? m.voice.thinking
@@ -186,7 +189,7 @@ export function VoiceStage({ session }: { session: Session }) {
       data-testid="voice-stage"
       data-engine={engine ?? "none"}
     >
-      <EzoHumanoid state={visible} framing="bust" label={status} className="absolute inset-0" />
+      <EzoHumanoid state={visible} framing="bust" label={status} frame followPointer className="absolute inset-0" />
       <div className="relative z-10 flex w-full max-w-2xl justify-end gap-1" role="group" aria-label={m.voice.language}>
         {LANGUAGES.map((code) => (
           <button

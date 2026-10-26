@@ -21,6 +21,10 @@ interface Measurement {
   intervalP95Ms: number;
   drawMedianMs: number;
   drawP95Ms: number;
+  /** JS heap of the whole page after 4 s of animation (Chromium only; null elsewhere). */
+  heapMB: number | null;
+  /** Time from navigation start to the first avatar frame, as the browser measured it. */
+  firstFrameMs: number | null;
 }
 
 const PROFILES = [
@@ -55,9 +59,13 @@ async function measure(browser: Browser, profile: (typeof PROFILES)[number]): Pr
       requestAnimationFrame(tick);
     });
     const rect = el.getBoundingClientRect();
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
     return {
       intervals,
       draws,
+      heapMB: memory ? Number((memory.usedJSHeapSize / 1048576).toFixed(1)) : null,
+      firstFrameMs: nav ? Number((nav.domContentLoadedEventEnd + Number(el.dataset.buildMs ?? 0)).toFixed(0)) : null,
       quality: el.dataset.quality ?? "",
       points: Number(el.dataset.points),
       buildMs: Number(el.dataset.buildMs),
@@ -84,6 +92,8 @@ async function measure(browser: Browser, profile: (typeof PROFILES)[number]): Pr
     intervalP95Ms: pct(sample.intervals, 0.95),
     drawMedianMs: pct(sample.draws, 0.5),
     drawP95Ms: pct(sample.draws, 0.95),
+    heapMB: sample.heapMB,
+    firstFrameMs: sample.firstFrameMs,
   };
 }
 
@@ -100,7 +110,7 @@ test("avatar performance: hardware-independent budgets hold and frame times are 
       `${r.profile}: quality=${r.quality} points=${r.points} build=${r.buildMs}ms ` +
       `canvas=${r.css.width}x${r.css.height} backing=${r.backing.width}x${r.backing.height} ` +
       `fps=${r.fps} interval p50/p95=${r.intervalMedianMs}/${r.intervalP95Ms}ms ` +
-      `draw+finish p50/p95=${r.drawMedianMs}/${r.drawP95Ms}ms (SwiftShader, CI VM)`;
+      `draw+finish p50/p95=${r.drawMedianMs}/${r.drawP95Ms}ms heap=${r.heapMB ?? "?"}MB first-frame≈${r.firstFrameMs ?? "?"}ms (SwiftShader, CI VM)`;
     console.log(process.env.GITHUB_ACTIONS ? `::notice title=Avatar performance::${line}` : line);
     test.info().annotations.push({ type: "avatar-performance", description: line });
   }
@@ -108,6 +118,8 @@ test("avatar performance: hardware-independent budgets hold and frame times are 
   const [desktop, phone] = results;
   // The draw loop runs (it pauses only when hidden or with reduced motion).
   for (const r of results) expect(r.frames).toBeGreaterThan(10);
+  // The owner's PC has under 16 GB: the whole page, avatar included, must stay small.
+  for (const r of results) if (r.heapMB !== null) expect(r.heapMB).toBeLessThan(200);
   // Point budgets (docs/devices/HUMANOID.md, measured 2026-10-24: 49,034 high / 18,630 low
   // on the voice stage). They guard against regressions; raising them is a deliberate change.
   expect(desktop.quality).toBe("high");

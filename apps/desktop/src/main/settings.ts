@@ -3,9 +3,12 @@
  * on each capability (and adds each folder) explicitly in the settings window.
  */
 import type { AppId } from "./intents";
+import type { Lang } from "./replies";
 
 export interface DesktopSettings {
   apiUrl: string;
+  /** Language of the app's own words (pill, settings, dialogs). */
+  language: Lang;
   allowedFolders: string[];
   apps: Record<AppId, boolean>;
   allowTyping: boolean;
@@ -22,6 +25,7 @@ export interface DesktopSettings {
 
 export const DEFAULT_SETTINGS: DesktopSettings = {
   apiUrl: "http://localhost:8000",
+  language: "uz",
   allowedFolders: [],
   apps: { calculator: false, notepad: false, paint: false, explorer: false },
   allowTyping: false,
@@ -60,6 +64,7 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     : [];
   return {
     apiUrl,
+    language: input.language === "en" || input.language === "ru" ? input.language : "uz",
     allowedFolders: [...new Set(folders)],
     apps: {
       calculator: apps.calculator === true,

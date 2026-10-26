@@ -7,7 +7,7 @@ label { display: block; margin: 8px 0; }
 label input:not([type=checkbox]), select { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; padding: 7px 9px; }
 .check { display: flex; gap: 8px; align-items: center; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
-button { padding: 7px 12px; border-radius: 8px; border: 0; background: #4b6bff; color: white; cursor: pointer; }
+button { padding: 7px 12px; border-radius: 8px; border: 0; background: #3556e6; color: white; cursor: pointer; }
 button.secondary { background: rgba(128,128,128,.25); color: CanvasText; }
 .muted { opacity: .7; font-size: 12px; font-weight: normal; }
 ul { padding-left: 18px; }

@@ -46,6 +46,12 @@ tekshirilgan, nimalar hali sizning kompyuteringizda sinalmagani alohida ko‘rsa
 ## 4. Birinchi ishga tushirish
 
 - Ekran tepasida kichik **EZO pill** chiqadi; soat yonida (tray) EZO belgisi bor.
+  Birinchi ishga tushirishda **Sozlamalar** oynasi o‘zi ochiladi.
+- Pill’dagi nuqta serverning haqiqiy holati: yashil — AI tayyor, sariq — server bor, AI kaliti
+  yo‘q (javoblar oflayn), qizil — serverga ulanib bo‘lmayapti (yuz kulrang bo‘ladi).
+- **Ctrl+Alt+H** — pill’ni ko‘rsatish/yashirish (tray belgisiga bosish ham shuni qiladi).
+- Sozlamalardagi **Ilova tili** (o‘zbek/ingliz/rus) pill, sozlamalar, dialoglar va xato
+  xabarlariga taalluqli; EZO gapirgan tilda javob beradi.
 - Tray → **Sozlamalar**:
   - **Server manzili:** `http://localhost:8000` (shu kompyuterdagi server) yoki
     `https://...` (masofaviy server).
@@ -63,6 +69,11 @@ tekshirilgan, nimalar hali sizning kompyuteringizda sinalmagani alohida ko‘rsa
 - Misollar: “Kalkulyatorni och”, “hisobot faylini top”, “Yoz: Salom!”,
   “Ekranda nima borligini tushuntir”. Boshqa savollar oddiy suhbat bo‘ladi va
   suhbat serverda saqlanadi — telefon va veb ilovada ham ko‘rinadi.
+- Pill holatlari: **Tinglayapman** (qizil halqa) → **Taniyapman** (yozuv matnga aylanmoqda) →
+  **O‘ylayapman** yoki **Bajaryapman** (kompyuterda amal) → **Gapiryapman** → **Bajarildi**.
+  **■** tugmasi haqiqatan to‘xtatadi: serverga ketgan so‘rov bekor qilinadi, kech kelgan javob ko‘rsatilmaydi.
+- **☰** — suhbat tarixi serverdan: oxirgi xabarlar, boshqa suhbatga o‘tish, yangi suhbat.
+- JARVIS vazifasi ketayotganda pill’da joriy qadam yoki “tasdiq kutilmoqda” yoziladi; **Vazifani bekor qilish** serverda bekor qiladi.
 
 ## 6. JARVIS (Downloads → PDF → foizlar → Telegram)
 

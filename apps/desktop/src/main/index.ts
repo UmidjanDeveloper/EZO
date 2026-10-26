@@ -24,30 +24,36 @@ import {
   Tray,
 } from "electron";
 import { createActions } from "./actions";
-import { createEzoClient, EzoApiError } from "./api";
+import { createEzoClient, EzoApiError, type JarvisTaskView, type ServerStatus } from "./api";
 import { createAssistant } from "./assistant";
 import { findFiles, isInsideAllowed } from "./files";
 import { buildResult, generateDeviceKey, latestDocuments, pairingRequest, validWork, type DeviceKey } from "./jarvis";
 import type { Lang } from "./replies";
 import { runSelfTest } from "./selftest";
 import { ALLOWED_SHORTCUTS, sanitizeSettings, type DesktopSettings } from "./settings";
+import { format, strings, UI_LANGUAGES } from "./strings";
 
 const SETTINGS_FILE = () => path.join(app.getPath("userData"), "settings.json");
 const TOKEN_FILE = () => path.join(app.getPath("userData"), "token.bin");
 const JARVIS_KEY_FILE = () => path.join(app.getPath("userData"), "jarvis-key.bin");
 const JARVIS_POLL_MS = 5_000;
+const STATUS_POLL_MS = 30_000;
+const SHOW_HIDE_SHORTCUT = "Control+Alt+H";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 let pill: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let settings: DesktopSettings = sanitizeSettings({});
+const t = () => strings(settings.language);
 
-function loadSettings(): void {
+function loadSettings(): boolean {
   try {
     settings = sanitizeSettings(JSON.parse(readFileSync(SETTINGS_FILE(), "utf8")));
+    return true;
   } catch {
     settings = sanitizeSettings({});
+    return false;
   }
 }
 
@@ -94,37 +100,100 @@ function writeDeviceKey(key: DeviceKey | null): void {
   writeFileSync(JARVIS_KEY_FILE(), safeStorage.encryptString(JSON.stringify(key)), { mode: 0o600 });
 }
 
+const client = (signal?: AbortSignal) => createEzoClient(settings.apiUrl, readToken(), fetch, { lang: settings.language, signal });
+
+// --- what the pill is told ---------------------------------------------------------------
+
+type PillStage = "recognizing" | "thinking" | "working";
+interface PillStatus {
+  online: boolean;
+  ai: boolean;
+  voice: boolean;
+  text: string;
+}
+let lastStatus: PillStatus = { online: false, ai: false, voice: false, text: "" };
+
+function tell(channel: "notice" | "error" | "stage" | "status" | "tasks" | "init", payload: unknown): void {
+  pill?.webContents.send(channel, payload);
+}
+
+/** Checks the server, then tells the pill and the tray. Called on a timer and after each turn. */
+async function refreshStatus(): Promise<PillStatus> {
+  let next: PillStatus;
+  try {
+    const status: ServerStatus = await client().status();
+    next = { online: true, ai: status.ai, voice: status.voice, text: status.ai ? t().pill.statusOnline : t().pill.statusNoAi };
+  } catch (error) {
+    // /api/status needs a valid token; a reachable server with a bad token is still "online".
+    const reachable = error instanceof EzoApiError && error.status > 0;
+    next = reachable ? { online: true, ai: false, voice: false, text: error instanceof EzoApiError ? error.message : t().pill.statusOffline } : { online: false, ai: false, voice: false, text: t().pill.statusOffline };
+  }
+  lastStatus = next;
+  tell("status", next);
+  tray?.setToolTip(format(t().tray.tooltip, { status: next.text }));
+  return next;
+}
+
+function pillInit(): { strings: ReturnType<typeof strings>["pill"]; shortcut: string; language: Lang; status: PillStatus } {
+  return { strings: t().pill, shortcut: settings.shortcut.replace("Control", "Ctrl"), language: settings.language, status: lastStatus };
+}
+
+// --- JARVIS companion ----------------------------------------------------------------------
+
 let jarvisBusy = false;
-const trackedTasks = new Set<string>();
+const trackedTasks = new Map<string, JarvisTaskView>();
 const askedSteps = new Set<string>();
+
+function taskSummaries(): { id: string; state: string; step: string | null; waiting: boolean; report: string }[] {
+  return [...trackedTasks.values()].map((task) => {
+    const current = task.steps.find((s) => !["completed", "skipped", "cancelled"].includes(s.state));
+    return {
+      id: task.id,
+      state: task.state,
+      step: current?.action ?? null,
+      waiting: current?.state === "awaiting_authorization",
+      report: task.report,
+    };
+  });
+}
 
 /** Native approval for the exact external action the server computed (recipient + file
  * hashes); the decision echoes the server's scope hash so nothing else can be approved. */
 async function followTasks(): Promise<void> {
-  const client = createEzoClient(settings.apiUrl, readToken());
-  for (const taskId of [...trackedTasks]) {
-    const task = await client.jarvisTask(taskId);
+  const api = client();
+  for (const taskId of [...trackedTasks.keys()]) {
+    let task: JarvisTaskView;
+    try {
+      task = await api.jarvisTask(taskId);
+    } catch (error) {
+      if (error instanceof EzoApiError && error.status === 404) trackedTasks.delete(taskId);
+      continue; // one unreachable task must not stop the others
+    }
+    trackedTasks.set(taskId, task);
     const step = task.steps.find((s) => s.state === "awaiting_authorization" && s.scope_sha256);
     if (step && !askedSteps.has(step.id)) {
       askedSteps.add(step.id);
+      tell("tasks", taskSummaries());
       const files = (step.output.documents ?? []).map((d) => `• ${d.filename} (${d.sha256.slice(0, 12)}…)`).join("\n");
+      const recipient = `${step.output.recipient ?? "?"}${step.output.telegram_name ? ` (${step.output.telegram_name})` : ""}`;
       const { response } = await dialog.showMessageBox({
         type: "warning",
-        buttons: ["Yuborishga ruxsat beraman", "Rad etish"],
+        buttons: [t().dialogs.allowSend, t().dialogs.deny],
         defaultId: 1,
         cancelId: 1,
-        title: "EZO JARVIS — tasdiq",
-        message: `Telegram’da ${step.output.recipient ?? "?"}${step.output.telegram_name ? ` (${step.output.telegram_name})` : ""}ga yuborilsinmi?`,
+        title: t().dialogs.jarvisApproveTitle,
+        message: format(t().dialogs.sendTo, { recipient }),
         detail: files,
       });
-      await client.decideJarvisStep(task.id, step.id, step.scope_sha256!, response === 0);
+      await api.decideJarvisStep(task.id, step.id, step.scope_sha256!, response === 0);
       continue;
     }
     if (["completed", "failed", "cancelled"].includes(task.state)) {
       trackedTasks.delete(taskId);
-      pill?.webContents.send("notice", task.report);
+      tell(task.state === "completed" ? "notice" : "error", task.report || format(t().dialogs.taskReport, { state: task.state }));
     }
   }
+  tell("tasks", taskSummaries());
 }
 
 /** Poll the owner's EZO server for this device's JARVIS work; ask the owner before
@@ -132,32 +201,35 @@ async function followTasks(): Promise<void> {
 async function pollJarvis(): Promise<void> {
   const deviceId = settings.jarvisDeviceId;
   const key = readDeviceKey();
-  if (jarvisBusy || !deviceId || !key) return;
+  if (jarvisBusy || !deviceId || !key) {
+    if (!jarvisBusy && trackedTasks.size > 0) await followTasks().catch(() => undefined);
+    return;
+  }
   jarvisBusy = true;
   try {
-    const client = createEzoClient(settings.apiUrl, readToken());
-    for (const item of await client.deviceWork(deviceId)) {
+    const api = client();
+    for (const item of await api.deviceWork(deviceId)) {
       if (!validWork(item, deviceId, Math.floor(Date.now() / 1000))) continue;
       let outcome: Parameters<typeof buildResult>[2];
       if (!settings.jarvisFolder) {
         outcome = { refused: "No folder is allowed for JARVIS on this computer." };
       } else {
         const latest = await latestDocuments(settings.jarvisFolder, item.count, item.extensions);
-        const names = latest.files.map((f) => `• ${f.name}`).join("\n") || "(mos fayl topilmadi)";
+        const names = latest.files.map((f) => `• ${f.name}`).join("\n") || t().dialogs.noFiles;
         const { response } = await dialog.showMessageBox({
           type: "question",
-          buttons: ["Yuborish", "Rad etish"],
+          buttons: [t().dialogs.send, t().dialogs.deny],
           defaultId: 1,
           cancelId: 1,
-          title: "EZO JARVIS",
-          message: "EZO vazifasi shu fayllarni sizning EZO serveringizga yuborishni so‘rayapti:",
-          detail: `${names}\n\nPapka: ${settings.jarvisFolder}\nTashqariga yuborish (masalan, Telegram) alohida tasdiqlanadi.`,
+          title: t().dialogs.jarvisTitle,
+          message: t().dialogs.filesRequest,
+          detail: `${names}\n\n${format(t().dialogs.filesDetail, { folder: settings.jarvisFolder })}`,
         });
         outcome = response === 0 ? latest : { refused: "The owner declined on the device." };
       }
       const result = await buildResult(item, key, outcome);
-      const task = await client.submitDeviceResult(deviceId, result);
-      pill?.webContents.send("notice", task.report || `JARVIS vazifasi: ${task.state}`);
+      const task = await api.submitDeviceResult(deviceId, result);
+      tell("notice", task.report || format(t().dialogs.taskReport, { state: task.state }));
     }
     await followTasks();
   } catch (error) {
@@ -168,6 +240,8 @@ async function pollJarvis(): Promise<void> {
     jarvisBusy = false;
   }
 }
+
+// --- local actions -------------------------------------------------------------------------
 
 const GUI_APPS = new Set(["calc.exe", "notepad.exe", "mspaint.exe", "explorer.exe"]);
 
@@ -207,21 +281,25 @@ async function captureScreen(): Promise<Uint8Array> {
     },
   });
   const source = sources.find((s) => s.display_id === String(display.id)) ?? sources[0];
-  if (!source || source.thumbnail.isEmpty()) throw new Error("Ekran rasmini olib bo‘lmadi.");
+  if (!source || source.thumbnail.isEmpty()) throw new Error(t().dialogs.screenshotFailed);
   // Hide nothing, keep nothing: the PNG lives only in memory for this one request.
   return new Uint8Array(source.thumbnail.toPNG());
 }
 
+// --- one turn ------------------------------------------------------------------------------
+
+let currentTurn: AbortController | null = null;
+
 const assistant = createAssistant({
   settings: () => settings,
-  client: () => createEzoClient(settings.apiUrl, readToken()),
+  client: () => client(currentTurn?.signal),
   actions,
   findFiles,
   isInsideAllowed,
   confirm: async (message) => {
     const { response } = await dialog.showMessageBox({
       type: "question",
-      buttons: ["Ruxsat beraman", "Bekor qilish"],
+      buttons: [t().dialogs.allow, t().dialogs.cancel],
       defaultId: 1,
       cancelId: 1,
       title: "EZO",
@@ -231,7 +309,11 @@ const assistant = createAssistant({
   },
   captureScreen,
   saveConversation: (id) => saveSettings({ ...settings, conversationId: id }),
-  trackTask: (id) => trackedTasks.add(id),
+  trackTask: (id) => {
+    trackedTasks.set(id, { id, state: "queued", report: "", steps: [] });
+    void pollJarvis();
+  },
+  onStage: (stage) => tell("stage", stage),
 });
 
 interface TurnResponse {
@@ -241,24 +323,46 @@ interface TurnResponse {
   audio?: { mimeType: string; data: Uint8Array };
   error?: string;
   notice?: string;
+  cancelled?: boolean;
 }
 
 async function respond(text: string, heard: Lang | null = null): Promise<TurnResponse> {
   const result = await assistant.handle(text, heard);
   const out: TurnResponse = { transcript: text, reply: result.reply, acted: result.acted };
-  if (settings.speakReplies) {
+  if (settings.speakReplies && !currentTurn?.signal.aborted) {
     try {
-      out.audio = await createEzoClient(settings.apiUrl, readToken()).speak(result.reply, result.language);
+      out.audio = await client(currentTurn?.signal).speak(result.reply, result.language);
     } catch (error) {
-      out.notice = error instanceof EzoApiError ? error.message : "Javobni ovozda o‘qib bo‘lmadi.";
+      if (error instanceof EzoApiError && error.code === "cancelled") return { cancelled: true };
+      out.notice = error instanceof EzoApiError ? error.message : t().pill.readAloudFailed;
     }
   }
   return out;
 }
 
 function failure(error: unknown): TurnResponse {
-  return { error: error instanceof EzoApiError ? error.message : `Xatolik: ${(error as Error).message}` };
+  if (error instanceof EzoApiError && error.code === "cancelled") return { cancelled: true };
+  if (error instanceof EzoApiError && error.code === "network") void refreshStatus();
+  return { error: error instanceof EzoApiError ? error.message : `${t().pill.error}: ${(error as Error).message}` };
 }
+
+/** Runs one turn with its own abort controller; a stop from the pill cancels the requests. */
+async function turn(body: () => Promise<TurnResponse>): Promise<TurnResponse> {
+  currentTurn?.abort();
+  const controller = new AbortController();
+  currentTurn = controller;
+  try {
+    const result = await body();
+    return controller.signal.aborted ? { cancelled: true } : result;
+  } catch (error) {
+    return failure(error);
+  } finally {
+    if (currentTurn === controller) currentTurn = null;
+    if (!controller.signal.aborted && !lastStatus.online) void refreshStatus();
+  }
+}
+
+// --- windows -------------------------------------------------------------------------------
 
 function secureWindow(win: BrowserWindow): void {
   win.webContents.on("will-navigate", (event) => event.preventDefault());
@@ -292,12 +396,18 @@ function createPill(): void {
   pill.once("ready-to-show", () => pill?.showInactive());
 }
 
+function togglePill(): void {
+  if (!pill) return;
+  if (pill.isVisible()) pill.hide();
+  else pill.showInactive();
+}
+
 function openSettings(): void {
   if (settingsWindow) return settingsWindow.focus();
   settingsWindow = new BrowserWindow({
     width: 560,
-    height: 720,
-    title: "EZO sozlamalari",
+    height: 760,
+    title: t().settings.title,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload-settings.js"),
@@ -316,31 +426,38 @@ function openSettings(): void {
 function registerShortcut(): void {
   globalShortcut.unregisterAll();
   const ok = globalShortcut.register(settings.shortcut, () => pill?.webContents.send("shortcut:toggle"));
-  if (!ok) pill?.webContents.send("notice", `${settings.shortcut} tugmasi band. Sozlamalarda boshqasini tanlang.`);
+  if (!ok) tell("error", format(t().pill.shortcutBusy, { shortcut: settings.shortcut.replace("Control", "Ctrl") }));
+  globalShortcut.register(SHOW_HIDE_SHORTCUT, togglePill);
+}
+
+function applyLanguage(): void {
+  tell("init", pillInit());
+  createTrayMenu();
+  settingsWindow?.setTitle(t().settings.title);
+  void refreshStatus();
 }
 
 function registerIpc(): void {
-  ipcMain.handle("turn:audio", async (_event, audio: unknown, mimeType: unknown) => {
-    if (!(audio instanceof ArrayBuffer) || audio.byteLength === 0 || audio.byteLength > MAX_AUDIO_BYTES) {
-      return failure(new Error("Yozuv bo‘sh yoki juda katta."));
-    }
-    const type = typeof mimeType === "string" && /^audio\/[a-z0-9.+-]+(;.*)?$/i.test(mimeType) ? mimeType : "audio/webm";
-    try {
-      const heard = await createEzoClient(settings.apiUrl, readToken()).transcribe(new Uint8Array(audio), type.split(";")[0]!);
-      if (!heard.text) return { error: "Hech narsa eshitilmadi. Qaytadan gapiring." };
-      return await respond(heard.text, heard.language);
-    } catch (error) {
-      return failure(error);
-    }
-  });
-  ipcMain.handle("turn:text", async (_event, text: unknown) => {
-    if (typeof text !== "string" || !text.trim() || text.length > 4000) return failure(new Error("Matn noto‘g‘ri."));
-    try {
-      return await respond(text.trim());
-    } catch (error) {
-      return failure(error);
-    }
-  });
+  ipcMain.handle("pill:init", () => pillInit());
+  ipcMain.handle("turn:audio", (_event, audio: unknown, mimeType: unknown) =>
+    turn(async () => {
+      if (!(audio instanceof ArrayBuffer) || audio.byteLength === 0 || audio.byteLength > MAX_AUDIO_BYTES) {
+        return { error: t().pill.emptyOrLarge };
+      }
+      const type = typeof mimeType === "string" && /^audio\/[a-z0-9.+-]+(;.*)?$/i.test(mimeType) ? mimeType : "audio/webm";
+      tell("stage", "recognizing");
+      const heard = await client(currentTurn?.signal).transcribe(new Uint8Array(audio), type.split(";")[0]!);
+      if (!heard.text) return { error: t().pill.nothingHeard };
+      return respond(heard.text, heard.language);
+    }),
+  );
+  ipcMain.handle("turn:text", (_event, text: unknown) =>
+    turn(async () => {
+      if (typeof text !== "string" || !text.trim() || text.length > 4000) return { error: t().pill.badText };
+      return respond(text.trim());
+    }),
+  );
+  ipcMain.on("turn:cancel", () => currentTurn?.abort());
   ipcMain.on("pill:focusable", (_event, focusable: unknown) => {
     if (!pill || typeof focusable !== "boolean") return;
     pill.setFocusable(focusable);
@@ -350,9 +467,50 @@ function registerIpc(): void {
   ipcMain.on("pill:height", (_event, height: unknown) => {
     if (!pill || typeof height !== "number") return;
     const [width] = pill.getSize();
-    pill.setSize(width ?? 360, Math.max(72, Math.min(420, Math.round(height))));
+    pill.setSize(width ?? 360, Math.max(72, Math.min(520, Math.round(height))));
   });
   ipcMain.on("settings:open", openSettings);
+  ipcMain.handle("status:refresh", () => refreshStatus());
+
+  // The conversation lives on the server, shared with the phone and the web app.
+  ipcMain.handle("history:recent", async () => {
+    try {
+      if (!settings.conversationId) return { ok: true, conversationId: null, messages: [] };
+      const messages = await client().messages(settings.conversationId);
+      return { ok: true, conversationId: settings.conversationId, messages: messages.map((m) => ({ role: m.role, content: m.content })) };
+    } catch (error) {
+      if (error instanceof EzoApiError && error.status === 404) {
+        saveSettings({ ...settings, conversationId: null }); // the conversation is gone (deleted elsewhere)
+        return { ok: true, conversationId: null, messages: [] };
+      }
+      return { ok: false, message: error instanceof EzoApiError ? error.message : t().pill.historyUnavailable };
+    }
+  });
+  ipcMain.handle("history:conversations", async () => {
+    try {
+      return { ok: true, conversations: await client().conversations(10) };
+    } catch (error) {
+      return { ok: false, message: error instanceof EzoApiError ? error.message : t().pill.historyUnavailable };
+    }
+  });
+  ipcMain.handle("history:switch", (_event, id: unknown) => {
+    saveSettings({ ...settings, conversationId: typeof id === "string" ? id : null });
+    return settings.conversationId;
+  });
+
+  ipcMain.handle("jarvis:tasks", () => taskSummaries());
+  ipcMain.handle("jarvis:cancel-task", async (_event, id: unknown) => {
+    if (typeof id !== "string" || !trackedTasks.has(id)) return { ok: false };
+    try {
+      const task = await client().cancelJarvisTask(id);
+      trackedTasks.delete(id);
+      tell("tasks", taskSummaries());
+      tell("notice", t().pill.taskCancelled);
+      return { ok: true, state: task.state };
+    } catch (error) {
+      return { ok: false, message: error instanceof EzoApiError ? error.message : String(error) };
+    }
+  });
 
   ipcMain.handle("settings:get", () => ({
     settings,
@@ -360,8 +518,11 @@ function registerIpc(): void {
     secureStorage: safeStorage.isEncryptionAvailable(),
     shortcuts: ALLOWED_SHORTCUTS,
     platform: process.platform,
+    strings: t().settings,
+    languages: UI_LANGUAGES,
   }));
   ipcMain.handle("settings:save", (_event, next: unknown) => {
+    const before = settings.language;
     const merged = sanitizeSettings({
       ...settings,
       ...(next as object),
@@ -372,13 +533,17 @@ function registerIpc(): void {
     });
     saveSettings(merged);
     registerShortcut();
+    if (settings.language !== before) applyLanguage();
+    else tell("init", pillInit());
     return settings;
   });
-  ipcMain.handle("settings:token", (_event, token: unknown) =>
-    writeToken(typeof token === "string" && token.trim() ? token.trim() : null),
-  );
+  ipcMain.handle("settings:token", (_event, token: unknown) => {
+    const ok = writeToken(typeof token === "string" && token.trim() ? token.trim() : null);
+    void refreshStatus();
+    return ok;
+  });
   ipcMain.handle("settings:add-folder", async () => {
-    const result = await dialog.showOpenDialog({ properties: ["openDirectory"], title: "EZO qidira oladigan papka" });
+    const result = await dialog.showOpenDialog({ properties: ["openDirectory"], title: t().dialogs.chooseFolder });
     const folder = result.filePaths[0];
     if (!result.canceled && folder) saveSettings({ ...settings, allowedFolders: [...settings.allowedFolders, folder] });
     return settings;
@@ -394,7 +559,7 @@ function registerIpc(): void {
   ipcMain.handle("jarvis:choose-folder", async () => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory"],
-      title: "JARVIS faqat shu papkadagi eng yangi hujjatlarni o‘qiy oladi (masalan, Downloads)",
+      title: t().dialogs.chooseJarvisFolder,
       defaultPath: app.getPath("downloads"),
     });
     const folder = result.filePaths[0];
@@ -406,17 +571,17 @@ function registerIpc(): void {
     return settings;
   });
   ipcMain.handle("jarvis:pair", async () => {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { ok: false, message: "Tizimning shifrlangan saqlash joyi yo‘q: kalitni saqlab bo‘lmaydi." };
-    }
+    if (!safeStorage.isEncryptionAvailable()) return { ok: false, message: t().dialogs.noSecureStorage };
+    const api = client();
+    // Pairing again replaces the old device: revoke it first so one computer is one device.
+    if (settings.jarvisDeviceId) await api.revokeDevice(settings.jarvisDeviceId).catch(() => undefined);
     const key = generateDeviceKey();
     try {
-      const client = createEzoClient(settings.apiUrl, readToken());
-      const body = pairingRequest(key, `EZO — ${process.env.COMPUTERNAME ?? "kompyuter"}`.slice(0, 80), process.platform === "win32" ? "windows" : "linux");
-      const paired = await client.requestPairing(body);
+      const body = pairingRequest(key, `EZO — ${process.env.COMPUTERNAME ?? "PC"}`.slice(0, 80), process.platform === "win32" ? "windows" : "linux");
+      const paired = await api.requestPairing(body);
       writeDeviceKey(key);
       saveSettings({ ...settings, jarvisDeviceId: paired.device.id });
-      return { ok: true, code: paired.code, message: "Shu kodni EZO ilovasidagi JARVIS sahifasiga kiriting (10 daqiqa amal qiladi)." };
+      return { ok: true, code: paired.code, message: t().dialogs.pairCode };
     } catch (error) {
       return { ok: false, message: error instanceof EzoApiError ? error.message : String(error) };
     }
@@ -424,7 +589,7 @@ function registerIpc(): void {
   ipcMain.handle("jarvis:unpair", async () => {
     if (settings.jarvisDeviceId) {
       try {
-        await createEzoClient(settings.apiUrl, readToken()).revokeDevice(settings.jarvisDeviceId);
+        await client().revokeDevice(settings.jarvisDeviceId);
       } catch {
         // offline: the local key is still destroyed, so this PC can no longer sign results
       }
@@ -436,7 +601,7 @@ function registerIpc(): void {
   ipcMain.handle("jarvis:status", async () => {
     if (!settings.jarvisDeviceId) return { paired: false, status: "none" };
     try {
-      const devices = await createEzoClient(settings.apiUrl, readToken()).devices();
+      const devices = await client().devices();
       const me = devices.find((d) => d.id === settings.jarvisDeviceId);
       return { paired: me?.status === "paired", status: me?.status ?? "unknown" };
     } catch (error) {
@@ -444,12 +609,14 @@ function registerIpc(): void {
     }
   });
   ipcMain.handle("settings:test", async () => {
-    const client = createEzoClient(settings.apiUrl, readToken());
+    const api = client();
     try {
-      await client.health();
-      const me = await client.me();
-      return { ok: true, message: `Ulandi: ${me.display_name ?? me.email ?? "EZO"}` };
+      await api.health();
+      const me = await api.me();
+      const status = await refreshStatus();
+      return { ok: true, message: `${format(t().dialogs.connected, { name: me.display_name ?? me.email ?? "EZO" })} — ${status.text}` };
     } catch (error) {
+      void refreshStatus();
       return { ok: false, message: error instanceof EzoApiError ? error.message : String(error) };
     }
   });
@@ -466,18 +633,23 @@ function allowOnlyMicrophone(): void {
   );
 }
 
+function createTrayMenu(): void {
+  tray?.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: `${t().tray.showHide}  (Ctrl+Alt+H)`, click: togglePill },
+      { label: t().tray.settings, click: openSettings },
+      { type: "separator" },
+      { label: t().tray.quit, click: () => app.quit() },
+    ]),
+  );
+}
+
 function createTray(): void {
   const icon = nativeImage.createFromPath(path.join(__dirname, "..", "assets", "icon.png")).resize({ width: 16, height: 16 });
   tray = new Tray(icon);
   tray.setToolTip("EZO");
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "Ko‘rsatish / yashirish", click: () => (pill?.isVisible() ? pill.hide() : pill?.showInactive()) },
-      { label: "Sozlamalar", click: openSettings },
-      { type: "separator" },
-      { label: "Chiqish", click: () => app.quit() },
-    ]),
-  );
+  tray.on("click", togglePill);
+  createTrayMenu();
 }
 
 const selfTestArg = process.argv.find((a) => a.startsWith("--self-test="));
@@ -493,14 +665,17 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
       app.exit(report.every((r) => r.ok || r.skipped || r.informational) ? 0 : 1);
       return;
     }
-    loadSettings();
+    const firstRun = !loadSettings();
     allowOnlyMicrophone();
     registerIpc();
     createPill();
     createTray();
     registerShortcut();
     setInterval(() => void pollJarvis(), JARVIS_POLL_MS);
-    if (!readToken() && settings.apiUrl.startsWith("https:")) openSettings();
+    setInterval(() => void refreshStatus(), STATUS_POLL_MS);
+    void refreshStatus();
+    // A new install, or a remote server without a token: the owner must see where to connect.
+    if (firstRun || (!readToken() && settings.apiUrl.startsWith("https:"))) openSettings();
   });
   app.on("will-quit", () => globalShortcut.unregisterAll());
   app.on("window-all-closed", () => {

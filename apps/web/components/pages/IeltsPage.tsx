@@ -83,7 +83,7 @@ interface EvaluationResult {
 }
 
 export function IeltsPage() {
-  const { m } = useI18n();
+  const { m, f } = useI18n();
 
   const [cueCards, setCueCards] = useState<CueCard[]>([]);
   const [selectedCard, setSelectedCard] = useState<CueCard | null>(null);
@@ -129,7 +129,7 @@ export function IeltsPage() {
     }
     const engine = serverRecordingSupported() || speechRecognitionSupported() ? pickListener(serverVoice, serverFailed) : null;
     if (!engine) {
-      setVoiceNote("Ovozli javob uchun brauzer yoki serverda nutqni aniqlash mavjud emas. Javobni yozing.");
+      setVoiceNote(m.ielts.voiceUnsupported);
       return;
     }
     setVoiceNote(null);
@@ -145,8 +145,8 @@ export function IeltsPage() {
         setIsListening(false);
         setStopListeningFn(null);
         if (error === "server-failed") setServerFailed(true);
-        if (error === "not-allowed") setVoiceNote("Mikrofonga ruxsat berilmadi.");
-        else if (error === "no-speech") setVoiceNote("Ovoz eshitilmadi. Qaytadan urinib ko'ring.");
+        if (error === "not-allowed") setVoiceNote(m.ielts.micDenied);
+        else if (error === "no-speech") setVoiceNote(m.ielts.noSpeech);
       },
     };
     const stop =
@@ -274,8 +274,8 @@ export function IeltsPage() {
 
   return (
     <PageFrame
-      title={m.ielts?.title ?? "IELTS Speaking Simulyatori 2.0"}
-      subtitle={m.ielts?.subtitle ?? "Real imtihon formati, taxminiy ballar va o&apos;zbekcha tavsiyalar."}
+      title={m.ielts.title}
+      subtitle={m.ielts.subtitle}
       actions={
         <Button
           variant="primary"
@@ -283,7 +283,7 @@ export function IeltsPage() {
           icon={<RotateCcw size={14} />}
           onClick={() => void startNewSession()}
         >
-          {m.ielts?.startSession ?? "Yangi imtihon"}
+          {m.ielts.startSession}
         </Button>
       }
     >
@@ -296,15 +296,14 @@ export function IeltsPage() {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-accent2">
-                {m.ielts?.voiceOffline ?? "Matnli rejim (Oflayn zaxira faol)"}
+                {m.ielts.voiceOffline}
               </span>
               <span className="rounded-md bg-surface-3 px-2 py-0.5 text-xs text-ink-muted">
                 {voiceStatus?.provider ?? "offline_text_fallback"}
               </span>
             </div>
             <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-              {voiceStatus?.notice_uz ??
-                "Ovozli xizmat sozlanmagan bo'lsa ham simulyator to'liq matnli rejimda ishlaydi. Barcha baholar taxminiy bo'lib, ta'limiy maqsadga mo'ljallangan."}
+              {voiceStatus?.notice_uz ?? m.ielts.voiceNoticeFallback}
             </p>
           </div>
         </div>
@@ -313,25 +312,25 @@ export function IeltsPage() {
       {/* Preparation Stats Bar */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-xl border border-line bg-surface p-3.5">
-          <p className="text-xs text-ink-muted">{m.ielts?.history ?? "Sinovlar soni"}</p>
+          <p className="text-xs text-ink-muted">{m.ielts.history}</p>
           <p className="mt-1 text-lg font-bold text-ink">{stats?.total_sessions ?? 0}</p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-3.5">
-          <p className="text-xs text-ink-muted">{m.ielts?.estimatedBand ?? "O'rtacha band"}</p>
+          <p className="text-xs text-ink-muted">{m.ielts.estimatedBand}</p>
           <p className="mt-1 text-lg font-bold text-accent">
             {stats?.average_band ? stats.average_band.toFixed(1) : "—"}
           </p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-3.5">
-          <p className="text-xs text-ink-muted">Eng yuqori natija</p>
+          <p className="text-xs text-ink-muted">{m.ielts.bestBand}</p>
           <p className="mt-1 text-lg font-bold text-success">
             {stats?.best_band ? stats.best_band.toFixed(1) : "—"}
           </p>
         </div>
         <div className="rounded-xl border border-line bg-surface p-3.5">
-          <p className="text-xs text-ink-muted">Nutq davomiyligi</p>
+          <p className="text-xs text-ink-muted">{m.ielts.speakingTime}</p>
           <p className="mt-1 text-lg font-bold text-ink">
-            {stats?.total_speaking_minutes ? `${stats.total_speaking_minutes} daq` : "0 daq"}
+            {f(m.ielts.minutes, { count: stats?.total_speaking_minutes || 0 })}
           </p>
         </div>
       </div>
@@ -348,14 +347,14 @@ export function IeltsPage() {
                   </span>
                   <h3 className="text-sm font-semibold text-ink">
                     {session.ielts_part === 1
-                      ? "Part 1: Tanishtiruv va kundalik mavzular"
+                      ? m.ielts.part1Title
                       : session.ielts_part === 2
-                        ? "Part 2: Mavzu kartasi (Cue Card)"
-                        : "Part 3: Chuqurlashtirilgan muhokama"}
+                        ? m.ielts.part2Title
+                        : m.ielts.part3Title}
                   </h3>
                 </div>
                 <span className="text-xs text-ink-muted">
-                  Javoblar: {session.answered_count} ta
+                  {f(m.ielts.answersCount, { count: session.answered_count })}
                 </span>
               </div>
 
@@ -363,7 +362,7 @@ export function IeltsPage() {
               <div className="rounded-xl border border-line bg-surface-2/60 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wider text-accent">
-                    Imtihon oluvchi savoli:
+                    {m.ielts.examinerQuestion}
                   </p>
                   {session.current_prompt && (
                     <button
@@ -372,12 +371,12 @@ export function IeltsPage() {
                       onClick={() => handleSpeakPrompt(session.current_prompt || "")}
                     >
                       <Volume2 size={13} className={speakingPrompt ? "text-accent animate-pulse" : ""} />
-                      {speakingPrompt ? "O'qilmoqda..." : "Savolni tinglash"}
+                      {speakingPrompt ? m.ielts.reading : m.ielts.listenQuestion}
                     </button>
                   )}
                 </div>
                 <p className="mt-1.5 whitespace-pre-line text-base font-medium leading-relaxed text-ink">
-                  {session.current_prompt || "Savol tayyorlanmoqda..."}
+                  {session.current_prompt || m.ielts.preparingQuestion}
                 </p>
               </div>
 
@@ -385,11 +384,8 @@ export function IeltsPage() {
               {!session.finished ? (
                 <div className="space-y-3">
                   <TextAreaField
-                    label="Sizning javobingiz:"
-                    placeholder={
-                      m.ielts?.answerPlaceholder ??
-                      "Javobingizni bu yerga yozing yoki mikrofon orqali ayting..."
-                    }
+                    label={m.ielts.yourAnswer}
+                    placeholder={m.ielts.answerPlaceholder}
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
                     rows={4}
@@ -408,20 +404,20 @@ export function IeltsPage() {
                         size="sm"
                         icon={
                           isListening ? (
-                            <Square size={13} className="text-red-500 animate-pulse" />
+                            <Square size={13} className="text-danger animate-pulse" />
                           ) : (
                             <Mic size={13} />
                           )
                         }
                         onClick={toggleListening}
                       >
-                        {isListening ? "To'xtatish (Eshitilmoqda...)" : "Ovoz bilan javob berish"}
+                        {isListening ? m.ielts.stopListening : m.ielts.answerByVoice}
                       </Button>
                       <p className="text-xs text-ink-muted">
-                        {answer.split(/\s+/).filter(Boolean).length} ta so&apos;z
-                        {speechSeconds ? ` · ${Math.round(speechSeconds)} s nutq (qurilmada o'lchangan)` : ""}
+                        {f(m.ielts.wordCount, { count: answer.split(/\s+/).filter(Boolean).length })}
+                        {speechSeconds ? ` · ${f(m.ielts.speechMeasured, { seconds: Math.round(speechSeconds) })}` : ""}
                       </p>
-                      {voiceNote ? <p className="text-xs text-red-500">{voiceNote}</p> : null}
+                      {voiceNote ? <p className="text-xs text-danger">{voiceNote}</p> : null}
                     </div>
                     <Button
                       variant="primary"
@@ -429,18 +425,18 @@ export function IeltsPage() {
                       disabled={loading || !answer.trim()}
                       onClick={() => void submitAnswer()}
                     >
-                      {loading ? <Spinner /> : m.ielts?.submitAnswer ?? "Yuborish"}
+                      {loading ? <Spinner /> : m.ielts.submitAnswer}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-xl bg-success/10 p-4 text-center text-success">
                   <Award size={32} className="mx-auto mb-2" />
-                  <p className="text-base font-semibold">Sinov muvaffaqiyatli yakunlandi!</p>
+                  <p className="text-base font-semibold">{m.ielts.finished}</p>
                   <p className="mt-1 text-sm text-ink-muted">
                     {session.band_low != null && session.band_high != null
-                      ? `Taxminiy natija: Band ${session.band_low} - ${session.band_high}`
-                      : "Bu sessiya uchun ball hisoblanmadi: EZO rasmiy yoki tasdiqlangan IELTS bahosini bermaydi."}
+                      ? f(m.ielts.estimatedResult, { low: session.band_low, high: session.band_high })
+                      : m.ielts.noScore}
                   </p>
                 </div>
               )}
@@ -448,20 +444,15 @@ export function IeltsPage() {
           ) : (
             <Card className="flex flex-col items-center justify-center p-8 text-center">
               <Award size={48} className="mb-3 text-accent" />
-              <h3 className="text-base font-semibold text-ink">
-                IELTS Speaking sinovini boshlang
-              </h3>
-              <p className="mt-1 max-w-md text-xs text-ink-muted">
-                Part 1, Part 2 (Cue Card) va Part 3 bosqichlarini mashq qiling. Bu rasmiy IELTS
-                bahosi emas.
-              </p>
+              <h3 className="text-base font-semibold text-ink">{m.ielts.startHeading}</h3>
+              <p className="mt-1 max-w-md text-xs text-ink-muted">{m.ielts.startDesc}</p>
               <Button
                 variant="primary"
                 className="mt-4"
                 icon={<Award size={16} />}
                 onClick={() => void startNewSession()}
               >
-                {m.ielts?.startSession ?? "Imtihonni boshlash"}
+                {m.ielts.startSession}
               </Button>
             </Card>
           )}
@@ -471,7 +462,7 @@ export function IeltsPage() {
             <Card className="space-y-4 border-line">
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <h4 className="text-sm font-semibold text-ink">
-                  {m.ielts?.feedback ?? "Natija va Mezonlar Tahlili"}
+                  {m.ielts.feedback}
                 </h4>
                 <span className="rounded-lg bg-accent/20 px-2.5 py-1 text-sm font-bold text-accent">
                   Band {evalResult.estimated_band?.toFixed(1) ?? "—"}
@@ -481,25 +472,25 @@ export function IeltsPage() {
               {/* 4 Criteria Grid */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
-                  <p className="text-xs text-ink-muted">{m.ielts?.fluency ?? "Ravonlik"}</p>
+                  <p className="text-xs text-ink-muted">{m.ielts.fluency}</p>
                   <p className="text-base font-bold text-ink">
                     {evalResult.fluency_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
-                  <p className="text-xs text-ink-muted">{m.ielts?.lexical ?? "Lug'at"}</p>
+                  <p className="text-xs text-ink-muted">{m.ielts.lexical}</p>
                   <p className="text-base font-bold text-ink">
                     {evalResult.lexical_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
-                  <p className="text-xs text-ink-muted">{m.ielts?.grammar ?? "Grammatika"}</p>
+                  <p className="text-xs text-ink-muted">{m.ielts.grammar}</p>
                   <p className="text-base font-bold text-ink">
                     {evalResult.grammar_score?.toFixed(1) ?? "—"}
                   </p>
                 </div>
                 <div className="rounded-lg bg-surface-2 p-2.5 text-center">
-                  <p className="text-xs text-ink-muted">{m.ielts?.pronunciation ?? "Talaffuz"}</p>
+                  <p className="text-xs text-ink-muted">{m.ielts.pronunciation}</p>
                   <p className="text-base font-bold text-ink">
                     {evalResult.pronunciation_score?.toFixed(1) ?? "—"}
                   </p>
@@ -508,11 +499,11 @@ export function IeltsPage() {
 
               <div className="space-y-2 text-xs leading-relaxed text-ink-muted">
                 <p>
-                  <strong className="text-ink">English feedback:</strong>{" "}
+                  <strong className="text-ink">{m.ielts.englishFeedback}</strong>{" "}
                   {evalResult.constructive_feedback}
                 </p>
                 <p className="rounded-lg bg-accent/5 p-3 text-accent">
-                  <strong className="text-ink">O&apos;zbekcha tavsiya:</strong>{" "}
+                  <strong className="text-ink">{m.ielts.uzbekAdviceLabel}</strong>{" "}
                   {evalResult.explanation_uz}
                 </p>
               </div>
@@ -528,9 +519,9 @@ export function IeltsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-ink">
-              {m.ielts?.cueCard ?? "Cue Card Banki (Part 2)"}
+              {m.ielts.cueCard}
             </h3>
-            <span className="text-xs text-ink-muted">{cueCards.length} ta karta</span>
+            <span className="text-xs text-ink-muted">{f(m.ielts.cardCount, { count: cueCards.length })}</span>
           </div>
 
           <div className="space-y-3">
@@ -557,7 +548,7 @@ export function IeltsPage() {
                     ))}
                   </ul>
                   <div className="mt-3 border-t border-line/60 pt-2 text-[11px] text-ink-faint">
-                    Follow-up: {card.follow_up}
+                    {m.ielts.followUp} {card.follow_up}
                   </div>
                 </div>
               );

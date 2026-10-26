@@ -39,6 +39,9 @@ emulator (`sdk_gphone64_x86_64`, KVM, `ubuntu-latest`) and driven through its ow
 | Continue from phone | The phone's message was stored by the server in the same conversation |
 | Crash check | No `FATAL EXCEPTION` for `uz.ezo.mobile` in logcat |
 
+Since [#53](https://github.com/UmidjanDeveloper/EZO/pull/53) the same job also goes through the welcome page, the Tasks, IELTS and Files
+screens and the English language switch (Devices run 40310764936).
+
 An emulator is not the owner's phone: no real Wi‑Fi/LAN, microphone, camera or voice key was
 involved. Scenario F on a physical phone is still pending.
 

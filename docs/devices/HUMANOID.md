@@ -40,9 +40,37 @@ in Next.js, Electron and the Android WebView.
 - Pulses travel up the veins. An error tints the figure red.
 
 **States** (`states.ts`)
-- `idle`, `listening`, `thinking`, `speaking`, `error`.
-- Every app state maps onto one of these; for example, searching shows the thinking look.
+- Nine looks: `idle`, `listening` (halo drawn in, head leans towards you), `recognizing`
+  (the recording is over and the server is turning it into words), `thinking` (slow scan),
+  `working` (a tool or device is doing real work: fast two-way scan, gold chest light,
+  quick pulses up the veins), `speaking` (face ripples with the voice), `success` (a gold
+  ring leaves the chest; returns to idle by itself after 1.6 s), `error` (red), `offline`
+  (grey, dim, still).
+- Every app state maps onto one of these; server-reported tool stages (searching,
+  reading, coding, creating) show the working look, not the thinking look.
 - The look eases smoothly from one state to the next.
+
+**Gaze** (`avatar.ts`)
+- `setGaze({yaw, pitch})` turns the head (±0.35 rad) towards a normalised point: the
+  pointer over the figure on the web voice stage, or a `packages/face-tracking` frame
+  through `setHeadAim()`. A gaze older than 1.5 s drifts back to the idle sway, so a
+  stale camera frame never looks like attention.
+
+**Voice frame** (`frame.ts`)
+- A thin ring, an equaliser and a state word around the figure, framework-free SVG. The
+  equaliser follows the level the figure is actually drawing (a real measurement where one
+  exists; drawn fainter when it is the animated speech rhythm). Pattern adapted from the
+  MIT-licensed APEX-UI orb; see `packages/avatar/NOTICE.md`.
+
+**Accessibility**
+- With `describe`, the canvas gets `role="img"` and an `aria-label` in the app's language
+  that changes with the state; the desktop pill and the Android app pass their own words.
+  The web app names its wrapper instead ("EZO — <state word>") and keeps the canvas
+  decorative, so a screen reader meets one image, not two.
+- `tests/e2e/specs/accessibility.spec.ts` runs axe-core (WCAG 2.x A/AA) over the home
+  screen, the voice stage, the pill renderer and the Android app's welcome/settings screens;
+  serious or critical violations fail CI. The voice stage is keyboard-operable (talk control
+  and mode tabs reachable by Tab/Enter).
 
 **Voice level** (`level.ts`)
 - The microphone level drives the face while EZO listens, and EZO's own voice drives it
@@ -81,6 +109,11 @@ How to read this:
 - The numbers come from Chromium's **SwiftShader software renderer on a shared VM**, with no GPU. They are a worst case for machines without graphics acceleration, not phone or PC GPU results.
 - The avatar's own draw is a few milliseconds even there. Most of the frame interval is the software compositor drawing the page.
 - On a real GPU, 49k points is a light load. A real-device measurement (owner PC and phone) is still pending.
+
+Memory and load (same spec, 2026-10-26): the whole page's JS heap after 4 s of animation is
+12.1 MB (desktop) / 10.7 MB (Pixel 7 profile); the figure is built in 30–80 ms and the first
+frame follows DOMContentLoaded by well under a second. The spec fails above a 200 MB heap, so
+the avatar stays within a sub-16 GB laptop's budget.
 
 The test asserts only hardware-independent budgets:
 - at most 50,000 points at high quality and 20,000 at low;

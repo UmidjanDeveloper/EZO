@@ -6,11 +6,12 @@
     <title>EZO humanoid</title>
     <style>
       html, body { margin: 0; height: 100%; background: radial-gradient(ellipse at 50% 35%, #0b1a3a 0%, #040a1a 55%, #01030a 100%); }
+      #frame { position: relative; width: 100%; height: 100%; }
       canvas { display: block; width: 100%; height: 100%; }
     </style>
   </head>
   <body>
-    <canvas id="stage" aria-label="EZO"></canvas>
+    <div id="frame"><canvas id="stage" aria-label="EZO"></canvas></div>
     <script src="demo.js"></script>
   </body>
 </html>

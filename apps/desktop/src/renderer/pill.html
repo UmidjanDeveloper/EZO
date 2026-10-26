@@ -11,22 +11,32 @@
   </head>
   <body>
     <main id="pill" class="pill idle" aria-live="polite">
-      <button id="orb" class="orb" title="Gapirish (Ctrl+Alt+Space)" aria-label="Gapirishni boshlash yoki to‘xtatish">
+      <button id="orb" class="orb" aria-label="EZO">
         <span class="ring"></span><span class="core"></span>
-        <canvas id="face" class="face" aria-hidden="true"></canvas>
+        <canvas id="face" class="face"></canvas>
       </button>
       <div class="status">
         <strong id="label">EZO</strong>
-        <span id="hint">Ctrl+Alt+Space — gapiring</span>
+        <span id="hint"></span>
       </div>
-      <button id="keyboard" class="icon" title="Yozib so‘rash" aria-label="Yozib so‘rash">⌨</button>
-      <button id="stop" class="icon" title="To‘xtatish" aria-label="To‘xtatish" hidden>■</button>
-      <button id="gear" class="icon" title="Sozlamalar" aria-label="Sozlamalar">⚙</button>
+      <span id="dot" class="dot" role="status" title=""></span>
+      <button id="keyboard" class="icon" aria-label="">⌨</button>
+      <button id="history" class="icon" aria-label="">☰</button>
+      <button id="stop" class="icon" aria-label="" hidden>■</button>
+      <button id="gear" class="icon" aria-label="">⚙</button>
     </main>
     <section id="panel" class="panel" hidden>
       <form id="ask">
-        <input id="question" maxlength="4000" placeholder="Masalan: Kalkulyatorni och" autocomplete="off" />
+        <input id="question" maxlength="4000" placeholder="" autocomplete="off" />
       </form>
+      <p id="task" class="task" hidden><span id="taskText"></span> <button type="button" id="cancelTask" class="link"></button></p>
+      <div id="historyView" class="history" hidden>
+        <div class="history-head">
+          <select id="conversations" aria-label=""></select>
+          <button type="button" id="newConversation" class="link"></button>
+        </div>
+        <ol id="messages" class="messages"></ol>
+      </div>
       <p id="transcript" class="transcript"></p>
       <p id="reply" class="reply"></p>
     </section>

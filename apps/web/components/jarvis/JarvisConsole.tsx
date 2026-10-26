@@ -3,6 +3,7 @@
 import { Button, Card, cn, Spinner } from "@ezo/ui";
 import { Check, Link2, Monitor, Play, RotateCcw, Send, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n/context";
 import {
   jarvisCall,
   JarvisCallError,
@@ -11,6 +12,7 @@ import {
   type JarvisStep,
   type JarvisTask,
 } from "@/lib/jarvis-api";
+import type { Section as JarvisConsoleTexts } from "@/lib/i18n/sections/jarvisConsole";
 
 /**
  * JARVIS owner console: pair devices with the code shown on the device, link Telegram
@@ -20,35 +22,38 @@ import {
 const INPUT =
   "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 
-const REFERENCE =
-  "Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini undan oldingi faylga o'xshatib tayyorla va Telegram'da Baxtiyorga yubor.";
+function stepLabels(t: JarvisConsoleTexts): Record<string, string> {
+  return {
+    "files.latest_documents": t.steps.filesLatestDocuments,
+    "document.extract": t.steps.documentExtract,
+    "compute.percentages": t.steps.computePercentages,
+    "document.convert_pdf": t.steps.documentConvertPdf,
+    "document.report_pdf": t.steps.documentReportPdf,
+    "telegram.send": t.steps.telegramSend,
+  };
+}
 
-const STEP_LABELS: Record<string, string> = {
-  "files.latest_documents": "Qurilmadan fayllar",
-  "document.extract": "Matnni o‘qish",
-  "compute.percentages": "Foizlarni hisoblash",
-  "document.convert_pdf": "PDF’ga aylantirish",
-  "document.report_pdf": "Foizlar hisoboti",
-  "telegram.send": "Telegram’ga yuborish",
-};
+function stateLabels(t: JarvisConsoleTexts): Record<string, string> {
+  return {
+    queued: t.states.queued,
+    pending: t.states.pending,
+    running: t.states.running,
+    awaiting_device: t.states.awaitingDevice,
+    awaiting_authorization: t.states.awaitingAuthorization,
+    completed: t.states.completed,
+    failed: t.states.failed,
+    cancelled: t.states.cancelled,
+  };
+}
 
-const STATE_LABELS: Record<string, string> = {
-  queued: "navbatda",
-  pending: "kutmoqda",
-  running: "bajarilmoqda",
-  awaiting_device: "qurilma javobini kutmoqda",
-  awaiting_authorization: "sizning tasdig‘ingizni kutmoqda",
-  completed: "bajarildi",
-  failed: "xato",
-  cancelled: "bekor qilindi",
-};
-
-function message(error: unknown): string {
+function message(error: unknown, fallback: string): string {
   if (error instanceof JarvisCallError) return error.message;
-  return "Server bilan aloqa bo‘lmadi.";
+  return fallback;
 }
 
 export function JarvisConsole() {
+  const { m } = useI18n();
+  const fallback = m.jarvisConsole.serverUnreachable;
   const [devices, setDevices] = useState<JarvisDevice[] | null>(null);
   const [recipients, setRecipients] = useState<JarvisRecipient[]>([]);
   const [tasks, setTasks] = useState<JarvisTask[]>([]);
@@ -71,11 +76,11 @@ export function JarvisConsole() {
         setTasks(t);
         setError(null);
       })
-      .catch((err: unknown) => alive && setError(message(err)));
+      .catch((err: unknown) => alive && setError(message(err, fallback)));
     return () => {
       alive = false;
     };
-  }, [tick]);
+  }, [tick, fallback]);
 
   useEffect(() => {
     // Running tasks change on the server (device answers, worker steps): refresh gently.
@@ -88,14 +93,14 @@ export function JarvisConsole() {
       await fn();
       reload();
     } catch (err) {
-      setError(message(err));
+      setError(message(err, fallback));
     }
   };
 
   return (
     <div className="space-y-6" data-testid="jarvis-console">
       {error && (
-        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-600">
+        <p role="alert" className="rounded-lg border border-danger/40 bg-danger/8 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
@@ -110,31 +115,31 @@ export function JarvisConsole() {
 type Act = (fn: () => Promise<unknown>) => Promise<void>;
 
 function Devices({ devices, act }: { devices: JarvisDevice[] | null; act: Act }) {
+  const { m } = useI18n();
+  const t = m.jarvisConsole.devices;
   const [codes, setCodes] = useState<Record<string, string>>({});
   return (
     <Card className="p-5" data-testid="jarvis-devices">
       <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
-        <Monitor className="h-4 w-4" aria-hidden /> Ulangan qurilmalar
+        <Monitor className="h-4 w-4" aria-hidden /> {t.title}
       </h2>
-      <p className="mb-3 text-xs text-ink-muted">
-        EZO desktop ilovasida: Sozlamalar → JARVIS → “Bu kompyuterni ulash”. Qurilmada ko‘rsatilgan 6 xonali kodni shu yerga kiriting.
-      </p>
+      <p className="mb-3 text-xs text-ink-muted">{t.hint}</p>
       {devices === null ? (
         <Spinner />
       ) : devices.length === 0 ? (
-        <p className="text-sm text-ink-muted">Hali qurilma yo‘q.</p>
+        <p className="text-sm text-ink-muted">{t.empty}</p>
       ) : (
         <ul className="space-y-2">
           {devices.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium text-ink">{d.name}</span>
-              <span className={cn("rounded px-1.5 text-xs", d.status === "paired" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600")}>
-                {d.status === "paired" ? "ulangan" : d.status === "pending" ? "tasdiq kutmoqda" : "bekor qilingan"}
+              <span className={cn("rounded px-1.5 text-xs", d.status === "paired" ? "bg-success/12 text-success" : "bg-warning/12 text-warning")}>
+                {d.status === "paired" ? t.statusPaired : d.status === "pending" ? t.statusPending : t.statusRevoked}
               </span>
               {d.status === "pending" && (
                 <>
                   <input
-                    aria-label="Qurilmadagi kod"
+                    aria-label={t.codeLabel}
                     inputMode="numeric"
                     maxLength={6}
                     className={cn(INPUT, "w-28")}
@@ -142,13 +147,13 @@ function Devices({ devices, act }: { devices: JarvisDevice[] | null; act: Act })
                     onChange={(e) => setCodes({ ...codes, [d.id]: e.target.value.replace(/\D/g, "") })}
                   />
                   <Button size="sm" onClick={() => void act(() => jarvisCall(`/api/jarvis/devices/${d.id}/confirm`, { method: "POST", body: { code: codes[d.id] ?? "" } }))}>
-                    Tasdiqlash
+                    {t.confirm}
                   </Button>
                 </>
               )}
               {d.status !== "revoked" && (
                 <Button size="sm" variant="secondary" onClick={() => void act(() => jarvisCall(`/api/jarvis/devices/${d.id}`, { method: "DELETE" }))}>
-                  Bekor qilish
+                  {t.revoke}
                 </Button>
               )}
             </li>
@@ -160,18 +165,18 @@ function Devices({ devices, act }: { devices: JarvisDevice[] | null; act: Act })
 }
 
 function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: Act }) {
+  const { m } = useI18n();
+  const t = m.jarvisConsole.recipients;
   const [label, setLabel] = useState("");
   const [pending, setPending] = useState<Record<string, { code: string; link: string }>>({});
   return (
     <Card className="p-5" data-testid="jarvis-recipients">
       <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-ink">
-        <Link2 className="h-4 w-4" aria-hidden /> Telegram qabul qiluvchilar
+        <Link2 className="h-4 w-4" aria-hidden /> {t.title}
       </h2>
-      <p className="mb-3 text-xs text-ink-muted">
-        Telegram botlari faqat ularni “Start” qilgan odamga yoza oladi. Havolani odamga yuboring; u Start bosgach, “Tekshirish”ni bosing.
-      </p>
+      <p className="mb-3 text-xs text-ink-muted">{t.hint}</p>
       <div className="mb-3 flex gap-2">
-        <input aria-label="Ism" placeholder="Masalan: Baxtiyor" className={INPUT} value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input aria-label={t.nameLabel} placeholder={t.namePlaceholder} className={INPUT} value={label} onChange={(e) => setLabel(e.target.value)} />
         <Button
           size="sm"
           disabled={label.trim().length < 2}
@@ -186,7 +191,7 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
             })
           }
         >
-          Qo‘shish
+          {t.add}
         </Button>
       </div>
       <ul className="space-y-2">
@@ -194,7 +199,7 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
           <li key={r.id} className="text-sm">
             <span className="font-medium text-ink">{r.label}</span>{" "}
             {r.status === "verified" ? (
-              <span className="text-xs text-emerald-600">✓ bog‘langan{r.telegram_name ? ` (${r.telegram_name})` : ""}</span>
+              <span className="text-xs text-success">{t.linked}{r.telegram_name ? ` (${r.telegram_name})` : ""}</span>
             ) : pending[r.id] ? (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <a className="text-xs text-accent underline" href={pending[r.id]!.link} target="_blank" rel="noreferrer">
@@ -205,11 +210,11 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
                   variant="secondary"
                   onClick={() => void act(() => jarvisCall(`/api/jarvis/telegram/recipients/${r.id}/verify`, { method: "POST", body: { code: pending[r.id]!.code } }))}
                 >
-                  Tekshirish
+                  {t.verify}
                 </Button>
               </span>
             ) : (
-              <span className="text-xs text-amber-600">bog‘lanmagan — qayta qo‘shing</span>
+              <span className="text-xs text-warning">{t.notLinked}</span>
             )}
           </li>
         ))}
@@ -219,13 +224,15 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
 }
 
 function NewTask({ act }: { act: Act }) {
-  const [text, setText] = useState(REFERENCE);
+  const { m } = useI18n();
+  const t = m.jarvisConsole.newTask;
+  const [text, setText] = useState(m.jarvisConsole.sampleCommand);
   return (
     <Card className="p-5" data-testid="jarvis-new-task">
       <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink">
-        <Play className="h-4 w-4" aria-hidden /> Yangi vazifa
+        <Play className="h-4 w-4" aria-hidden /> {t.title}
       </h2>
-      <textarea aria-label="Vazifa matni" rows={3} className={INPUT} value={text} onChange={(e) => setText(e.target.value)} />
+      <textarea aria-label={t.textLabel} rows={3} className={INPUT} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="mt-2 flex justify-end">
         <Button
           size="sm"
@@ -236,7 +243,7 @@ function NewTask({ act }: { act: Act }) {
             )
           }
         >
-          Boshlash
+          {t.start}
         </Button>
       </div>
     </Card>
@@ -244,7 +251,10 @@ function NewTask({ act }: { act: Act }) {
 }
 
 function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act: Act }) {
+  const { m, f } = useI18n();
+  const t = m.jarvisConsole.approval;
   const output = step.output as { recipient?: string; telegram_name?: string; documents?: { filename: string; sha256: string }[] };
+  const recipient = `${output.recipient ?? ""}${output.telegram_name ? ` (${output.telegram_name})` : ""}`;
   const decide = (approve: boolean) =>
     act(() =>
       jarvisCall(`/api/jarvis/tasks/${task.id}/steps/${step.id}/decision`, {
@@ -253,11 +263,10 @@ function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act
       }),
     );
   return (
-    <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm" data-testid="jarvis-approval">
+    <div className="mt-2 rounded-lg border border-warning/40 bg-warning/8 p-3 text-sm" data-testid="jarvis-approval">
       <p className="font-medium text-ink">
         <Send className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-        Telegram’da {output.recipient}
-        {output.telegram_name ? ` (${output.telegram_name})` : ""}ga yuborilsinmi?
+        {f(t.question, { recipient })}
       </p>
       <ul className="my-1 list-disc pl-5 text-xs text-ink-muted">
         {(output.documents ?? []).map((d) => (
@@ -268,10 +277,10 @@ function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act
       </ul>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => void decide(true)}>
-          <Check className="mr-1 h-3.5 w-3.5" /> Ruxsat beraman
+          <Check className="mr-1 h-3.5 w-3.5" /> {t.approve}
         </Button>
         <Button size="sm" variant="secondary" onClick={() => void decide(false)}>
-          <X className="mr-1 h-3.5 w-3.5" /> Rad etish
+          <X className="mr-1 h-3.5 w-3.5" /> {t.reject}
         </Button>
       </div>
     </div>
@@ -279,22 +288,26 @@ function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act
 }
 
 function Tasks({ tasks, act }: { tasks: JarvisTask[]; act: Act }) {
+  const { m } = useI18n();
+  const t = m.jarvisConsole.tasks;
+  const steps = stepLabels(m.jarvisConsole);
+  const states = stateLabels(m.jarvisConsole);
   if (tasks.length === 0) return null;
   return (
     <Card className="p-5" data-testid="jarvis-tasks">
-      <h2 className="mb-3 text-sm font-semibold text-ink">Vazifalar</h2>
+      <h2 className="mb-3 text-sm font-semibold text-ink">{t.title}</h2>
       <ul className="space-y-4">
         {tasks.map((task) => (
           <li key={task.id} className="border-b border-line pb-3 last:border-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-ink">{task.request_text}</p>
-              <span className="text-xs font-medium text-ink-muted">{STATE_LABELS[task.state] ?? task.state}</span>
+              <span className="text-xs font-medium text-ink-muted">{states[task.state] ?? task.state}</span>
             </div>
             <ol className="mt-2 space-y-1 text-xs">
               {task.steps.map((step) => (
                 <li key={step.id}>
-                  <span className={cn(step.state === "completed" ? "text-emerald-600" : step.state === "failed" ? "text-red-600" : "text-ink-muted")}>
-                    {step.position}. {STEP_LABELS[step.action] ?? step.action} — {STATE_LABELS[step.state] ?? step.state}
+                  <span className={cn(step.state === "completed" ? "text-success" : step.state === "failed" ? "text-danger" : "text-ink-muted")}>
+                    {step.position}. {steps[step.action] ?? step.action} — {states[step.state] ?? step.state}
                     {step.error_message ? `: ${step.error_message}` : ""}
                   </span>
                   {step.state === "awaiting_authorization" && step.scope_sha256 && <Approval task={task} step={step} act={act} />}
@@ -305,12 +318,12 @@ function Tasks({ tasks, act }: { tasks: JarvisTask[]; act: Act }) {
             <div className="mt-2 flex gap-2">
               {["queued", "running", "awaiting_authorization"].includes(task.state) && (
                 <Button size="sm" variant="secondary" onClick={() => void act(() => jarvisCall(`/api/jarvis/tasks/${task.id}/cancel`, { method: "POST" }))}>
-                  Bekor qilish
+                  {t.cancel}
                 </Button>
               )}
               {task.state === "failed" && (
                 <Button size="sm" variant="secondary" onClick={() => void act(() => jarvisCall(`/api/jarvis/tasks/${task.id}/retry`, { method: "POST" }))}>
-                  <RotateCcw className="mr-1 h-3.5 w-3.5" /> Qayta urinish
+                  <RotateCcw className="mr-1 h-3.5 w-3.5" /> {t.retry}
                 </Button>
               )}
             </div>

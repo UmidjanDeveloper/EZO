@@ -107,7 +107,7 @@ function FeatureList({ state }: { state: CapabilityState }) {
   if (state.status === "error") {
     const unauthorized = state.httpStatus === 401 || state.httpStatus === 403;
     return (
-      <p className="flex items-start gap-2 text-sm text-rose-500" role="alert" data-testid="jarvis-load-error">
+      <p className="flex items-start gap-2 text-sm text-danger" role="alert" data-testid="jarvis-load-error">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <span>{unauthorized ? t.signInRequired : t.loadFailed}</span>
       </p>
@@ -138,7 +138,7 @@ function FeatureList({ state }: { state: CapabilityState }) {
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                  feat === "authorized_by_backend" ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500",
+                  feat === "authorized_by_backend" ? "bg-success/12 text-success" : "bg-warning/12 text-warning",
                 )}
               >
                 <ShieldAlert className="h-3 w-3" aria-hidden />
@@ -284,7 +284,7 @@ function PercentageCalculator() {
         </div>
 
         {error ? (
-          <p className="mt-3 flex items-start gap-2 text-xs text-rose-500" role="alert" data-testid="jarvis-calc-error">
+          <p className="mt-3 flex items-start gap-2 text-xs text-danger" role="alert" data-testid="jarvis-calc-error">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             {error}
           </p>

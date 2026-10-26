@@ -38,13 +38,13 @@ Merged by the owner during the mission: [#37](https://github.com/UmidjanDevelope
 | Phase | Status | Evidence / next step |
 |---|---|---|
 | 1 Security recovery | COMPLETE | #37 merged by the owner; Security (pip-audit, Trivy, pnpm, gitleaks) green on it. Remaining audit items F26/F27 are tracked under P0. |
-| 2 Desktop + Android usability | PARTIAL | Windows installer self-tested on a CI VM; Android APK driven on an emulator ([40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627)). Owner PC and phone runs pending. |
+| 2 Desktop + Android usability | PARTIAL | Windows installer self-tested on a CI VM; Android APK driven on an emulator through every screen ([#53](https://github.com/UmidjanDeveloper/EZO/pull/53)). Owner PC and phone runs pending; packages unsigned. |
 | 3 Core agent reliability | PARTIAL | F18/F19 fixes in #39. Cross-device conversation proven against local API (Devices run 39988632939). |
 | 4 Student + Office + Presentation | PARTIAL | Isolated OCR/Office executor (PR #33) not deployed/activated; chat Office creation fixed in #39. |
 | 5 IELTS + Personal Intelligence | PARTIAL | Exact text metrics (PR #32); cue card (#39); consent/recall (#39). No live STT scoring. |
 | 6 JARVIS action engine | PARTIAL | Engine, pairing, approvals, Telegram contract, desktop companion (#41); live acceptance BLOCKED on owner PC, bot token, executor host. |
 | 7 K4/K5/K6/K8 + multi-user | PARTIAL | K4 BLOCKED (no verified sandbox host); K5 and K6 BLOCKED behind K4 (`EXECUTION_GATES.md`: only K4-tested, signed artifacts may be promoted to a PR — promoting untested drafts would bypass the gate); multi-user foundation in #48. |
-| 8 Premium UX + upstreams | PARTIAL | Procedural humanoid (PR #35), measured on the voice stage (#50); APEX-UI not integrated; F26 i18n open. |
+| 8 Premium UX + upstreams | PARTIAL | Humanoid with nine states, gaze, voice frame and accessible names ([#53](https://github.com/UmidjanDeveloper/EZO/pull/53)); APEX-UI pattern reuse with attribution (frame, activity graph); F26 i18n done ([#53](https://github.com/UmidjanDeveloper/EZO/pull/53)). Camera tracking stays isolated (model licence unapproved). |
 | 9 Verification + packaging | PARTIAL | Windows NSIS + Android debug APK built in CI (unsigned). |
 | 10 Owner production readiness | PARTIAL | P9 preparation docs (PR #31); nothing provisioned. |
 
@@ -81,9 +81,9 @@ Merged by the owner during the mission: [#37](https://github.com/UmidjanDevelope
 
 | Platform | Status | Evidence | Missing |
 |---|---|---|---|
-| Windows desktop (`apps/desktop`, Electron) | PARTIAL | Unsigned NSIS `EZO-Setup-0.1.0.exe` built and silently installed on `windows-latest`; self-test: open Calculator, scoped file find, dictation into a focused box, screenshot (Devices run 39988632939) | Owner-PC test with mic/speakers + keys; signing; updater |
-| Android (`apps/mobile`, Capacitor) | PARTIAL | Debug APK built and driven on an Android 14 emulator against a real API: connect, shared history, send ([40080361627](https://github.com/UmidjanDeveloper/EZO/actions/runs/40080361627), #42) | Physical phone on real Wi‑Fi; voice key; Student PDF/DOCX (#44); release signing |
-| Web (`apps/web`) | PARTIAL | Playwright 54/54 e2e in CI | — |
+| Windows desktop (`apps/desktop`, Electron) | PARTIAL | Unsigned NSIS installer built and silently installed on `windows-latest` with the self-test on every push; [#53](https://github.com/UmidjanDeveloper/EZO/pull/53): live server status, recognizing/working states, real cancel, server history, task progress, uz/en/ru, renderer spec 5/5 in real Chromium | Owner-PC test with mic/speakers + keys; signing; updater |
+| Android (`apps/mobile`, Capacitor) | PARTIAL | Debug APK driven on an Android 14 emulator against a real API on every push: welcome page, settings, shared history, send, tasks, IELTS cue cards, files, English switch ([#53](https://github.com/UmidjanDeveloper/EZO/pull/53), Devices run 40310764936) | Physical phone on real Wi‑Fi; voice key; executor host; release signing |
+| Web (`apps/web`) | PARTIAL | Playwright e2e in CI; [#53](https://github.com/UmidjanDeveloper/EZO/pull/53): every page in uz/en/ru (F26), Student learning paths + comparison, trace activity graph, recognizing voice phase | Live AI/voice keys for real answers |
 | Chrome extension (`apps/chrome-extension`, MV3) | PARTIAL | Summary/explanation merged (#43); reviewed-value form filling without submit (#49); loads in Chromium with activeTab/scripting/storage only | Live round trip with an AI key; navigation/clicking deliberately not implemented |
 | iOS | BLOCKED | No macOS/Xcode host, no Apple account | — |
 

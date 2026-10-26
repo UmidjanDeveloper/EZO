@@ -30,6 +30,8 @@ const CATEGORIES: MemoryCategory[] = [
   "fact",
 ];
 
+const GOAL_CATEGORIES = ["learning", "career", "language", "productivity", "personal", "other"] as const;
+
 interface PersonalGoal {
   id: string;
   title: string;
@@ -50,7 +52,7 @@ interface PersonalProfile {
 }
 
 export function MemoryPage() {
-  const { m } = useI18n();
+  const { m, f } = useI18n();
   // Free beta refuses automatic capture (409), so consent there covers explicit saves only.
   const freeBeta = useApp().status?.deployment_profile === "free-beta";
   const [activeTab, setActiveTab] = useState<Tab>("memories");
@@ -125,7 +127,7 @@ export function MemoryPage() {
           prev ? { ...prev, memory_consent: nextConsent, auto_memory: nextAuto } : null,
         );
       } else {
-        setError(`Rozilik o‘zgarmadi (${res.status}).`);
+        setError(f(m.memory.consentError, { status: res.status }));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -151,7 +153,7 @@ export function MemoryPage() {
         setNewGoalTitle("");
         refresh();
       } else {
-        setError(`Maqsad saqlanmadi (${res.status}).`);
+        setError(f(m.memory.goalSaveError, { status: res.status }));
       }
     } catch (e) {
       setError((e as Error).message);
@@ -198,7 +200,7 @@ export function MemoryPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `ezo-xotiralari-${new Date().toISOString().split("T")[0]}.md`;
+        a.download = f(m.memory.exportFileName, { date: new Date().toISOString().split("T")[0] });
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -244,8 +246,8 @@ export function MemoryPage() {
 
   return (
     <PageFrame
-      title={m.personal?.title ?? m.memory.title}
-      subtitle={m.personal?.subtitle ?? m.memory.subtitle}
+      title={m.personal.title}
+      subtitle={m.personal.subtitle}
       actions={
         <div className="flex items-center gap-2">
           <Button
@@ -254,7 +256,7 @@ export function MemoryPage() {
             icon={<Download size={14} />}
             onClick={() => void exportMemories()}
           >
-            {m.personal?.exportData ?? "Eksport"}
+            {m.personal.exportData}
           </Button>
           {memories && memories.length > 0 ? (
             <Button
@@ -279,7 +281,7 @@ export function MemoryPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold text-ink">
-                  {m.personal?.consentTitle ?? "Xotira saqlashga rozilik (Opt-in)"}
+                  {m.personal.consentTitle}
                 </h2>
                 <span
                   className={cn(
@@ -290,14 +292,11 @@ export function MemoryPage() {
                   )}
                   data-testid="memory-consent-badge"
                 >
-                  {profile?.memory_consent
-                    ? m.personal?.consentGranted ?? "Faol"
-                    : m.personal?.consentRevoked ?? "O'chiq"}
+                  {profile?.memory_consent ? m.personal.consentGranted : m.personal.consentRevoked}
                 </span>
               </div>
               <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                {m.personal?.consentDesc ??
-                  "EZO faqat siz ruxsat berganingizdagina suhbatlar mazmunidan muhim faktlarni xotirada saqlaydi. Hech qanday yashirin to'plash bo'lmaydi."}
+                {m.personal.consentDesc}
               </p>
             </div>
           </div>
@@ -311,9 +310,9 @@ export function MemoryPage() {
             {consentLoading ? (
               <Spinner />
             ) : profile?.memory_consent ? (
-              m.personal?.revokeConsent ?? "To'xtatish"
+              m.personal.revokeConsent
             ) : (
-              m.personal?.grantConsent ?? "Ruxsat berish"
+              m.personal.grantConsent
             )}
           </Button>
         </div>
@@ -326,7 +325,7 @@ export function MemoryPage() {
             <Brain size={20} />
           </div>
           <div>
-            <p className="text-xs text-ink-muted">{m.personal?.totalMemories ?? "Xotiralar"}</p>
+            <p className="text-xs text-ink-muted">{m.personal.totalMemories}</p>
             <p className="text-lg font-semibold text-ink">
               {profile?.memory_stats?.total_count ?? memories?.length ?? 0}
             </p>
@@ -337,7 +336,7 @@ export function MemoryPage() {
             <Target size={20} />
           </div>
           <div>
-            <p className="text-xs text-ink-muted">{m.personal?.activeGoals ?? "Faol maqsadlar"}</p>
+            <p className="text-xs text-ink-muted">{m.personal.activeGoals}</p>
             <p className="text-lg font-semibold text-ink">
               {profile?.goals_stats?.active_count ?? (goals?.filter((g) => g.status === "active").length ?? 0)}
             </p>
@@ -348,9 +347,7 @@ export function MemoryPage() {
             <CheckCircle2 size={20} />
           </div>
           <div>
-            <p className="text-xs text-ink-muted">
-              {m.personal?.learningScore ?? "Tugallangan maqsadlar"}
-            </p>
+            <p className="text-xs text-ink-muted">{m.personal.learningScore}</p>
             <p className="text-lg font-semibold text-ink">
               {profile?.goals_stats?.completed_count ??
                 (goals?.filter((g) => g.status === "completed").length ?? 0)}
@@ -389,7 +386,7 @@ export function MemoryPage() {
           )}
         >
           <Target size={16} />
-          {m.personal?.goalsTitle ?? "Shaxsiy maqsadlar"}
+          {m.personal.goalsTitle}
         </button>
       </div>
 
@@ -472,8 +469,8 @@ export function MemoryPage() {
             <form onSubmit={addGoal} className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <TextField
-                  label={m.personal?.addGoal ?? "Yangi maqsad"}
-                  placeholder="Masalan: IELTS 7.5 olish yoki Python kitobini yakunlash"
+                  label={m.personal.addGoal}
+                  placeholder={m.memory.goalPlaceholder}
                   value={newGoalTitle}
                   onChange={(e) => setNewGoalTitle(e.target.value)}
                   maxLength={200}
@@ -481,16 +478,15 @@ export function MemoryPage() {
               </div>
               <div className="sm:w-44">
                 <SelectField
-                  label="Kategoriya"
+                  label={m.memory.goalCategory}
                   value={newGoalCategory}
                   onChange={(e) => setNewGoalCategory(e.target.value)}
                 >
-                  <option value="learning">Ta&apos;lim</option>
-                  <option value="career">Karyera</option>
-                  <option value="language">Til</option>
-                  <option value="productivity">Samaradorlik</option>
-                  <option value="personal">Shaxsiy</option>
-                  <option value="other">Boshqa</option>
+                  {GOAL_CATEGORIES.map((key) => (
+                    <option key={key} value={key}>
+                      {m.memory.goalCategories[key]}
+                    </option>
+                  ))}
                 </SelectField>
               </div>
               <Button
@@ -507,7 +503,7 @@ export function MemoryPage() {
           {goals === null ? <Spinner label={m.common.loading} /> : null}
           {goals?.length === 0 ? (
             <p className="text-sm text-ink-muted">
-              {m.personal?.noGoals ?? "Hozircha maqsadlar kiritilmagan."}
+              {m.personal.noGoals}
             </p>
           ) : null}
 
@@ -535,7 +531,7 @@ export function MemoryPage() {
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-ink-muted">
-                      <span>{m.personal?.progress ?? "Rivojlanish"}</span>
+                      <span>{m.personal.progress}</span>
                       <span className="font-semibold text-ink">{percent}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
@@ -562,7 +558,7 @@ export function MemoryPage() {
                         onClick={() => void updateGoalProgress(goal.id, 1.0)}
                         className="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:border-accent/40"
                       >
-                        100% (Bajarildi)
+                        {m.memory.markDone}
                       </button>
                     </div>
                   </div>

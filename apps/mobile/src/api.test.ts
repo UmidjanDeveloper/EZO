@@ -78,3 +78,58 @@ describe("EZO Student from the phone", () => {
     expect(JSON.parse(String(calls[2]!.init.body))).toEqual({ kind: "summary", language: "uz" });
   });
 });
+
+describe("createApi: status, files, IELTS, JARVIS, cancellation", () => {
+  it("reads the server's real capabilities and never assumes an AI provider", async () => {
+    const { impl } = fakeFetch(() => Response.json({ offline_mode: true, providers: [{ name: "openai", configured: false }] }));
+    expect(await createApi("https://x", "t", impl).status()).toEqual({ online: true, ai: false, voice: false, providers: [] });
+  });
+
+  it("downloads a generated file with the server's own filename", async () => {
+    const { calls, impl } = fakeFetch(
+      () => new Response(new Blob([new Uint8Array([80, 75, 3, 4])]), { headers: { "Content-Disposition": 'attachment; filename="Hisobot oktyabr.docx"' } }),
+    );
+    const file = await createApi("https://x", "t", impl).downloadArtifact("a1");
+    expect(file.filename).toBe("Hisobot oktyabr.docx");
+    expect(file.blob.size).toBe(4);
+    expect(calls[0]!.url).toBe("https://x/api/artifacts/a1/download");
+  });
+
+  it("starts an IELTS session with a chosen cue card and sends the phone-measured speaking time", async () => {
+    const { calls, impl } = fakeFetch(() => Response.json({ session_id: "s", part: 1, instruction: "", finished: false, metrics: null }));
+    const api = createApi("https://x", "t", impl);
+    await api.startIelts("place");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ cue_card: "place" });
+    await api.ieltsAdvance("s", "My name is Umid.", 4.2);
+    expect(calls[1]!.url).toBe("https://x/api/ielts/sessions/s/advance");
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ answer: "My name is Umid.", speech_seconds: 4.2 });
+  });
+
+  it("approves a JARVIS step only with the server's scope hash, and cancels through the server", async () => {
+    const { calls, impl } = fakeFetch(() => Response.json({ id: "t1", state: "running", steps: [] }));
+    const api = createApi("https://x", "t", impl);
+    await api.decideJarvisStep("t1", "s1", "a".repeat(64), true);
+    expect(calls[0]!.url).toBe("https://x/api/jarvis/tasks/t1/steps/s1/decision");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ scope_sha256: "a".repeat(64), approve: true });
+    await api.cancelJarvisTask("t1");
+    expect(calls[1]!.url).toBe("https://x/api/jarvis/tasks/t1/cancel");
+    await api.createJarvisTask("Downloads dagi oxirgi faylni yubor", "uz");
+    expect(JSON.parse(String(calls[2]!.init.body))).toMatchObject({ language: "uz" });
+    expect(JSON.parse(String(calls[2]!.init.body)).idempotency_key).toMatch(/^mobile-/);
+  });
+
+  it("reports an aborted request as cancelled, in the chosen language", async () => {
+    const controller = new AbortController();
+    const impl = ((_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("x", "AbortError"))))) as unknown as typeof fetch;
+    const api = createApi("https://x", "t", impl, { lang: "en", signal: controller.signal });
+    const pending = api.chat("Hi", null, null, "text").catch((e: unknown) => e);
+    controller.abort();
+    const error = (await pending) as ApiError;
+    expect(error.code).toBe("cancelled");
+    expect(error.message).toBe("Cancelled.");
+    const { impl: unauthorized } = fakeFetch(() => Response.json({ error: { code: "x" } }, { status: 401 }));
+    const ru = (await createApi("https://x", "bad", unauthorized, { lang: "ru" }).me().catch((e: unknown) => e)) as ApiError;
+    expect(ru.message).toContain("Токен");
+  });
+});

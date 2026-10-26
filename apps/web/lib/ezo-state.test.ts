@@ -63,7 +63,7 @@ describe("EZO visible state", () => {
     for (const state of EZO_STATES) {
       const look = presenceLook(state);
       expect(look.spin).toBeGreaterThan(0);
-      expect(look.busy).toBe(!["idle", "completed", "error"].includes(state));
+      expect(look.busy).toBe(!["idle", "completed", "error", "offline"].includes(state));
     }
     expect(presenceLook("error").tone).toBe("danger");
     expect(presenceLook("completed").tone).toBe("success");
