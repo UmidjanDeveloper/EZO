@@ -67,7 +67,7 @@ test("extension: loads with scoped permissions, no content scripts, no worker, n
   });
   expect(runtime.contentScripts).toBeNull();
   expect(runtime.background).toBeNull();
-  expect(runtime.permissions).toEqual(["activeTab", "scripting"]);
+  expect(runtime.permissions).toEqual(["activeTab", "scripting", "storage"]);
   expect(runtime.origins).toEqual([]); // nothing granted until the user clicks
   expect(context.serviceWorkers()).toHaveLength(0);
 });
@@ -90,8 +90,11 @@ test("extension: shows honest not-available states and makes no network call on 
   for (const forbidden of ["ulangan (online)", "paired", "juftlangan", "yetkazildi", "completed"]) {
     expect(text).not.toContain(forbidden);
   }
-  // No task command box or cancel button exists.
-  await expect(page.locator("input[type=text], textarea, #cancelTaskBtn, #sendCmdBtn")).toHaveCount(0);
+  // No task command box exists; nothing can be sent before a preview.
+  await expect(page.locator("textarea, #cancelTaskBtn, #sendCmdBtn")).toHaveCount(0);
+  await expect(page.locator("#sendBtn")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Sahifani qisqacha bayon qil" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Tanlangan matnni tushuntir" })).toBeVisible();
   await page.waitForTimeout(3500); // the old popup polled every 3s; the new one must not
   expect(requests).toEqual([]);
 });
@@ -102,4 +105,22 @@ test("extension: page reading is user-initiated and fails closed on pages it was
   await expect(page.locator("#pageState")).toHaveText(""); // nothing read until the click
   await page.locator("#readPageBtn").click();
   await expect(page.locator("#pageState")).toContainText("o'qib bo'lmadi");
+});
+
+test("extension: summary/explanation read nothing without a granted tab and send nothing", async () => {
+  const page = await context.newPage();
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (!request.url().startsWith("chrome-extension://")) requests.push(request.url());
+  });
+  await page.goto(`chrome-extension://${extensionId}/popup.html`);
+  // Opened as a tab (not from the toolbar), activeTab grants nothing: reading fails closed.
+  await page.getByRole("button", { name: "Sahifani qisqacha bayon qil" }).click();
+  await expect(page.locator("#preview")).toContainText("o'qib bo'lmadi");
+  await expect(page.locator("#sendBtn")).toBeHidden();
+  // Only loopback EZO servers can be configured.
+  await page.fill("#apiBase", "https://evil.example");
+  await page.click("#saveServer");
+  await expect(page.locator("#answer")).toContainText("localhost");
+  expect(requests).toEqual([]);
 });
