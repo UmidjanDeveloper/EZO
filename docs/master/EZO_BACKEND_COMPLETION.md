@@ -37,7 +37,7 @@ repeat approval/send. Uncertain outcomes require human inspection, not a retry b
 
 | Phase | Code evidence in current repository | Result / remaining acceptance |
 |---|---|---|
-| P0 | auth edge, owner-managed tokens, RBAC, account quotas; new JARVIS delivery regressions | PARTIAL: independent review and current vulnerability scan evidence required; do not equate green gates with zero risk |
+| P0 | auth edge, owner-managed tokens, RBAC, account quotas; new JARVIS delivery regressions | BLOCKED for release: fresh executor CRITICAL, Electron HIGH, independent review and containment failures; scans below |
 | P1 | `student/`, `documents/executor/`, migration0022, real native tests in CI | PARTIAL: OCR/Office is implemented (older matrix saying absent is stale); selected host acceptance, large-scan batching/resume still incomplete |
 | P2 | `memory/`, `api/routes/personal.py`, consent/recall changes preserved from PR39 | PARTIAL: per-user persistence exists; full retention/revocation/failure drills need further acceptance |
 | P3 | `student/paths.py`, cited comparison/graphs/cards, immutable revisions | PARTIAL: paths use actual reviews; automatic tutor quality/longitudinal evaluation and integrated journeys incomplete |
@@ -137,3 +137,56 @@ cloud backup/restore, exact recurring quotes including backups/egress/taxes and
 release signing. No guaranteed$10 budget or official IELTS band without evidence.
 No credential creation, public registration/payment activation, provisioning,
 production deployment, branch protection change or automatic merge performed.
+
+## Verified candidate snapshot (backend source7cb4e31)
+
+Final local suites (locked dependencies, explicit reviewed OCR language packs):
+SQLite **1363 passed /54 skipped**; PostgreSQL **1378 passed /39 skipped**; focused
+JARVIS/signature tests **28 passed**. Ruff/format pass (528 files), mypy344 modules.
+Alembic: both databases0024, no new upgrade operations. No schema changes here.
+The API image source tree and all117 audited runtime dependency versions match.
+Python audit117/0 advisories; production Node audit0; gitleaks265 commits/0 leaks
+at the backend-code checkpoint. Final evidence archive records later docs/CI head.
+
+Actual API image build/smoke PASS: UID10001, networknone, read-only/capdrop/no-new-
+privileges,768MiB/1CPU, test settings inside the production image. Native processing
+remains OFF in API, with no Tesseract/soffice. lxml6.1.3 embeds libxml2 runtime and
+compiled2.14.6. This is not production DB/TLS or a live provider acceptance test.
+
+Actual executor image build PASS. Quiescent real-container document subset:
+**12 passed /19 deselected**, covering PDF/DOCX/EPUB citation offsets, five OCR
+language cases, multi-page scan numbering and DOCX/XLSX/PPTX→PDF. Separate aggregate
+memory recheck: **1 passed**. Counts are distinct runs, not additive coverage totals.
+
+**Full native containment suite did not pass:** interrupted after **5 passed,
+31 failed**. The first failure is the unchanged15-second Docker-create deadline
+on this VFS daemon; fresh/stalled reservation then caused cascading failures.
+This is not proof every subsequent failure is environmental. Preserve the complete
+failure log, rerun on a suitable selected host, and review all remaining failures.
+Neither deadlines nor assertions were weakened. Partial successful reruns do not
+replace full containment acceptance. Fixed-function containers are never K4 proof.
+
+Web Docker build BLOCKED at mandatory Alpine apk upgrade (HTTP403, exit99).
+No frontend Dockerfile or upgrade gate was changed. Hosted CI/Security/Devices
+NOT RUN on this candidate: git push lacks write authentication, GraphQL PR creation
+returns Forbidden. A verified Git bundle is supplied; no remote branch/PR is claimed.
+
+### Current security release blockers
+
+| Finding | Verified evidence | Reachability / decision |
+|---|---|---|
+| Native **CRITICAL CVE-2026-6653** | libxml2 `2.12.7+dfsg+really2.9.14-2.1+deb13u3` in fresh executor; Trivy advertises no fixed Debian version | UAF in XML parsing; Office XML processing makes this relevant. EZO exploit reachability is not proven. Isolation mitigates blast radius, not the vulnerable package; independent review/vendor fix or reviewed backport required |
+| API44 HIGH /0 CRITICAL; executor80 HIGH /1 CRITICAL | Fresh official GHCR Trivy database; zero findings with a vendor fixed version among HIGH/CRITICAL | No suppression/ignore-unfixed; passing the unchanged fixable-CVE gate is not release approval |
+| **HIGH CVE-2026-115570 / GHSA-jr5w-w6x2-84p9** | Electron44.7.0, patched>=44.9.1, npm advisory: compromised eMudhra intermediate mitigation | Electron ships in Windows app even though declared devDependency. Claude owns desktop dependency patch and Windows acceptance. API cert mitigation does not patch Electron |
+| MODERATE CVE-2026-41907 / GHSA-w5hq-g745-h8pq | uuid7.0.3 via mobile>@capacitor/cli>xcode; patched>=11.1.1 | Build-tool dependency, no EZO exploit demonstrated. Coordinate compatible upstream/tooling upgrade; do not force a breaking major override to hide it |
+
+The security workflow now builds/scans the **executor as well as API and web**.
+It also fails HIGH/CRITICAL packaged Electron findings from node-all.json despite
+production-only audit passing. Current local Electron gate correctly exits1 on
+the actual advisory. Thresholds have not been weakened; expect that new check to
+remain red until the coordinated desktop patch is made. Workflow YAML parses,
+but its new hosted execution is unverified because publishing is blocked.
+
+**Release verdict: BLOCKED.** These are code/security, runtime, ownership and
+external-validation gates; not merely missing production credentials. No claim
+that P0–P9 or K1–K9 is fully finished. No merge, deployment or purchase performed.

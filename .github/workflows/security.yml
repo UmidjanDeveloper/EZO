@@ -78,6 +78,22 @@ jobs:
         if: always()
         continue-on-error: true
         run: pnpm audit --json > reports/security/node-all.json
+      - name: Packaged Electron is runtime even when listed as a devDependency
+        if: always()
+        run: |
+          python3 - <<'PYCODE'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("reports/security/node-all.json").read_text())
+          findings = [
+              item for item in report["advisories"].values()
+              if item["module_name"] == "electron" and item["severity"] in {"high", "critical"}
+          ]
+          for item in findings:
+              print("Packaged Electron vulnerability:", item["github_advisory_id"],
+                    "patched:", item["patched_versions"])
+          raise SystemExit(bool(findings))
+          PYCODE
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -94,11 +110,13 @@ jobs:
         run: |
           docker run --rm --network=none --read-only --interactive --entrypoint python \
             ezo-api:scan - < apps/api/tests/unit/test_tls_trust.py
+      - name: Build the actual isolated OCR and Office executor for security scanning
+        run: docker build --pull=false --build-arg API_IMAGE=ezo-api:scan -f apps/api/src/ezo_api/documents/executor/Dockerfile -t ezo-executor:scan apps/api
       - run: docker build -t ezo-web:scan -f apps/web/Dockerfile .
-      - name: Scan OS packages and libraries in both images
+      - name: Scan OS packages and libraries in API, executor and web images
         run: |
           mkdir -p reports/security
-          for component in api web; do
+          for component in api executor web; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD/reports/security:/reports" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
               aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
@@ -120,7 +138,7 @@ jobs:
           PYCODE
       - name: Report all findings and enforce the fixable HIGH/CRITICAL gate
         if: always()
-        run: python3 scripts/container_vulnerability_gate.py reports/security/api.trivy.json reports/security/web.trivy.json
+        run: python3 scripts/container_vulnerability_gate.py reports/security/api.trivy.json reports/security/executor.trivy.json reports/security/web.trivy.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
