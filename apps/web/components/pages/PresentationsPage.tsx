@@ -42,6 +42,11 @@ interface PresentationOutline {
   language: string;
   slide_count: number;
   slides: SlideOutline[];
+  /** "model": planned by the configured AI for this topic; "template": EZO's fixed structure. */
+  source?: "model" | "template";
+  notice?: string;
+  /** The validated model deck; built as-is (charts, tables) when present. */
+  deck?: Record<string, unknown> | null;
 }
 
 interface GeneratedArtifact {
@@ -162,7 +167,7 @@ export function PresentationsPage() {
           title: outline.title,
           theme: outline.theme,
           language: outline.language,
-          slides: outline.slides,
+          ...(outline.deck ? { deck: outline.deck } : { slides: outline.slides }),
         }),
       });
       if (res.ok) {
@@ -352,8 +357,16 @@ export function PresentationsPage() {
                     {m.presentations?.outlineTitle ?? "Taqdimot rejasi va tuzilishi"}
                   </h3>
                   <p className="text-xs text-ink-muted">
-                    {outline.slides.length} ta slayd · Uslub: {outline.theme}
+                    {outline.slides.length} ta slayd · Uslub: {outline.theme} ·{" "}
+                    <span data-testid="outline-source">
+                      {outline.source === "model" ? "AI rejalashtirgan" : "Andoza"}
+                    </span>
                   </p>
+                  {outline.notice ? (
+                    <p className="mt-1 text-xs text-amber-600" data-testid="outline-notice">
+                      {outline.notice}
+                    </p>
+                  ) : null}
                 </div>
 
                 <Button

@@ -1,14 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "EZO OS — JARVIS Web Companion (experimental)",
-  "version": "1.1.0",
-  "description": "Experimental. Shows EZO backend reachability and reads the current tab only when you click. No pairing, no task execution, no background access.",
+  "name": "EZO OS — Browser Companion",
+  "version": "1.2.0",
+  "description": "Click-only: summarise the current page or explain selected text with your own local EZO server. Shows what will be sent and asks first. No background access, no automatic collection.",
   "action": {
     "default_popup": "popup.html",
-    "default_title": "EZO JARVIS (experimental)"
+    "default_title": "EZO"
   },
-  "permissions": ["activeTab", "scripting"],
-  "optional_host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "optional_host_permissions": [
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   }

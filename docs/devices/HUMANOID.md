@@ -23,7 +23,8 @@ The package is framework-free TypeScript using WebGL 1, with no dependencies, so
 in Next.js, Electron and the Android WebView.
 
 **Figure** (`figure.ts`)
-- About 30–45k points, built once:
+- Built once: 49,034 points at high quality and 18,630 at low quality on the voice stage
+  (measured, see Performance below), made of:
   - head contour rings shaped by a head profile (crown, temples, cheekbones, jaw, chin) and
     a light face relief;
   - neck rings and arcs over the shoulders;
@@ -62,6 +63,32 @@ face over particle mountains). The public APEX-UI repository **does not contain*
 humanoid: its README says the humanoid lives in a separate, private repository. This
 package is therefore EZO's own procedural implementation. No APEX-UI code, shaders or
 assets were copied, and the "Apex" name and branding are not used.
+
+## Performance (measured)
+
+`tests/e2e/specs/avatar-performance.spec.ts` measures the real voice stage in the production
+web build. It writes `tests/e2e/reports/avatar-performance.json` and, in CI, a
+`Avatar performance` notice. Local session VM and GitHub runner, 2026-10-24:
+
+| Profile | Quality | Points | Figure build | Canvas (CSS → backing) | Frame interval p50/p95 | Avatar draw + `finish()` p50/p95 |
+|---|---|---|---|---|---|---|
+| Desktop 1280×800 @1x | high | 49,034 | 73–82 ms | 1016×690 → 1016×690 | 66.6 / 116.7 ms (≈16 fps) | 5.7 / 17.7 ms |
+| Pixel 7 412×839 @2.625x | low | 18,630 | 33–41 ms | 412×709 → 824×1418 (capped at 2x) | 33.4 / 66.7 ms (≈25 fps) | 7.3 / 15.6 ms |
+| Desktop @1x, GitHub `ubuntu-latest` (PR #50 CI) | high | 49,034 | 50 ms | 1016×690 → 1016×690 | 33.3 / 50 ms (≈33 fps) | 7.7 / 16 ms |
+| Pixel 7 @2.625x, GitHub `ubuntu-latest` (PR #50 CI) | low | 18,630 | 20 ms | 412×709 → 824×1418 | 16.8 / 50 ms (≈38 fps) | 7.5 / 16.3 ms |
+
+How to read this:
+- The numbers come from Chromium's **SwiftShader software renderer on a shared VM**, with no GPU. They are a worst case for machines without graphics acceleration, not phone or PC GPU results.
+- The avatar's own draw is a few milliseconds even there. Most of the frame interval is the software compositor drawing the page.
+- On a real GPU, 49k points is a light load. A real-device measurement (owner PC and phone) is still pending.
+
+The test asserts only hardware-independent budgets:
+- at most 50,000 points at high quality and 20,000 at low;
+- low quality on dense phone screens;
+- the backing store capped at 2× the CSS size;
+- a running draw loop.
+
+It records frame times but does not assert them.
 
 ## Three languages, no setup
 
