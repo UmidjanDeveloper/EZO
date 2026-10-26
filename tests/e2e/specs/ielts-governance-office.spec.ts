@@ -224,6 +224,12 @@ test("office: presentation maker and document workspace", async ({ page }) => {
   await page.goto("/presentations");
   await expect(page.getByRole("heading", { level: 1, name: /Taqdimotlar/ })).toBeVisible();
   await expect(page.getByLabel("Taqdimot mavzusi")).toBeVisible();
+  // Offline (no AI provider): the plan is EZO's fixed template and says so.
+  await page.getByLabel("Taqdimot mavzusi").fill("Raqamli ta'lim");
+  await page.getByLabel("Batafsil mazmun yoki maqsad").fill("Maktablarda raqamli ta'limni joriy etish");
+  await page.getByRole("button", { name: "Reja tuzish" }).click();
+  await expect(page.getByTestId("outline-source")).toHaveText("Andoza");
+  await expect(page.getByTestId("outline-notice")).toContainText("tadqiq qilingan taqdimot emas");
 
   await page.goto("/office");
   await expect(page.getByRole("heading", { level: 1, name: /Hujjatlar va Ofis/ })).toBeVisible();
