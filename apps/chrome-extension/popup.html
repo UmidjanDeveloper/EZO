@@ -71,6 +71,23 @@
       <p id="answer" role="status"></p>
     </section>
 
+    <section class="card" aria-labelledby="formTitle">
+      <h2 class="card-title" id="formTitle">Formani to'ldirish (faqat siz tasdiqlaganini)</h2>
+      <p class="muted">Faqat maydon nomlari va sizning ko'rsatmangiz yuboriladi. Parol, karta va maxfiy maydonlar o'qilmaydi. Har bir qiymatni ko'rib, belgilaganingizgina yoziladi. Forma yuborilmaydi.</p>
+      <button class="btn" id="readFormBtn" type="button">Formani o'qish</button>
+      <p id="formPreview" class="muted" style="margin-top: 8px;"></p>
+      <label class="muted" id="fillInstructionLabel" hidden>Nima yozilsin? <input type="text" id="fillInstruction" autocomplete="off" placeholder="Masalan: Ismim Dilnoza Karimova, email dilnoza@example.com"></label>
+      <div class="row">
+        <button class="btn" id="askFillBtn" type="button" hidden>EZO'dan qiymat so'rash</button>
+      </div>
+      <ul id="fillChoices" class="muted" style="list-style: none; margin-top: 8px;"></ul>
+      <div class="row">
+        <button class="btn" id="applyFillBtn" type="button" hidden>Belgilanganlarini yozish</button>
+        <button class="btn secondary" id="cancelFillBtn" type="button" hidden>Bekor qilish</button>
+      </div>
+      <p id="fillResult" class="muted" role="status" style="margin-top: 8px;"></p>
+    </section>
+
     <section class="card" aria-labelledby="unavailTitle" id="unavailableCard">
       <h2 class="card-title" id="unavailTitle">Mavjud emas</h2>
       <p class="unavailable" id="pairingState"></p>
