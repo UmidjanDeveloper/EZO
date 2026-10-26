@@ -61,3 +61,20 @@ describe("createApi", () => {
     expect((error as ApiError).message).toContain("CORS");
   });
 });
+
+describe("EZO Student from the phone", () => {
+  it("uploads raw bytes as octet-stream with the filename, then reads the real job and summary", async () => {
+    const { calls, impl } = fakeFetch(() =>
+      Response.json({ id: "j1", document_id: "d1", state: "queued", error_code: null, error_message: null, text: "Xulosa [1]", citations: [{}] }),
+    );
+    const api = createApi("https://api.ezo.uz", "tok", impl);
+    const job = await api.uploadStudent("Kitob 1.pdf", new Uint8Array([37, 80, 68, 70]));
+    expect(job.state).toBe("queued");
+    expect(calls[0]!.url).toBe("https://api.ezo.uz/api/student/uploads?filename=Kitob%201.pdf");
+    expect(new Headers(calls[0]!.init.headers).get("Content-Type")).toBe("application/octet-stream");
+    await api.studentJob("j1");
+    expect(calls[1]!.url).toBe("https://api.ezo.uz/api/knowledge/document-jobs/j1");
+    expect(await api.studentSummary("d1")).toEqual({ text: "Xulosa [1]", citations: 1 });
+    expect(JSON.parse(String(calls[2]!.init.body))).toEqual({ kind: "summary", language: "uz" });
+  });
+});

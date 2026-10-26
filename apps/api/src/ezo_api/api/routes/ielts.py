@@ -210,7 +210,10 @@ async def start_ielts_session(
     """Start a structured IELTS speaking test session."""
     await require_owned_conversation(db, user.id, payload.conversation_id)
     session_id = uuid.uuid4()
-    state = new_test(str(session_id))
+    try:
+        state = new_test(str(session_id), payload.cue_card)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Unknown IELTS cue card.") from exc
     meta: dict[str, Any] = {
         "ui_language": "uz",
         "ielts": state.to_dict(),

@@ -165,7 +165,9 @@ async def interpret(
     audio: UploadFile = File(...),  # noqa: B008 (FastAPI dependency declaration)
     target: LanguageCode = Form(...),  # noqa: B008
     source: LanguageCode | None = Form(default=None),  # noqa: B008
-    speak: bool = Form(default=True),
+    # Read as text: recent FastAPI turns a missing bool form field into False (HTML
+    # checkbox rule), but an absent `speak` must mean "speak".
+    speak: str | None = Form(default=None),
 ) -> dict[str, Any]:
     """One interpreted turn: the recording is transcribed, translated and (if a speech
     provider is configured and `speak` is set) read aloud. Turn-based, not simultaneous."""
@@ -173,6 +175,7 @@ async def interpret(
         raise _fail(503, "voice_not_configured", "No speech-to-text provider is configured.")
     if services.router.is_offline:
         raise _fail(503, "offline", "Translation needs a connected AI provider.")
+    speak_reply = speak is None or speak.strip().lower() not in ("false", "0", "no", "off")
     limit = services.settings.voice_max_audio_mb * 1024 * 1024
     data = await audio.read(limit + 1)
     if len(data) > limit:
@@ -192,7 +195,7 @@ async def interpret(
             source=source,
             target=target,
             terms_for=terms_for,
-            speak=speak,
+            speak=speak_reply,
         )
     except AllVoiceProvidersFailedError as exc:
         raise _fail(502, "voice_failed", "No voice provider could handle the recording.") from exc

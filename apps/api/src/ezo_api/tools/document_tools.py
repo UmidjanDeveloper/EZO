@@ -13,14 +13,15 @@ import uuid
 from collections import Counter
 from dataclasses import replace
 from functools import partial
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, model_validator
 
 from ezo_api.agents.references import document_text
 from ezo_api.artifacts.service import ArtifactError, VersionResult
 from ezo_api.db.models import Artifact, KnowledgeDocument, StoryProject
 from ezo_api.documents.docx.writer import render_docx
+from ezo_api.documents.isolation import native_execution_allowed
 from ezo_api.documents.markdown_io import parse_markdown, to_markdown, to_text
 from ezo_api.documents.model import Paragraph, Rule, Run, word_count
 from ezo_api.documents.pdf.writer import render_pdf
@@ -31,6 +32,7 @@ from ezo_api.documents.spreadsheet.writer import Sheet, render_csv, render_xlsx
 from ezo_api.knowledge.uploads import sanitize_filename
 from ezo_api.organization.letterhead import Letterhead, from_facts
 from ezo_api.organization.service import load_facts
+from ezo_api.schemas.office import MAX_TOTAL_CELLS, Cell
 from ezo_api.storage.base import StorageError
 from ezo_api.story.from_deck import scene_from_slide, story_from_deck
 from ezo_api.story.service import StoryError
@@ -254,8 +256,12 @@ class CreateDocumentTool(Tool[CreateDocumentArgs]):
 
 class SheetIn(BaseModel):
     name: str = Field(default="Sheet1", max_length=100)
-    columns: list[str] = Field(min_length=1, max_length=100)
-    rows: list[list[str | float | int | None]] = Field(default_factory=list, max_length=20_000)
+    columns: list[Annotated[str, StringConstraints(max_length=300)]] = Field(
+        min_length=1, max_length=100
+    )
+    rows: list[Annotated[list[Cell], Field(max_length=100)]] = Field(
+        default_factory=list, max_length=20_000
+    )
 
 
 class CreateSpreadsheetArgs(BaseModel):
@@ -267,6 +273,12 @@ class CreateSpreadsheetArgs(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     provider: str | None = None
     model: str | None = None
+
+    @model_validator(mode="after")
+    def bounded_workbook(self) -> CreateSpreadsheetArgs:
+        if sum(len(row) for sheet in self.sheets for row in sheet.rows) > MAX_TOTAL_CELLS:
+            raise ValueError(f"A workbook may have at most {MAX_TOTAL_CELLS} cells.")
+        return self
 
 
 class CreateSpreadsheetTool(Tool[CreateSpreadsheetArgs]):
@@ -407,7 +419,15 @@ class CreatePresentationTool(Tool[CreatePresentationArgs]):
         self, deck: DeckSpec, args: CreatePresentationArgs, ctx: ToolContext
     ) -> ToolResult:
         existing = await owned_artifact(ctx, args.artifact_id, ("presentation",))
-        images, missing = await slide_images(ctx, deck)
+        if native_execution_allowed():
+            images, missing = await slide_images(ctx, deck)
+        else:
+            # Decoding stored images is untrusted-image processing; outside the isolated
+            # workload slides keep EZO's abstract visuals and the user is told.
+            missing = sum(1 for slide in deck.slides if slide.image_artifact_id)
+            for slide in deck.slides:
+                slide.image_artifact_id = ""
+            images = {}
         try:
             build = await asyncio.to_thread(partial(build_deck, deck, images=images))
         except DeckBuildError as exc:

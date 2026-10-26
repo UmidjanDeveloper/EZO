@@ -25,9 +25,11 @@ ISOLATED_TOOLS = frozenset(
         "extract_tables",
         "sheet_ops",
         "office_pdf",
-        "create_document",
-        "create_spreadsheet",
-        "create_presentation",
+        # create_document / create_spreadsheet / create_presentation are NOT here: they
+        # build new files from model text with EZO's own Python renderers (no OCR/Office
+        # binaries, no untrusted input parsing), exactly like the REST Office routes that
+        # already run in production (audit F19). Presentation images from other artifacts
+        # are dropped outside a verified workload (see CreatePresentationTool).
         "create_graphic",
         "edit_image",
         "generate_image",

@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Literal, cast
 
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import (
@@ -34,6 +35,10 @@ from ezo_api.documents.executor.protocol import (
 )
 from ezo_api.knowledge.jobs.service import DocumentJobs, JobError, Lease
 from ezo_api.knowledge.uploads import sanitize_filename
+
+# F22: per-user bounds while no worker drains the queue (raw bytes stay in the database).
+MAX_PENDING_RAW_JOBS = 20
+MAX_RAW_BYTES_PER_USER = 200 * 1024 * 1024
 
 NativeFormat = Literal["pdf", "docx", "epub", "png", "jpeg"]
 _EXTENSIONS: dict[str, NativeFormat] = {
@@ -134,6 +139,7 @@ class StudentIngestion(DocumentJobs):
             )
             if existing is not None:
                 return existing
+            await self._check_quota(session, user_id, len(data))
             source = KnowledgeSource(
                 user_id=user_id, project_id=project_id, name=filename, source_type="upload"
             )
@@ -180,6 +186,37 @@ class StudentIngestion(DocumentJobs):
             session.add(job)
             await session.flush()
             return job
+
+    async def _check_quota(self, session: AsyncSession, user_id: uuid.UUID, size: int) -> None:
+        """F22: bounded raw storage and queue depth per user (runs under the user lock)."""
+        pending = await session.scalar(
+            select(func.count())
+            .select_from(DocumentJob)
+            .where(
+                DocumentJob.user_id == user_id,
+                DocumentJob.parser_version == PROCESSOR_VERSION,
+                DocumentJob.state.in_(("queued", "running")),
+            )
+        )
+        if (pending or 0) >= MAX_PENDING_RAW_JOBS:
+            raise JobError(
+                "quota_pending",
+                f"At most {MAX_PENDING_RAW_JOBS} documents can wait for processing at once.",
+                429,
+            )
+        stored = await session.scalar(
+            select(func.coalesce(func.sum(func.length(StudentRawRevision.data)), 0))
+            .select_from(StudentRawRevision)
+            .join(DocumentRevision, DocumentRevision.id == StudentRawRevision.revision_id)
+            .join(KnowledgeDocument, KnowledgeDocument.id == DocumentRevision.document_id)
+            .where(KnowledgeDocument.user_id == user_id)
+        )
+        if int(stored or 0) + size > MAX_RAW_BYTES_PER_USER:
+            raise JobError(
+                "quota_storage",
+                "Student source storage is full; delete documents you no longer need.",
+                413,
+            )
 
     async def raw_input(self, lease: Lease) -> tuple[bytes, NativeFormat, tuple[OcrLanguage, ...]]:
         async with self._transaction() as session:

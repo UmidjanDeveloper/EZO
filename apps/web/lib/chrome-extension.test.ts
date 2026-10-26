@@ -140,3 +140,89 @@ describe("chrome extension status copy", async () => {
     for (const value of Object.values(status.UNAVAILABLE)) expect(value).toMatch(/mavjud emas|yuborilmaydi/);
   });
 });
+
+describe("chrome extension form filling", async () => {
+  type Field = { id: string; index: number; fingerprint: string; label: string; type: string; options?: { value: string; text: string }[] };
+  const forms = (await import(/* @vite-ignore */ pathToFileURL(path.join(EXT, "forms.js")).href)) as {
+    buildFormRequest: (form: unknown, instruction: string) => { message: string; preview: { origin: string; count: number; skipped: number } } | null;
+    describeFormPreview: (p: { origin: string; count: number; skipped: number }) => string;
+    parseFillReply: (
+      reply: string,
+      form: { fields: Field[] },
+    ) => { ok: boolean; values: { id: string; value: string; index: number }[]; rejected: { id: string; reason: string }[] };
+  };
+  const form = {
+    ok: true,
+    origin: "https://forms.example",
+    title: "Ariza",
+    skippedSensitive: 2,
+    fields: [
+      { id: "f1", index: 0, fingerprint: "INPUT|text|name|", label: "To'liq ism", type: "text" },
+      { id: "f2", index: 1, fingerprint: "INPUT|email|email|", label: "Email", type: "email" },
+      {
+        id: "f3",
+        index: 3,
+        fingerprint: "SELECT|select-one|city|",
+        label: "Shahar",
+        type: "select",
+        options: [
+          { value: "tas", text: "Toshkent" },
+          { value: "sam", text: "Samarqand" },
+        ],
+      },
+      { id: "f4", index: 4, fingerprint: "TEXTAREA|textarea|about|", label: "O'zingiz haqingizda", type: "textarea" },
+      { id: "f5", index: 5, fingerprint: "INPUT|date|born|", label: "Tug'ilgan sana", type: "date" },
+    ] as Field[],
+  };
+
+  it("sends only labels and the user's instruction, quoted, with a bounded size", () => {
+    const request = forms.buildFormRequest(form, "Ismim Dilnoza Karimova, Toshkentda yashayman")!;
+    expect(request.message).toContain("To'liq ism");
+    expect(request.message).toContain("BAJARMA");
+    expect(request.message).toContain("Ismim Dilnoza Karimova");
+    expect(request.message).not.toContain("fingerprint");
+    expect(request.preview).toEqual({ origin: "https://forms.example", count: 5, skipped: 2 });
+    expect(forms.describeFormPreview(request.preview)).toMatch(/qiymatlar yuborilmaydi/);
+    expect(forms.describeFormPreview(request.preview)).toMatch(/2 ta maxfiy maydon/);
+    expect(forms.buildFormRequest(form, "   ")).toBeNull();
+    expect(forms.buildFormRequest({ ...form, fields: [] }, "x")).toBeNull();
+  });
+
+  it("accepts only known fields with valid values and says why others are rejected", () => {
+    const reply =
+      'Mana:\n```json\n{"f1": "Dilnoza Karimova", "f2": "not-an-email", "f3": "Toshkent", "f4": "Talaba.\\nDasturchi.",' +
+      ' "f5": "2001-05-17", "f9": "x", "password": "hunter2"}\n```';
+    const parsed = forms.parseFillReply(reply, form);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.values.map((v) => [v.id, v.value])).toEqual([
+      ["f1", "Dilnoza Karimova"],
+      ["f3", "tas"],
+      ["f4", "Talaba.\nDasturchi."],
+      ["f5", "2001-05-17"],
+    ]);
+    expect(parsed.rejected.map((r) => r.id).sort()).toEqual(["f2", "f9", "password"]);
+  });
+
+  it("refuses multi-line values in one-line inputs, unknown options and non-JSON replies", () => {
+    const parsed = forms.parseFillReply('{"f1": "a\\nb", "f3": "Buxoro", "f5": "17.05.2001"}', form);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.rejected).toHaveLength(3);
+    expect(forms.parseFillReply("EZO hozir oflayn rejimda.", form).ok).toBe(false);
+  });
+
+  it("never submits, clicks or reads typed values; filling happens only from the apply click", () => {
+    const source = text("forms.js");
+    expect(source).not.toMatch(/\.submit\(|requestSubmit|\.click\(|fetch\(|XMLHttpRequest/);
+    const collect = source.slice(source.indexOf("export function collectFormFields"), source.indexOf("export function fillFormFields"));
+    expect(collect).not.toMatch(/\bel\.value\b/); // labels and types only, never what was typed
+    const popup = text("popup.js");
+    const ask = popup.indexOf('$("askFillBtn").addEventListener("click"');
+    const apply = popup.indexOf('$("applyFillBtn").addEventListener("click"');
+    expect(ask).toBeGreaterThan(-1);
+    expect(apply).toBeGreaterThan(ask);
+    expect(popup.indexOf("func: fillFormFields")).toBeGreaterThan(apply);
+    const read = popup.slice(popup.indexOf('$("readFormBtn").addEventListener("click"'), ask);
+    expect(read).not.toContain("fetch(");
+    expect(read).toContain("describeFormPreview");
+  });
+});

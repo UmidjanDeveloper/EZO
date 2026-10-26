@@ -211,3 +211,14 @@ async def test_ielts_pace_needs_reported_time_for_every_answer(client: AsyncClie
     assert parts[3]["timing_source"] == "client_reported"
     assert body["metrics"]["timing_source"] == "client_reported"
     assert all("audio not analysed" in o for o in parts[3]["observations_en"] if "wpm" in o)
+
+
+@pytest.mark.asyncio
+async def test_selected_cue_card_is_used_for_part_2(client: AsyncClient) -> None:
+    """F25: the card chosen in the bank is the Part 2 card of the session."""
+    cards = (await client.get("/api/ielts/cue-cards")).json()
+    for card in cards:
+        session = (await client.post("/api/ielts/sessions", json={"cue_card": card["id"]})).json()
+        assert session["cue_card"] == card["id"]
+    unknown = await client.post("/api/ielts/sessions", json={"cue_card": "not-a-card"})
+    assert unknown.status_code == 422

@@ -18,6 +18,11 @@ _TEXTS: dict[str, dict[str, str]] = {
         "en": "_(The reply hit the length limit and was cut off. Say “continue”.)_",
         "ru": "_(Ответ достиг лимита длины и был обрезан. Напишите «продолжай».)_",
     },
+    "artifact_not_created": {
+        "uz": "⚠️ Fayl yaratilmadi ({error}). Hech narsa saqlanmadi.",
+        "en": "⚠️ No file was created ({error}). Nothing was saved.",
+        "ru": "⚠️ Файл не создан ({error}). Ничего не сохранено.",
+    },
     "all_providers_failed": {
         "uz": "AI provayderlarning hech biri javob bermadi.",
         "en": "None of the AI providers answered.",

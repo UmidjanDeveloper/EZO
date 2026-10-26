@@ -10,10 +10,12 @@ import {
   originPattern,
   validApiBase,
 } from "./status.js";
+import { buildFormRequest, collectFormFields, describeFormPreview, fillFormFields, parseFillReply } from "./forms.js";
 
 // Everything here runs only after the user clicks. There is no polling, no background
 // worker, no content script, and no call to any planning/execution/pairing endpoint.
 // Page text leaves the browser only after the user saw a preview and pressed "Yuborish".
+// Form filling types only values the user ticked; it never submits or clicks anything.
 
 const $ = (id) => document.getElementById(id);
 
@@ -197,5 +199,120 @@ $("sendBtn").addEventListener("click", async () => {
   } finally {
     controller = null;
     resetAssist();
+  }
+});
+
+// --- approved form filling: read labels → preview → ask EZO → review each value → type ---
+
+let formRead = null;
+let fillTabId = null;
+let suggestions = [];
+
+function resetFill(message = "") {
+  formRead = null;
+  fillTabId = null;
+  suggestions = [];
+  $("fillInstructionLabel").hidden = true;
+  $("askFillBtn").hidden = true;
+  $("applyFillBtn").hidden = true;
+  $("cancelFillBtn").hidden = true;
+  $("fillChoices").replaceChildren();
+  $("fillResult").textContent = message;
+}
+
+$("readFormBtn").addEventListener("click", async () => {
+  resetFill();
+  $("formPreview").textContent = "";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || tab.id === undefined) throw new Error("no_tab");
+    // activeTab: this tab only, for this click. Labels and types only, never typed values.
+    const [injection] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: collectFormFields });
+    const form = injection?.result;
+    if (!form?.ok || form.fields.length === 0) {
+      $("formPreview").textContent = form?.ok ? "Bu sahifada to'ldiriladigan maydon topilmadi." : describePage(null).text;
+      return;
+    }
+    formRead = form;
+    fillTabId = tab.id;
+    $("formPreview").textContent = describeFormPreview({
+      origin: form.origin,
+      count: form.fields.length,
+      skipped: form.skippedSensitive,
+    });
+    $("fillInstructionLabel").hidden = false;
+    $("askFillBtn").hidden = false;
+    $("cancelFillBtn").hidden = false;
+  } catch {
+    $("formPreview").textContent = describePage(null).text;
+  }
+});
+
+$("cancelFillBtn").addEventListener("click", () => resetFill("Bekor qilindi. Sahifaga hech narsa yozilmadi."));
+
+$("askFillBtn").addEventListener("click", async () => {
+  const request = buildFormRequest(formRead, $("fillInstruction").value);
+  if (!request) {
+    $("fillResult").textContent = "Avval nima yozilishini kiriting.";
+    return;
+  }
+  $("askFillBtn").hidden = true;
+  $("fillResult").textContent = "EZO o'ylamoqda…";
+  try {
+    const granted = await chrome.permissions.request({ origins: [originPattern(apiBase)] });
+    if (!granted) throw new Error("Ruxsat berilmadi.");
+    const token = await currentToken();
+    const res = await fetch(`${apiBase}${CHAT_PATH}`, {
+      method: "POST",
+      credentials: "omit",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ message: request.message }),
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+    const parsed = parseFillReply(body?.message?.content ?? "", formRead);
+    suggestions = parsed.values;
+    const items = parsed.values.map((v) => {
+      const li = document.createElement("li");
+      const label = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = true;
+      box.dataset.id = v.id;
+      label.append(box, ` ${v.label}: `);
+      const value = document.createElement("strong");
+      value.textContent = v.value; // shown as text, never as HTML
+      label.append(value);
+      li.append(label);
+      return li;
+    });
+    $("fillChoices").replaceChildren(...items);
+    const rejected = parsed.rejected.length ? ` ${parsed.rejected.length} ta taklif rad etildi (noto'g'ri format).` : "";
+    $("fillResult").textContent = parsed.ok ? `Tekshiring va keraklilarini belgilang.${rejected}` : `${parsed.reason}${rejected}`;
+    $("applyFillBtn").hidden = !parsed.ok;
+  } catch (error) {
+    $("fillResult").textContent = `Xatolik: ${error?.message ?? error}`;
+    $("askFillBtn").hidden = false;
+  }
+});
+
+$("applyFillBtn").addEventListener("click", async () => {
+  const chosen = new Set(
+    [...$("fillChoices").querySelectorAll("input[type=checkbox]")].filter((b) => b.checked).map((b) => b.dataset.id),
+  );
+  const items = suggestions.filter((s) => chosen.has(s.id));
+  if (!items.length || fillTabId === null) return resetFill("Hech narsa tanlanmadi. Sahifaga hech narsa yozilmadi.");
+  try {
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: fillTabId },
+      func: fillFormFields,
+      args: [items],
+    });
+    const result = injection?.result ?? { filled: 0, changed: [] };
+    const changed = result.changed.length ? ` ${result.changed.length} ta maydon sahifa o'zgargani uchun yozilmadi.` : "";
+    resetFill(`${result.filled} ta maydon to'ldirildi.${changed} Forma yuborilmadi — tekshirib, o'zingiz yuboring.`);
+  } catch {
+    resetFill("Sahifaga yozib bo'lmadi (tab yopilgan yoki ruxsat tugagan bo'lishi mumkin).");
   }
 });

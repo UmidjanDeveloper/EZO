@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
+import { AccountsPanel } from "@/components/admin/AccountsPanel";
 import { PageFrame } from "./PageFrame";
 
 interface GovernanceStatus {
@@ -377,6 +378,8 @@ export function AdminPage() {
                 </span>
               </Card>
             </div>
+
+            <AccountsPanel />
 
             {/* Registered Agents Catalog */}
             <Card className="p-5 flex flex-col gap-4">
