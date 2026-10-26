@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rmsOf, speakingSeconds, vadStart, vadStep, type VadAction, type VadConfig } from "./vad";
+import { DEFAULT_VAD, rmsOf, speakingSeconds, vadStart, vadStep, type VadAction, type VadConfig } from "./vad";
 
 const config: VadConfig = { threshold: 0.1, endSilenceMs: 1000, noSpeechMs: 3000, maxMs: 10_000 };
 
@@ -43,5 +43,24 @@ describe("voice activity detection", () => {
       state = vadStep(state, rms, now)[0];
     }
     expect(speakingSeconds(state)).toBe(2.4);
+  });
+});
+
+describe("long exam answers", () => {
+  it("a 2.5 s pause ends a chat utterance but not an IELTS long turn", async () => {
+    const { LONG_ANSWER_VAD } = await import("./engine");
+    const run = (config: typeof DEFAULT_VAD) => {
+      let state = vadStart(0);
+      let action: VadAction = "continue";
+      for (let t = 0; t <= 4000 && action === "continue"; t += 100) {
+        const loud = t < 1500; // 1.5 s of speech, then silence
+        [state, action] = vadStep(state, loud ? 0.1 : 0, t, config);
+        if (t === 4000) break;
+      }
+      return action;
+    };
+    expect(run(DEFAULT_VAD)).toBe("end");
+    expect(run(LONG_ANSWER_VAD)).toBe("continue");
+    expect(LONG_ANSWER_VAD.maxMs).toBeGreaterThanOrEqual(120_000);
   });
 });

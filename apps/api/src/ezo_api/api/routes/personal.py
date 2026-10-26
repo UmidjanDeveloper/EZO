@@ -19,6 +19,7 @@ from ezo_api.db.models import (
     PersonalGoal,
     User,
 )
+from ezo_api.memory.consent import apply_consent_change, memory_policy
 from ezo_api.schemas.api import MemoryOut, Preferences
 from ezo_api.schemas.personal import (
     GoalCategory,
@@ -50,8 +51,8 @@ async def get_personal_profile(
 ) -> PersonalIntelligenceProfile:
     """Consolidated Personal Intelligence profile: consent, memory counts, goals and progress."""
     prefs = user.preferences or {}
-    memory_consent = bool(prefs.get("memory_consent", False))
-    auto_memory = bool(prefs.get("auto_memory", False))
+    policy = memory_policy(prefs)
+    memory_consent, auto_memory = policy.consent, policy.capture
 
     # Memory statistics
     memories = list((await session.scalars(select(Memory).where(Memory.user_id == user.id))).all())
@@ -122,6 +123,7 @@ async def get_personal_profile(
         role=getattr(user, "role", "user"),
         memory_consent=memory_consent,
         auto_memory=auto_memory,
+        memory_recall=policy.recall,
         preferences=Preferences.model_validate(prefs),
         memory_stats=memory_stats,
         goals_stats=goals_stats,
@@ -139,25 +141,35 @@ async def update_memory_consent(
     current_user = await session.get(User, user.id)
     if current_user is None:
         raise HTTPException(401, detail="User not found.")
-    prefs = dict(current_user.preferences or {})
-    prefs["memory_consent"] = body.consent
-    prefs["auto_memory"] = body.auto_memory if body.consent else False
+    change: dict[str, object] = {"memory_consent": body.consent, "auto_memory": body.auto_memory}
+    if body.recall is not None:
+        change["memory_recall"] = body.recall
+    prefs = apply_consent_change(dict(current_user.preferences or {}), change)
     current_user.preferences = prefs
+    policy = memory_policy(prefs)
     audit(
         session,
         user.id,
         "personal.consent_updated",
         "user",
         user.id,
-        {"consent": body.consent, "auto_memory": prefs["auto_memory"]},
+        {"consent": body.consent, "auto_memory": policy.capture, "recall": policy.recall},
     )
     await session.commit()
     return {
         "memory_consent": body.consent,
-        "auto_memory": prefs["auto_memory"],
+        "auto_memory": policy.capture,
+        "memory_recall": policy.recall,
         "message": "Memory consent updated successfully."
         if body.consent
-        else "Memory consent revoked. Automatic memory capture is disabled.",
+        else (
+            "Memory consent revoked. Automatic capture is off"
+            + (
+                "; saved memories are still used because you kept recall on."
+                if policy.recall
+                else " and saved memories are no longer used in replies."
+            )
+        ),
     }
 
 

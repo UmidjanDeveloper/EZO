@@ -336,5 +336,16 @@ async def test_turn_based_interpretation(database_url: str) -> None:
             assert body["source_language"] == "uz" and body["target_language"] == "en"
             assert body["audio_mime"] == "audio/mpeg" and body["audio_base64"]
             assert [c[0] for c in voice.calls] == ["stt", "tts"] and voice.calls[1][2] == "en"
+
+            # speak=false: translated text only, no voice call.
+            provider.replies = ["The meeting starts at 10 today.\n=====\nNOTES: none"]
+            quiet = await client.post(
+                "/api/translation/interpret",
+                files={"audio": ("turn.webm", WEBM)},
+                data={"target": "en", "source": "uz", "speak": "false"},
+            )
+            assert quiet.status_code == 200, quiet.text
+            assert quiet.json()["audio_base64"] is None
+            assert [c[0] for c in voice.calls] == ["stt", "tts", "stt"]
     finally:
         await app.state.services.db.dispose()

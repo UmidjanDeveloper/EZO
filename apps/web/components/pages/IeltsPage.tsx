@@ -14,12 +14,21 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
+import type { VoiceStatus as ServerVoice } from "@ezo/shared";
+import { api } from "@/lib/api";
 import {
   listenOnce,
   speak,
   speechRecognitionSupported,
   speechSynthesisSupported,
 } from "@/lib/speech";
+import {
+  LONG_ANSWER_VAD,
+  listenWithServer,
+  pickListener,
+  serverRecordingSupported,
+  speakReply,
+} from "@/lib/voice/engine";
 import { PageFrame } from "./PageFrame";
 
 interface CueCard {
@@ -95,6 +104,22 @@ export function IeltsPage() {
   const [speechSeconds, setSpeechSeconds] = useState<number | null>(null);
   const [speakingPrompt, setSpeakingPrompt] = useState(false);
 
+  // Server speech recognition (OpenAI/ElevenLabs/VoiceStudio) when the server has it,
+  // otherwise the browser recogniser. Nothing is faked: unsupported paths say so.
+  const [serverVoice, setServerVoice] = useState<ServerVoice | null>(null);
+  const [serverFailed, setServerFailed] = useState(false);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api
+      .voiceStatus()
+      .then((status) => alive && setServerVoice(status))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   function toggleListening() {
     if (isListening && stopListeningFn) {
       stopListeningFn();
@@ -102,29 +127,39 @@ export function IeltsPage() {
       setStopListeningFn(null);
       return;
     }
-    if (!speechRecognitionSupported()) {
-      alert("Brauzeringizda ovoz tanish funksiyasi qo'llab-quvvatlanmaydi.");
+    const engine = serverRecordingSupported() || speechRecognitionSupported() ? pickListener(serverVoice, serverFailed) : null;
+    if (!engine) {
+      setVoiceNote("Ovozli javob uchun brauzer yoki serverda nutqni aniqlash mavjud emas. Javobni yozing.");
       return;
     }
+    setVoiceNote(null);
     setIsListening(true);
-    const stop = listenOnce("en", {
-      onInterim: (text) => setAnswer(text),
-      onFinal: (text, info) => {
+    const handlers = {
+      onInterim: (text: string) => setAnswer(text),
+      onFinal: (text: string, info?: { speechSeconds?: number | null }) => {
         setAnswer(text);
+        // Measured from the recording on this device; the API labels it client-reported.
         if (info?.speechSeconds) setSpeechSeconds(info.speechSeconds);
       },
-      onEnd: () => {
+      onEnd: (error: string | null) => {
         setIsListening(false);
         setStopListeningFn(null);
+        if (error === "server-failed") setServerFailed(true);
+        if (error === "not-allowed") setVoiceNote("Mikrofonga ruxsat berilmadi.");
+        else if (error === "no-speech") setVoiceNote("Ovoz eshitilmadi. Qaytadan urinib ko'ring.");
       },
-    });
+    };
+    const stop =
+      engine === "server" ? listenWithServer("en", handlers, LONG_ANSWER_VAD) : listenOnce("en", handlers);
     setStopListeningFn(() => stop);
   }
 
   function handleSpeakPrompt(text: string) {
-    if (!speechSynthesisSupported() || !text) return;
+    if (!text) return;
+    if (!serverVoice?.text_to_speech.length && !speechSynthesisSupported()) return;
     setSpeakingPrompt(true);
-    void speak(text, "en").finally(() => setSpeakingPrompt(false));
+    // The examiner question in a real voice when the server has one; browser voice otherwise.
+    void (serverVoice ? speakReply(text, "en", serverVoice) : speak(text, "en")).finally(() => setSpeakingPrompt(false));
   }
 
   const authHeaders = useCallback(() => {
@@ -179,7 +214,8 @@ export function IeltsPage() {
       const res = await fetch(`${apiUrl()}/api/ielts/sessions`, {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ target_band: 7.0 }),
+        // The Part 2 card the learner picked in the bank (F25); otherwise EZO chooses.
+        body: JSON.stringify({ target_band: 7.0, cue_card: selectedCard?.id ?? null }),
       });
       if (res.ok) {
         const data = (await res.json()) as IeltsSession;
@@ -383,7 +419,9 @@ export function IeltsPage() {
                       </Button>
                       <p className="text-xs text-ink-muted">
                         {answer.split(/\s+/).filter(Boolean).length} ta so&apos;z
+                        {speechSeconds ? ` · ${Math.round(speechSeconds)} s nutq (qurilmada o'lchangan)` : ""}
                       </p>
+                      {voiceNote ? <p className="text-xs text-red-500">{voiceNote}</p> : null}
                     </div>
                     <Button
                       variant="primary"

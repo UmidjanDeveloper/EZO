@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
@@ -14,6 +15,7 @@ from ezo_api.agents.base import GatherContext, Gathered, call_tool
 from ezo_api.agents.office import IMAGE_MIMES, PDF_MIME, attached_files, recent_files
 from ezo_api.core.text import normalize
 from ezo_api.db.models import KnowledgeDocument
+from ezo_api.documents.isolation import native_execution_allowed
 from ezo_api.documents.pdf import engine
 from ezo_api.documents.pdf.engine import PdfError
 from ezo_api.documents.spreadsheet.analysis import read_sheets
@@ -208,10 +210,14 @@ async def run_sheet_action(ctx: GatherContext, gathered: Gathered) -> bool:
     document = files[0]
     if not document.storage_key:
         return False
+    # F20: parsing an uploaded workbook is untrusted-document processing. It belongs to
+    # the isolated path like every other sheet tool; never open it in the API process.
+    if not native_execution_allowed():
+        return False
     data = await ctx.tools.services.storage.get(document.storage_key)
     name = document.filename or f"{document.title}.xlsx"
     try:
-        sheets = read_sheets(data, name)
+        sheets = await asyncio.to_thread(read_sheets, data, name)
     except Exception:  # damaged workbook: let the other actions explain
         return False
     if not sheets:

@@ -20,6 +20,9 @@ class CueCardOut(BaseModel):
 class IeltsSessionCreate(BaseModel):
     conversation_id: uuid.UUID | None = None
     target_band: float | None = Field(default=None, ge=4.0, le=9.0)
+    cue_card: str | None = Field(
+        default=None, max_length=40, description="Part 2 card id from /api/ielts/cue-cards"
+    )
 
 
 class IeltsSessionOut(BaseModel):

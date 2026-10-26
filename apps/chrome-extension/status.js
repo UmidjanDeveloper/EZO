@@ -29,7 +29,7 @@ export function describeBackend(result) {
 /** Honest, fixed copy for features the canonical backend does not provide. */
 export const UNAVAILABLE = Object.freeze({
   pairing: "Brauzerni JARVIS qurilmasi sifatida ulash: mavjud emas (faqat desktop ilovasi ulanadi).",
-  tasks: "Sahifada amal bajarish (forma to'ldirish, navigatsiya): mavjud emas.",
+  tasks: "Navigatsiya, tugma bosish va formani avtomatik yuborish: mavjud emas (forma faqat siz tasdiqlagan qiymatlar bilan to'ldiriladi, yuborishni o'zingiz qilasiz).",
   telegram: "Telegramga yuborish: kengaytmadan mavjud emas, hech narsa yuborilmaydi.",
 });
 
