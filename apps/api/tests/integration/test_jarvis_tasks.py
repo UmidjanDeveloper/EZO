@@ -476,3 +476,33 @@ async def test_crash_after_remote_send_cannot_reconsume_approval(
     assert recovered["state"] == "failed"
     assert recovered["error_code"] == "delivery_unknown"
     assert len(telegram.sent) == 1
+
+
+async def test_opt_in_signed_work_requires_server_configuration(client, app, monkeypatch):
+    from cryptography.hazmat.primitives.serialization import NoEncryption, PrivateFormat
+    from pydantic import SecretStr
+
+    from ezo_api.jarvis.device_protocol import SignedDeviceWork, verify_work
+
+    device = Device()
+    await pair(client, device)
+    await start(client, text="Downloads eng oxirgi faylni PDF qil")
+    url = f"/api/jarvis/devices/{device.id}/work-signed"
+    assert (await client.get(url)).status_code == 503
+    key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(
+        app.state.services.settings,
+        "jarvis_work_signing_key",
+        SecretStr(key.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption()).hex()),
+    )
+    response = await client.get(url)
+    assert response.status_code == 200
+    [work] = response.json()
+    verify_work(
+        SignedDeviceWork.model_validate(work),
+        key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw).hex(),
+        device_id=uuid.UUID(device.id),
+        now=int(time.time()),
+    )
+    monkeypatch.setattr(app.state.services.settings, "jarvis_work_signing_key", SecretStr("bad"))
+    assert (await client.get(url)).status_code == 503

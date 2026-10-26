@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.db.models import AuditLog, User
+from ezo_api.jarvis.device_protocol import SignedDeviceWork, sign_work
 from ezo_api.orchestration.planning_policy import availability
 from ezo_api.orchestration.tool_plan import PlanInspectionError, ToolGraph, inspect_graph
 from ezo_api.tools.percentage import PercentageArgs, calculate_percentages
@@ -468,3 +469,24 @@ async def retry_task(
     except JarvisError as exc:
         raise _jarvis_call(exc) from exc
     return await _advance_and_commit(service, task)
+
+
+@router.get("/devices/{device_id}/work-signed")
+async def signed_device_work(
+    device_id: uuid.UUID, user: CurrentUser, session: SessionDep, services: ServicesDep
+) -> list[SignedDeviceWork]:
+    """Opt-in companion contract; existing clients are never silently upgraded."""
+    key = services.settings.jarvis_work_signing_key
+    if key is None:
+        raise HTTPException(503, detail={"code": "work_signing_not_configured"})
+    try:
+        work = await JarvisService(session, services).device_work(user.id, device_id)
+        # Validate configuration even for an empty queue, without exposing key data.
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        Ed25519PrivateKey.from_private_bytes(bytes.fromhex(key.get_secret_value()))
+        return [sign_work(item, key.get_secret_value()) for item in work]
+    except JarvisError as exc:
+        raise _jarvis_call(exc) from exc
+    except ValueError:
+        raise HTTPException(503, detail={"code": "work_signing_invalid"}) from None

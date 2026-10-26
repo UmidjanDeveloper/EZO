@@ -28,6 +28,7 @@ history merges them. Their test counts are historical, not this candidate's evid
   preserves events while masking Bot API credential paths. Regression verifies it.
 
 No schema migration, provider rewrite, frontend edit, sandbox enable or new dependency.
+An additive typed server-work signature endpoint is opt-in and503 by default.
 The code deliberately commits authority separately from request completion; an HTTP500
 may follow an admitted delivery. Clients must read task status, never automatically
 repeat approval/send. Uncertain outcomes require human inspection, not a retry button.
@@ -83,8 +84,13 @@ updated to the actual locked0.156.5 tag, not the older locally installed0.143.3.
 ## Canonical device/API contracts
 
 See `docs/integration/MASTER_API_CONTRACT.md` (Pydantic request bodies and OpenAPI in
-FastAPI remain source-of-truth). Devices use signed `DeviceWork` and
-`SignedDeviceResult` from `jarvis/device_protocol.py`; capability is currently a fixed
+FastAPI remain source-of-truth). Devices currently receive typed `DeviceWork` over authenticated HTTP; only
+`SignedDeviceResult` is Ed25519-signed in this protocol. The new opt-in `/work-signed` endpoint signs that existing queue, and
+`SignedDeviceWork`/`verify_work` provide device/deadline/tamper verification. It
+fails503 without an operator signing key. Existing clients still use the legacy
+route; pinned-key enrollment, durable receiver replay journal and rollout remain
+engineering/integration work. TLS is not a substitute for those requirements. Types live in `jarvis/device_protocol.py`;
+capability is currently a fixed
 Downloads document action, never arbitrary paths/commands. Pairing is Ed25519 proof
 of possession plus short-lived owner confirmation. No Android/iOS unrestricted
 control claim. Existing desktop/mobile UX and voice providers are unchanged.
@@ -98,7 +104,7 @@ failed delivery retry and stale authority do not grant a new send.
 
 ## Acceptance evidence / operating rules
 
-Focused local JARVIS regression suite:26 passed on the synchronized locked environment.
+Focused local JARVIS/delivery/signature regression suite:28 passed on the synchronized locked environment.
 Before fixes:2 new delivery regressions failed. Test doubles: Telegram HTTP only;
 real ASGI requests, SQL transactions, Ed25519 and PDF artifacts. No live provider call.
 Full SQLite/PostgreSQL, migration, Security, Docker/native and Devices results are
@@ -117,7 +123,8 @@ not retried. No claim that public Bot API metadata proves the recipient opened a
 
 ## Remaining engineering work vs external authorization
 
-Independent code work still remains: true provider token/audio/cost accounting
+Independent code work still remains: client adoption of the new signed device-work endpoint with pinned
+server trust and a durable replay journal (result/pairing proofs alone do not satisfy it); true provider token/audio/cost accounting
 (across processes, distinct from daily entitlement counters), durable worker
 admission/cancellation for every native action, long-scan batches/resume, measured
 LlamaIndex retrieval improvements, full retention/lifecycle and privacy-sharing
