@@ -96,7 +96,9 @@ services:
   #   1. in .env: VOICESTUDIO_URL=http://voicestudio:3900 and VOICESTUDIO_API_KEY=<long random text>
   #   2. docker compose --profile voice up
   voicestudio:
-    image: ghcr.io/debpalash/voicestudio:stable
+    # Pinned by digest (what `:stable` pointed to on 2026-10-24) so the image cannot change
+    # silently. To update: check the new release and its licence terms, then replace the digest.
+    image: ghcr.io/debpalash/voicestudio:stable@sha256:588fe119082bb97e722f5e53fe7b0fe1a406885bf72a4c60889d3d03376d7768
     profiles: ["voice"]
     expose:
       - "3900" # reachable by the EZO API inside Docker only; not published on your network
