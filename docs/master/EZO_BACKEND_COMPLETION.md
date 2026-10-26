@@ -183,9 +183,11 @@ Neither deadlines nor assertions were weakened. Partial successful reruns do not
 replace full containment acceptance. Fixed-function containers are never K4 proof.
 
 Web Docker build BLOCKED at mandatory Alpine apk upgrade (HTTP403, exit99).
-No frontend Dockerfile or upgrade gate was changed. Hosted CI/Security/Devices
-NOT RUN on this candidate: git push lacks write authentication, GraphQL PR creation
-returns Forbidden. A verified Git bundle is supplied; no remote branch/PR is claimed.
+No frontend Dockerfile or upgrade gate was changed. The first publish attempt lacked write authentication; a final retry succeeded and
+`feat/final-backend-acceptance` is published. CI/Security/Devices are triggered for
+this branch; exact final-head outcomes belong in the accompanying evidence report,
+not inherited from historical runs. GraphQL PR creation still returns Forbidden;
+no PR URL is fabricated. A verified Git bundle is also supplied for offline review.
 
 ### Current security release blockers
 
@@ -200,8 +202,8 @@ The security workflow now builds/scans the **executor as well as API and web**.
 It also fails HIGH/CRITICAL packaged Electron findings from node-all.json despite
 production-only audit passing. Current local Electron gate correctly exits1 on
 the actual advisory. Thresholds have not been weakened; expect that new check to
-remain red until the coordinated desktop patch is made. Workflow YAML parses,
-but its new hosted execution is unverified because publishing is blocked.
+remain red until the coordinated desktop patch is made. Workflow YAML parses; new hosted outcomes must be verified on the exact published
+head. The local Electron gate intentionally reports the current real risk.
 
 **Release verdict: BLOCKED.** These are code/security, runtime, ownership and
 external-validation gates; not merely missing production credentials. No claim
