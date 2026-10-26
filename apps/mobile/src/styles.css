@@ -31,6 +31,7 @@ label.check input { flex: 0; }
 .muted { color: var(--muted); font-size: 13px; }
 h2 { font-size: 17px; margin: 8px 0 0; }
 nav { display: flex; border-top: 1px solid #23273a; }
+nav[hidden] { display: none; }
 nav button { flex: 1; background: none; color: var(--muted); border-radius: 0; padding: 14px 4px; font-size: 13px; }
 nav button.active { color: var(--accent); }
 .stage { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
@@ -50,3 +51,31 @@ nav button.active { color: var(--accent); }
 .stage-heard:not(:empty)::after { content: "”"; }
 .stage-reply { color: #f8fafc; font-size: 17px; line-height: 1.45; margin: 0; }
 .mic.big { position: relative; margin-top: 14px; width: 68px; height: 68px; font-size: 28px; box-shadow: 0 0 30px -4px var(--accent); }
+/* Server status dot: green = AI ready, amber = server without an AI provider, red = unreachable. */
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: #6b7585; }
+.dot.online { background: #34d399; box-shadow: 0 0 8px rgba(52,211,153,.7); }
+.dot.noai { background: #fbbf24; box-shadow: 0 0 8px rgba(251,191,36,.6); }
+.dot.offline { background: #f87171; box-shadow: 0 0 8px rgba(248,113,113,.6); }
+.banner { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(248,113,113,.15); color: #fca5a5; font-size: 13px; }
+.welcome { display: flex; flex-direction: column; gap: 12px; padding: 12px 0; }
+.welcome h1 { font-size: 22px; margin: 0; }
+.welcome p { margin: 0; line-height: 1.45; }
+.welcome-face { position: relative; width: min(220px, 50vw); aspect-ratio: 1; align-self: center; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 38%, #0b1a3a 0%, #050c1f 60%, #01040c 100%); }
+.welcome-face canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.avatar-box { position: absolute; inset: 0; }
+.avatar-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.card { padding: 12px; border-radius: 12px; background: var(--card); font-size: 14px; line-height: 1.45; }
+.card p { margin: 0 0 6px; }
+.prompt { font-size: 17px; line-height: 1.45; margin: 0; }
+textarea { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px solid #2e3346; background: var(--card); color: var(--text); font-size: 15px; font-family: inherit; }
+.list li .row { margin-top: 8px; }
+.list li .state { font-size: 12px; color: var(--muted); }
+.list li .state.waiting { color: #fbbf24; }
+.list li .state.failed { color: var(--danger); }
+.list li .state.completed { color: #34d399; }
+.list li button.small { padding: 7px 10px; font-size: 13px; }
+.list li .title { font-weight: 600; }
+.retry { margin-top: 4px; }
+.bubble.failed { opacity: .75; border: 1px dashed var(--danger); }
+.bubble .retry { display: block; background: none; color: #fca5a5; padding: 4px 0 0; font-size: 13px; text-align: left; }

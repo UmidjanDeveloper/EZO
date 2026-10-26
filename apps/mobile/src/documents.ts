@@ -28,16 +28,32 @@ export function base64Bytes(base64: string): Uint8Array {
 
 export type JobState = "queued" | "running" | "completed" | "failed" | "cancelled";
 
-/** Honest Uzbek status for a Student job (no progress is invented). */
-export function jobMessage(state: JobState, waitedSeconds: number, error?: string | null): string {
-  if (state === "completed") return "Hujjat o‘qildi. Qisqacha mazmun tayyorlanmoqda…";
-  if (state === "failed") return `Hujjatni o‘qib bo‘lmadi: ${error ?? "noma’lum xato"}`;
-  if (state === "cancelled") return "O‘qish bekor qilindi.";
-  if (waitedSeconds >= 90) {
-    return "Hujjat navbatda turibdi: EZO’ning izolyatsiyalangan hujjat ishchisi hozir ishlamayapti. Tayyor bo‘lganda Student bo‘limida ko‘rinadi.";
-  }
-  return state === "running" ? "Hujjat o‘qilmoqda…" : "Hujjat navbatda…";
+/** Words for an honest Student job status (no progress is invented). */
+export interface JobWords {
+  completed: string;
+  failed: string;
+  cancelled: string;
+  stillQueued: string;
+  running: string;
+  queued: string;
 }
+
+export function jobMessage(state: JobState, waitedSeconds: number, error?: string | null, words: JobWords = UZ_JOB_WORDS): string {
+  if (state === "completed") return words.completed;
+  if (state === "failed") return words.failed.replace("{error}", error ?? "?");
+  if (state === "cancelled") return words.cancelled;
+  if (waitedSeconds >= 90) return words.stillQueued;
+  return state === "running" ? words.running : words.queued;
+}
+
+const UZ_JOB_WORDS: JobWords = {
+  completed: "Hujjat o‘qildi. Qisqacha mazmun tayyorlanmoqda…",
+  failed: "Hujjatni o‘qib bo‘lmadi: {error}",
+  cancelled: "O‘qish bekor qilindi.",
+  stillQueued: "Hujjat navbatda turibdi: EZO’ning izolyatsiyalangan hujjat ishchisi hozir ishlamayapti. Tayyor bo‘lganda Fayllar bo‘limida ko‘rinadi.",
+  running: "Hujjat o‘qilmoqda…",
+  queued: "Hujjat navbatda…",
+};
 
 export function documentPrompt(name: string, base64: string | undefined): DocumentResult {
   if (!TEXT_TYPES.test(name)) {

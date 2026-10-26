@@ -13,9 +13,13 @@ export interface Prefs {
   speakReplies: boolean;
   /** "auto": speak Uzbek, English or Russian and EZO answers in the same language. */
   voiceLanguage: "auto" | "uz" | "en" | "ru";
+  /** Language of the app's own words. */
+  language: "uz" | "en" | "ru";
+  /** The welcome page was seen once. */
+  onboarded: boolean;
 }
 
-const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto" };
+const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false };
 
 export function loadPrefs(): Prefs {
   try {
