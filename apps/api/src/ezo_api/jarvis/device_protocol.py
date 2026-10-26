@@ -126,3 +126,35 @@ def verify_pairing(
         )
     except (InvalidSignature, ValueError) as exc:
         raise ValueError("invalid_signature") from exc
+
+
+WORK_DOMAIN = b"ezo-jarvis-server-work-v1\x00"
+
+
+class SignedDeviceWork(BaseModel):
+    """Opt-in server signature. Receiver must pin its trusted public key separately."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    payload: DeviceWork
+    signature: str = Field(pattern=r"^[a-f0-9]{128}$")
+
+
+def sign_work(work: DeviceWork, private_key_hex: str) -> SignedDeviceWork:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key = Ed25519PrivateKey.from_private_bytes(bytes.fromhex(private_key_hex))
+    return SignedDeviceWork(payload=work, signature=key.sign(WORK_DOMAIN + canonical(work)).hex())
+
+
+def verify_work(
+    work: SignedDeviceWork, pinned_key_hex: str, *, device_id: uuid.UUID, now: int
+) -> None:
+    """Verify before local dispatch. Durable request-id replay journal is also required."""
+    if work.payload.device_id != device_id or not now < work.payload.expires_at <= now + 300:
+        raise ValueError("wrong_device_or_expired_work")
+    try:
+        public_key(pinned_key_hex).verify(
+            bytes.fromhex(work.signature), WORK_DOMAIN + canonical(work.payload)
+        )
+    except (InvalidSignature, ValueError) as exc:
+        raise ValueError("invalid_work_signature") from exc

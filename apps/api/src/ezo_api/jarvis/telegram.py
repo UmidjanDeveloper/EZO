@@ -13,6 +13,8 @@ stored in the database, returned by the API or put into error messages.
 from __future__ import annotations
 
 import hashlib
+import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,6 +22,21 @@ import httpx
 
 API = "https://api.telegram.org"
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+
+
+class _RedactBotURL(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # HTTPX INFO records include full request URLs (and hence bot credentials).
+        record.msg = re.sub(
+            r"https://api\.telegram\.org/bot[^/\s]+/",
+            "https://api.telegram.org/bot[REDACTED]/",
+            record.getMessage(),
+        )
+        record.args = ()
+        return True
+
+
+logging.getLogger("httpx").addFilter(_RedactBotURL())
 
 
 class TelegramError(Exception):
@@ -85,7 +102,7 @@ class TelegramClient:
             ) from None
         except httpx.HTTPError:
             raise TelegramError(
-                "unreachable", "Telegram could not be reached.", outcome_unknown=False
+                "unreachable", "Telegram could not be reached.", outcome_unknown=sends
             ) from None
         try:
             body = response.json()
@@ -99,7 +116,10 @@ class TelegramClient:
             description = (
                 str((body or {}).get("description", ""))[:160] if isinstance(body, dict) else ""
             )
-            raise TelegramError("rejected", f"Telegram refused the request: {description}")
+            raise TelegramError(
+                "rejected",
+                f"Telegram refused the request: {description.replace(self._token, chr(42) * 3)}",
+            )
         return body.get("result")
 
     async def bot_username(self) -> str:
