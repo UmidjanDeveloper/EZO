@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
-from ezo_api.db.models import AuditLog
+from ezo_api.db.models import AuditLog, User
 from ezo_api.orchestration.planning_policy import availability
 from ezo_api.orchestration.tool_plan import PlanInspectionError, ToolGraph, inspect_graph
 from ezo_api.tools.percentage import PercentageArgs, calculate_percentages
@@ -161,6 +161,7 @@ from datetime import datetime as _datetime  # noqa: E402
 
 from pydantic import BaseModel, Field  # noqa: E402
 
+from ezo_api.account.http import enforce_quota  # noqa: E402
 from ezo_api.db.models import JarvisDevice, JarvisTask, JarvisTaskStep, TelegramRecipient  # noqa: E402
 from ezo_api.jarvis.device_protocol import DeviceWork, SignedDeviceResult  # noqa: E402
 from ezo_api.jarvis.service import JarvisError, JarvisService  # noqa: E402
@@ -390,8 +391,16 @@ async def create_task(
     body: TaskIn, user: CurrentUser, session: SessionDep, services: ServicesDep
 ) -> dict[str, Any]:
     service = JarvisService(session, services)
+
+    async def admit() -> None:
+        account = await session.get(User, user.id)
+        if account is not None:
+            await enforce_quota(
+                session, account, "jarvis_tasks_per_day", owner_email=services.settings.owner_email
+            )
+
     try:
-        task = await service.create_task(user.id, **body.model_dump())
+        task = await service.create_task(user.id, **body.model_dump(), admit=admit)
     except JarvisError as exc:
         raise _jarvis_call(exc) from exc
     return await _advance_and_commit(service, task)

@@ -9,7 +9,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.db.models import User
-from ezo_api.security.edge import AUTHENTICATED
+from ezo_api.security.edge import AUTHENTICATED, PRINCIPAL
 from ezo_api.services import Services
 
 
@@ -62,10 +62,12 @@ SuperAdminUser = Annotated[User, Depends(require_super_admin)]
 
 def client_key(request: Request) -> str:
     """Who the limit applies to. With token auth the edge guard has already checked the
-    token, so every request here is the owner's (one shared key: an attacker can neither
-    use up nor dodge it). Without token auth (own computer) the client address is used."""
-    if request.scope.get("state", {}).get(AUTHENTICATED):
-        return "owner"
+    token and recorded whose it is: the owner, or one owner-managed user (each user has
+    their own key, so one user cannot use up the owner's or another user's budget).
+    Without token auth (own computer) the client address is used."""
+    state = request.scope.get("state", {})
+    if state.get(AUTHENTICATED):
+        return str(state.get(PRINCIPAL) or "owner")
     return request.client.host if request.client else "unknown"
 
 
