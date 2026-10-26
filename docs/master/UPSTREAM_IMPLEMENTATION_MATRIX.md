@@ -50,7 +50,7 @@ It adopts the upstream patterns named below and links to no upstream runtime.
 | LlamaIndex | PARTIAL (thin) | Unchanged. |
 | Ruflo | PARTIAL (concept port) | Unchanged. Unrestricted Ruflo execution is still not imported (owner rule). |
 | VoiceStudio | PARTIAL | Unchanged. AGPL code and noncommercial weights are not copied. Image tag pin (F27) is open because the registry is blocked from this session. Needs an owner licensing decision before any deeper use. |
-| APEX-UI | NOT STARTED | Unchanged; needs Antigravity coordination. |
+| APEX-UI | PARTIAL (pattern reuse, attributed) | Inspected at `a8732fa`: MIT, orb + reasoning web only; its humanoid is explicitly not in the repo. EZO adapts two **patterns**, not code: the voice frame (ring + equaliser + state word) in `packages/avatar/src/frame.ts` and the trace activity graph in `apps/web/components/chat/AgentWeb.tsx`; notices in `packages/avatar/NOTICE.md` and `apps/web/NOTICE.md`; no Apex name/branding ([#53](https://github.com/UmidjanDeveloper/EZO/pull/53)). Its two 21st.dev components are not used. |
 | REA | PARTIAL (adapted) | JARVIS `/capabilities` reports device features from **verified prerequisites**: a paired device, a configured Telegram bot, a verified recipient, an executor for Office files. Draft #41. Still no RE engine. |
 | Supabase | PARTIAL | Unchanged. New tables (JARVIS 0023, accounts 0024) get the same PUBLIC/anon/authenticated `REVOKE`. |
 | Microsoft JARVIS | PARTIAL (adapted) | Task-planning pattern adopted as a durable **fixed-rule** planner: task → ordered steps with explicit states, approvals bound to the exact step scope (SHA-256), exact Decimal percentages. Draft #41. No model-driven planning, no upstream code. |

@@ -32,6 +32,8 @@ export interface AssistantDeps {
   saveConversation(id: string): void;
   /** Watch a JARVIS task so its approvals and final report reach the owner. */
   trackTask?(taskId: string): void;
+  /** What EZO is doing right now, for the figure: "working" for a local action, "thinking" for the model. */
+  onStage?(stage: "thinking" | "working"): void;
 }
 
 export function createAssistant(deps: AssistantDeps) {
@@ -61,6 +63,7 @@ export function createAssistant(deps: AssistantDeps) {
     const lang = heard ?? guessLanguage(text);
     const t = replies(lang);
     const say = (reply: string, acted = false): TurnResult => ({ intent: intent.kind, reply, acted, language: lang });
+    deps.onStage?.(intent.kind === "chat" ? "thinking" : "working");
     try {
       switch (intent.kind) {
         case "open_app":

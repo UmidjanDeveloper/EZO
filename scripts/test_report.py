@@ -27,6 +27,8 @@ class Suite:
     failed: int = 0
     skipped: int = 0
     skip_reasons: Counter[str] = field(default_factory=Counter)
+    failures: list[tuple[str, str]] = field(default_factory=list)
+    """(test, first line of the failure message) so the checks API names what failed."""
     timings: list[tuple[str, str, str]] = field(default_factory=list)
     """(test, property, value) of JUnit "*_seconds*" properties (measured evidence)."""
 
@@ -40,8 +42,12 @@ def read_suite(label: str, path: Path) -> Suite:
     suite = Suite(label)
     for case in root.iter("testcase"):
         suite.collected += 1
-        if case.find("failure") is not None or case.find("error") is not None:
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
             suite.failed += 1
+            suite.failures.append((case.get("name") or "", failure_summary(problem)))
         skipped = case.find("skipped")
         if skipped is not None:
             suite.skipped += 1
@@ -54,12 +60,32 @@ def read_suite(label: str, path: Path) -> Suite:
     return suite
 
 
+def failure_summary(problem: ET.Element) -> str:
+    """The assertion that failed, not just the test title: the first "Error"/"expect" line of
+    the failure text plus the lines that say what was received, so a CI failure can be
+    understood from the checks API alone."""
+    lines = [line.strip() for line in (problem.text or "").splitlines() if line.strip()]
+    start = next((i for i, line in enumerate(lines) if "Error" in line or "expect(" in line), None)
+    if start is None:
+        message = (problem.get("message") or "").strip().splitlines()
+        return (message[0] if message else lines[0] if lines else "no message")[:400]
+    detail = ("Received", "Expected", "Locator", "+ ", "- ", "Timeout", "Call log")
+    keep = [lines[start]]
+    keep += [line for line in lines[start + 1 : start + 12] if line.startswith(detail)][:5]
+    return " | ".join(keep)[:600]
+
+
 def annotations(suites: list[Suite]) -> list[str]:
     """GitHub workflow notices: readable from the checks API without downloading logs."""
     lines = [
         f"::notice title=Tests {s.label}::collected {s.collected}, passed {s.passed}, "
         f"failed {s.failed}, skipped {s.skipped}"
         for s in suites
+    ]
+    lines += [
+        f"::error title=Failed {s.label}::{test}: {message}"
+        for s in suites
+        for test, message in s.failures
     ]
     lines += [
         f"::notice title=Timing {s.label}::{test} {name}={value}"
@@ -76,6 +102,10 @@ def render(suites: list[Suite]) -> str:
     ]
     for s in suites:
         lines.append(f"| {s.label} | {s.collected} | {s.passed} | {s.failed} | {s.skipped} |")
+    failures = [(s.label, test, message) for s in suites for test, message in s.failures]
+    if failures:
+        lines += ["", "Failed tests:", ""]
+        lines += [f"- {label}: {test} — {message}" for label, test, message in failures]
     reasons = [(s.label, r, n) for s in suites for r, n in s.skip_reasons.items()]
     if reasons:
         lines += ["", "Skipped tests (reason → count):", ""]

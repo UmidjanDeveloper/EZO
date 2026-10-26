@@ -4,6 +4,7 @@
  * a renderer, a webpage or a log line.
  */
 import type { Lang } from "./replies";
+import { format, strings } from "./strings";
 
 export class EzoApiError extends Error {
   constructor(
@@ -28,29 +29,38 @@ const asLang = (value: string | null | undefined): Lang | null =>
 
 type Fetch = typeof fetch;
 
-const UZ_MESSAGES: Record<string, string> = {
-  network: "EZO serveriga ulanib bo‘lmadi. Server manzilini va internetni tekshiring.",
-  unauthorized: "Kirish tokeni noto‘g‘ri yoki yo‘q. Sozlamalarda tokenni kiriting.",
-  voice_not_configured: "Serverda nutqni aniqlash/ovoz chiqarish provayderi sozlanmagan.",
-  vision_not_configured: "Serverda rasmni tushunadigan AI provayder sozlanmagan.",
-  rate_limited: "Juda ko‘p so‘rov. Birozdan keyin urinib ko‘ring.",
-};
+export interface ClientOptions {
+  /** Language of the error messages shown to the owner. */
+  lang?: Lang;
+  /** Cancels every request made through this client (the owner pressed stop). */
+  signal?: AbortSignal;
+}
 
-export function createEzoClient(baseUrl: string, token: string | null, fetchImpl: Fetch = fetch) {
+export function createEzoClient(baseUrl: string, token: string | null, fetchImpl: Fetch = fetch, options: ClientOptions = {}) {
   const root = baseUrl.replace(/\/+$/, "");
+  const t = strings(options.lang ?? "uz").api;
+  const known: Record<string, string> = {
+    network: t.network,
+    unauthorized: t.unauthorized,
+    voice_not_configured: t.voice_not_configured,
+    vision_not_configured: t.vision_not_configured,
+    rate_limited: t.rate_limited,
+  };
 
   async function request(path: string, init: RequestInit = {}, timeoutMs = 90_000): Promise<Response> {
     const headers = new Headers(init.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
+    const signals = [AbortSignal.timeout(timeoutMs), ...(options.signal ? [options.signal] : [])];
     let response: Response;
     try {
-      response = await fetchImpl(`${root}${path}`, { ...init, headers, signal: AbortSignal.timeout(timeoutMs) });
+      response = await fetchImpl(`${root}${path}`, { ...init, headers, signal: AbortSignal.any(signals) });
     } catch {
-      throw new EzoApiError(0, "network", UZ_MESSAGES.network!);
+      if (options.signal?.aborted) throw new EzoApiError(0, "cancelled", t.cancelled);
+      throw new EzoApiError(0, "network", t.network);
     }
     if (response.ok) return response;
     let code = `http_${response.status}`;
-    let message = `So‘rov bajarilmadi (${response.status}).`;
+    let message = format(t.failed, { status: response.status });
     try {
       const body = (await response.json()) as { error?: { code?: string; message?: string }; detail?: unknown };
       const error = body.error ?? (typeof body.detail === "object" ? (body.detail as { code?: string; message?: string }) : undefined);
@@ -61,13 +71,42 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
     }
     if (response.status === 401) code = "unauthorized";
     if (response.status === 429) code = "rate_limited";
-    throw new EzoApiError(response.status, code, UZ_MESSAGES[code] ?? message);
+    throw new EzoApiError(response.status, code, known[code] ?? message);
   }
 
   return {
     async health(): Promise<boolean> {
       await request("/api/health", {}, 10_000);
       return true;
+    },
+
+    /** What the server can really do right now: an AI provider, voice, vision. */
+    async status(): Promise<ServerStatus> {
+      const body = (await (await request("/api/status", {}, 10_000)).json()) as {
+        offline_mode?: boolean;
+        providers?: { name: string; configured: boolean; capabilities?: string[] }[];
+        version?: string;
+      };
+      const configured = (body.providers ?? []).filter((p) => p.configured);
+      return {
+        ai: body.offline_mode === false && configured.length > 0,
+        voice: configured.some((p) => (p.capabilities ?? []).some((c) => c.includes("speech") || c.includes("voice"))),
+        providers: configured.map((p) => p.name),
+        version: body.version ?? "",
+      };
+    },
+
+    async conversations(limit = 20): Promise<{ id: string; title: string; updated_at: string }[]> {
+      return (await request(`/api/conversations?limit=${limit}`, {}, 15_000)).json() as Promise<
+        { id: string; title: string; updated_at: string }[]
+      >;
+    },
+
+    async messages(conversationId: string, limit = 12): Promise<{ role: string; content: string; created_at: string }[]> {
+      const body = (await (
+        await request(`/api/conversations/${encodeURIComponent(conversationId)}/messages?limit=${limit}`, {}, 15_000)
+      ).json()) as { role: string; content: string; created_at: string }[];
+      return Array.isArray(body) ? body : [];
     },
 
     async me(): Promise<{ email?: string; display_name?: string }> {
@@ -169,6 +208,10 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       return response.json() as Promise<JarvisTaskView>;
     },
 
+    async cancelJarvisTask(taskId: string): Promise<JarvisTaskView> {
+      return (await request(`/api/jarvis/tasks/${encodeURIComponent(taskId)}/cancel`, { method: "POST" }, 20_000)).json() as Promise<JarvisTaskView>;
+    },
+
     async revokeDevice(deviceId: string): Promise<void> {
       await request(`/api/jarvis/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" }, 15_000);
     },
@@ -190,6 +233,15 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
 }
 
 export type EzoClient = ReturnType<typeof createEzoClient>;
+
+export interface ServerStatus {
+  /** An AI provider is configured and the server is not in offline mode. */
+  ai: boolean;
+  /** Some configured provider offers speech. */
+  voice: boolean;
+  providers: string[];
+  version: string;
+}
 
 export interface JarvisTaskView {
   id: string;

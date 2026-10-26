@@ -140,6 +140,7 @@ export const listenWithServer = (
       }
       const mime = recorder.mimeType || type || "audio/webm";
       const blob = new Blob(chunks, { type: mime });
+      handlers.onRecognizing?.(); // the recording is over; the server is turning it into words
       try {
         const result = await api.transcribe(blob, `speech.${extensionFor(mime)}`, language);
         if (cancelled) return;

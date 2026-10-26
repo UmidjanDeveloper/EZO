@@ -10,81 +10,149 @@
     <header>
       <span class="logo">EZO</span>
       <p id="status" class="status" role="status" aria-live="polite"></p>
+      <span id="dot" class="dot" role="status" title=""></span>
     </header>
 
     <main>
+      <section id="welcomeTab" data-tab="welcome" hidden>
+        <div class="welcome">
+          <div class="welcome-face"><canvas id="welcomeAvatar" aria-hidden="true"></canvas></div>
+          <h1 data-i18n="welcome.title"></h1>
+          <p data-i18n="welcome.body"></p>
+          <p data-i18n="welcome.needs"></p>
+          <p class="muted" data-i18n="welcome.privacy"></p>
+          <label><span data-i18n="more.language"></span>
+            <select id="welcomeLanguage" aria-label="Language"></select>
+          </label>
+          <button id="welcomeStart" data-i18n="welcome.start"></button>
+        </div>
+      </section>
+
       <section id="chatTab" data-tab="chat">
+        <p id="offlineBanner" class="banner" hidden data-i18n="chat.offlineBanner"></p>
         <div class="row">
-          <select id="conversation" aria-label="Suhbat"></select>
-          <button id="refresh" class="ghost" aria-label="Yangilash">⟳</button>
+          <select id="conversation" aria-label=""></select>
+          <button id="refresh" class="ghost" aria-label="">⟳</button>
         </div>
         <div id="messages" class="messages"></div>
         <form id="composer" class="composer">
-          <button type="button" id="document" class="ghost" aria-label="Hujjat">📄</button>
-          <button type="button" id="camera" class="ghost" aria-label="Kamera">📷</button>
-          <input id="input" placeholder="Yozing yoki 🎤 bosing" autocomplete="off" maxlength="4000" />
-          <button type="button" id="mic" class="mic" aria-label="Gapirish">🎤</button>
+          <button type="button" id="document" class="ghost" aria-label="">📄</button>
+          <button type="button" id="camera" class="ghost" aria-label="">📷</button>
+          <input id="input" placeholder="" autocomplete="off" maxlength="4000" />
+          <button type="submit" id="send" class="ghost" aria-label="">➤</button>
+          <button type="button" id="mic" class="mic" aria-label="">🎤</button>
         </form>
       </section>
 
-      <section data-tab="projects" hidden>
-        <h2>Loyihalar</h2>
-        <p class="muted">Tanlangan loyiha ichida yangi suhbat boshlanadi (veb va desktop bilan bir xil).</p>
-        <ul id="projectList" class="list"></ul>
+      <section data-tab="tasks" hidden>
+        <h2 data-i18n="tasks.title"></h2>
+        <p class="muted" data-i18n="tasks.note"></p>
+        <form id="taskForm" class="row">
+          <input id="taskText" placeholder="" maxlength="2000" />
+          <button data-i18n="tasks.create"></button>
+        </form>
+        <p id="taskCapabilities" class="muted"></p>
+        <ul id="taskList" class="list"></ul>
       </section>
 
-      <section data-tab="memory" hidden>
-        <h2>Xotira</h2>
+      <section data-tab="learn" hidden>
+        <h2 data-i18n="ielts.title"></h2>
+        <p class="muted" data-i18n="ielts.note"></p>
+        <div id="ieltsStart" class="stack">
+          <label><span data-i18n="ielts.cueCard"></span>
+            <select id="cueCard"></select>
+          </label>
+          <button id="ieltsBegin" data-i18n="ielts.start"></button>
+          <p id="ieltsHistory" class="muted"></p>
+        </div>
+        <div id="ieltsRun" class="stack" hidden>
+          <p id="ieltsPart" class="muted"></p>
+          <p id="ieltsPrompt" class="prompt"></p>
+          <p id="ieltsHeard" class="muted"></p>
+          <form id="ieltsForm" class="stack">
+            <textarea id="ieltsAnswer" rows="4" placeholder=""></textarea>
+            <div class="row">
+              <button type="button" id="ieltsMic" class="ghost"></button>
+              <button type="submit" id="ieltsSubmit" data-i18n="ielts.submit"></button>
+            </div>
+          </form>
+          <p id="ieltsStatus" class="muted" role="status"></p>
+          <div id="ieltsMetrics" class="card" hidden></div>
+          <div id="ieltsDone" class="card" hidden></div>
+          <button type="button" id="ieltsNew" class="ghost" data-i18n="ielts.newSession" hidden></button>
+        </div>
+      </section>
+
+      <section data-tab="files" hidden>
+        <h2 data-i18n="files.title"></h2>
+        <p class="muted" data-i18n="files.note"></p>
+        <ul id="fileList" class="list"></ul>
+      </section>
+
+      <section data-tab="more" hidden>
+        <h2 data-i18n="more.projects"></h2>
+        <p class="muted" data-i18n="more.projectsNote"></p>
+        <form id="addProject" class="row">
+          <input id="projectName" placeholder="" maxlength="120" />
+          <button data-i18n="more.addProject"></button>
+        </form>
+        <ul id="projectList" class="list"></ul>
+
+        <h2 data-i18n="more.memory"></h2>
         <form id="addMemory" class="row">
-          <input id="memoryInput" placeholder="EZO eslab qolsin: …" maxlength="1000" />
-          <button>Qo‘shish</button>
+          <input id="memoryInput" placeholder="" maxlength="1000" />
+          <button data-i18n="more.add"></button>
         </form>
         <ul id="memoryList" class="list"></ul>
-        <h2>Eslatma</h2>
-        <form id="reminder" class="stack">
-          <input id="reminderText" placeholder="Nimani eslatay?" maxlength="200" />
-          <input id="reminderAt" type="datetime-local" />
-          <button>Eslatma qo‘yish</button>
-        </form>
-      </section>
 
-      <section data-tab="settings" hidden>
-        <h2>Sozlamalar</h2>
-        <label>EZO server manzili <input id="apiUrl" inputmode="url" placeholder="https://api.sizning-domen.uz" /></label>
-        <label>Kirish tokeni <input id="token" type="password" autocomplete="off" placeholder="saqlangan bo‘lsa bo‘sh qoldiring" /></label>
-        <label class="check"><input id="speakReplies" type="checkbox" /> Ovozli savollarga ovozda javob berish</label>
+        <h2 data-i18n="more.reminder"></h2>
+        <form id="reminder" class="stack">
+          <input id="reminderText" placeholder="" maxlength="200" />
+          <input id="reminderAt" type="datetime-local" />
+          <button data-i18n="more.setReminder"></button>
+        </form>
+
+        <h2 data-i18n="more.settings"></h2>
+        <label><span data-i18n="more.serverUrl"></span> <input id="apiUrl" inputmode="url" placeholder="https://api.sizning-domen.uz" /></label>
+        <label><span data-i18n="more.token"></span> <input id="token" type="password" autocomplete="off" placeholder="" /></label>
+        <label><span data-i18n="more.language"></span>
+          <select id="language"></select>
+        </label>
+        <label class="check"><input id="speakReplies" type="checkbox" /> <span data-i18n="more.speakReplies"></span></label>
         <div class="row">
-          <button id="saveSettings">Saqlash va ulanish</button>
-          <button id="clearToken" class="ghost">Tokenni o‘chirish</button>
+          <button id="saveSettings" data-i18n="more.saveConnect"></button>
+          <button id="clearToken" class="ghost" data-i18n="more.clearToken"></button>
         </div>
-        <p class="muted">Token telefonning shifrlangan xotirasida saqlanadi. Rasm va ovoz yozuvlari serverda saqlanmaydi.</p>
+        <p class="muted" data-i18n="more.settingsNote"></p>
+        <button id="showWelcome" class="ghost" data-i18n="more.showWelcome"></button>
       </section>
     </main>
 
-    <section id="voiceStage" class="stage" hidden aria-label="EZO bilan gaplashish">
-      <canvas id="avatar" aria-hidden="true"></canvas>
+    <section id="voiceStage" class="stage" hidden aria-label="">
+      <div id="avatarBox" class="avatar-box"><canvas id="avatar"></canvas></div>
       <div class="stage-top">
-        <div class="langs" role="group" aria-label="Nutq tili">
-          <button type="button" data-lang="auto" title="O‘zbekcha, inglizcha yoki ruscha — EZO o‘sha tilda javob beradi">Auto</button>
+        <div class="langs" role="group" aria-label="">
+          <button type="button" data-lang="auto"></button>
           <button type="button" data-lang="uz">UZ</button>
           <button type="button" data-lang="en">EN</button>
           <button type="button" data-lang="ru">RU</button>
         </div>
-        <button type="button" id="stageClose" class="round" aria-label="Yopish">✕</button>
+        <button type="button" id="stageClose" class="round" aria-label="">✕</button>
       </div>
       <div class="stage-text">
         <p id="stageStatus" class="stage-status" aria-live="polite"></p>
         <p id="stageHeard" class="stage-heard"></p>
         <p id="stageReply" class="stage-reply"></p>
       </div>
-      <button type="button" id="stageMic" class="mic big" aria-label="Gapirish">🎤</button>
+      <button type="button" id="stageMic" class="mic big" aria-label="">🎤</button>
     </section>
 
     <nav>
-      <button data-go="chat">Suhbat</button>
-      <button data-go="projects">Loyihalar</button>
-      <button data-go="memory">Xotira</button>
-      <button data-go="settings">Sozlamalar</button>
+      <button data-go="chat" data-i18n="nav.chat"></button>
+      <button data-go="tasks" data-i18n="nav.tasks"></button>
+      <button data-go="learn" data-i18n="nav.learn"></button>
+      <button data-go="files" data-i18n="nav.files"></button>
+      <button data-go="more" data-i18n="nav.more"></button>
     </nav>
     <script type="module" src="/src/main.ts"></script>
   </body>

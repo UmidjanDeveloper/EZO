@@ -14,7 +14,7 @@ import { buildFigure, type Figure } from "./figure";
 import { followLevel, syntheticSpeech } from "./level";
 import { frameCamera, project, type Framing } from "./math";
 import { MASK_FRAGMENT, MASK_VERTEX, POINT_FRAGMENT, POINT_VERTEX } from "./shaders";
-import { easeLook, lookFor, type AvatarState, type Look } from "./states";
+import { easeLook, lookFor, TRANSIENT_STATES, type AvatarState, type Look } from "./states";
 
 export interface AvatarOptions {
   framing?: Framing;
@@ -24,9 +24,20 @@ export interface AvatarOptions {
   terrain?: boolean;
   /** Overrides the prefers-reduced-motion media query. */
   reducedMotion?: boolean;
+  /** Accessible name per state, in the app's language; applied to the canvas as aria-label. */
+  describe?: (state: AvatarState) => string;
 }
 
-const UNIFORMS = ["uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef"] as const;
+/** Where EZO looks, from camera tracking or a pointer. Normalised: -1 (left/down) .. 1. */
+export interface Gaze {
+  yaw: number;
+  pitch: number;
+}
+
+/** How long a gaze stays before the head drifts back to its idle sway. */
+const GAZE_HOLD_SECONDS = 1.5;
+
+const UNIFORMS = ["uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef"] as const;
 type UniformName = (typeof UNIFORMS)[number];
 
 interface GlState {
@@ -79,6 +90,11 @@ export class EzoAvatar {
   private level = 0;
   private levelTarget = 0;
   private levelAt = -Infinity;
+  private gazeTarget: Gaze = { yaw: 0, pitch: 0 };
+  private gaze: Gaze = { yaw: 0, pitch: 0 };
+  private gazeAt = -Infinity;
+  private stateAt = 0;
+  private readonly describe: ((state: AvatarState) => string) | null;
   private time = 0;
   private last = 0;
   private frame = 0;
@@ -102,6 +118,7 @@ export class EzoAvatar {
     this.framing = options.framing ?? "bust";
     const media = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
     this.reduced = options.reducedMotion ?? media?.matches ?? false;
+    this.describe = options.describe ?? null;
     const rect = canvas.getBoundingClientRect();
     const small = Math.max(rect.width, rect.height) < 260;
     const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
@@ -118,6 +135,7 @@ export class EzoAvatar {
     canvas.dataset.points = String(this.figure.count);
     canvas.dataset.buildMs = buildMs.toFixed(1);
     canvas.dataset.state = this.state;
+    this.label();
     canvas.addEventListener("webglcontextlost", this.onLost);
     canvas.addEventListener("webglcontextrestored", this.onRestored);
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.onVisibility);
@@ -140,17 +158,58 @@ export class EzoAvatar {
   setState(state: AvatarState): void {
     if (state === this.state) return;
     this.state = state;
+    this.stateAt = this.time;
     this.canvas.dataset.state = state;
+    this.label();
     if (this.reduced || !this.running) {
       this.look = lookFor(state);
       this.redrawIfStill();
     }
   }
 
+  /** The state as last set (transient states return to "idle" by themselves). */
+  getState(): AvatarState {
+    return this.state;
+  }
+
+  /** The level actually being drawn now: the live voice, or the speech rhythm animated in its place. */
+  getLevel(): number {
+    return this.level;
+  }
+
+  /** True while the drawn level comes from a real measurement (not the synthetic rhythm). */
+  hasLiveLevel(): boolean {
+    return this.time - this.levelAt < 0.4;
+  }
+
   /** Live voice level 0..1 (microphone while listening, EZO's voice while speaking). */
   setLevel(level: number): void {
     this.levelTarget = Math.min(1, Math.max(0, Number.isFinite(level) ? level : 0));
     this.levelAt = this.time;
+  }
+
+  /** Turn the head towards a point (camera tracking, or the pointer). Null, or silence for
+   * 1.5 s, lets the head return to its own gentle sway. Never used as proof of a face. */
+  setGaze(gaze: Gaze | null): void {
+    if (!gaze) {
+      this.gazeAt = -Infinity;
+      return;
+    }
+    const clamp = (v: number) => Math.min(1, Math.max(-1, Number.isFinite(v) ? v : 0));
+    this.gazeTarget = { yaw: clamp(gaze.yaw), pitch: clamp(gaze.pitch) };
+    this.gazeAt = this.time;
+    if (this.reduced || !this.running) this.redrawIfStill();
+  }
+
+  /** `packages/face-tracking` MotionPort: head angles in radians, or null when no face. */
+  setHeadAim(aim: { yawRadians: number; pitchRadians: number } | null): void {
+    this.setGaze(aim ? { yaw: aim.yawRadians / 0.25, pitch: aim.pitchRadians / 0.15 } : null);
+  }
+
+  private label(): void {
+    if (!this.describe) return;
+    this.canvas.setAttribute("role", "img");
+    this.canvas.setAttribute("aria-label", this.describe(this.state));
   }
 
   destroy(): void {
@@ -250,7 +309,13 @@ export class EzoAvatar {
 
   private step(dt: number): void {
     this.time += dt;
+    const hold = TRANSIENT_STATES[this.state];
+    if (hold !== undefined && this.time - this.stateAt > hold) this.setState("idle");
     this.look = easeLook(this.look, lookFor(this.state), dt);
+    const held = this.time - this.gazeAt < GAZE_HOLD_SECONDS;
+    const aim = held ? this.gazeTarget : { yaw: 0, pitch: 0 };
+    const k = 1 - Math.exp(-dt * (held ? 6 : 1.5));
+    this.gaze = { yaw: this.gaze.yaw + (aim.yaw - this.gaze.yaw) * k, pitch: this.gaze.pitch + (aim.pitch - this.gaze.pitch) * k };
     // Without a live level (e.g. the browser's own voice), speech gets a speech-like rhythm.
     const fresh = this.time - this.levelAt < 0.4;
     const target = fresh ? this.levelTarget : this.state === "speaking" ? syntheticSpeech(this.time) : this.state === "listening" ? 0.08 : 0;
@@ -282,7 +347,14 @@ export class EzoAvatar {
 
   private motion(): { yaw: number; pitch: number } {
     const t = this.time;
-    return { yaw: 0.1 * Math.sin(t * 0.23) + 0.04 * Math.sin(t * 0.61), pitch: 0.03 * Math.sin(t * 0.17) };
+    const still = this.reduced || !this.running;
+    const gaze = still && this.time - this.gazeAt < GAZE_HOLD_SECONDS ? this.gazeTarget : this.gaze;
+    // Idle sway, plus up to ±0.35 rad of real gaze (listening leans in a little).
+    const attention = 1 - 0.3 * this.look.listen;
+    return {
+      yaw: attention * (0.1 * Math.sin(t * 0.23) + 0.04 * Math.sin(t * 0.61)) + 0.35 * gaze.yaw,
+      pitch: 0.03 * Math.sin(t * 0.17) + 0.2 * gaze.pitch,
+    };
   }
 
   private draw(): void {
@@ -332,6 +404,9 @@ export class EzoAvatar {
     gl.uniform1f(u.uThink, look.think);
     gl.uniform1f(u.uSpeak, look.speak);
     gl.uniform1f(u.uError, look.error);
+    gl.uniform1f(u.uWork, look.work);
+    gl.uniform1f(u.uSuccess, look.success);
+    gl.uniform1f(u.uOffline, look.offline);
     gl.uniform1f(u.uYaw, yaw);
     gl.uniform1f(u.uPitch, pitch);
     // Point size follows the view size; small faces (pill, home screen) keep visible lines.
@@ -359,8 +434,9 @@ export class EzoAvatar {
     if (!ctx) return;
     ctx.clearRect(0, 0, width, height);
     ctx.globalCompositeOperation = "lighter";
-    const tint = this.state === "error" ? "255,70,80" : "70,170,255";
-    const warm = this.state === "speaking" ? "255,170,60" : "255,110,30";
+    const tint =
+      this.state === "error" ? "255,70,80" : this.state === "offline" ? "90,100,120" : this.state === "success" ? "255,200,90" : "70,170,255";
+    const warm = this.state === "speaking" || this.state === "success" ? "255,170,60" : this.state === "offline" ? "110,100,90" : "255,110,30";
     const { positions, data, count } = this.figure;
     const dot = Math.max(1, height / 500);
     for (let i = 0; i < count; i++) {

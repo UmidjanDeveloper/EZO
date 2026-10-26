@@ -4,6 +4,7 @@ import { Button, Card } from "@ezo/ui";
 import { KeyRound, UserPlus, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 
 // Owner-managed accounts (P8 foundation). The server enforces everything: only the
 // Super Admin may call these routes, a tier never grants authority, and a token secret
@@ -45,6 +46,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export function AccountsPanel() {
+  const { m, f } = useI18n();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tokens, setTokens] = useState<Record<string, AccountToken[]>>({});
   const [secret, setSecret] = useState<{ email: string; token: string } | null>(null);
@@ -94,11 +96,10 @@ export function AccountsPanel() {
       <div>
         <h3 className="font-semibold text-ink flex items-center gap-2">
           <Users size={18} className="text-primary" />
-          Foydalanuvchilar va tokenlar
+          {m.accounts.title}
         </h3>
         <p className="text-xs text-ink-muted mt-0.5">
-          Hisoblarni faqat siz yaratasiz. Tarif (free/pro/premium) faqat kunlik limitni
-          belgilaydi, hech qanday boshqaruv huquqini bermaydi. To‘lov ulanmagan.
+          {m.accounts.subtitle}
         </p>
       </div>
 
@@ -107,12 +108,11 @@ export function AccountsPanel() {
       {secret && (
         <div className="p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm" data-testid="account-secret">
           <p className="text-ink">
-            <strong>{secret.email}</strong> uchun token. U faqat hozir ko‘rsatiladi — nusxa
-            olib, foydalanuvchiga xavfsiz yo‘l bilan bering:
+            <strong>{secret.email}</strong> {m.accounts.secretAfterEmail}
           </p>
           <code className="block mt-2 break-all font-mono text-xs text-ink">{secret.token}</code>
           <Button variant="secondary" className="mt-2 h-7 text-xs" onClick={() => setSecret(null)}>
-            Yashirish
+            {m.accounts.hide}
           </Button>
         </div>
       )}
@@ -134,25 +134,25 @@ export function AccountsPanel() {
       >
         <input
           className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-          placeholder="Email"
+          placeholder={m.accounts.emailLabel}
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          aria-label="Email"
+          aria-label={m.accounts.emailLabel}
         />
         <input
           className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-          placeholder="Ism"
+          placeholder={m.accounts.nameLabel}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          aria-label="Ism"
+          aria-label={m.accounts.nameLabel}
         />
         <select
           className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
           value={tier}
           onChange={(e) => setTier(e.target.value as Account["tier"])}
-          aria-label="Tarif"
+          aria-label={m.accounts.tierLabel}
         >
           {TIERS.map((t) => (
             <option key={t} value={t}>
@@ -162,7 +162,7 @@ export function AccountsPanel() {
         </select>
         <Button type="submit" className="gap-1">
           <UserPlus size={14} />
-          Qo‘shish
+          {m.accounts.add}
         </Button>
       </form>
 
@@ -175,13 +175,13 @@ export function AccountsPanel() {
                 <span className="font-mono text-xs">{a.role}</span>
               </span>
               {a.role === "super_admin" ? (
-                <span className="text-xs text-ink-faint">Egasi · cheklovsiz</span>
+                <span className="text-xs text-ink-faint">{m.accounts.ownerUnlimited}</span>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <select
                     className="rounded-md border border-line bg-surface px-2 py-1 text-xs"
                     value={a.tier}
-                    aria-label={`${a.email} tarifi`}
+                    aria-label={f(m.accounts.tierOf, { email: a.email })}
                     onChange={(e) =>
                       void run(
                         call(`/api/admin/users/${a.id}`, {
@@ -211,16 +211,16 @@ export function AccountsPanel() {
                       )
                     }
                   >
-                    {a.status === "active" ? "O‘chirish" : "Yoqish"}
+                    {a.status === "active" ? m.accounts.disable : m.accounts.enable}
                   </Button>
                   {a.status === "active" && (
                     <Button variant="secondary" className="h-7 text-xs gap-1" onClick={() => void issue(a)}>
                       <KeyRound size={12} />
-                      Token berish
+                      {m.accounts.issueToken}
                     </Button>
                   )}
                   <Button variant="secondary" className="h-7 text-xs" onClick={() => void loadTokens(a.id)}>
-                    Tokenlar
+                    {m.accounts.tokens}
                   </Button>
                 </div>
               )}
@@ -228,8 +228,13 @@ export function AccountsPanel() {
             {tokens[a.id]?.map((t) => (
               <div key={t.id} className="flex items-center justify-between text-xs text-ink-muted pl-2">
                 <span>
-                  {t.label} · {t.revoked ? "bekor qilingan" : `muddati: ${t.expires_at?.slice(0, 10) ?? "cheksiz"}`}
-                  {t.last_used_at ? ` · oxirgi: ${t.last_used_at.slice(0, 10)}` : ""}
+                  {t.label} ·{" "}
+                  {t.revoked
+                    ? m.accounts.tokenRevoked
+                    : f(m.accounts.tokenExpires, {
+                        date: t.expires_at?.slice(0, 10) ?? m.accounts.tokenNoExpiry,
+                      })}
+                  {t.last_used_at ? ` · ${f(m.accounts.tokenLastUsed, { date: t.last_used_at.slice(0, 10) })}` : ""}
                 </span>
                 {!t.revoked && (
                   <Button
@@ -241,7 +246,7 @@ export function AccountsPanel() {
                         .catch((e: Error) => setError(e.message))
                     }
                   >
-                    Bekor qilish
+                    {m.accounts.revoke}
                   </Button>
                 )}
               </div>

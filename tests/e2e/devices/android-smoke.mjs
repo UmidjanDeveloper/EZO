@@ -44,7 +44,10 @@ try {
   step("app launched and its WebView attached", page.url());
   await device.screenshot({ path: path.join(shotsDir, "1-first-launch.png") });
 
-  // 2. First launch asks for the server (settings tab) — fill it like a user.
+  // 2. First launch shows the welcome page, then asks for the server — go through it like a user.
+  await page.locator("#welcomeStart").waitFor({ state: "visible", timeout: 60_000 });
+  step("welcome page shown", (await page.textContent("#welcomeTab h1")) ?? "");
+  await page.click("#welcomeStart");
   await page.locator("#apiUrl").waitFor({ state: "visible", timeout: 60_000 });
   await page.fill("#apiUrl", "http://10.0.2.2:8000");
   await page.fill("#token", token);
@@ -96,6 +99,22 @@ try {
   if (!stored) throw new Error("the phone's message did not reach the server");
   step("phone message stored in the same server conversation");
   await device.screenshot({ path: path.join(shotsDir, "3-continued.png") });
+
+  // 5. The other screens render against the real server: tasks, IELTS, files, and English words.
+  await page.click('nav button[data-go="tasks"]');
+  await page.locator("#taskList li").first().waitFor({ timeout: 30_000 });
+  step("tasks screen", (await page.textContent("#taskCapabilities"))?.slice(0, 160) ?? "");
+  await page.click('nav button[data-go="learn"]');
+  await page.waitForFunction(() => document.querySelectorAll("#cueCard option").length > 1, undefined, { timeout: 30_000 });
+  step("IELTS cue cards loaded", String(await page.locator("#cueCard option").count()));
+  await page.click('nav button[data-go="files"]');
+  await page.locator("#fileList li").first().waitFor({ timeout: 30_000 });
+  step("files screen", (await page.textContent("#fileList li")) ?? "");
+  await page.click('nav button[data-go="more"]');
+  await page.selectOption("#language", "en");
+  await page.waitForFunction(() => document.querySelector('nav button[data-go="chat"]')?.textContent === "Chat", undefined, { timeout: 10_000 });
+  step("language switched to English", (await page.getAttribute("#dot", "aria-label")) ?? "");
+  await device.screenshot({ path: path.join(shotsDir, "4-english.png") });
   report.ok = true;
 } catch (error) {
   report.error = String(error?.stack ?? error);

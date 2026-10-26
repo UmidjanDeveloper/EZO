@@ -100,10 +100,11 @@ export function EzoPresence({ state, size = 260, label, className }: EzoPresence
 /** The motion that is specific to one state. */
 function StateLayer({ state, tone, animate, spin }: { state: EzoState; tone: string; animate: boolean; spin: number }) {
   switch (state) {
+    case "recognizing":
     case "listening":
       // Ripples moving outwards: EZO is taking sound in.
       return (
-        <g data-layer="listening">
+        <g data-layer={state}>
           {[0, 1, 2].map((i) => (
             <motion.circle
               key={i} cx={C} cy={C} r={84} fill="none" strokeWidth={1.2}
@@ -222,9 +223,10 @@ function StateLayer({ state, tone, animate, spin }: { state: EzoState; tone: str
           transition={{ duration: 1.2, ease: "easeOut" }}
         />
       );
+    case "offline":
     case "error":
       return (
-        <circle data-layer="error" cx={C} cy={C} r={94} fill="none" strokeWidth={1.6} strokeDasharray="10 6" style={{ stroke: tone }} opacity={0.7} />
+        <circle data-layer={state} cx={C} cy={C} r={94} fill="none" strokeWidth={1.6} strokeDasharray="10 6" style={{ stroke: tone }} opacity={0.7} />
       );
     case "idle":
       return null;

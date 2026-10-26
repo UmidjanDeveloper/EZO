@@ -14,6 +14,8 @@ interface EzoRobotProps {
   showHalo?: boolean;
   /** Overrides the light colour (e.g. success / danger from EzoPresence). */
   color?: string;
+  /** Accessible name in the UI language; without one the robot is decorative (its parent names it). */
+  label?: string;
 }
 
 const EYE_COLOR: Record<RobotState, string> = {
@@ -34,7 +36,7 @@ const loop = (duration: number, extra: Transition = {}): Transition => ({
  * EZO's face: a calm, futuristic robot whose eyes, mouth and core light
  * react to what EZO is doing (idle, listening, thinking, speaking).
  */
-export function EzoRobot({ size = 240, state = "idle", className, showHalo = true, color }: EzoRobotProps) {
+export function EzoRobot({ size = 240, state = "idle", className, showHalo = true, color, label }: EzoRobotProps) {
   const reduce = useReducedMotion() ?? false;
   const uid = useId().replace(/:/g, "");
   const id = (name: string) => `${name}-${uid}`;
@@ -69,8 +71,9 @@ export function EzoRobot({ size = 240, state = "idle", className, showHalo = tru
       style={{ width: size, height: size }}
       animate={animate && showHalo ? { y: [0, -6, 0] } : undefined}
       transition={loop(5)}
-      role="img"
-      aria-label={`EZO — ${state}`}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
       data-testid="ezo-robot"
       data-state={state}
     >

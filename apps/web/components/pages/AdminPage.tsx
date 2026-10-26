@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
+import { useI18n } from "@/lib/i18n/context";
 import { AccountsPanel } from "@/components/admin/AccountsPanel";
 import { PageFrame } from "./PageFrame";
 
@@ -77,6 +78,7 @@ interface ImprovementProposal {
 }
 
 export function AdminPage() {
+  const { m, f, language } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -217,7 +219,7 @@ export function AdminPage() {
         await loadData();
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        setError(data.error?.message || `Qaror qabul qilishda xatolik: HTTP ${res.status}`);
+        setError(data.error?.message || f(m.admin.decisionError, { status: res.status }));
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -228,8 +230,8 @@ export function AdminPage() {
 
   return (
     <PageFrame
-      title="Super Admin boshqaruvi"
-      subtitle="EZO OS tizim boshqaruvi, xavfsizlik siyosatlari va arxitektura tekshiruvlari"
+      title={m.admin.title}
+      subtitle={m.admin.subtitle}
       actions={
         <Button
           variant="secondary"
@@ -238,7 +240,7 @@ export function AdminPage() {
           disabled={loading}
         >
           <RefreshCw size={14} className={cn(loading && "animate-spin")} />
-          Yangilash
+          {m.admin.refresh}
         </Button>
       }
     >
@@ -246,7 +248,7 @@ export function AdminPage() {
         {/* Loading state */}
         {loading && (
           <div className="flex items-center justify-center p-12">
-            <Spinner className="h-8 w-8" label="Ma'lumotlar yuklanmoqda..." />
+            <Spinner className="h-8 w-8" label={m.admin.loading} />
           </div>
         )}
 
@@ -254,12 +256,13 @@ export function AdminPage() {
         {forbidden && !loading && (
           <Card className="p-8 border-danger/30 bg-danger/5 text-center flex flex-col items-center gap-4">
             <ShieldAlert size={48} className="text-danger animate-bounce" />
-            <h2 className="text-xl font-bold text-danger">Kirish taqiqlangan (403 Forbidden)</h2>
+            <h2 className="text-xl font-bold text-danger">{m.admin.forbiddenTitle}</h2>
             <p className="text-sm text-ink-muted max-w-md">
-              Ushbu bo‘lim faqat tizim <strong>Super Admin</strong> foydalanuvchisi uchun ochiq.
+              {m.admin.forbiddenBodyPrefix} <strong>{m.admin.forbiddenBodyRole}</strong>{" "}
+              {m.admin.forbiddenBodySuffix}
             </p>
             <p className="text-sm text-ink-muted max-w-md">
-              Obuna maqomi (pro, enterprise) platforma boshqaruviga ruxsat bermaydi.
+              {m.admin.forbiddenTier}
             </p>
           </Card>
         )}
@@ -283,14 +286,14 @@ export function AdminPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-ink">Super Admin Autentifikatsiya Qilingan</h3>
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-600 font-medium border border-emerald-500/20">
-                      Tasdiqlangan
+                    <h3 className="font-semibold text-ink">{m.admin.verifiedTitle}</h3>
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-success/12 text-success font-medium border border-success/30">
+                      {m.admin.verifiedBadge}
                     </span>
                   </div>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    Boshqaruv rejimi: <span className="font-mono text-ink">{govStatus.governance_mode}</span> | 
-                    Avtonom deploy / merge: <span className="text-emerald-600 font-medium">To‘liq bloklangan</span>
+                    {m.admin.governanceMode}: <span className="font-mono text-ink">{govStatus.governance_mode}</span> | 
+                    {m.admin.autonomy}: <span className="text-success font-medium">{m.admin.autonomyBlocked}</span>
                   </p>
                 </div>
               </div>
@@ -310,55 +313,57 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="p-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Ma&apos;lumotlar bazasi</span>
+                  <span>{m.admin.databaseCard}</span>
                   <Database size={16} className="text-primary" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       "h-2.5 w-2.5 rounded-full",
-                      healthStatus?.database === "ok" ? "bg-emerald-500" : "bg-danger"
+                      healthStatus?.database === "ok" ? "bg-success" : "bg-danger"
                     )}
                   />
                   <span className="text-lg font-bold capitalize text-ink">
-                    {systemStatus?.database ?? "noma’lum"} ({healthStatus?.database ?? "javob yo‘q"})
+                    {systemStatus?.database ?? m.admin.unknown} ({healthStatus?.database ?? m.admin.noResponse})
                   </span>
                 </div>
                 <span className="text-xs text-ink-faint">
-                  Profil: <strong className="text-ink">{systemStatus?.deployment_profile ?? "noma’lum"}</strong>
+                  {m.admin.profile}: <strong className="text-ink">{systemStatus?.deployment_profile ?? m.admin.unknown}</strong>
                 </span>
               </Card>
 
               <Card className="p-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Tizim holati</span>
+                  <span>{m.admin.systemCard}</span>
                   <Server size={16} className="text-primary" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span
                     className={cn(
                       "h-2.5 w-2.5 rounded-full",
-                      healthStatus?.status === "ok" ? "bg-emerald-500" : "bg-warning"
+                      healthStatus?.status === "ok" ? "bg-success" : "bg-warning"
                     )}
                   />
                   <span className="text-lg font-bold uppercase text-ink">
-                    {healthStatus?.status ?? "javob yo‘q"}
+                    {healthStatus?.status ?? m.admin.noResponse}
                   </span>
                 </div>
                 <span className="text-xs text-ink-faint">
-                  Muhit: <strong className="text-ink">{systemStatus?.environment ?? "noma’lum"}</strong>
+                  {m.admin.environment}: <strong className="text-ink">{systemStatus?.environment ?? m.admin.unknown}</strong>
                 </span>
               </Card>
 
               <Card className="p-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>AI Provayderlari</span>
+                  <span>{m.admin.providersCard}</span>
                   <Cpu size={16} className="text-primary" />
                 </div>
                 <span className="text-lg font-bold text-ink">
                   {systemStatus?.offline_mode
-                    ? "Offline rejim"
-                    : `${systemStatus?.providers.filter((p) => p.configured).length || 0} ta sozlangan`}
+                    ? m.admin.offlineMode
+                    : f(m.admin.providersConfigured, {
+                        count: systemStatus?.providers.filter((p) => p.configured).length || 0,
+                      })}
                 </span>
                 <span className="text-xs text-ink-faint">
                   {systemStatus?.providers.map((p) => p.name).join(", ") || "—"}
@@ -367,14 +372,17 @@ export function AdminPage() {
 
               <Card className="p-4 flex flex-col gap-2">
                 <div className="flex items-center justify-between text-xs text-ink-muted">
-                  <span>Versiya</span>
+                  <span>{m.admin.versionCard}</span>
                   <Activity size={16} className="text-primary" />
                 </div>
                 <span className="text-lg font-bold font-mono text-ink">
-                  {systemStatus?.version ? `v${systemStatus.version}` : "noma’lum"}
+                  {systemStatus?.version ? `v${systemStatus.version}` : m.admin.unknown}
                 </span>
                 <span className="text-xs text-ink-faint">
-                  Xavfsizlik audit loglari: <strong>Durable</strong>
+                  {f(m.admin.versionContext, {
+                    environment: systemStatus?.environment ?? m.admin.unknown,
+                    profile: systemStatus?.deployment_profile ?? m.admin.unknown,
+                  })}
                 </span>
               </Card>
             </div>
@@ -387,14 +395,14 @@ export function AdminPage() {
                 <div>
                   <h3 className="font-semibold text-ink flex items-center gap-2">
                     <Bot size={18} className="text-primary" />
-                    Ro‘yxatdan o‘tgan Agentlar katalogi
+                    {m.admin.agentsTitle}
                   </h3>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    Tizimda faoliyat yurituvchi aqlli agentlar va ularning statusi
+                    {m.admin.agentsSubtitle}
                   </p>
                 </div>
                 <span className="text-xs px-2.5 py-1 rounded-md bg-surface-2 border border-line text-ink-muted font-mono">
-                  Jami: {systemStatus?.agents.length || 0} ta
+                  {f(m.admin.agentsTotal, { count: systemStatus?.agents.length || 0 })}
                 </span>
               </div>
 
@@ -406,24 +414,24 @@ export function AdminPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-sm text-ink capitalize">
-                        {agent.names?.uz || agent.key}
+                        {agent.names?.[language] || agent.names?.uz || agent.key}
                       </span>
                       <span
                         className={cn(
                           "px-2 py-0.5 text-xs rounded-full font-medium border",
                           agent.available
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            ? "bg-success/12 text-success border-success/30"
                             : "bg-surface-3 text-ink-faint border-line"
                         )}
                       >
-                        {agent.available ? "Faol" : "O‘chirilgan"}
+                        {agent.available ? m.admin.agentActive : m.admin.agentDisabled}
                       </span>
                     </div>
                     <p className="text-xs text-ink-muted line-clamp-2">
                       {agent.description}
                     </p>
                     <div className="flex items-center justify-between text-xs text-ink-faint pt-2 border-t border-line/60">
-                      <span>Kalit: <strong className="font-mono">{agent.key}</strong></span>
+                      <span>{m.admin.agentKey}: <strong className="font-mono">{agent.key}</strong></span>
                       <span className="capitalize">{agent.maturity || "v1"}</span>
                     </div>
                   </div>
@@ -437,19 +445,19 @@ export function AdminPage() {
                 <div>
                   <h3 className="font-semibold text-ink flex items-center gap-2">
                     <FileText size={18} className="text-primary" />
-                    Boshqariladigan Arxitektura Takliflari (Durable Proposals)
+                    {m.admin.proposalsTitle}
                   </h3>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    Tizim yaxshilanishlari AuditLog orqali saqlanadi va inson tomonidan tasdiqlanishi shart
+                    {m.admin.proposalsSubtitle}
                   </p>
                 </div>
               </div>
 
               {proposals.length === 0 ? (
                 <div className="p-8 text-center text-ink-muted border border-dashed border-line rounded-xl">
-                  <p className="text-sm">Hozircha ko‘rib chiqilmagan yangi arxitektura takliflari mavjud emas.</p>
+                  <p className="text-sm">{m.admin.proposalsEmpty}</p>
                   <p className="text-xs text-ink-faint mt-1">
-                    Barcha amallar to‘g‘ridan-to‘g‘ri ma&apos;lumotlar bazasining AuditLog jadvalida qayd etiladi.
+                    {m.admin.proposalsEmptyHint}
                   </p>
                 </div>
               ) : (
@@ -463,14 +471,14 @@ export function AdminPage() {
                         <div>
                           <h4 className="font-medium text-sm text-ink">{prop.goal}</h4>
                           <p className="text-xs font-mono text-ink-faint mt-0.5">
-                            ID: {prop.id} | SHA256: {prop.sha256.slice(0, 16)}...
+                            {f(m.admin.proposalMeta, { id: prop.id, sha: prop.sha256.slice(0, 16) })}
                           </p>
                         </div>
                         <span
                           className={cn(
                             "px-2.5 py-0.5 text-xs rounded-full font-medium border",
                             prop.status === "proposal_only"
-                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                              ? "bg-warning/12 text-warning border-warning/30"
                               : prop.decision === "request_independent_review"
                               ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
                               : "bg-surface-3 text-ink-faint border-line"
@@ -483,8 +491,8 @@ export function AdminPage() {
                       <div className="flex items-center justify-between pt-2 border-t border-line text-xs">
                         <span className="text-ink-faint flex items-center gap-1">
                           <Lock size={12} />
-                          Sandbox tested: <strong>{prop.sandbox_tested ? "Ha" : "Yo‘q"}</strong> | 
-                          Execution authorized: <strong>{prop.execution_authorized ? "Ha" : "Bloklangan"}</strong>
+                          {m.admin.sandboxTested}: <strong>{prop.sandbox_tested ? m.admin.yes : m.admin.no}</strong> | 
+                          {m.admin.executionAuthorized}: <strong>{prop.execution_authorized ? m.admin.yes : m.admin.blocked}</strong>
                         </span>
 
                         <div className="flex items-center gap-2">
@@ -495,7 +503,7 @@ export function AdminPage() {
                             onClick={() => void handleDecision(prop, "reject")}
                           >
                             <XCircle size={14} className="mr-1" />
-                            Rad etish
+                            {m.admin.reject}
                           </Button>
                           <Button
                             variant="primary"
@@ -504,7 +512,7 @@ export function AdminPage() {
                             onClick={() => void handleDecision(prop, "request_independent_review")}
                           >
                             <CheckCircle2 size={14} className="mr-1" />
-                            Mustaqil ko‘rib chiqishni talab qilish
+                            {m.admin.requestReview}
                           </Button>
                         </div>
                       </div>

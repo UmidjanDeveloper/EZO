@@ -24,10 +24,31 @@ function silentWav(seconds: number): Buffer {
   return buffer;
 }
 
+/** Every state the figure, its frame and the status line went through, in order. */
+const sequence = (page: Page) => page.evaluate(() => (window as unknown as { __ezoSequence: string[] }).__ezoSequence);
+
 async function fakeMicrophoneAndBrowserSpeech(page: Page) {
   await page.addInitScript(() => {
     const w = window as unknown as Record<string, unknown>;
     w.__ezoSpoken = [];
+    // Short states (recognizing lasts as long as the transcription) are easy to miss on a
+    // slow machine, so the page records every state change and the test checks the order.
+    const sequence: string[] = [];
+    w.__ezoSequence = sequence;
+    const push = (entry: string) => sequence[sequence.length - 1] !== entry && sequence.push(entry);
+    const name = (node: Node) =>
+      node instanceof Element ? node.closest("[data-testid]")?.getAttribute("data-testid") ?? node.tagName.toLowerCase() : "";
+    new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "attributes" && record.target instanceof Element) {
+          const value = record.target.getAttribute("data-state");
+          if (value) push(`${name(record.target)}${record.target.tagName === "svg" ? ":frame" : ""}=${value}`);
+        } else if (record.target.parentElement?.closest('[data-testid="voice-status"]') || (record.target as Element).getAttribute?.("data-testid") === "voice-status") {
+          const text = record.target.textContent?.trim();
+          if (text) push(`status=${text}`);
+        }
+      }
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-state"], childList: true, characterData: true });
     w.__ezoBrowserHeard = ["Salom, brauzer orqali gapiryapman"];
     navigator.mediaDevices.getUserMedia = async () => {
       const context = new AudioContext();
@@ -92,6 +113,7 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
     uploads += 1;
     const body = route.request().postDataBuffer() ?? Buffer.alloc(0);
     expect(body.includes(Buffer.from('name="audio"'))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 700)); // a real recogniser takes a moment
     await route.fulfill({ json: { text: transcripts.shift() ?? "", language: "uz", provider: "voicestudio", attempts: [] } });
   });
   await page.route("**/api/voice/speak", async (route) => {
@@ -106,8 +128,17 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   const chatRequest = page.waitForRequest((request) => request.url().includes("/api/chat/stream"));
   await page.getByTestId("voice-toggle").click();
   await expect(page.getByTestId("voice-status")).toHaveText("Tinglayapman…");
-
-  await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 10_000 });
+  await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 15_000 });
+  // Listening → recognizing (the recording ended; the server is turning it into words: an
+  // honest in-between state) → thinking, in that order, on the figure, its frame and the words.
+  const seen = await sequence(page);
+  const order = (entries: string[]) => entries.map((entry) => seen.indexOf(entry));
+  expect(seen).toEqual(expect.arrayContaining(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"]));
+  expect(order(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"])).toEqual(
+    order(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"]).sort((a, b) => a - b),
+  );
+  expect(seen).toEqual(expect.arrayContaining(["voice-frame:frame=listening", "voice-frame:frame=recognizing"]));
+  expect(seen.indexOf("status=Tinglayapman…")).toBeLessThan(seen.indexOf("status=Eshitganimni matnga aylantiryapman…"));
   // The measured speaking time travels with the voice message (the fake microphone speaks 0.7 s).
   const sent = (await chatRequest).postDataJSON() as { channel: string; speech_seconds: number; language_hint?: string };
   expect(sent.channel).toBe("voice");
