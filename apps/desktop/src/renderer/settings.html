@@ -3,62 +3,65 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'" />
-    <title>EZO sozlamalari</title>
+    <title data-i18n="title">EZO sozlamalari</title>
     <link rel="stylesheet" href="settings.css" />
   </head>
   <body>
-    <h1>EZO sozlamalari</h1>
+    <h1 data-i18n="title">EZO sozlamalari</h1>
     <section>
-      <h2>EZO serveri</h2>
-      <label>Server manzili <input id="apiUrl" placeholder="https://api.sizning-domen.uz" /></label>
-      <label>Kirish tokeni <input id="token" type="password" autocomplete="off" placeholder="EZO_API_TOKEN" /></label>
+      <h2 data-i18n="server">EZO serveri</h2>
+      <label><span data-i18n="serverUrl">Server manzili</span> <input id="apiUrl" placeholder="https://api.sizning-domen.uz" /></label>
+      <label><span data-i18n="token">Kirish tokeni</span> <input id="token" type="password" autocomplete="off" placeholder="EZO_API_TOKEN" /></label>
       <p id="tokenState" class="muted"></p>
+      <label><span data-i18n="language">Ilova tili</span>
+        <select id="language"></select>
+      </label>
       <div class="row">
-        <button id="saveServer">Saqlash</button>
-        <button id="clearToken" class="secondary">Tokenni o‘chirish</button>
-        <button id="test" class="secondary">Ulanishni tekshirish</button>
+        <button id="saveServer" data-i18n="save">Saqlash</button>
+        <button id="clearToken" class="secondary" data-i18n="clearToken">Tokenni o‘chirish</button>
+        <button id="test" class="secondary" data-i18n="test">Ulanishni tekshirish</button>
       </div>
       <p id="testResult" role="status"></p>
     </section>
     <section>
-      <h2>Ruxsatlar <span class="muted">(hammasi boshida o‘chiq)</span></h2>
-      <label class="check"><input type="checkbox" data-app="calculator" /> Kalkulyatorni ochish</label>
-      <label class="check"><input type="checkbox" data-app="notepad" /> Bloknotni ochish</label>
-      <label class="check"><input type="checkbox" data-app="paint" /> Paint’ni ochish</label>
-      <label class="check"><input type="checkbox" data-app="explorer" /> Fayl menejerini ochish</label>
-      <label class="check"><input type="checkbox" id="allowVolume" /> Ovoz balandligini o‘zgartirish</label>
-      <label class="check"><input type="checkbox" id="allowTyping" /> Aytilgan matnni faol oynaga yozish (“Yoz: …”)</label>
-      <label class="check"><input type="checkbox" id="allowScreen" /> Ekranni tahlil qilish (har safar alohida so‘raladi)</label>
-      <label class="check"><input type="checkbox" id="speakReplies" /> Javoblarni ovozda o‘qish</label>
-      <label>Tugma
+      <h2><span data-i18n="permissions">Ruxsatlar</span> <span class="muted" data-i18n="permissionsNote">(hammasi boshida o‘chiq)</span></h2>
+      <label class="check"><input type="checkbox" data-app="calculator" /> <span data-i18n="appCalculator">Kalkulyatorni ochish</span></label>
+      <label class="check"><input type="checkbox" data-app="notepad" /> <span data-i18n="appNotepad">Bloknotni ochish</span></label>
+      <label class="check"><input type="checkbox" data-app="paint" /> <span data-i18n="appPaint">Paint’ni ochish</span></label>
+      <label class="check"><input type="checkbox" data-app="explorer" /> <span data-i18n="appExplorer">Fayl menejerini ochish</span></label>
+      <label class="check"><input type="checkbox" id="allowVolume" /> <span data-i18n="allowVolume">Ovoz balandligini o‘zgartirish</span></label>
+      <label class="check"><input type="checkbox" id="allowTyping" /> <span data-i18n="allowTyping">Aytilgan matnni faol oynaga yozish (“Yoz: …”)</span></label>
+      <label class="check"><input type="checkbox" id="allowScreen" /> <span data-i18n="allowScreen">Ekranni tahlil qilish (har safar alohida so‘raladi)</span></label>
+      <label class="check"><input type="checkbox" id="speakReplies" /> <span data-i18n="speakReplies">Javoblarni ovozda o‘qish</span></label>
+      <label><span data-i18n="shortcut">Tugma</span>
         <select id="shortcut"></select>
       </label>
     </section>
     <section>
-      <h2>Qidirish mumkin bo‘lgan papkalar</h2>
-      <p class="muted">EZO faqat shu papkalardagi fayl NOMLARINI qidiradi va faqat ulardan fayl ocha oladi.</p>
+      <h2 data-i18n="folders">Qidirish mumkin bo‘lgan papkalar</h2>
+      <p class="muted" data-i18n="foldersNote">EZO faqat shu papkalardagi fayl NOMLARINI qidiradi va faqat ulardan fayl ocha oladi.</p>
       <ul id="folders"></ul>
-      <button id="addFolder" class="secondary">Papka qo‘shish…</button>
+      <button id="addFolder" class="secondary" data-i18n="addFolder">Papka qo‘shish…</button>
     </section>
     <section>
-      <h2>JARVIS vazifalari</h2>
-      <p class="muted">EZO faqat shu papkadagi eng yangi hujjatlarni (PDF, Word, Excel, PowerPoint, TXT, CSV) o‘qiy oladi. Har bir fayl yuborilishidan oldin sizdan so‘raladi; Telegram’ga yuborish alohida tasdiqlanadi.</p>
-      <p>Papka: <span id="jarvisFolder"></span></p>
+      <h2 data-i18n="jarvis">JARVIS vazifalari</h2>
+      <p class="muted" data-i18n="jarvisNote">EZO faqat shu papkadagi eng yangi hujjatlarni o‘qiy oladi.</p>
+      <p><span data-i18n="jarvisFolder">Papka:</span> <span id="jarvisFolder"></span></p>
       <div class="row">
-        <button id="jarvisChoose" class="secondary">Papkani tanlash…</button>
-        <button id="jarvisClear" class="secondary">Ruxsatni olib tashlash</button>
+        <button id="jarvisChoose" class="secondary" data-i18n="jarvisChoose">Papkani tanlash…</button>
+        <button id="jarvisClear" class="secondary" data-i18n="jarvisClear">Ruxsatni olib tashlash</button>
       </div>
       <p id="jarvisState" class="muted"></p>
       <div class="row">
-        <button id="jarvisPair">Bu kompyuterni ulash</button>
-        <button id="jarvisUnpair" class="secondary">Ulanishni bekor qilish</button>
+        <button id="jarvisPair" data-i18n="pair">Bu kompyuterni ulash</button>
+        <button id="jarvisUnpair" class="secondary" data-i18n="unpair">Ulanishni bekor qilish</button>
       </div>
       <p id="jarvisCode" role="status"></p>
     </section>
     <section>
-      <h2>Suhbat</h2>
-      <p class="muted">Desktop suhbati EZO serverida saqlanadi va telefon/veb ilovada ham ko‘rinadi.</p>
-      <button id="newConversation" class="secondary">Yangi suhbat boshlash</button>
+      <h2 data-i18n="conversation">Suhbat</h2>
+      <p class="muted" data-i18n="conversationNote">Desktop suhbati EZO serverida saqlanadi va telefon/veb ilovada ham ko‘rinadi.</p>
+      <button id="newConversation" class="secondary" data-i18n="newConversation">Yangi suhbat boshlash</button>
     </section>
     <script src="settings.js"></script>
   </body>

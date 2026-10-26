@@ -72,3 +72,61 @@ describe("createEzoClient", () => {
     await expect(createEzoClient("http://x", "bad", fetchImpl).me()).rejects.toMatchObject({ code: "unauthorized" });
   });
 });
+
+describe("createEzoClient: status, history, tasks and cancellation", () => {
+  it("reads whether the server really has an AI provider and voice", async () => {
+    const { fetchImpl } = recorder(() =>
+      Response.json({
+        offline_mode: false,
+        version: "0.1.0",
+        providers: [
+          { name: "openai", configured: true, capabilities: ["chat", "speech_to_text"] },
+          { name: "gemini", configured: false, capabilities: ["chat"] },
+        ],
+      }),
+    );
+    expect(await createEzoClient("http://x", "t", fetchImpl).status()).toEqual({ ai: true, voice: true, providers: ["openai"], version: "0.1.0" });
+    const offline = recorder(() => Response.json({ offline_mode: true, providers: [] }));
+    expect((await createEzoClient("http://x", "t", offline.fetchImpl).status()).ai).toBe(false);
+  });
+
+  it("lists the conversation's messages and recent conversations from the server", async () => {
+    const { calls, fetchImpl } = recorder((url) =>
+      url.includes("/messages")
+        ? Response.json([{ role: "user", content: "Salom", created_at: "2026-10-26T00:00:00Z" }])
+        : Response.json([{ id: "c1", title: "Salom", updated_at: "2026-10-26T00:00:00Z" }]),
+    );
+    const client = createEzoClient("http://x", "t", fetchImpl);
+    expect((await client.messages("c1")).map((m) => m.content)).toEqual(["Salom"]);
+    expect((await client.conversations()).map((c) => c.id)).toEqual(["c1"]);
+    expect(calls[0]!.url).toBe("http://x/api/conversations/c1/messages?limit=12");
+    expect(calls[1]!.url).toBe("http://x/api/conversations?limit=20");
+  });
+
+  it("cancels a JARVIS task through the server, never locally", async () => {
+    const { calls, fetchImpl } = recorder(() => Response.json({ id: "t1", state: "cancelled", report: "", steps: [] }));
+    expect((await createEzoClient("http://x", "t", fetchImpl).cancelJarvisTask("t1")).state).toBe("cancelled");
+    expect(calls[0]!.url).toBe("http://x/api/jarvis/tasks/t1/cancel");
+    expect(calls[0]!.init.method).toBe("POST");
+  });
+
+  it("an aborted request is reported as cancelled, not as a network failure, in the owner's language", async () => {
+    const controller = new AbortController();
+    const fetchImpl = ((_url: string, init: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      })) as unknown as typeof fetch;
+    const client = createEzoClient("http://x", "t", fetchImpl, { lang: "en", signal: controller.signal });
+    const pending = client.chat("Hello", null).catch((e: unknown) => e);
+    controller.abort();
+    const error = (await pending) as EzoApiError;
+    expect(error.code).toBe("cancelled");
+    expect(error.message).toBe("The request was cancelled.");
+  });
+
+  it("speaks the owner's language in error messages", async () => {
+    const { fetchImpl } = recorder(() => Response.json({ error: { code: "x" } }, { status: 401 }));
+    const error = (await createEzoClient("http://x", "bad", fetchImpl, { lang: "ru" }).me().catch((e: unknown) => e)) as EzoApiError;
+    expect(error.message).toContain("Токен");
+  });
+});
