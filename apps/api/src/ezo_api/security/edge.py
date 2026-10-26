@@ -14,6 +14,12 @@ API address could send gigabytes and exhaust the server without a token. So, for
 
 Authenticated requests are marked in the ASGI scope, so the per-route rate limits count
 the owner's own requests, not an attacker's.
+
+3. local mode (no token, never allowed in production): a state-changing request that a
+   browser sends from another site carries an ``Origin`` header. Unless that origin is
+   one of the configured CORS origins it is refused (403) before any route runs, so a
+   web page cannot make the owner's browser queue uploads or change data (finding F23;
+   CORS alone does not stop "simple" cross-site POSTs, it only hides the response).
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from ezo_api.security.rate_limit import RateLimitExceededError, SlidingWindowRateLimiter
 
 PUBLIC_PATHS = frozenset({"/api/health"})
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 AUTHENTICATED = "ezo.authenticated"
 FAILED_AUTH_PER_MINUTE = 30
 
@@ -49,9 +56,16 @@ async def _reply(send: Send, status: int, code: str, message: str, **headers: st
 
 class EdgeGuardMiddleware:
     def __init__(
-        self, app: ASGIApp, *, token: str | None, max_body_bytes: int, free_beta: bool = False
+        self,
+        app: ASGIApp,
+        *,
+        token: str | None,
+        max_body_bytes: int,
+        free_beta: bool = False,
+        allowed_origins: list[str] | None = None,
     ) -> None:
         self.app = app
+        self.allowed_origins = frozenset(o.rstrip("/") for o in allowed_origins or [])
         self.token = token.encode() if token else None
         self.max_body = max_body_bytes
         self.free_beta = free_beta
@@ -76,6 +90,15 @@ class EdgeGuardMiddleware:
         if scope.get("method") == "OPTIONS":
             await self.app(scope, receive, send)  # CORS preflight carries no token or body
             return
+
+        if self.token is None and scope.get("method") not in SAFE_METHODS:
+            origin = next(
+                (v.decode("latin-1") for k, v in scope.get("headers", []) if k == b"origin"),
+                None,
+            )
+            if origin is not None and origin.rstrip("/") not in self.allowed_origins:
+                await _reply(send, 403, "cross_site", "Cross-site requests are not allowed.")
+                return
 
         if not self._authorized(scope):
             try:

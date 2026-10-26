@@ -61,6 +61,7 @@ from ezo_api.knowledge.retrieval.citations import (
 )
 from ezo_api.knowledge.retrieval.sources import number_sources
 from ezo_api.language.service import active_session as active_language_session
+from ezo_api.memory.consent import memory_policy
 from ezo_api.memory.service import MemoryIndex, MemoryService, RetrievedMemory
 from ezo_api.personality.profile import HumorLevel, PersonalityProfile
 from ezo_api.personality.prompt import PromptContext, PromptMemory, build_system_prompt
@@ -219,6 +220,24 @@ async def _latest_artifact_is_image(
 ) -> bool:
     latest = await latest_artifact(session, user_id, conversation_id, ARTIFACT_TYPES)
     return latest is not None and latest.artifact_type == "image"
+
+
+# Tools whose success means a real file exists for the user (see `_verify`).
+ARTIFACT_TOOLS = frozenset(
+    {
+        "create_document",
+        "create_spreadsheet",
+        "create_presentation",
+        "create_graphic",
+        "generate_image",
+        "edit_image",
+        "office_pdf",
+        "ocr_export",
+        "pdf_tool",
+        "sheet_ops",
+        "extract_tables",
+    }
+)
 
 
 class EzoCore:
@@ -540,7 +559,7 @@ class EzoCore:
                     else ""
                 )
 
-            reply, quality = self._verify(prepared, "".join(parts), end)
+            reply, quality = self._verify(prepared, "".join(parts), end, gathered)
             if quality.get("appended"):
                 yield CoreDelta(str(quality["appended"]))
 
@@ -598,6 +617,9 @@ class EzoCore:
         self, session: AsyncSession, prepared: PreparedTurn
     ) -> list[RetrievedMemory]:
         with prepared.tracer.step("retrieve_memory") as step:
+            if not memory_policy(prepared.user.preferences).recall:
+                step.summary = "disabled: memory recall is off (consent revoked or recall off)"
+                return []
             retrieved = await MemoryService(session, self.memory_index).retrieve(
                 prepared.user.id,
                 prepared.user_message.content,
@@ -758,7 +780,11 @@ class EzoCore:
             return prompt
 
     def _verify(
-        self, prepared: PreparedTurn, raw_reply: str, end: StreamEnd | None
+        self,
+        prepared: PreparedTurn,
+        raw_reply: str,
+        end: StreamEnd | None,
+        gathered: Gathered | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Quality checks on the final reply (cheap, deterministic)."""
         with prepared.tracer.step("verify") as step:
@@ -776,6 +802,21 @@ class EzoCore:
                 reply += notice
                 quality["appended"] = notice
                 quality["truncated"] = True
+            failed = [
+                c
+                for c in (gathered.tool_calls if gathered else [])
+                if c["tool"] in ARTIFACT_TOOLS and not c["ok"]
+            ]
+            if failed and not (gathered and gathered.artifacts):
+                # Never let a model's wording ("Taqdimot tayyor") stand for a file that the
+                # tool did not create (audit F19). The notice is fixed text, not generated.
+                error = str(failed[-1].get("error") or "tool failed")[:200]
+                notice = "\n\n" + messages.text("artifact_not_created", prepared.language).format(
+                    error=error
+                )
+                reply += notice
+                quality["artifact_failed"] = True
+                quality["appended"] = (quality.get("appended") or "") + notice
             step.summary = (
                 ", ".join(f"{k}={v}" for k, v in quality.items() if k != "appended" and v) or "ok"
             )
@@ -798,13 +839,10 @@ class EzoCore:
 
         saved_memories = 0
         with prepared.tracer.step("save_memory") as step:
-            prefs = prepared.user.preferences or {}
-            has_consent = bool(prefs.get("memory_consent", False))
-            auto_memory = bool(prefs.get("auto_memory", False))
-            if (
-                has_consent
-                and auto_memory
-                and not (self.services and self.services.settings.deployment_profile == "free-beta")
+            policy = memory_policy(prepared.user.preferences)
+            has_consent = policy.consent
+            if policy.capture and not (
+                self.services and self.services.settings.deployment_profile == "free-beta"
             ):
                 capture = await MemoryService(session, self.memory_index).capture_from_message(
                     prepared.user.id,

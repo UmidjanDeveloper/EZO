@@ -86,3 +86,73 @@ async def test_project_memories_stay_in_their_project(
         client, message="Which color palette should we use?", project_id=project["id"]
     )
     assert "dark blue" in (fake_anthropic.requests[-1].system or "")
+
+
+# --- F18: consent controls recall as well as capture ------------------------------------
+
+
+async def _manual_memory_then_chat(client: AsyncClient, fake: FakeProvider) -> str:
+    await client.post("/api/memories", json={"content": "Prefers minimalist teal designs"})
+    await stream_chat(client, message="Sayt dizayni haqida maslahat ber, minimalist teal")
+    return fake.requests[-1].system or ""
+
+
+async def test_revoking_consent_stops_recall_of_saved_memories(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
+    assert "minimalist teal" in await _manual_memory_then_chat(client, fake_anthropic)
+
+    revoked = await client.post(
+        "/api/personal/consent", json={"consent": False, "auto_memory": False}
+    )
+    assert revoked.json()["memory_recall"] is False
+    assert "no longer used" in revoked.json()["message"]
+    await stream_chat(client, message="Sayt dizayni haqida yana maslahat ber, minimalist teal")
+    assert "minimalist teal" not in (fake_anthropic.requests[-1].system or "")
+    # The memory itself is kept for the user to see, export or delete.
+    assert [m["content"] for m in (await client.get("/api/memories")).json()] == [
+        "Prefers minimalist teal designs"
+    ]
+    profile = (await client.get("/api/personal/profile")).json()
+    assert profile["memory_recall"] is False and profile["auto_memory"] is False
+
+
+async def test_recall_can_be_kept_explicitly_without_capture(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
+    kept = await client.post(
+        "/api/personal/consent", json={"consent": False, "auto_memory": True, "recall": True}
+    )
+    assert kept.json() | {"message": ""} == {
+        "memory_consent": False,
+        "auto_memory": False,  # capture always needs consent
+        "memory_recall": True,
+        "message": "",
+    }
+    assert "minimalist teal" in await _manual_memory_then_chat(client, fake_anthropic)
+    await stream_chat(client, message="Eslab qol: men choyni yaxshi ko'raman.")
+    assert len((await client.get("/api/memories")).json()) == 1  # nothing captured
+
+
+async def test_preferences_endpoint_cannot_bypass_consent(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    await client.post("/api/personal/consent", json={"consent": True, "auto_memory": True})
+    response = await client.patch(
+        "/api/me/preferences", json={"memory_consent": False, "auto_memory": True}
+    )
+    prefs = response.json()["preferences"]
+    assert prefs["memory_consent"] is False and prefs["auto_memory"] is False
+    assert prefs["memory_recall"] is None  # follows consent -> off
+    assert "minimalist teal" not in await _manual_memory_then_chat(client, fake_anthropic)
+
+
+async def test_without_consent_saved_memories_are_not_recalled_by_default(
+    client: AsyncClient, fake_anthropic: FakeProvider
+) -> None:
+    assert "minimalist teal" not in await _manual_memory_then_chat(client, fake_anthropic)
+    await client.patch("/api/me/preferences", json={"memory_recall": True})
+    await stream_chat(client, message="Yana dizayn maslahati: minimalist teal")
+    assert "minimalist teal" in (fake_anthropic.requests[-1].system or "")

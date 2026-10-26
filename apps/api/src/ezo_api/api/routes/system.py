@@ -13,6 +13,7 @@ from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.api.serializers import user_out
 from ezo_api.db.models import AgentRun, User
 from ezo_api.maturity import FEATURES
+from ezo_api.memory.consent import apply_consent_change
 from ezo_api.providers.registry import KNOWN_PROVIDERS
 from ezo_api.schemas.api import (
     AgentInfo,
@@ -129,8 +130,10 @@ async def update_preferences(
         raise HTTPException(401, detail="User not found.")
     if services.settings.deployment_profile == "free-beta" and body.auto_memory:
         raise HTTPException(409, detail="Automatic memory capture is disabled in free beta.")
-    merged = Preferences.model_validate(user.preferences or {}).model_dump()
-    merged.update(body.model_dump(exclude_unset=True, exclude_none=True))
+    current_prefs = Preferences.model_validate(user.preferences or {}).model_dump()
+    merged = apply_consent_change(
+        current_prefs, body.model_dump(exclude_unset=True, exclude_none=True)
+    )
     user.preferences = Preferences.model_validate(merged).model_dump()
     audit(
         session,

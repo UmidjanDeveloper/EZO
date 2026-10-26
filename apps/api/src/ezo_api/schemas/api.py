@@ -27,6 +27,8 @@ class Preferences(BaseModel):
     humor: Literal["default", "off", "light", "normal"] = "default"
     memory_consent: bool = False
     auto_memory: bool = False
+    memory_recall: bool | None = None
+    """Saved memories may be used in replies; None follows memory_consent (F18)."""
     learning_style: str = "balanced"
 
 
@@ -36,6 +38,7 @@ class PreferencesUpdate(BaseModel):
     humor: Literal["default", "off", "light", "normal"] | None = None
     memory_consent: bool | None = None
     auto_memory: bool | None = None
+    memory_recall: bool | None = None
     learning_style: str | None = None
 
 
