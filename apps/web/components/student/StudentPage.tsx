@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Brain, Layers, ListTodo, Sparkles } from "lucide-react";
 import { hasNextStudentPage, studentRequest } from "@/lib/student-api";
+import { useI18n } from "@/lib/i18n/context";
 import { PageFrame } from "../pages/PageFrame";
+import { Comparison } from "./Comparison";
+import { LearningPaths } from "./LearningPaths";
 
 type Job = {
   parser_version: string;
@@ -95,6 +98,8 @@ interface SynthesisOut {
 }
 
 export function StudentPage() {
+  const { m, f } = useI18n();
+  const t = m.student;
   const [entries, setEntries] = useState<Entry[]>([]);
   const [libraryOffset, setLibraryOffset] = useState(0);
   const [moreBooks, setMoreBooks] = useState(false);
@@ -338,13 +343,13 @@ export function StudentPage() {
     : 0;
 
   return (
-    <PageFrame title="EZO Student" subtitle="Manbani o‘qing, dalil bilan o‘rganing.">
+    <PageFrame title={t.title} subtitle={t.subtitle}>
       <p className="mb-4 text-sm text-ink-muted">
-        PDF, EPUB, DOCX: 5 MiB gacha. Alohida xavfsiz worker talab qilinadi. Skanerlangan PDF uchun OCR hozircha mavjud emas.
+        {t.limits} {t.ocrNeedsWorker}
       </p>
       {!provider && (
         <p role="status" className="mb-4 text-sm text-amber-600 dark:text-amber-400">
-          AI provayder ulanmagan. O‘qish ishlaydi; AI javoblari, qo‘llanma va testlar uchun provayder kerak.
+          {t.noProvider}
         </p>
       )}
       {error && (
@@ -354,9 +359,9 @@ export function StudentPage() {
       )}
 
       {/* Upload and Text Intake */}
-      <section aria-label="Hujjat yuklash" className="mb-6 grid gap-3 rounded-2xl border border-line bg-surface p-4">
+      <section aria-label={t.intake.region} className="mb-6 grid gap-3 rounded-2xl border border-line bg-surface p-4">
         <label className="grid gap-2 text-sm font-semibold text-ink">
-          Hujjat yuklash
+          {t.intake.upload}
           <input
             type="file"
             accept=".pdf,.epub,.docx"
@@ -366,7 +371,7 @@ export function StudentPage() {
               const file = e.target.files?.[0];
               if (!file) return;
               if (file.size > 5 * 1024 * 1024) {
-                setError("Fayl 5 MiB dan katta.");
+                setError(t.fileTooLarge);
                 return;
               }
               void perform(async () => {
@@ -379,7 +384,7 @@ export function StudentPage() {
           />
         </label>
         <label htmlFor="student-text" className="text-sm font-semibold text-ink">
-          Yoki o‘rganish uchun matn
+          {t.intake.textLabel}
         </label>
         <textarea
           id="student-text"
@@ -387,7 +392,7 @@ export function StudentPage() {
           onChange={(e) => setText(e.target.value)}
           maxLength={2000000}
           rows={3}
-          placeholder="O'rganmoqchi bo'lgan matningizni kiriting..."
+          placeholder={t.intake.textPlaceholder}
           className="rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
         />
         <div>
@@ -405,19 +410,19 @@ export function StudentPage() {
               })
             }
           >
-            Matnni saqlash
+            {t.intake.saveText}
           </button>
         </div>
       </section>
 
       <div className="grid gap-6 md:grid-cols-[240px_minmax(0,1fr)]">
         {/* Library sidebar */}
-        <nav aria-label="Hujjatlar kutubxonasi" className="grid content-start gap-2">
+        <nav aria-label={t.library.region} className="grid content-start gap-2">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-ink">Kutubxona</h2>
-            <span className="text-xs text-ink-faint">{entries.length} manba</span>
+            <h2 className="font-semibold text-ink">{t.library.heading}</h2>
+            <span className="text-xs text-ink-faint">{f(t.library.count, { n: entries.length })}</span>
           </div>
-          {!entries.length && <p className="text-sm text-ink-muted">Hali hujjat yo‘q.</p>}
+          {!entries.length && <p className="text-sm text-ink-muted">{t.library.empty}</p>}
           {entries.map((entry) => (
             <button
               key={entry.job.id}
@@ -429,13 +434,7 @@ export function StudentPage() {
             >
               <div className="font-medium text-ink">{entry.title}</div>
               <span className="block text-xs text-ink-muted">
-                {({
-                  queued: "Navbatda",
-                  running: "O‘qilmoqda",
-                  completed: "Tayyor",
-                  failed: "Xato",
-                  cancelled: "Bekor qilindi",
-                })[entry.job.state] ?? entry.job.state}
+                {(t.jobState as Record<string, string>)[entry.job.state] ?? entry.job.state}
               </span>
             </button>
           ))}
@@ -450,20 +449,20 @@ export function StudentPage() {
               disabled={libraryOffset === 0}
               onClick={() => setLibraryOffset(Math.max(0, libraryOffset - 30))}
             >
-              Oldingi hujjatlar
+              {t.library.previous}
             </button>
             <button
               className={button}
               disabled={!moreBooks}
               onClick={() => setLibraryOffset(libraryOffset + 30)}
             >
-              Keyingi hujjatlar
+              {t.library.next}
             </button>
           </div>
         </nav>
 
         {/* Main reading & study workspace */}
-        <section className="min-w-0" aria-label="O‘qish va o‘rganish">
+        <section className="min-w-0" aria-label={t.workspace.region}>
           {selected && (
             <>
               {/* Header */}
@@ -471,7 +470,7 @@ export function StudentPage() {
                 <div>
                   <h2 className="text-lg font-bold text-ink">{selected.title}</h2>
                   <p role="status" className="text-xs text-ink-muted">
-                    Urinishlar: {selected.job.attempts}/{selected.job.max_attempts}
+                    {f(t.workspace.attempts, { attempts: selected.job.attempts, max: selected.job.max_attempts })}
                   </p>
                 </div>
 
@@ -484,7 +483,7 @@ export function StudentPage() {
                       }`}
                       onClick={() => setActiveTab("reader")}
                     >
-                      <BookOpen size={13} /> O‘qish va Tahlil
+                      <BookOpen size={13} /> {t.tabs.reader}
                     </button>
                     <button
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors ${
@@ -492,7 +491,7 @@ export function StudentPage() {
                       }`}
                       onClick={() => setActiveTab("plan")}
                     >
-                      <ListTodo size={13} /> Reja
+                      <ListTodo size={13} /> {t.tabs.plan}
                     </button>
                     <button
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors ${
@@ -500,7 +499,7 @@ export function StudentPage() {
                       }`}
                       onClick={() => setActiveTab("flashcards")}
                     >
-                      <Layers size={13} /> Kartalar
+                      <Layers size={13} /> {t.tabs.flashcards}
                     </button>
                     <button
                       className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-colors ${
@@ -508,7 +507,7 @@ export function StudentPage() {
                       }`}
                       onClick={() => setActiveTab("concepts")}
                     >
-                      <Brain size={13} /> Tushunchalar
+                      <Brain size={13} /> {t.tabs.concepts}
                     </button>
                   </div>
                 )}
@@ -530,7 +529,7 @@ export function StudentPage() {
                     })
                   }
                 >
-                  Bekor qilish
+                  {t.workspace.cancel}
                 </button>
               )}
 
@@ -548,7 +547,7 @@ export function StudentPage() {
                       })
                     }
                   >
-                    Qayta urinish
+                    {t.workspace.retry}
                   </button>
                 )}
 
@@ -560,7 +559,7 @@ export function StudentPage() {
                       {/* Reading Controls Bar */}
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-2.5 text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="text-ink-muted">Shrift:</span>
+                          <span className="text-ink-muted">{t.reader.font}</span>
                           {(["sm", "base", "lg"] as const).map((sz) => (
                             <button
                               key={sz}
@@ -575,14 +574,14 @@ export function StudentPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-ink-muted">Uslub:</span>
+                          <span className="text-ink-muted">{t.reader.theme}</span>
                           <button
                             className={`rounded px-2 py-0.5 ${
                               readerTheme === "default" ? "bg-surface-2 text-ink font-semibold" : "text-ink-faint"
                             }`}
                             onClick={() => setReaderTheme("default")}
                           >
-                            Standart
+                            {t.reader.themeDefault}
                           </button>
                           <button
                             className={`rounded px-2 py-0.5 ${
@@ -590,7 +589,7 @@ export function StudentPage() {
                             }`}
                             onClick={() => setReaderTheme("sepia")}
                           >
-                            Sepia
+                            {t.reader.themeSepia}
                           </button>
                           <button
                             className={`rounded px-2 py-0.5 ${
@@ -598,13 +597,13 @@ export function StudentPage() {
                             }`}
                             onClick={() => setReaderTheme("contrast")}
                           >
-                            Kontrast
+                            {t.reader.themeContrast}
                           </button>
                         </div>
 
                         {/* Progress Gauge */}
                         <div className="flex items-center gap-2">
-                          <span className="text-ink-muted">{readPercent}% o‘qildi</span>
+                          <span className="text-ink-muted">{f(t.reader.readPercent, { percent: readPercent })}</span>
                           <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2">
                             <div className="h-full bg-accent" style={{ width: `${readPercent}%` }} />
                           </div>
@@ -613,7 +612,7 @@ export function StudentPage() {
 
                       {/* Section Dropdown */}
                       <label className="block">
-                        <span className="mb-1 block text-xs font-semibold text-ink-muted">Bob / bo‘lim</span>
+                        <span className="mb-1 block text-xs font-semibold text-ink-muted">{t.reader.sectionLabel}</span>
                         <select
                           className="block w-full rounded-lg border border-line bg-surface p-2.5 text-sm text-ink focus:border-accent focus:outline-none"
                           value={sectionStart ?? ""}
@@ -623,10 +622,13 @@ export function StudentPage() {
                             setOffset(start ?? 0);
                           }}
                         >
-                          <option value="">Boshidan o‘qish</option>
+                          <option value="">{t.reader.fromStart}</option>
                           {sections.map((section, i) => (
                             <option key={section.start} value={section.start}>
-                              {section.heading ?? (section.page ? `${section.page}-sahifa` : `${i + 1}-bo‘lim`)}
+                              {section.heading ??
+                                (section.page
+                                  ? f(t.reader.pageOption, { page: section.page })
+                                  : f(t.reader.sectionOption, { n: i + 1 }))}
                             </option>
                           ))}
                         </select>
@@ -634,7 +636,7 @@ export function StudentPage() {
 
                       {/* Article Text View */}
                       <article
-                        aria-label="Manba matni"
+                        aria-label={t.reader.article}
                         className={`whitespace-pre-wrap break-words rounded-xl border border-line p-5 leading-relaxed shadow-sm transition-all ${
                           fontSize === "sm" ? "text-xs" : fontSize === "lg" ? "text-base" : "text-sm"
                         } ${
@@ -656,17 +658,17 @@ export function StudentPage() {
                             disabled={offset === 0}
                             onClick={() => setOffset(Math.max(0, offset - 4000))}
                           >
-                            Oldingi
+                            {t.reader.previous}
                           </button>
                           <span className="text-xs text-ink-muted">
-                            {page?.offset ?? 0} / {page?.total_chars ?? 0} belgi
+                            {f(t.reader.chars, { offset: page?.offset ?? 0, total: page?.total_chars ?? 0 })}
                           </span>
                           <button
                             className={button}
                             disabled={!page || !hasNextStudentPage(page)}
                             onClick={() => setOffset(offset + 4000)}
                           >
-                            Keyingi
+                            {t.reader.next}
                           </button>
                         </div>
 
@@ -682,19 +684,19 @@ export function StudentPage() {
                                     `student/documents/${selected.job.document_id}/semantic-index?offset=${next}`,
                                     { method: "POST" }
                                   );
-                                  setIndexNotice(`${next + result.indexed} parcha indekslandi.`);
+                                  setIndexNotice(f(t.reader.indexed, { n: next + result.indexed }));
                                   if (result.next_offset === null) {
                                     setIndexOffset(0);
                                     return;
                                   }
-                                  if (result.next_offset <= next) throw new Error("Indeks holati mos kelmadi.");
+                                  if (result.next_offset <= next) throw new Error(t.indexMismatch);
                                   next = result.next_offset;
                                   setIndexOffset(next);
                                 }
                               })
                             }
                           >
-                            Semantik qidiruvni tayyorlash
+                            {t.reader.buildIndex}
                           </button>
                         )}
                       </div>
@@ -706,29 +708,29 @@ export function StudentPage() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <h3 className="flex items-center gap-2 font-semibold text-ink">
                             <Sparkles size={16} className="text-accent" />
-                            Manba asosida o‘rganish va savol-javob
+                            {t.learn.heading}
                           </h3>
                           <label className="flex items-center gap-1.5 text-xs text-ink-muted">
-                            Javob tili:
+                            {t.learn.answerLanguage}
                             <select
                               value={language}
                               onChange={(e) => setLanguage(e.target.value)}
                               className="rounded border border-line bg-surface-2 p-1 text-xs text-ink"
                             >
-                              <option value="uz">O‘zbek</option>
-                              <option value="en">English</option>
-                              <option value="ru">Русский</option>
+                              <option value="uz">{t.learn.languages.uz}</option>
+                              <option value="en">{t.learn.languages.en}</option>
+                              <option value="ru">{t.learn.languages.ru}</option>
                             </select>
                           </label>
                         </div>
 
                         <label htmlFor="student-question" className="mt-3 block text-xs font-semibold text-ink-muted">
-                          Hujjat haqida savol
+                          {t.learn.questionLabel}
                         </label>
                         <input
                           id="student-question"
                           className="my-2 w-full rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
-                          placeholder="Savolingizni yozing yoki quyidagi tayyor tugmalardan foydalaning..."
+                          placeholder={t.learn.questionPlaceholder}
                           value={question}
                           onChange={(e) => setQuestion(e.target.value)}
                           maxLength={2000}
@@ -736,10 +738,10 @@ export function StudentPage() {
 
                         <div className="flex flex-wrap gap-2">
                           {[
-                            ["answer", "Javob olish"],
-                            ["summary", "Bo‘lim xulosasi"],
-                            ["study_guide", "O‘quv qo‘llanma"],
-                            ["quiz", "Test tuzish"],
+                            ["answer", t.learn.answer],
+                            ["summary", t.learn.summary],
+                            ["study_guide", t.learn.studyGuide],
+                            ["quiz", t.learn.quiz],
                           ].map(([kind, label]) => (
                             <button
                               className={button}
@@ -756,8 +758,8 @@ export function StudentPage() {
                           <div aria-live="polite" className="mt-5 grid gap-3 border-t border-line pt-4">
                             <p className="text-xs text-ink-muted">
                               {answer.generated
-                                ? `AI izohi (${answer.provider}); tanlangan manba parchalari asosida. Citation tekshiruvi faktlarning to‘g‘riligini kafolatlamaydi.`
-                                : "Yetarli dalil topilmadi."}
+                                ? f(t.learn.generatedNote, { provider: String(answer.provider) })
+                                : t.learn.noEvidence}
                             </p>
                             {!answer.quiz && (
                               <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
@@ -787,7 +789,7 @@ export function StudentPage() {
                                       choices[i] === item.answer ? "text-success" : "text-amber-600"
                                     }`}
                                   >
-                                    {choices[i] === item.answer ? "To‘g‘ri." : "Qayta o‘ylab ko‘ring."}{" "}
+                                    {choices[i] === item.answer ? t.learn.correct : t.learn.incorrect}{" "}
                                     <span className="font-normal text-ink-muted">{item.explanation}</span>
                                   </p>
                                 )}
@@ -795,7 +797,7 @@ export function StudentPage() {
                             ))}
 
                             {/* Exact Citations */}
-                            <h3 className="mt-2 font-semibold text-ink">Manbalar</h3>
+                            <h3 className="mt-2 font-semibold text-ink">{t.learn.sources}</h3>
                             {answer.citations.map((citation) => (
                               <blockquote
                                 className="cursor-pointer rounded-r-lg border-l-2 border-accent bg-surface-2/40 p-3 text-xs leading-relaxed transition-colors hover:bg-surface-2"
@@ -818,19 +820,18 @@ export function StudentPage() {
                   {activeTab === "plan" && (
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
                       <div>
-                        <h3 className="font-bold text-ink">Bugungi takrorlash rejasi</h3>
+                        <h3 className="font-bold text-ink">{t.plan.heading}</h3>
                         <p className="text-xs text-ink-muted">
-                          Saqlangan kartalaringizning haqiqiy takrorlash jadvalidan. Bu o‘zlashtirish bahosi yoki
-                          avtomatik tuzilgan o‘quv dasturi emas.
+                          {t.plan.hint}
                         </p>
                       </div>
                       {!practicePlan ? (
-                        <p className="text-xs text-ink-muted">Yuklanmoqda…</p>
+                        <p className="text-xs text-ink-muted">{t.plan.loading}</p>
                       ) : practicePlan.items.length === 0 ? (
                         <p className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-ink-muted">
                           {cards.length === 0
-                            ? "Hali saqlangan karta yo‘q. “Flash-kartalar” bo‘limida manbadan karta yarating."
-                            : "Hozir takrorlanadigan karta yo‘q."}
+                            ? t.plan.noCards
+                            : t.plan.nothingDue}
                         </p>
                       ) : (
                         <ol className="grid gap-2">
@@ -838,9 +839,9 @@ export function StudentPage() {
                             const card = cards.find((c) => c.id === item.card_id);
                             return (
                               <li key={item.card_id} className="rounded-xl border border-line bg-surface-2/40 p-3 text-sm">
-                                <span className="font-semibold text-ink">{card?.front ?? "Karta"}</span>
+                                <span className="font-semibold text-ink">{card?.front ?? t.plan.card}</span>
                                 <span className="ml-2 text-xs text-ink-muted">
-                                  {item.reason === "scheduled_recall" ? "rejali takrorlash" : "birinchi yoki qayta takrorlash"} ·{" "}
+                                  {item.reason === "scheduled_recall" ? t.plan.scheduledRecall : t.plan.firstRecall} ·{" "}
                                   {new Date(item.due_at).toLocaleString()}
                                 </span>
                               </li>
@@ -850,24 +851,30 @@ export function StudentPage() {
                       )}
                     </div>
                   )}
+                  {activeTab === "plan" && (
+                    <LearningPaths
+                      cards={cards.map((c) => ({ id: c.id, front: c.front }))}
+                      projectId={selected?.job.project_id ?? null}
+                    />
+                  )}
 
                   {/* TAB 3: Interactive Flashcards */}
                   {activeTab === "flashcards" && (
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                          <h3 className="font-bold text-ink">Asosiy Tushunchalar bo‘yicha Flash-kartalar</h3>
+                          <h3 className="font-bold text-ink">{t.flashcards.heading}</h3>
                           <p className="text-xs text-ink-muted">
-                            Manbadan iqtibos olingan kartalar. Spaced repetition orqali eslab qolishni mustahkamlang.
+                            {t.flashcards.hint}
                           </p>
                         </div>
                         {progress && (
                           <div className="flex items-center gap-2 text-xs">
                             <span className="rounded-full bg-accent/10 px-2.5 py-1 font-medium text-accent border border-accent/20">
-                              Faol: {progress.active_cards} ta
+                              {f(t.flashcards.active, { n: progress.active_cards })}
                             </span>
                             <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-600 border border-emerald-500/20">
-                              O‘rganilgan: {progress.reviewed_cards} ta
+                              {f(t.flashcards.reviewed, { n: progress.reviewed_cards })}
                             </span>
                           </div>
                         )}
@@ -892,9 +899,9 @@ export function StudentPage() {
                                   }
                                 >
                                   <div className="flex items-center justify-between text-xs text-ink-faint">
-                                    <span className="font-mono">Karta v{card.version}</span>
+                                    <span className="font-mono">{f(t.flashcards.version, { version: card.version })}</span>
                                     <span className="text-[11px] font-medium text-accent">
-                                      {isFlipped ? "Ta'rif (Orqa)" : "Savol (Oldi — Flip)"}
+                                      {isFlipped ? t.flashcards.back : t.flashcards.front}
                                     </span>
                                   </div>
                                   <div className="my-3 min-h-[60px] flex items-center justify-center text-center">
@@ -917,7 +924,7 @@ export function StudentPage() {
                                     onClick={() => void handleDeleteCard(card.id)}
                                     className="text-[11px] text-danger hover:underline"
                                   >
-                                    O‘chirish
+                                    {t.flashcards.delete}
                                   </button>
                                   <div className="flex items-center gap-1.5">
                                     <button
@@ -925,28 +932,28 @@ export function StudentPage() {
                                       className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-ink font-medium"
                                       onClick={() => void handleReview(card, "again")}
                                     >
-                                      Qayta
+                                      {t.flashcards.again}
                                     </button>
                                     <button
                                       type="button"
                                       className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-amber-600 font-medium"
                                       onClick={() => void handleReview(card, "hard")}
                                     >
-                                      Qiyin
+                                      {t.flashcards.hard}
                                     </button>
                                     <button
                                       type="button"
                                       className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-primary font-medium"
                                       onClick={() => void handleReview(card, "good")}
                                     >
-                                      Yaxshi
+                                      {t.flashcards.good}
                                     </button>
                                     <button
                                       type="button"
                                       className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-emerald-600 font-medium"
                                       onClick={() => void handleReview(card, "easy")}
                                     >
-                                      Oson
+                                      {t.flashcards.easy}
                                     </button>
                                   </div>
                                 </div>
@@ -956,14 +963,14 @@ export function StudentPage() {
                         </div>
                       ) : (
                         <p className="rounded-xl border border-dashed border-line p-6 text-center text-xs text-ink-muted">
-                          Hali saqlangan o‘quv kartalari yo‘q.
+                          {t.flashcards.empty}
                         </p>
                       )}
 
                       <div className="space-y-3 border-t border-line pt-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-xs text-ink-muted">
-                            AI manbadan iqtibosli karta taklif qiladi; siz saqlamaguningizcha hech narsa yozilmaydi.
+                            {t.flashcards.proposeHint}
                           </p>
                           <button
                             type="button"
@@ -971,7 +978,7 @@ export function StudentPage() {
                             disabled={busy || !provider}
                             onClick={() => void perform(proposeCards)}
                           >
-                            Manbadan karta taklif qilish (AI)
+                            {t.flashcards.propose}
                           </button>
                         </div>
                         {proposals.map((proposal, index) => (
@@ -979,7 +986,7 @@ export function StudentPage() {
                             <p className="font-semibold text-ink">{proposal.front}</p>
                             <p className="mt-1 text-xs text-ink-muted">{proposal.back}</p>
                             <button type="button" className={`${button} mt-2`} onClick={() => void perform(() => saveProposal(index))}>
-                              Saqlash
+                              {t.flashcards.save}
                             </button>
                           </div>
                         ))}
@@ -992,8 +999,8 @@ export function StudentPage() {
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-5">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
-                          <h3 className="font-bold text-ink">Kitob Strukturasi va Konsept Daraxti</h3>
-                          <p className="text-xs text-ink-muted">Hujjatning iyerarxik boblari va model talqini konsept grafi</p>
+                          <h3 className="font-bold text-ink">{t.concepts.heading}</h3>
+                          <p className="text-xs text-ink-muted">{t.concepts.hint}</p>
                         </div>
                         <button
                           type="button"
@@ -1001,20 +1008,20 @@ export function StudentPage() {
                           disabled={conceptLoading || !provider}
                           onClick={() => void handleGenerateConceptGraph()}
                         >
-                          {conceptLoading ? "Tahlil qilinmoqda..." : "Konsept grafini tahlil qilish (AI)"}
+                          {conceptLoading ? t.concepts.analyzing : t.concepts.analyze}
                         </button>
                       </div>
 
                       {conceptGraph && !conceptGraph.graph && (
                         <p role="status" className="rounded-xl border border-line p-3 text-xs text-ink-muted">
-                          Konsept grafi uchun yetarli manba topilmadi.
+                          {t.concepts.noEvidence}
                         </p>
                       )}
                       {conceptGraph?.graph && (
                         <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-primary">AI taklif qilgan konsept grafi</span>
-                            <span className="text-ink-faint">Model talqini; iqtiboslar manbaga tekshirilgan</span>
+                            <span className="font-semibold text-primary">{t.concepts.graphTitle}</span>
+                            <span className="text-ink-faint">{t.concepts.graphNote}</span>
                           </div>
                           <div className="grid gap-2 sm:grid-cols-2">
                             {conceptGraph.graph.nodes.map((n) => (
@@ -1026,7 +1033,7 @@ export function StudentPage() {
                           </div>
                           {conceptGraph.graph.edges.length > 0 && (
                             <div className="pt-2 border-t border-line/60">
-                              <h5 className="text-xs font-semibold text-ink mb-1.5">Bog‘liqliklar:</h5>
+                              <h5 className="text-xs font-semibold text-ink mb-1.5">{t.concepts.edges}</h5>
                               <ul className="text-xs space-y-1 text-ink-muted">
                                 {conceptGraph.graph.edges.map((e, i) => {
                                   const label = (id: string) =>
@@ -1053,10 +1060,11 @@ export function StudentPage() {
                               </div>
                               <div className="flex-1">
                                 <h4 className="text-sm font-semibold text-ink">
-                                  {sec.heading || `Bo‘lim ${idx + 1}`}
+                                  {sec.heading || f(t.concepts.section, { n: idx + 1 })}
                                 </h4>
                                 <p className="text-xs text-ink-muted">
-                                  Diapazon: {sec.start}–{sec.end} belgilar {sec.page ? `(${sec.page}-sahifa)` : ""}
+                                  {f(t.concepts.range, { start: sec.start, end: sec.end })}{" "}
+                                  {sec.page ? f(t.concepts.pageNote, { page: sec.page }) : ""}
                                 </p>
                               </div>
                               <button
@@ -1067,17 +1075,24 @@ export function StudentPage() {
                                   setActiveTab("reader");
                                 }}
                               >
-                                O‘qishga o‘tish
+                                {t.concepts.openReader}
                               </button>
                             </div>
                           ))
                         ) : (
                           <div className="rounded-xl border border-line bg-surface-2/20 p-4 text-center text-xs text-ink-muted">
-                            Matn bo‘limlari indekslanmoqda yoki yagona yaxlit matn sifatida saqlangan.
+                            {t.concepts.noSections}
                           </div>
                         )}
                       </div>
                     </div>
+                  )}
+                  {activeTab === "concepts" && (
+                    <Comparison
+                      documents={entries.filter((e) => e.job.state === "completed").map((e) => ({ id: e.job.document_id, title: e.title }))}
+                      projectId={selected?.job.project_id ?? null}
+                      provider={provider}
+                    />
                   )}
                 </>
               )}

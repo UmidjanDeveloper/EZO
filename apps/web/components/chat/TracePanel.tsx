@@ -7,6 +7,7 @@ import { useCallback } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
+import { AgentWeb } from "./AgentWeb";
 
 export function TracePanel({ runId, onClose }: { runId: string | null; onClose: () => void }) {
   const { m } = useI18n();
@@ -44,6 +45,7 @@ function TraceBody({ runId }: { runId: string }) {
             {!run && !error ? <Spinner label={m.common.loading} /> : null}
             {run ? (
               <div className="flex flex-col gap-5">
+                <AgentWeb run={run} />
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
                   <Row label={m.trace.intent} value={`${run.intent} (${run.intent_confidence ?? "–"})`} />
                   <Row label={m.trace.agent} value={run.agent} />

@@ -207,8 +207,10 @@ jobs:
               report = json.load(open(path))
           except Exception:
               report = {"ok": False, "steps": []}
-          print(f"::notice title=Android emulator::ok={report['ok']} steps={len(report['steps'])}")
-          for s in report["steps"]:
+          # GitHub keeps at most 10 notices per step: the verdict first, then the latest steps.
+          print(f"::notice title=Android emulator::ok={report['ok']} steps={len(report['steps'])} "
+                + " → ".join(s["name"] for s in report["steps"])[:700])
+          for s in report["steps"][-8:]:
               print(f"::notice title=Android step::{s['name']} {s.get('detail','')}"[:900])
           if report.get("error"):
               first = " ".join(report["error"].split())

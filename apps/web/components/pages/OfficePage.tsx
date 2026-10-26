@@ -43,7 +43,7 @@ interface OfficeArtifact {
 }
 
 export function OfficePage() {
-  const { m } = useI18n();
+  const { m, f } = useI18n();
   const { status } = useApp();
   const freeBeta = status?.deployment_profile === "free-beta";
   const [activeTab, setActiveTab] = useState<OfficeTab>("document");
@@ -73,18 +73,14 @@ export function OfficePage() {
   const artifacts = artifactsData ?? [];
 
   // Document creation form
-  const [docTitle, setDocTitle] = useState("Rasmiy murojaat xati");
-  const [docMarkdown, setDocMarkdown] = useState(
-    "# RASMIY XAT\n\n**Kimga:** Tashkilot rahbariyatiga\n\n**Mavzu:** Hamkorlik loyihasi to'g'risida\n\nHurmatli hamkasblar!\n\nMazkur xat orqali ta'lim va axborot texnologiyalari sohasida hamkorlik qilish istagimizni bildiramiz.",
-  );
+  const [docTitle, setDocTitle] = useState(m.office.sampleDocTitle);
+  const [docMarkdown, setDocMarkdown] = useState(m.office.sampleDocMarkdown);
   const [exportPdf, setExportPdf] = useState(true);
 
   // Spreadsheet creation form
-  const [sheetTitle, setSheetTitle] = useState("Oylik daromad va xarajatlar");
-  const [columnsStr, setColumnsStr] = useState("Modda, Reja (UZS), Haqiqat (UZS), Farq (UZS)");
-  const [rowsData, setRowsData] = useState(
-    "Infratuzilma, 12000000, 11500000, -500000\nMaoshlar, 45000000, 45000000, 0\nMarketing, 8000000, 9200000, 1200000",
-  );
+  const [sheetTitle, setSheetTitle] = useState(m.office.sampleSheetTitle);
+  const [columnsStr, setColumnsStr] = useState(m.office.sampleColumns);
+  const [rowsData, setRowsData] = useState(m.office.sampleRows);
 
   const [loading, setLoading] = useState(false);
   const [recentSuccess, setRecentSuccess] = useState<OfficeArtifact | null>(null);
@@ -113,7 +109,7 @@ export function OfficePage() {
     try {
       const detail = await api.getArtifact(artifact.artifact_id);
       const version = detail.current_version;
-      if (!version) throw new Error("Fayl versiyasi topilmadi.");
+      if (!version) throw new Error(m.office.versionNotFound);
       const result = format
         ? await api.downloadExport(artifact.artifact_id, version.version_number, format)
         : await api.downloadArtifact(artifact.artifact_id, version.version_number);
@@ -143,7 +139,7 @@ export function OfficePage() {
         setRecentSuccess(art);
         reloadArtifacts();
       } else {
-        setError("Hujjatni shakllantirishda xatolik yuz berdi.");
+        setError(m.office.documentError);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -188,7 +184,7 @@ export function OfficePage() {
         setRecentSuccess(art);
         reloadArtifacts();
       } else {
-        setError("Jadvalni shakllantirishda xatolik yuz berdi.");
+        setError(m.office.spreadsheetError);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -199,11 +195,8 @@ export function OfficePage() {
 
   return (
     <PageFrame
-      title={m.office?.title ?? "Hujjatlar va Ofis Ustaxonasi"}
-      subtitle={
-        m.office?.subtitle ??
-        "Xavfsiz Word (DOCX) va Excel (XLSX) hujjatlarini yaratish va yuklab olish."
-      }
+      title={m.office.title}
+      subtitle={m.office.subtitle}
     >
       {/* Safety Notice Banner */}
       <Card className="mb-6 border-line bg-surface-2/40">
@@ -212,8 +205,7 @@ export function OfficePage() {
             <ShieldCheck size={20} />
           </div>
           <p className="text-xs leading-relaxed text-ink-muted">
-            {m.office?.safeNotice ??
-              "Makroslar va tashqi skriptlarsiz toza, xavfsiz ofis fayllari yaratiladi."}
+            {m.office.safeNotice}
           </p>
         </div>
       </Card>
@@ -221,7 +213,7 @@ export function OfficePage() {
       {/* Templates Row */}
       <div className="mb-6">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-          {m.office?.templates ?? "Tayyor shablonlar"}
+          {m.office.templates}
         </h3>
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
           {templates.map((tmpl) => (
@@ -261,7 +253,7 @@ export function OfficePage() {
           )}
         >
           <FileText size={16} />
-          {m.office?.createDocument ?? "Word (DOCX)"}
+          {m.office.createDocument}
         </button>
         <button
           type="button"
@@ -277,7 +269,7 @@ export function OfficePage() {
           )}
         >
           <FileSpreadsheet size={16} />
-          {m.office?.createSpreadsheet ?? "Excel (XLSX)"}
+          {m.office.createSpreadsheet}
         </button>
         <button
           type="button"
@@ -293,7 +285,7 @@ export function OfficePage() {
           )}
         >
           <TableIcon size={16} />
-          {m.office?.myArtifacts ?? "Mening fayllarim"} ({artifacts.length})
+          {m.office.myArtifacts} ({artifacts.length})
         </button>
       </div>
 
@@ -304,7 +296,7 @@ export function OfficePage() {
             <div className="flex items-center gap-3">
               <CheckCircle2 size={24} className="text-success" />
               <div>
-                <h4 className="text-sm font-semibold text-ink">{recentSuccess.title} tayyor!</h4>
+                <h4 className="text-sm font-semibold text-ink">{f(m.office.readyBanner, { title: recentSuccess.title })}</h4>
                 <p className="text-xs text-ink-muted">{recentSuccess.filename}</p>
               </div>
             </div>
@@ -315,7 +307,7 @@ export function OfficePage() {
                 className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
               >
                 <Download size={14} />
-                {recentSuccess.type === "document" ? "DOCX yuklab olish" : "XLSX yuklab olish"}
+                {recentSuccess.type === "document" ? m.office.downloadDocx : m.office.downloadXlsx}
               </button>
               {recentSuccess.exports["pdf"] ? (
                 <button
@@ -324,7 +316,7 @@ export function OfficePage() {
                   className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <FileText size={14} />
-                  PDF versiya
+                  {m.office.pdfVersion}
                 </button>
               ) : null}
             </div>
@@ -339,13 +331,13 @@ export function OfficePage() {
         <Card>
           <form onSubmit={handleCreateDocument} className="space-y-4">
             <TextField
-              label={m.office?.docTitle ?? "Hujjat nomi"}
+              label={m.office.docTitle}
               value={docTitle}
               onChange={(e) => setDocTitle(e.target.value)}
               required
             />
             <TextAreaField
-              label={m.office?.contentLabel ?? "Matn (Markdown formatida)"}
+              label={m.office.contentLabel}
               value={docMarkdown}
               onChange={(e) => setDocMarkdown(e.target.value)}
               rows={10}
@@ -360,7 +352,7 @@ export function OfficePage() {
                   onChange={(e) => setExportPdf(e.target.checked)}
                   className="rounded border-line"
                 />
-                {freeBeta ? "PDF bepul profilda o‘chirilgan (DOCX ishlaydi)" : (m.office?.exportPdf ?? "PDF nusxasini ham eksport qilish")}
+                {freeBeta ? m.office.pdfDisabledFreeBeta : m.office.exportPdf}
               </label>
 
               <Button
@@ -369,7 +361,7 @@ export function OfficePage() {
                 disabled={loading}
                 icon={<Download size={15} />}
               >
-                {m.office?.generate ?? "DOCX yaratish"}
+                {m.office.generate}
               </Button>
             </div>
           </form>
@@ -379,19 +371,19 @@ export function OfficePage() {
         <Card>
           <form onSubmit={handleCreateSpreadsheet} className="space-y-4">
             <TextField
-              label={m.office?.spreadsheetTitle ?? "Jadval nomi"}
+              label={m.office.spreadsheetTitle}
               value={sheetTitle}
               onChange={(e) => setSheetTitle(e.target.value)}
               required
             />
             <TextField
-              label={m.office?.columnsLabel ?? "Ustunlar (vergul bilan)"}
+              label={m.office.columnsLabel}
               value={columnsStr}
               onChange={(e) => setColumnsStr(e.target.value)}
               required
             />
             <TextAreaField
-              label="Qatorlar ma'lumoti (har bir qator yangi satrda, vergul bilan)"
+              label={m.office.rowsLabel}
               value={rowsData}
               onChange={(e) => setRowsData(e.target.value)}
               rows={8}
@@ -404,7 +396,7 @@ export function OfficePage() {
                 disabled={loading}
                 icon={<Download size={15} />}
               >
-                {m.office?.generate ?? "XLSX yaratish"}
+                {m.office.generate}
               </Button>
             </div>
           </form>
@@ -413,7 +405,7 @@ export function OfficePage() {
         /* Artifacts List */
         <div className="space-y-3">
           {artifacts.length === 0 ? (
-            <p className="text-sm text-ink-muted">Hozircha ofis fayllari yaratilmagan.</p>
+            <p className="text-sm text-ink-muted">{m.office.noArtifacts}</p>
           ) : (
             artifacts.map((art) => (
               <div
@@ -442,7 +434,7 @@ export function OfficePage() {
                   className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <Download size={13} />
-                  {m.office?.download ?? "Yuklab olish"}
+                  {m.office.download}
                 </button>
               </div>
             ))

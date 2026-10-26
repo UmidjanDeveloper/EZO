@@ -61,7 +61,7 @@ interface GeneratedArtifact {
 }
 
 export function PresentationsPage() {
-  const { m } = useI18n();
+  const { m, f } = useI18n();
 
   const authHeaders = useCallback(() => {
     const token = storedToken.get().trim();
@@ -82,15 +82,11 @@ export function PresentationsPage() {
   const [selectedTheme, setSelectedTheme] = useState("ezo");
 
   // Brief state
-  const [title, setTitle] = useState("O'zbekistonda Raqamli Iqtisodiyot");
-  const [topic, setTopic] = useState(
-    "Sun'iy intellekt va zamonaviy texnologiyalarni joriy etish orqali biznes samaradorligini oshirish",
-  );
-  const [audience, setAudience] = useState("Kompaniya rahbarlari va investorlar");
+  const [title, setTitle] = useState(m.presentations.sampleTitle);
+  const [topic, setTopic] = useState(m.presentations.sampleTopic);
+  const [audience, setAudience] = useState(m.presentations.sampleAudience);
   const [slideCount, setSlideCount] = useState(6);
-  const [keyPoints, setKeyPoints] = useState(
-    "Jarayonlarni avtomatlashtirish, Mijozlar bilan ishlash sifati, Xarajatlarni optimallashtirish",
-  );
+  const [keyPoints, setKeyPoints] = useState(m.presentations.sampleKeyPoints);
 
   // Outline & Generation state
   const [loadingOutline, setLoadingOutline] = useState(false);
@@ -104,7 +100,7 @@ export function PresentationsPage() {
     try {
       const detail = await api.getArtifact(artifactId);
       const version = detail.current_version;
-      if (!version) throw new Error("Fayl versiyasi topilmadi.");
+      if (!version) throw new Error(m.presentations.versionNotFound);
       const result = format
         ? await api.downloadExport(artifactId, version.version_number, format)
         : await api.downloadArtifact(artifactId, version.version_number);
@@ -146,7 +142,7 @@ export function PresentationsPage() {
         setOutline(data);
         setGenerated(null);
       } else {
-        setError("Reja tuzishda xatolik yuz berdi.");
+        setError(m.presentations.outlineError);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -174,7 +170,7 @@ export function PresentationsPage() {
         const data = (await res.json()) as GeneratedArtifact;
         setGenerated(data);
       } else {
-        setError("PPTX taqdimotni shakllantirishda xatolik yuz berdi.");
+        setError(m.presentations.pptxError);
       }
     } catch (err) {
       setError((err as Error).message);
@@ -185,11 +181,8 @@ export function PresentationsPage() {
 
   return (
     <PageFrame
-      title={m.presentations?.title ?? "Taqdimotlar Ustaxonasi 2.0"}
-      subtitle={
-        m.presentations?.subtitle ??
-        "Mavzu bo'yicha tuzilma yaratish, slaydlar arxitekturasi va professional PPTX eksporti."
-      }
+      title={m.presentations.title}
+      subtitle={m.presentations.subtitle}
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Column: Brief Intake Form (5 cols) */}
@@ -198,20 +191,20 @@ export function PresentationsPage() {
             <div className="flex items-center gap-2 border-b border-line pb-3">
               <Presentation size={18} className="text-accent" />
               <h3 className="text-sm font-semibold text-ink">
-                {m.presentations?.briefTitle ?? "Taqdimot ma'lumotlarini kiritish"}
+                {m.presentations.briefTitle}
               </h3>
             </div>
 
             <form onSubmit={handleGenerateOutline} className="space-y-3">
               <TextField
-                label={m.presentations?.topicLabel ?? "Taqdimot mavzusi"}
+                label={m.presentations.topicLabel}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
               />
 
               <TextAreaField
-                label="Batafsil mazmun yoki maqsad"
+                label={m.presentations.detailsLabel}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 rows={3}
@@ -220,12 +213,12 @@ export function PresentationsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <TextField
-                  label={m.presentations?.audienceLabel ?? "Auditoriya"}
+                  label={m.presentations.audienceLabel}
                   value={audience}
                   onChange={(e) => setAudience(e.target.value)}
                 />
                 <TextField
-                  label={m.presentations?.slidesCountLabel ?? "Slaydlar soni"}
+                  label={m.presentations.slidesCountLabel}
                   type="number"
                   min={3}
                   max={25}
@@ -237,7 +230,7 @@ export function PresentationsPage() {
               {/* Theme Picker */}
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-ink">
-                  {m.presentations?.themeLabel ?? "Dizayn uslubi (Mavzular)"}
+                  {m.presentations.themeLabel}
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {themes.slice(0, 6).map((thm) => (
@@ -268,7 +261,7 @@ export function PresentationsPage() {
               </div>
 
               <TextField
-                label="Asosiy nuqtalar (vergul bilan ajratilgan)"
+                label={m.presentations.keyPointsLabel}
                 value={keyPoints}
                 onChange={(e) => setKeyPoints(e.target.value)}
               />
@@ -282,11 +275,7 @@ export function PresentationsPage() {
                 disabled={loadingOutline}
                 icon={<Sparkles size={16} />}
               >
-                {loadingOutline ? (
-                  <Spinner />
-                ) : (
-                  m.presentations?.generateOutline ?? "Reja tuzish"
-                )}
+                {loadingOutline ? <Spinner /> : m.presentations.generateOutline}
               </Button>
             </form>
           </Card>
@@ -302,10 +291,10 @@ export function PresentationsPage() {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-ink">
-                    {m.presentations?.ready ?? "Taqdimot muvaffaqiyatli tayyorlandi!"}
+                    {m.presentations.ready}
                   </h3>
                   <p className="text-xs text-ink-muted">
-                    {generated.title} · {generated.slide_count} slayd · Uslub: {generated.theme}
+                    {f(m.presentations.generatedMeta, { title: generated.title, count: generated.slide_count, theme: generated.theme })}
                   </p>
                 </div>
               </div>
@@ -318,7 +307,7 @@ export function PresentationsPage() {
                   className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90"
                 >
                   <Download size={16} />
-                  {m.presentations?.downloadPptx ?? "PPTX yuklab olish"}
+                  {m.presentations.downloadPptx}
                 </button>
                 <button
                   type="button"
@@ -326,7 +315,7 @@ export function PresentationsPage() {
                   className="flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <FileText size={16} />
-                  {m.presentations?.downloadPdf ?? "PDF versiya"}
+                  {m.presentations.downloadPdf}
                 </button>
                 <button
                   type="button"
@@ -334,17 +323,14 @@ export function PresentationsPage() {
                   className="flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-accent/40"
                 >
                   <Eye size={16} />
-                  {m.presentations?.previewHtml ?? "Veb ko'rinish"}
+                  {m.presentations.previewHtml}
                 </button>
               </div>
 
               {/* QA Badge */}
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-surface-2 p-2.5 text-xs text-ink-muted">
                 <ShieldCheck size={16} className="text-success" />
-                <span>
-                  Layout QA tekshiruvidan o&apos;tdi: barcha matn o&apos;lchamlari va rang kontrasti
-                  moslashtirildi.
-                </span>
+                <span>{m.presentations.qaPassed}</span>
               </div>
             </Card>
           ) : null}
@@ -354,12 +340,12 @@ export function PresentationsPage() {
               <div className="flex items-center justify-between border-b border-line pb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-ink">
-                    {m.presentations?.outlineTitle ?? "Taqdimot rejasi va tuzilishi"}
+                    {m.presentations.outlineTitle}
                   </h3>
                   <p className="text-xs text-ink-muted">
-                    {outline.slides.length} ta slayd · Uslub: {outline.theme} ·{" "}
+                    {f(m.presentations.outlineMeta, { count: outline.slides.length, theme: outline.theme })} ·{" "}
                     <span data-testid="outline-source">
-                      {outline.source === "model" ? "AI rejalashtirgan" : "Andoza"}
+                      {outline.source === "model" ? m.presentations.sourceModel : m.presentations.sourceTemplate}
                     </span>
                   </p>
                   {outline.notice ? (
@@ -376,11 +362,7 @@ export function PresentationsPage() {
                   icon={<Play size={14} />}
                   onClick={() => void handleGeneratePptx()}
                 >
-                  {loadingPptx ? (
-                    <Spinner />
-                  ) : (
-                    m.presentations?.createPptx ?? "PPTX yaratish"
-                  )}
+                  {loadingPptx ? <Spinner /> : m.presentations.createPptx}
                 </Button>
               </div>
 
@@ -422,11 +404,8 @@ export function PresentationsPage() {
           ) : (
             <Card className="flex flex-col items-center justify-center p-8 text-center">
               <Presentation size={48} className="mb-3 text-accent" />
-              <h3 className="text-base font-semibold text-ink">Taqdimot loyihasini boshlang</h3>
-              <p className="mt-1 max-w-sm text-xs text-ink-muted">
-                Chap tomonda mavzu va parametrlarni kiriting, EZO avtomatik ravishda slaydlar
-                rejasi va professional dizaynni tuzadi.
-              </p>
+              <h3 className="text-base font-semibold text-ink">{m.presentations.emptyTitle}</h3>
+              <p className="mt-1 max-w-sm text-xs text-ink-muted">{m.presentations.emptyDesc}</p>
             </Card>
           )}
         </div>
