@@ -198,7 +198,7 @@ no PR URL is fabricated. A verified Git bundle is also supplied for offline revi
 |---|---|---|
 | Native **CRITICAL CVE-2026-6653** | libxml2 `2.12.7+dfsg+really2.9.14-2.1+deb13u3` in fresh executor; Trivy advertises no fixed Debian version | UAF in XML parsing; Office XML processing makes this relevant. EZO exploit reachability is not proven. Isolation mitigates blast radius, not the vulnerable package; independent review/vendor fix or reviewed backport required |
 | API44 HIGH /0 CRITICAL; executor80 HIGH /1 CRITICAL | Fresh official GHCR Trivy database; zero findings with a vendor fixed version among HIGH/CRITICAL | No suppression/ignore-unfixed; passing the unchanged fixable-CVE gate is not release approval |
-| **HIGH CVE-2026-115570 / GHSA-jr5w-w6x2-84p9** | Electron44.7.0, patched>=44.9.1, npm advisory: compromised eMudhra intermediate mitigation | Electron ships in Windows app even though declared devDependency. Claude owns desktop dependency patch and Windows acceptance. API cert mitigation does not patch Electron |
+| ~~HIGH CVE-2026-115570 / GHSA-jr5w-w6x2-84p9~~ **fixed** | Electron 44.7.0 → **44.9.3** (patched ≥ 44.9.1) in `apps/desktop/package.json`; `pnpm audit` now reports no high/critical Electron advisory | Closed by the desktop dependency patch. Windows acceptance is the Devices workflow (installer + real OS self-test) on the merged head |
 | MODERATE CVE-2026-41907 / GHSA-w5hq-g745-h8pq | uuid7.0.3 via mobile>@capacitor/cli>xcode; patched>=11.1.1 | Build-tool dependency, no EZO exploit demonstrated. Coordinate compatible upstream/tooling upgrade; do not force a breaking major override to hide it |
 
 The security workflow now builds/scans the **executor as well as API and web**.
