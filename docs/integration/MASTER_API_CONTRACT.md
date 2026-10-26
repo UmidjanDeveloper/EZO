@@ -302,3 +302,15 @@ give quota back; rows older than two days are pruned. Each authenticated caller 
 own per-minute and daily rate-limit key (`owner` or `user:<id>`), so one user cannot use up
 another's budget. Every user's data is scoped by `user_id`; cross-user reads return 404 or
 empty.
+
+### Delivery admission / crash recovery addendum (2026-10-26 candidate)
+
+Approval consumption and dispatch intent commit before Telegram I/O. Exact produced
+artifact SHA256 must match all loaded bytes before the first document is sent.
+`receipt.delivery_state: "dispatching"` is not a successful delivery. Verified
+`receipt.delivered[]` entries persist independently. An interrupted dispatch older
+than2min becomes terminal `delivery_unknown` on worker/poll recovery; no resend.
+`artifact_changed` sends nothing. Cancellation/revocation is checked between
+bounded sends; already in-flight messages cannot be recalled. After HTTP500 or a
+lost connection, fetch task status rather than reapprove or create a new task.
+No frontend/provider edits are part of this contract change.
