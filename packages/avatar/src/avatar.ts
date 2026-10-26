@@ -106,11 +106,17 @@ export class EzoAvatar {
     const small = Math.max(rect.width, rect.height) < 260;
     const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
     const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
+    const started = typeof performance !== "undefined" ? performance.now() : 0;
     this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust" });
+    const buildMs = typeof performance !== "undefined" ? performance.now() - started : 0;
 
     this.glState = this.initGl();
     this.renderer = this.glState ? "webgl" : canvas.getContext("2d") ? "2d" : "none";
     canvas.dataset.ezoAvatar = this.renderer;
+    // Static facts for performance checks (set once, never per frame).
+    canvas.dataset.quality = quality;
+    canvas.dataset.points = String(this.figure.count);
+    canvas.dataset.buildMs = buildMs.toFixed(1);
     canvas.dataset.state = this.state;
     canvas.addEventListener("webglcontextlost", this.onLost);
     canvas.addEventListener("webglcontextrestored", this.onRestored);
