@@ -15,6 +15,18 @@ const EXTENSION_POPUP = path.resolve(__dirname, "../../../apps/chrome-extension/
 const MOBILE_DIST = path.resolve(__dirname, "../../../apps/mobile/dist");
 
 async function scan(page: Page) {
+  // Scan the settled page: entrance fades (opacity 0 → 1) would otherwise be measured as
+  // blended, lower-contrast colours on a slow machine. Looping animations are left alone.
+  await page
+    .evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((a) => Number.isFinite(a.effect?.getTiming().iterations ?? 1))
+          .map((a) => a.finished.catch(() => undefined)),
+      ),
+    )
+    .catch(() => undefined);
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const serious = results.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
   const describe = (v: (typeof results.violations)[number]) =>

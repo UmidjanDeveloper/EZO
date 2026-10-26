@@ -25,7 +25,7 @@ says so, and anything that needs your PC, phone, keys or accounts is marked as y
 | Global shortcut to talk (configurable); Ctrl+Alt+H show/hide; tray toggle | COMPLETE | Code; shortcut hint follows the setting |
 | Live server status: AI ready / server without AI / unreachable; the figure goes offline | COMPLETE | `/api/status` polled; pill spec asserts the three states |
 | Voice turn: record → recognizing → thinking/working → speaking → success/idle | COMPLETE (pipeline) | Pill spec; `apps/desktop` vitest 69/69 |
-| Stop really cancels the server request; a late reply is ignored | COMPLETE | Pill spec "stop during thinking" |
+| Stop really cancels the server request; a late reply or a late stage event is ignored | COMPLETE | Pill spec "stop during thinking" and the stage guard case (a late `working` stage used to wake the idle pill — found by the spec, fixed) |
 | Spoken Uzbek reply through a real provider | BLOCKED (owner) | Needs `OPENAI_API_KEY` or `ELEVENLABS_API_KEY` on the server, mic and speakers |
 | Text chat; conversation history from the server; switch/new conversation | COMPLETE | Pill spec; shared with web/phone (live test `live.test.ts` when `EZO_LIVE_API` is set) |
 | Scoped folder access, file search/open, denial outside the folder | COMPLETE (CI VM) | Windows self-test (decoy outside the folder not returned) |
