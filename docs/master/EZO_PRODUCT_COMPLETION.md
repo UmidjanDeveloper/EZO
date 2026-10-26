@@ -69,7 +69,7 @@ says so, and anything that needs your PC, phone, keys or accounts is marked as y
 
 ## 5. Avatar and voice capability (actual)
 
-- Figure: 49,034 points (high) / 18,630 (low), WebGL 1, 2D still fallback, reduced-motion stills, pauses when hidden, restores after context loss. Measured on the CI software renderer: avatar draw + finish 6–9 ms p50 (`avatar-performance.spec.ts`); on a real GPU this is a light load. Not yet measured on the owner's PC/phone.
+- Figure: 49,034 points (high) / 18,630 (low), WebGL 1, 2D still fallback, reduced-motion stills, pauses when hidden, restores after context loss. Measured on the CI software renderer (`avatar-performance.spec.ts`): avatar draw + finish 6–9 ms p50, page JS heap 12 MB (desktop) / 11 MB (phone profile), figure built in 30–80 ms, first frame ≈ 0.15 s after DOMContentLoaded; the spec fails above a 200 MB heap. On a real GPU this is a light load. Not yet measured on the owner's PC/phone.
 - Voice level: microphone (listening) and EZO's own voice (speaking, via `captureStream`) drive the face and the frame's equaliser. Where no measurement exists (browser speech synthesis), a speech-like rhythm is animated and drawn fainter.
 - Head: idle sway plus gaze towards the pointer/touch or a `packages/face-tracking` frame (`setHeadAim`). Camera tracking is NOT wired into any app: the face-tracking package is isolated, its model licence/SHA unapproved and hardware validation BLOCKED (no camera here).
 - Honesty: no surface ever says "transcribed" or "spoken" unless the provider call returned; the exact server error is shown.

@@ -104,6 +104,11 @@ How to read this:
 - The avatar's own draw is a few milliseconds even there. Most of the frame interval is the software compositor drawing the page.
 - On a real GPU, 49k points is a light load. A real-device measurement (owner PC and phone) is still pending.
 
+Memory and load (same spec, 2026-10-26): the whole page's JS heap after 4 s of animation is
+12.1 MB (desktop) / 10.7 MB (Pixel 7 profile); the figure is built in 30–80 ms and the first
+frame follows DOMContentLoaded by well under a second. The spec fails above a 200 MB heap, so
+the avatar stays within a sub-16 GB laptop's budget.
+
 The test asserts only hardware-independent budgets:
 - at most 50,000 points at high quality and 20,000 at low;
 - low quality on dense phone screens;
