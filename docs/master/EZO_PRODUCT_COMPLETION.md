@@ -33,6 +33,8 @@ says so, and anything that needs your PC, phone, keys or accounts is marked as y
 | Screen capture with explicit per-use consent | COMPLETE | Self-test captures a PNG; consent dialog in `assistant.ts` |
 | JARVIS pairing (code shown on the PC, confirmed in the web app), file consent, send approval, progress line, cancel | COMPLETE (protocol) | `apps/desktop` jarvis tests; API suite; live run BLOCKED (owner) |
 | Three UI languages (uz/en/ru) for pill, settings, dialogs, tray, errors | COMPLETE | `strings.test.ts` key parity |
+| Silent uninstall leaves no `EZO.exe` and no desktop shortcut | COMPLETE (CI VM) | Devices workflow step after the self-test (run 40312790256) |
+| Pill renderer: no serious/critical axe (WCAG 2.x A/AA) violations | COMPLETE | `accessibility.spec.ts` |
 | Microphone denial / missing microphone told apart | COMPLETE | Pill code |
 | Code signing, auto-update | BLOCKED (owner) | Certificate |
 | Owner-PC run (A, B, C, I, J) | BLOCKED (owner) | `docs/devices/EZO_WINDOWS_INSTALL_GUIDE_UZ.md` |
@@ -53,6 +55,7 @@ says so, and anything that needs your PC, phone, keys or accounts is marked as y
 | Files: EZO-generated DOCX/XLSX/PPTX/PDF opened through the share sheet | COMPLETE (code) | Download verified by API test; share sheet needs a device |
 | Projects (create/pick), memory (add/delete), reminders (permission asked when used) | COMPLETE | Smoke |
 | Three UI languages | COMPLETE | `strings.test.ts`; smoke switches to English |
+| Welcome + settings screens: no serious/critical axe violations; every control labelled in uz/en/ru | COMPLETE | `accessibility.spec.ts` scans the built app |
 | Physical phone run (F) | BLOCKED (owner) | Checklist in §7 |
 | Release signing, Play Store | BLOCKED (owner) | Keystore / account |
 
@@ -66,6 +69,7 @@ says so, and anything that needs your PC, phone, keys or accounts is marked as y
 | Student: uploads, job states, reader, cards, spaced repetition, concept graph, **learning paths**, **cited comparison** | COMPLETE (UI) | `student.spec.ts`, `student-paths.spec.ts` |
 | Office/Presentations: real DOCX/XLSX/PPTX/PDF downloads; files open in LibreOffice (CI) | COMPLETE | existing specs + office-tests stage |
 | Chrome extension: summary, explanation, approved form filling | COMPLETE | merged #43/#49 |
+| Accessibility: home, Student, IELTS, Settings, JARVIS, Memory and the voice stage pass axe (WCAG 2.x A/AA, serious/critical); contrast tokens fixed (faint text 2.5→5.1:1, accent buttons 4.0→5.2:1, warning badges 4.3→5.6:1); the humanoid is one named image, keyboard-operable voice stage | COMPLETE | `accessibility.spec.ts` 9/9 |
 
 ## 5. Avatar and voice capability (actual)
 
@@ -105,7 +109,8 @@ iOS: BLOCKED. No macOS/Xcode/Apple account here. Plan: Capacitor already targets
 ## 9. Evidence and commands
 
 - Branch commits: see PR #53. CI/Devices/Security runs on each push; Devices artifacts `ezo-windows` (installer + `selftest.json`), `ezo-android` (APK + badging), `ezo-android-emulator` (report, screenshots, logcat).
-- Local: `pnpm -C apps/desktop test && pnpm -C apps/desktop build`; `pnpm -C apps/mobile test && pnpm -C apps/mobile build`; `pnpm -C packages/avatar test`; `pnpm -C apps/web test`; `pnpm --filter @ezo/e2e exec playwright test specs/desktop-pill.spec.ts specs/voice-server.spec.ts specs/student-paths.spec.ts`.
+- Final CI on this branch: all nine checks green on `0cf1fb9` (CI run 40312655594, Devices 40312655648, Security 40312655790). The Web job's Playwright suite (69 tests) failed one test on three other heads of the same code (baf7736, 0684521, 0c869c4) and passed on 0cf1fb9 — a CI-timing flake; `scripts/test_report.py` now names failed tests in check annotations and the job keeps `playwright-failure` (junit + traces), so the next failure is attributable.
+- Local: `pnpm -C apps/desktop test && pnpm -C apps/desktop build`; `pnpm -C apps/mobile test && pnpm -C apps/mobile build`; `pnpm -C packages/avatar test`; `pnpm -C apps/web test`; `pnpm --filter @ezo/e2e exec playwright test specs/desktop-pill.spec.ts specs/voice-server.spec.ts specs/student-paths.spec.ts specs/accessibility.spec.ts`.
 
 ## 10. What is not claimed
 

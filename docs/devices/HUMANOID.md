@@ -64,7 +64,13 @@ in Next.js, Electron and the Android WebView.
 
 **Accessibility**
 - With `describe`, the canvas gets `role="img"` and an `aria-label` in the app's language
-  that changes with the state; the web, desktop and Android apps pass their own words.
+  that changes with the state; the desktop pill and the Android app pass their own words.
+  The web app names its wrapper instead ("EZO — <state word>") and keeps the canvas
+  decorative, so a screen reader meets one image, not two.
+- `tests/e2e/specs/accessibility.spec.ts` runs axe-core (WCAG 2.x A/AA) over the home
+  screen, the voice stage, the pill renderer and the Android app's welcome/settings screens;
+  serious or critical violations fail CI. The voice stage is keyboard-operable (talk control
+  and mode tabs reachable by Tab/Enter).
 
 **Voice level** (`level.ts`)
 - The microphone level drives the face while EZO listens, and EZO's own voice drives it
