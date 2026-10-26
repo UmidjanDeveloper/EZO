@@ -43,6 +43,7 @@ describe("backend contract (canonical Codex FastAPI routes)", () => {
       "GET /api/jarvis/capabilities",
       "GET /api/jarvis/devices",
       "GET /api/jarvis/devices/{}/work",
+      "GET /api/jarvis/devices/{}/work-signed",
       "GET /api/jarvis/receipts/{}",
       "GET /api/jarvis/tasks",
       "GET /api/jarvis/tasks/{}",

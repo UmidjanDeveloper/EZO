@@ -27,7 +27,10 @@ history merges them. Their test counts are historical, not this candidate's evid
   INFO request URLs previously exposed bot tokens: a targeted log redaction filter
   preserves events while masking Bot API credential paths. Regression verifies it.
 
-No schema migration, provider rewrite, frontend edit, sandbox enable or new dependency.
+No schema migration, provider rewrite, frontend implementation edit, sandbox enable
+or new dependency. The canonical frontend API inventory test adds only the new
+explicit route; its exact-match assertion is preserved. PR53 had the unchanged
+base fixture when this coordinated contract dependency was inspected.
 An additive typed server-work signature endpoint is opt-in and503 by default.
 The code deliberately commits authority separately from request completion; an HTTP500
 may follow an admitted delivery. Clients must read task status, never automatically
