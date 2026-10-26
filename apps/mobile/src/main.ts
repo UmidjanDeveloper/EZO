@@ -4,7 +4,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
 import { createLevelMeter, EzoAvatar, type AvatarState, type LevelMeter } from "@ezo/avatar";
 import { ApiError, createApi, type Api, type Lang, type Message } from "./api";
-import { documentPrompt } from "./documents";
+import { base64Bytes, documentPrompt, isStudentDocument, jobMessage, MAX_STUDENT_BYTES } from "./documents";
 import { Recorder } from "./recorder";
 import { loadPrefs, normalizeApiUrl, readToken, savePrefs, writeToken, type Prefs } from "./store";
 
@@ -259,6 +259,7 @@ async function summarizeDocument(): Promise<void> {
     const picked = await FilePicker.pickFiles({ limit: 1, readData: true });
     const file = picked.files[0];
     if (!file) return;
+    if (isStudentDocument(file.name)) return await readWithStudent(file.name, file.data);
     const result = documentPrompt(file.name, file.data);
     if (!result.ok) return setStatus(result.reason, "error");
     if (result.truncated) setStatus("Hujjat uzun: faqat boshi yuborildi.", "info");
@@ -268,6 +269,30 @@ async function summarizeDocument(): Promise<void> {
     if ((error as Error).message?.toLowerCase().includes("cancel")) return;
     setStatus(errorText(error), "error");
   }
+}
+
+/** PDF/DOCX/EPUB/scans: upload to EZO Student, follow the real job, then a cited summary. */
+async function readWithStudent(name: string, base64: string | undefined): Promise<void> {
+  if (!api) return setStatus("Avval EZO serveriga ulaning.", "error");
+  if (!base64) return setStatus("Faylni o‘qib bo‘lmadi.", "error");
+  const bytes = base64Bytes(base64);
+  if (bytes.length > MAX_STUDENT_BYTES) return setStatus("Fayl 5 MB dan katta.", "error");
+  let job = await api.uploadStudent(name, bytes);
+  const started = Date.now();
+  appendMessage("user", `📄 ${name}`);
+  while (job.state === "queued" || job.state === "running") {
+    const waited = Math.round((Date.now() - started) / 1000);
+    setStatus(jobMessage(job.state, waited), "info");
+    if (waited >= 90) return; // honest: the worker may not be running; the job stays queued
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    job = await api.studentJob(job.id);
+  }
+  setStatus(jobMessage(job.state, 0, job.error_message), job.state === "completed" ? "info" : "error");
+  if (job.state !== "completed") return;
+  const summary = await api.studentSummary(job.document_id);
+  appendMessage("assistant", summary.text + (summary.citations ? `\n\n(${summary.citations} ta manba havolasi)` : ""));
+  setStatus("");
+  await speak(summary.text, "uz");
 }
 
 async function scheduleReminder(): Promise<void> {

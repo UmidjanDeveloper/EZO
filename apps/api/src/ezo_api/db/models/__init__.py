@@ -12,6 +12,13 @@ from ezo_api.db.models.artifacts import (
 from ezo_api.db.models.career import CareerProfile
 from ezo_api.db.models.conversation import Conversation, Message
 from ezo_api.db.models.document_jobs import DocumentJob, DocumentJobPublication
+from ezo_api.db.models.jarvis import (
+    JarvisAuthorization,
+    JarvisDevice,
+    JarvisTask,
+    JarvisTaskStep,
+    TelegramRecipient,
+)
 from ezo_api.db.models.knowledge import (
     DocumentRevision,
     KnowledgeChunk,
@@ -45,7 +52,7 @@ from ezo_api.db.models.project import Project
 from ezo_api.db.models.student import StudentRawRevision
 from ezo_api.db.models.study import StudentLearningPath, StudyCard, StudyReview
 from ezo_api.db.models.translation import GlossaryTerm
-from ezo_api.db.models.user import User
+from ezo_api.db.models.user import UsageEvent, User, UserToken
 
 __all__ = [
     "AgentRun",
@@ -58,6 +65,10 @@ __all__ = [
     "DocumentJobPublication",
     "DocumentRevision",
     "GlossaryTerm",
+    "JarvisAuthorization",
+    "JarvisDevice",
+    "JarvisTask",
+    "JarvisTaskStep",
     "KnowledgeChunk",
     "KnowledgeDocument",
     "KnowledgeLibrary",
@@ -92,7 +103,10 @@ __all__ = [
     "StudentRawRevision",
     "StudyCard",
     "StudyReview",
+    "TelegramRecipient",
     "ToolCall",
+    "UsageEvent",
     "User",
+    "UserToken",
     "VectorEntry",
 ]

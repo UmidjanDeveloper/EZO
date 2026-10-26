@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
+from ezo_api.account.http import require_quota
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
 from ezo_api.api.routes.document_jobs import _call
 from ezo_api.db.models import Project
@@ -45,7 +46,10 @@ async def status(user: CurrentUser, services: ServicesDep) -> dict[str, object]:
     }
 
 
-@router.post("/readings", response_model=JobOut, status_code=201)
+DOCUMENT_QUOTA = [Depends(require_quota("document_jobs_per_day"))]
+
+
+@router.post("/readings", response_model=JobOut, status_code=201, dependencies=DOCUMENT_QUOTA)
 async def submit(
     body: TextSubmission, user: CurrentUser, session: SessionDep, services: ServicesDep
 ) -> JobOut:
@@ -95,7 +99,7 @@ async def reading(
     )
 
 
-@router.post("/uploads", response_model=JobOut, status_code=201)
+@router.post("/uploads", response_model=JobOut, status_code=201, dependencies=DOCUMENT_QUOTA)
 async def upload_raw(
     request: Request,
     user: CurrentUser,
@@ -198,7 +202,9 @@ async def structure(
         }
 
 
-@router.post("/readings/{job_id}/retry", response_model=JobOut, status_code=201)
+@router.post(
+    "/readings/{job_id}/retry", response_model=JobOut, status_code=201, dependencies=DOCUMENT_QUOTA
+)
 async def retry_reading(
     job_id: uuid.UUID,
     user: CurrentUser,

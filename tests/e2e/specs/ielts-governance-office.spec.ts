@@ -220,6 +220,59 @@ test("governance: super admin accesses health, agent routing, proposals, and aud
   await expect(page.getByText("Upgrade Student durable parser to isolated worker pool v2")).toBeVisible();
 });
 
+test("governance: super admin creates an account and sees its token exactly once", async ({ page }) => {
+  await page.route("**/api/admin/governance/status", (route) =>
+    route.fulfill({
+      json: {
+        role: "super_admin",
+        super_admin_verified: true,
+        autonomous_code_modification: false,
+        autonomous_pr_merge: false,
+        autonomous_deployment: false,
+        governance_mode: "human_governed",
+        policies: {},
+      },
+    })
+  );
+  const accounts = [
+    { id: "owner", email: "owner@example.com", display_name: "Egasi", role: "super_admin", tier: "free", status: "active" },
+  ];
+  const created: unknown[] = [];
+  await page.route("**/api/admin/users", (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as { email: string; display_name: string; tier: string };
+      created.push(body);
+      accounts.push({ id: "u1", email: body.email, display_name: body.display_name, role: "user", tier: body.tier, status: "active" });
+      return route.fulfill({ status: 201, json: accounts[accounts.length - 1] });
+    }
+    return route.fulfill({ json: accounts });
+  });
+  await page.route("**/api/admin/users/u1/tokens", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({
+          status: 201,
+          json: { token: "ezo_u_shown-once-secret", id: "t1", label: "EZO", expires_at: "2027-01-22T00:00:00", last_used_at: null, revoked: false },
+        })
+      : route.fulfill({ json: [{ id: "t1", label: "EZO", expires_at: "2027-01-22T00:00:00", last_used_at: null, revoked: false }] })
+  );
+
+  await page.goto("/admin");
+  const panel = page.getByTestId("accounts-panel");
+  await expect(panel.getByText("Egasi · cheklovsiz")).toBeVisible();
+  await panel.getByLabel("Email").fill("dilnoza@example.com");
+  await panel.getByLabel("Ism").fill("Dilnoza");
+  await panel.getByLabel("Tarif").selectOption("pro");
+  await panel.getByRole("button", { name: /Qo[‘']shish/ }).click();
+  await expect(panel.getByText("dilnoza@example.com", { exact: false })).toBeVisible();
+  expect(created).toEqual([{ email: "dilnoza@example.com", display_name: "Dilnoza", tier: "pro" }]);
+
+  await panel.getByRole("button", { name: "Token berish" }).click();
+  await expect(page.getByTestId("account-secret")).toContainText("ezo_u_shown-once-secret");
+  await expect(panel.getByText(/muddati: 2027-01-22/)).toBeVisible();
+  await page.getByRole("button", { name: "Yashirish" }).click();
+  await expect(page.getByTestId("account-secret")).toHaveCount(0);
+});
+
 test("office: presentation maker and document workspace", async ({ page }) => {
   await page.goto("/presentations");
   await expect(page.getByRole("heading", { level: 1, name: /Taqdimotlar/ })).toBeVisible();

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hmac
 import json
+from collections.abc import Awaitable, Callable
 
 from fastapi import HTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -35,6 +36,8 @@ from ezo_api.security.rate_limit import RateLimitExceededError, SlidingWindowRat
 PUBLIC_PATHS = frozenset({"/api/health"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 AUTHENTICATED = "ezo.authenticated"
+PRINCIPAL = "ezo.principal"
+"""Rate-limit key of the authenticated caller: "owner" or "user:<id>" for a per-user token."""
 FAILED_AUTH_PER_MINUTE = 30
 
 
@@ -63,24 +66,33 @@ class EdgeGuardMiddleware:
         max_body_bytes: int,
         free_beta: bool = False,
         allowed_origins: list[str] | None = None,
+        token_validator: Callable[[str], Awaitable[str | None]] | None = None,
     ) -> None:
         self.app = app
         self.allowed_origins = frozenset(o.rstrip("/") for o in allowed_origins or [])
+        # Owner-issued per-user tokens are checked against the database (hash lookup)
+        # before any body is read, exactly like the installation token.
+        self.token_validator = token_validator
         self.token = token.encode() if token else None
         self.max_body = max_body_bytes
         self.free_beta = free_beta
         self.failures = SlidingWindowRateLimiter()
 
-    def _authorized(self, scope: Scope) -> bool:
+    async def _principal(self, scope: Scope) -> str | None:
+        """Who is calling ("owner" or "user:<id>"), or None when not authorized."""
         if self.token is None:
-            return True
+            return "owner"
         for name, value in scope.get("headers", []):
             if name == b"authorization":
                 scheme, _, given = value.decode("latin-1").partition(" ")
-                return scheme.lower() == "bearer" and hmac.compare_digest(
-                    given.strip().encode("latin-1"), self.token
-                )
-        return False
+                if scheme.lower() != "bearer":
+                    return None
+                if hmac.compare_digest(given.strip().encode("latin-1"), self.token):
+                    return "owner"
+                if self.token_validator is None:
+                    return None
+                return await self.token_validator(given.strip())
+        return None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "") if scope["type"] == "http" else ""
@@ -100,7 +112,12 @@ class EdgeGuardMiddleware:
                 await _reply(send, 403, "cross_site", "Cross-site requests are not allowed.")
                 return
 
-        if not self._authorized(scope):
+        try:
+            principal = await self._principal(scope)
+        except Exception:  # the token store is unreachable: fail closed, readable reply
+            await _reply(send, 503, "unavailable", "Authentication is temporarily unavailable.")
+            return
+        if principal is None:
             try:
                 self.failures.check("failed-auth", FAILED_AUTH_PER_MINUTE)
             except RateLimitExceededError as exc:
@@ -114,7 +131,9 @@ class EdgeGuardMiddleware:
                 return
             await _reply(send, 401, "unauthorized", "Missing or invalid API token.")
             return
-        scope.setdefault("state", {})[AUTHENTICATED] = self.token is not None
+        state = scope.setdefault("state", {})
+        state[AUTHENTICATED] = self.token is not None
+        state[PRINCIPAL] = principal
 
         if self.free_beta:
             from ezo_api.free_beta import allowed

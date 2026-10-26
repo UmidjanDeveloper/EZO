@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Card, cn, Spinner } from "@ezo/ui";
-import { AlertTriangle, Ban, Plus, RefreshCw, ShieldAlert, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fetchCapabilities, JarvisApiError, postPercentages } from "@/lib/jarvis-api";
 import {
@@ -15,6 +15,7 @@ import {
   type PercentageRowInput,
 } from "@/lib/jarvis-contract";
 import { useI18n } from "@/lib/i18n/context";
+import { JarvisConsole } from "@/components/jarvis/JarvisConsole";
 import { PageFrame } from "./PageFrame";
 
 type CapabilityState =
@@ -34,13 +35,10 @@ const INPUT_CLASS =
   "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 
 /**
- * JARVIS page, honest edition.
- *
- * The canonical backend exposes only capability inspection, a deterministic percentage
- * calculator with an owner-scoped receipt, receipt lookup and static plan inspection.
- * It has no task planning/execution, device pairing, PDF or Telegram API, so this page
- * has no execute/approve/paired/delivered UI. Every state shown here comes from a
- * validated backend response; anything else is "not available" or "unknown".
+ * JARVIS page: capability inspection, the governed task console (device pairing,
+ * Telegram recipients, tasks, exact-action approvals) and the percentage calculator.
+ * Every state shown comes from a validated backend response; "delivered" appears only
+ * with Telegram's own message id recorded by the API.
  */
 export function JarvisPage() {
   const { m } = useI18n();
@@ -88,20 +86,7 @@ export function JarvisPage() {
           </Card>
         </section>
 
-        <section aria-labelledby="jarvis-task-title" data-testid="jarvis-task-unavailable">
-          <Card className="border border-amber-500/40 bg-amber-500/5 p-5">
-            <div className="flex items-start gap-3">
-              <Ban className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" aria-hidden />
-              <div className="space-y-1.5">
-                <h2 id="jarvis-task-title" className="text-sm font-semibold text-ink">
-                  {t.taskTitle}: {t.notAvailable}
-                </h2>
-                <p className="text-sm text-ink-muted">{t.taskBody}</p>
-                <p className="text-sm text-ink-muted">{t.voiceBody}</p>
-              </div>
-            </div>
-          </Card>
-        </section>
+        <JarvisConsole />
 
         <PercentageCalculator />
       </div>

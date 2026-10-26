@@ -37,12 +37,27 @@ function backendRoutes(): Set<string> {
 }
 
 describe("backend contract (canonical Codex FastAPI routes)", () => {
-  it("the canonical backend declares exactly the four known JARVIS routes", () => {
+  it("the canonical backend declares exactly the known JARVIS routes", () => {
     expect([...backendRoutes()].sort()).toEqual([
+      "DELETE /api/jarvis/devices/{}",
       "GET /api/jarvis/capabilities",
+      "GET /api/jarvis/devices",
+      "GET /api/jarvis/devices/{}/work",
       "GET /api/jarvis/receipts/{}",
+      "GET /api/jarvis/tasks",
+      "GET /api/jarvis/tasks/{}",
+      "GET /api/jarvis/telegram/recipients",
+      "POST /api/jarvis/devices/pairing",
+      "POST /api/jarvis/devices/{}/confirm",
+      "POST /api/jarvis/devices/{}/results",
       "POST /api/jarvis/inspect-plan",
       "POST /api/jarvis/percentages",
+      "POST /api/jarvis/tasks",
+      "POST /api/jarvis/tasks/{}/cancel",
+      "POST /api/jarvis/tasks/{}/retry",
+      "POST /api/jarvis/tasks/{}/steps/{}/decision",
+      "POST /api/jarvis/telegram/recipients",
+      "POST /api/jarvis/telegram/recipients/{}/verify",
     ]);
   });
 
@@ -61,7 +76,8 @@ describe("backend contract (canonical Codex FastAPI routes)", () => {
   });
 
   it("no frontend or extension source references the removed fabricated endpoints", () => {
-    const forbidden = /\/api\/jarvis\/(companion|plan\b|tasks|setup-scenario)|\/(execute|authorize|cancel)\b.*jarvis|jarvis.*\/(execute|authorize)\b/;
+    // Still fabricated: none of these exist; tasks/cancel/decision are real routes now.
+    const forbidden = /\/api\/jarvis\/(companion|plan\b|setup-scenario)|jarvis.*\/(execute|authorize)\b/;
     const files = [...walk(path.join(REPO, "apps/web")), ...walk(path.join(REPO, "apps/chrome-extension"))];
     for (const file of files) expect(readFileSync(file, "utf8"), file).not.toMatch(forbidden);
   });

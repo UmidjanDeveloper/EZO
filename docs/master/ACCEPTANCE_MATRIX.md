@@ -16,17 +16,22 @@ with the extraction; historic technical claims remain historic. Additional owner
 requirements (eight upstreams and governed device agents) remain in force.
 These statuses describe acceptance, not just whether source files exist.
 
+**Final Master Mission update (2026-10-24).** The rows below now cite the mission PRs.
+A PR is evidence of implementation and tests, not acceptance: drafts still need independent
+review and the owner's merge. Live owner-device and credentialed runs remain pending
+(`EZO_REAL_WORLD_ACCEPTANCE.md`). Mission tracker: `EZO_FINAL_MISSION_STATE.md`.
+
 | Phase | Owner's scope | Current acceptance status / gate |
 |---|---|---|
-| P0 | Baseline and security | PARTIAL — local/hosted regression evidence exists; current changes need independent review; unresolved distro CVEs remain recorded. |
-| P1 | Student Deep Reading V1 | PARTIAL — text path and citations work; PDF/DOCX/EPUB need the dedicated Docker worker (its executor tests skip without the pinned image). Review candidate [P1_EXECUTOR_OCR_OFFICE.md](P1_EXECUTOR_OCR_OFFICE.md) adds scanned-PDF/PNG/JPEG OCR (eng/uzb/uzb_cyrl/rus, ≤6 pages, refused above) and DOCX/XLSX/PPTX→PDF inside that isolated executor only; not activated, needs independent review and dependency review. No OCR in the API image. |
-| P2 | Personal Intelligence K9 | PARTIAL — consent, memory, goals and routing exist; full owner journeys and reviewed multi-user readiness remain. |
+| P0 | Baseline and security | PARTIAL — #37 merged (pypdf 6.21.2; Security green). Audit F18–F25 fixed in draft #39 (awaiting independent review); F26 (i18n) and F27 (VoiceStudio tag pin) open. Unresolved distro CVEs remain recorded. |
+| P1 | Student Deep Reading V1 | PARTIAL — text path and citations work; isolated PDF/DOCX/EPUB + OCR + Office→PDF executor merged (PR #33, real-container CI) but **not activated** (no executor host). Phone PDF/DOCX/EPUB/scans go through Student in draft #44. Generated DOCX/XLSX/PPTX open in real LibreOffice (#46). |
+| P2 | Personal Intelligence K9 | PARTIAL — consent, memory, goals and routing exist; recall now honours consent separately from capture (#39). Multi-user scoping exercised by #48 tests. Retention policy and owner journeys remain. |
 | P3 | Student V2/V3 | PARTIAL — cited synthesis/graphs/cards/recall progress exist; longitudinal adaptive tutor quality and integrated UI remain. |
 | P4 | K4 Secure Sandbox | BLOCKED — execution remains disabled without a validated separate Python-compatible trust boundary. |
-| P5 | K5/K6/K8 Admin Engine | PARTIAL — backend admin proposals/static drafts/reviews exist; sandbox tests and governed application PR promotion remain gated. |
+| P5 | K5/K6/K8 Admin Engine | PARTIAL — K8 proposals/static drafts/hash-bound reviews exist. K5 and K6 BLOCKED behind K4: `EXECUTION_GATES.md` allows PR promotion only for K4-tested signed artifacts, so promoting untested drafts would bypass the gate. |
 | P6 | K7 Knowledge Refresh | PARTIAL — durable permission-fenced refresh under implementation; verification and independent review required before acceptance. |
-| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports work (deck layout bug fixed in PR #28); IELTS REST is text-only: per-answer metrics labelled with the part actually answered, and on completion per-part observations plus numbers-only overall statistics (words, lexical diversity, fillers, repeats; pace only from *client-reported*, unverified time). Thresholds are non-official EZO practice heuristics; no audio is analysed and band/pronunciation/model scores stay null; presentation intake is a fixed template; chat-driven Office/presentation tools are denied in production. |
-| P8 | Premium UX and multi-user readiness | PARTIAL — single owner only; multi-user accounts, tiers and quotas NOT STARTED; Admin/JARVIS/Student pages not internationalised. |
+| P7 | IELTS / Presentation / Office 2.0 | PARTIAL — REST DOCX/XLSX/PPTX exports open in LibreOffice (#46); chat-created Office files honest about failures (#39). IELTS: exact text metrics, chosen cue card (#39), server STT + long-answer VAD + examiner voice (#45, needs a voice key for live use); no band/pronunciation scores. Presentations: model-planned intake with template fallback labelled (#47). |
+| P8 | Premium UX and multi-user readiness | PARTIAL — procedural humanoid (PR #35). Owner-managed accounts, hashed per-user tokens, tiers, durable per-user quotas and per-user rate limits in draft #48 (needs independent auth review). No self-signup or billing (owner product decisions). Admin/JARVIS/Student pages not internationalised (F26). |
 | P9 | Final cloud integration | NOT STARTED / BLOCKED — preparation documents only; deployment needs separate owner approval. |
 
 No numerical completion percentage is invented. The following detailed rows retain
@@ -49,7 +54,7 @@ not a waiver of later owner requirements or an assertion that these features wor
 | Knowledge Refresh / K7 | Migration0020 durable refresh runs, explicit permission generations/schedules, leased claims, atomic staged publication, bounded history, per-document stale labels and cleanup journal. See K7_DURABLE_REFRESH.md and actual regression evidence. | Independent review/hosting acceptance pending. Initial K1 first-read runner remains legacy; native PDF/OCR/Office still needs the separate reviewed executor. The new worker is explicit and is not auto-started. |
 | K4 general-code sandbox | **Not implemented/enabled.** Existing parser accepts a fixed data protocol, not generated programs. Design in EXECUTION_GATES.md. | Dedicated microVM/VM runtime, trusted build chain and adversarial containment evidence required. Missing /dev/kvm and no approved remote executor; no unsafe substitute. |
 | K5 Skill Builder | K3 and admin proposals remain non-executable data. | Code generation, isolated tests, signed skill artifacts and installation blocked on verified K4. No fake successful test/status. |
-| K6 branch/tests/PR workflow | This candidate itself uses reviewable commits and CI; proposed promotion contract documented. | General app-controlled skill PR workflow not implemented. No unattended git, merge, secret access or deployment. |
+| K6 branch/tests/PR workflow | This candidate itself uses reviewable commits and CI; proposed promotion contract documented. | BLOCKED behind K4/K5 (only K4-tested, signed artifacts may be promoted). General app-controlled skill PR workflow not implemented. No unattended git, merge, secret access or deployment. |
 | K8 Super Admin | New backend-only capability proposals from owned libraries, bounded immutable snapshots, hash-bound owner review/reject decisions and audit. No execution authority. | Sandbox tests and source improvement blocked on K4/K5/K6; no complete autonomous self-improvement claim. Independent review still required. |
 | AI orchestrator | PR21 Gemini/OpenAI/optional Claude chat+embedding adapters, task routing/fallback/budgets; ElevenLabs STT/TTS and existing VoiceStudio interface preserved. | Process-local caps aren't a durable billing ledger; no hard dollar guarantee, live quality or realtime voice implementation. Cloud privacy allowlist per request not implemented. |
 | Personal Intelligence / IELTS / Presentation / Office / Admin | Prior routes retained, consent and owner scope preserved; honesty fixes stay in PR21. | Dedicated IELTS voice/scoring incomplete; presentation intake is a deterministic template, not researched AI output. Office PDF/OCR unavailable without reviewed worker integration. |

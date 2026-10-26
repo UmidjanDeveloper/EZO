@@ -65,3 +65,11 @@ describe("parseIntent", () => {
     expect(normalize("  O‘zbek  ʻtiliʼ ")).toBe("o'zbek 'tili'");
   });
 });
+
+describe("JARVIS task intent", () => {
+  it("routes Downloads + PDF/Telegram/percent requests to the governed task engine", () => {
+    expect(parseIntent("Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir").kind).toBe("jarvis_task");
+    expect(parseIntent("Send the latest file in Downloads to Dilnoza on Telegram").kind).toBe("jarvis_task");
+    expect(parseIntent("hisobot faylini och").kind).toBe("open_file");
+  });
+});
