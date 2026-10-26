@@ -81,6 +81,22 @@ updated to the actual locked0.156.5 tag, not the older locally installed0.143.3.
 | OpenJarvis `8f81c024608bacaefc551761196eeb556ab5631e` | typed tools/traces and governed companion → jarvis/device_protocol.py, service.py → real Ed25519/DB + mocked Telegram integration | Apache-2.0 | PARTIAL; Windows/Android owned by Claude, real device/provider acceptance separate |
 | FastAPI `43f46fb14feeee78f4077a55eb3f95f792b7cd9d` | existing application/dependency/security composition → main.py, api/deps.py, routes → ASGI auth/ownership/contract suite | MIT | ACTUAL framework integration retained; inspected applications.py and security/http.py at locked0.156.5, no replacement or speculative optimization |
 
+### Exact code/test file index for the upstream matrix
+
+Code paths below are relative to `apps/api/src/ezo_api`; test paths to `apps/api/tests`.
+
+| Upstream | EZO files | Working test files / exclusion |
+|---|---|---|
+| LlamaIndex | `student/synthesis.py` | `integration/test_student_synthesis.py`; measurable retrieval benefit still unproven |
+| Ruflo | `orchestration/planning_policy.py` | `unit/test_jarvis_foundation.py` |
+| VoiceStudio | `voice/openai_audio.py`, `voice/service.py` | `unit/test_voice.py`; HTTP doubles, no model service |
+| APEX-UI | repository `docs/integration/MASTER_API_CONTRACT.md` only | No APEX implementation test; frontend port pending Claude |
+| REA | `orchestration/planning_policy.py`, `companion/metadata.py` | `integration/test_companion_metadata.py`; actual RE engine excluded |
+| Supabase | `storage/supabase.py` | `unit/test_supabase_storage.py`; HTTP doubles, no cloud restore |
+| Microsoft JARVIS | `jarvis/planner.py`, `jarvis/percentages.py` | `unit/test_jarvis_engine_units.py` |
+| OpenJarvis | `jarvis/device_protocol.py`, `jarvis/service.py`, `api/routes/jarvis.py` | `unit/test_signed_device_work.py`, `integration/test_jarvis_tasks.py` |
+| FastAPI | `main.py`, `api/deps.py`, `api/routes/accounts.py` | `integration/test_projects_auth.py`, `integration/test_accounts.py` |
+
 ## Canonical device/API contracts
 
 See `docs/integration/MASTER_API_CONTRACT.md` (Pydantic request bodies and OpenAPI in
