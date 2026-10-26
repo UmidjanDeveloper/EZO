@@ -16,6 +16,7 @@ from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from ezo_api.api.deps import CurrentUser, ServicesDep, SessionDep, rate_limit
@@ -58,10 +59,83 @@ async def list_themes() -> list[ThemeInfoOut]:
     ]
 
 
+TEMPLATE_NOTICE = (
+    "Bu EZO’ning andoza tuzilmasi (AI provayder sozlanmagan yoki model reja bera olmadi): "
+    "sarlavha va bandlarni o‘zingiz to‘ldiring. Bu tadqiq qilingan taqdimot emas."
+)
+
+
+async def _model_outline(
+    brief: PresentationBriefIn, services: Any
+) -> PresentationOutlineOut | None:
+    """The configured model plans the deck exactly like the chat Presentation agent does;
+    EZO validates it (layouts, sizes) before anything is shown or built."""
+    from ezo_api.agents.llm import complete, extract_json
+    from ezo_api.agents.presentation import DECK_SYSTEM, INVALID_PROMPT, parse_deck
+    from ezo_api.providers.types import ChatMessage
+
+    if services.router.is_offline:
+        return None
+    request = (
+        f"Title: {brief.title}\nTopic: {brief.topic}\nAudience: {brief.audience}\n"
+        + ("Key points to cover: " + "; ".join(brief.key_points) + "\n" if brief.key_points else "")
+        + f"Language: {brief.language}. Slides: exactly {brief.slide_count} (including cover and "
+        "closing). Aspect ratio: 16:9.\n\nNo sources were provided: do not invent statistics, "
+        "quotes or citations; mark any number as an example."
+    )
+    messages = [ChatMessage("user", request)]
+    deck = None
+    for _ in range(2):
+        try:
+            completion = await complete(
+                services.router,
+                "reasoning",
+                system=DECK_SYSTEM,
+                messages=messages,
+                max_output_tokens=min(32_000, 2_000 + 700 * brief.slide_count),
+                language=brief.language,
+            )
+        except Exception:  # provider failure: fall back to the labelled template
+            return None
+        deck, error = parse_deck(extract_json(completion.text), brief.language)
+        if deck is not None:
+            break
+        messages += [
+            ChatMessage("assistant", completion.text[:20_000]),
+            ChatMessage("user", INVALID_PROMPT.format(error=error)),
+        ]
+    if deck is None:
+        return None
+    theme = brief.theme if brief.theme in THEMES else deck.theme
+    deck.theme = theme
+    return PresentationOutlineOut(
+        title=deck.title or brief.title,
+        theme=theme,
+        language=brief.language,
+        slide_count=len(deck.slides),
+        slides=[
+            SlideOutlineItem(
+                slide_number=n,
+                layout=slide.layout,
+                title=slide.title,
+                summary=slide.subtitle or (slide.bullets[0] if slide.bullets else ""),
+                bullet_hints=list(slide.bullets),
+            )
+            for n, slide in enumerate(deck.slides, start=1)
+        ],
+        source="model",
+        deck=deck.model_dump(mode="json"),
+    )
+
+
 @router.post("/intake")
-async def intake_brief(brief: PresentationBriefIn) -> PresentationOutlineOut:
-    """Intake presentation brief and generate a structured outline with slide architecture."""
-    # Deterministic outline generation based on topic and slide count
+async def intake_brief(brief: PresentationBriefIn, services: ServicesDep) -> PresentationOutlineOut:
+    """A slide plan for the brief: model-planned when a provider is configured, otherwise
+    EZO's fixed template, clearly labelled as such."""
+    planned = await _model_outline(brief, services)
+    if planned is not None:
+        return planned
+    # Fixed template structure (labelled `source="template"`)
     slides: list[SlideOutlineItem] = []
     total = brief.slide_count
 
@@ -154,6 +228,8 @@ async def intake_brief(brief: PresentationBriefIn) -> PresentationOutlineOut:
         language=brief.language,
         slide_count=len(slides),
         slides=slides,
+        source="template",
+        notice=TEMPLATE_NOTICE,
     )
 
 
@@ -190,13 +266,21 @@ async def generate_presentation(
             SlideSpec(layout="closing", title="Rahmat!", subtitle="Savollar bormi?"),
         ]
 
-    deck = DeckSpec(
-        title=payload.title,
-        theme=theme_name,
-        aspect_ratio="16:9",
-        language=payload.language,
-        slides=slide_specs,
-    )
+    if payload.deck is not None:
+        # A model-planned deck from /intake: validate again, build without flattening.
+        try:
+            deck = DeckSpec.model_validate({**payload.deck, "language": payload.language})
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail="The slide plan is invalid.") from exc
+        deck.title, deck.theme = payload.title, theme_name
+    else:
+        deck = DeckSpec(
+            title=payload.title,
+            theme=theme_name,
+            aspect_ratio="16:9",
+            language=payload.language,
+            slides=slide_specs,
+        )
 
     try:
         build = await asyncio.to_thread(partial(build_deck, deck))

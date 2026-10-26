@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -42,6 +42,12 @@ class PresentationOutlineOut(BaseModel):
     language: str
     slide_count: int
     slides: list[SlideOutlineItem]
+    source: Literal["model", "template"] = "template"
+    """"model": planned by the configured AI model for this topic; "template": EZO's fixed
+    placeholder structure (no AI provider, or the model's plan was invalid)."""
+    notice: str = ""
+    deck: dict[str, Any] | None = None
+    """The validated model deck (charts, tables, layouts) to build without flattening."""
 
 
 class PresentationGenerateIn(BaseModel):
@@ -49,6 +55,7 @@ class PresentationGenerateIn(BaseModel):
     theme: str = Field(default="ezo", max_length=50)
     language: str = Field(default="uz", max_length=10)
     slides: list[SlideOutlineItem] | None = None
+    deck: dict[str, Any] | None = None
     conversation_id: uuid.UUID | None = None
 
 
