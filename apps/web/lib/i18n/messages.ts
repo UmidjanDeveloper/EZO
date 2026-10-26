@@ -40,6 +40,8 @@ const uz = {
   },
   common: {
     newChat: "Yangi suhbat",
+    freeBeta:
+      "Bepul beta · AI ulanmagan. Text chat, manual memory, loyihalar, goals, IELTS matnli mashq va kichik Office eksportlari. PDF/EPUB/DOCX o‘qish va avtomatik vazifalar o‘chirilgan. Saqlangan fayllarni hozircha tahrirlab yoki o‘chirib bo‘lmaydi.",
     recent: "So‘nggi suhbatlar",
     noConversations: "Hali suhbatlar yo‘q",
     delete: "O‘chirish",
@@ -765,6 +767,8 @@ const en: Messages = {
   },
   common: {
     newChat: "New chat",
+    freeBeta:
+      "Free beta · no AI connected. Text chat, manual memory, projects, goals, IELTS text practice and small Office exports. PDF/EPUB/DOCX reading and automatic tasks are off. Saved files cannot be edited or deleted yet.",
     recent: "Recent chats",
     noConversations: "No conversations yet",
     delete: "Delete",
@@ -1486,6 +1490,8 @@ const ru: Messages = {
   },
   common: {
     newChat: "Новый чат",
+    freeBeta:
+      "Бесплатная бета · ИИ не подключён. Текстовый чат, ручная память, проекты, цели, текстовая практика IELTS и небольшие экспорты Office. Чтение PDF/EPUB/DOCX и автоматические задачи отключены. Сохранённые файлы пока нельзя изменить или удалить.",
     recent: "Недавние чаты",
     noConversations: "Пока нет разговоров",
     delete: "Удалить",

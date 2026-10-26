@@ -47,8 +47,7 @@ def read_suite(label: str, path: Path) -> Suite:
             problem = case.find("error")
         if problem is not None:
             suite.failed += 1
-            text = (problem.get("message") or problem.text or "no message").strip()
-            suite.failures.append((case.get("name") or "", text.splitlines()[0][:400]))
+            suite.failures.append((case.get("name") or "", failure_summary(problem)))
         skipped = case.find("skipped")
         if skipped is not None:
             suite.skipped += 1
@@ -59,6 +58,19 @@ def read_suite(label: str, path: Path) -> Suite:
             if "_seconds" in name:
                 suite.timings.append((case.get("name") or "", name, prop.get("value") or ""))
     return suite
+
+
+def failure_summary(problem: ET.Element) -> str:
+    """The assertion that failed, not just the test title: the first "Error"/"expect" line of
+    the failure text plus the lines that say what was received, so a CI failure can be
+    understood from the checks API alone."""
+    lines = [line.strip() for line in (problem.text or "").splitlines() if line.strip()]
+    start = next((i for i, line in enumerate(lines) if "Error" in line or "expect(" in line), None)
+    if start is None:
+        return (problem.get("message") or (lines[0] if lines else "no message"))[:400]
+    keep = [lines[start]]
+    keep += [line for line in lines[start + 1 : start + 12] if line.startswith(("Received", "Expected", "Locator", "+ ", "- ", "Timeout", "Call log"))][:5]
+    return " | ".join(keep)[:600]
 
 
 def annotations(suites: list[Suite]) -> list[str]:

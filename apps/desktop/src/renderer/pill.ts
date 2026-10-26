@@ -390,7 +390,10 @@ ezo.onError((text) => {
   showPanel("", String(text));
 });
 ezo.onStage((stage) => {
-  if (stage === "recognizing" || stage === "thinking" || stage === "working") setState(stage);
+  // Stages describe the turn in flight; one that arrives after the turn ended or was
+  // stopped must not wake the pill up again.
+  const inFlight = state === "listening" || state === "recognizing" || state === "thinking" || state === "working";
+  if (inFlight && (stage === "recognizing" || stage === "thinking" || stage === "working")) setState(stage);
 });
 ezo.onStatus((next) => renderStatus(next as PillStatus));
 ezo.onTasks((tasks) => renderTasks(tasks as TaskSummary[]));

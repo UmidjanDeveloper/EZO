@@ -225,8 +225,8 @@ export function StudentPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           document_ids: [documentId],
-          question: "Hujjatdagi asosiy tushunchalar va ularning mantiqiy bog‘liqligi",
-          language: "uz",
+          question: m.student.concepts.question,
+          language,
           kind: "concept_graph",
         }),
       });

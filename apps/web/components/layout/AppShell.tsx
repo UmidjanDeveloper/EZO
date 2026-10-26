@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useState, type ReactNode } from "react";
 import { useApp } from "@/lib/app-state";
+import { useI18n } from "@/lib/i18n/context";
 import { createStoredValue } from "@/lib/stored-value";
 import { HistoryPanel } from "./HistoryPanel";
 import { ShellContext } from "./shell-context";
@@ -15,6 +16,7 @@ const storedHistoryOpen = createStoredValue<"open" | "closed">(
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { status } = useApp();
+  const { m } = useI18n();
   const desktopOpen = storedHistoryOpen.useValue() === "open";
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -75,9 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {status?.deployment_profile === "free-beta" ? (
             <div role="status" className="shrink-0 border-b border-line bg-panel px-3 py-2 text-xs">
-              Bepul beta · AI ulanmagan. Text chat, manual memory, loyihalar, goals,
-              IELTS matnli mashq va kichik Office eksportlari. PDF/EPUB/DOCX o‘qish va avtomatik vazifalar o‘chirilgan.
-              Saqlangan fayllarni hozircha tahrirlab yoki o‘chirib bo‘lmaydi.
+              {m.common.freeBeta}
             </div>
           ) : null}
           <div className="min-h-0 flex-1">{children}</div>

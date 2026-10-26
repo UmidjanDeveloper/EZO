@@ -108,7 +108,7 @@ test("desktop pill: words, shortcut and server status come from the main process
 });
 
 test("desktop pill: a typed turn goes thinking → working → success and shows the reply", async ({ page }) => {
-  await openPill(page);
+  await openPill(page, { replyDelayMs: 1200 }); // a server answer takes a moment; the stage arrives meanwhile
   await page.locator("#keyboard").click();
   await page.locator("#question").fill("kalkulyatorni och");
   await page.locator("#question").press("Enter");
@@ -121,6 +121,10 @@ test("desktop pill: a typed turn goes thinking → working → success and shows
   await expect(page.locator("#pill")).toHaveClass(/success/);
   await expect(page.locator("#face")).toHaveAttribute("aria-label", "Bajarildi");
   await expect(page.locator("#pill")).toHaveClass(/idle/, { timeout: 5000 }); // success is a moment
+  // A stage that arrives after the turn ended must not wake the pill up again.
+  await emit(page, "stage", "working");
+  await page.waitForTimeout(200);
+  await expect(page.locator("#pill")).toHaveClass(/idle/);
 });
 
 test("desktop pill: stop during thinking really cancels the request and ignores a late reply", async ({ page }) => {
