@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ezo_api.account.http import enforce_quota
 from ezo_api.api.deps import CurrentUser, ServicesDep, rate_limit
 from ezo_api.api.serializers import message_out
 from ezo_api.core.ezo_core import (
@@ -72,6 +73,9 @@ async def _prepare(
     user = await session.get(User, current.id)
     if user is None:
         raise HTTPException(401, detail="User not found.")
+    await enforce_quota(
+        session, user, "chat_messages_per_day", owner_email=services.settings.owner_email
+    )
     try:
         return await services.core.prepare(session, user, turn)
     except TurnError as exc:

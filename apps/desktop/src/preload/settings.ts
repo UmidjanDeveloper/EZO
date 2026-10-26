@@ -9,4 +9,9 @@ contextBridge.exposeInMainWorld("ezoSettings", {
   removeFolder: (folder: string) => ipcRenderer.invoke("settings:remove-folder", folder),
   forgetConversation: () => ipcRenderer.invoke("settings:forget-conversation"),
   test: () => ipcRenderer.invoke("settings:test"),
+  jarvisChooseFolder: () => ipcRenderer.invoke("jarvis:choose-folder"),
+  jarvisClearFolder: () => ipcRenderer.invoke("jarvis:clear-folder"),
+  jarvisPair: () => ipcRenderer.invoke("jarvis:pair"),
+  jarvisUnpair: () => ipcRenderer.invoke("jarvis:unpair"),
+  jarvisStatus: () => ipcRenderer.invoke("jarvis:status"),
 });

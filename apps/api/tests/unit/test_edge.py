@@ -6,7 +6,12 @@ from typing import Any
 
 from starlette.types import Message, Receive, Scope, Send
 
-from ezo_api.security.edge import AUTHENTICATED, FAILED_AUTH_PER_MINUTE, EdgeGuardMiddleware
+from ezo_api.security.edge import (
+    AUTHENTICATED,
+    FAILED_AUTH_PER_MINUTE,
+    PRINCIPAL,
+    EdgeGuardMiddleware,
+)
 
 TOKEN = "edge-guard-test-token-with-enough-length"
 
@@ -140,3 +145,32 @@ async def test_token_mode_does_not_need_the_origin_check() -> None:
     edge = guard(probe)
     owner = {"Authorization": f"Bearer {TOKEN}", "Origin": "capacitor://localhost"}
     assert (await call(edge, headers=owner))[0] == 200
+
+
+async def test_per_user_tokens_are_checked_before_the_body_and_keep_their_identity() -> None:
+    async def validator(token: str) -> str | None:
+        return "user:42" if token == "ezo_u_valid" else None
+
+    probe = Probe()
+    guard = EdgeGuardMiddleware(probe, token=TOKEN, max_body_bytes=1024, token_validator=validator)
+    status, _, reads = await call(guard, headers={"Authorization": "Bearer ezo_u_wrong"})
+    assert (status, reads, probe.called) == (401, 0, False)
+    status, _, _ = await call(guard, headers={"Authorization": "Bearer ezo_u_valid"})
+    assert status == 200
+    assert probe.scope["state"][AUTHENTICATED] is True
+    assert probe.scope["state"][PRINCIPAL] == "user:42"
+    await call(guard, headers={"Authorization": f"Bearer {TOKEN}"})
+    assert probe.scope["state"][PRINCIPAL] == "owner"
+
+
+async def test_an_unreachable_token_store_fails_closed() -> None:
+    async def broken(token: str) -> str | None:
+        raise ConnectionError("database down")
+
+    probe = Probe()
+    guard = EdgeGuardMiddleware(probe, token=TOKEN, max_body_bytes=1024, token_validator=broken)
+    status, _, reads = await call(guard, headers={"Authorization": "Bearer ezo_u_anything"})
+    assert (status, reads, probe.called) == (503, 0, False)
+    # The owner token never needs the store.
+    status, _, _ = await call(guard, headers={"Authorization": f"Bearer {TOKEN}"})
+    assert status == 200

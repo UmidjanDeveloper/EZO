@@ -14,6 +14,10 @@ export interface DesktopSettings {
   speakReplies: boolean;
   shortcut: string;
   conversationId: string | null;
+  /** The one folder JARVIS tasks may read the newest documents from (owner-chosen). */
+  jarvisFolder: string | null;
+  /** This computer's paired JARVIS device id (the private key is stored encrypted). */
+  jarvisDeviceId: string | null;
 }
 
 export const DEFAULT_SETTINGS: DesktopSettings = {
@@ -26,6 +30,8 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   speakReplies: true,
   shortcut: "Control+Alt+Space",
   conversationId: null,
+  jarvisFolder: null,
+  jarvisDeviceId: null,
 };
 
 const SHORTCUTS = new Set(["Control+Alt+Space", "Control+Shift+Space", "Alt+Space", "Control+Alt+E"]);
@@ -69,6 +75,11 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     conversationId:
       typeof input.conversationId === "string" && /^[0-9a-f-]{36}$/.test(input.conversationId)
         ? input.conversationId
+        : null,
+    jarvisFolder: typeof input.jarvisFolder === "string" && input.jarvisFolder.length > 2 ? input.jarvisFolder : null,
+    jarvisDeviceId:
+      typeof input.jarvisDeviceId === "string" && /^[0-9a-f-]{36}$/.test(input.jarvisDeviceId)
+        ? input.jarvisDeviceId
         : null,
   };
 }

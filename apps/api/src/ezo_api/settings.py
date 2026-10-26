@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
     anthropic_api_key: SecretStr | None = Field(default=None, alias="ANTHROPIC_API_KEY")
     gemini_api_key: SecretStr | None = Field(default=None, alias="GEMINI_API_KEY")
+    # JARVIS Telegram delivery (Bot API). Never logged, stored or returned by the API.
+    telegram_bot_token: SecretStr | None = Field(default=None, alias="EZO_TELEGRAM_BOT_TOKEN")
     preferred_provider: Literal["openai", "anthropic", "gemini"] | None = Field(
         default=None, alias="EZO_PREFERRED_PROVIDER"
     )

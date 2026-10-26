@@ -127,7 +127,79 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       };
       return body.text;
     },
+
+    // --- JARVIS device companion (pairing, fixed work items, signed results) ---
+
+    async requestPairing(body: Record<string, unknown>): Promise<{ device: { id: string; status: string }; code: string }> {
+      const response = await request(
+        "/api/jarvis/devices/pairing",
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+        20_000,
+      );
+      return response.json() as Promise<{ device: { id: string; status: string }; code: string }>;
+    },
+
+    async devices(): Promise<{ id: string; status: string; name: string }[]> {
+      return (await request("/api/jarvis/devices", {}, 15_000)).json() as Promise<{ id: string; status: string; name: string }[]>;
+    },
+
+    async createJarvisTask(text: string, language: Lang = "uz"): Promise<JarvisTaskView> {
+      const response = await request(
+        "/api/jarvis/tasks",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, language, idempotency_key: `desktop-${crypto.randomUUID()}` }),
+        },
+        30_000,
+      );
+      return response.json() as Promise<JarvisTaskView>;
+    },
+
+    async jarvisTask(taskId: string): Promise<JarvisTaskView> {
+      return (await request(`/api/jarvis/tasks/${encodeURIComponent(taskId)}`, {}, 20_000)).json() as Promise<JarvisTaskView>;
+    },
+
+    async decideJarvisStep(taskId: string, stepId: string, scope: string, approve: boolean): Promise<JarvisTaskView> {
+      const response = await request(
+        `/api/jarvis/tasks/${encodeURIComponent(taskId)}/steps/${encodeURIComponent(stepId)}/decision`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope_sha256: scope, approve }) },
+        60_000,
+      );
+      return response.json() as Promise<JarvisTaskView>;
+    },
+
+    async revokeDevice(deviceId: string): Promise<void> {
+      await request(`/api/jarvis/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" }, 15_000);
+    },
+
+    async deviceWork(deviceId: string): Promise<unknown[]> {
+      const body = await (await request(`/api/jarvis/devices/${encodeURIComponent(deviceId)}/work`, {}, 20_000)).json();
+      return Array.isArray(body) ? body : [];
+    },
+
+    async submitDeviceResult(deviceId: string, result: unknown): Promise<{ state: string; report: string }> {
+      const response = await request(
+        `/api/jarvis/devices/${encodeURIComponent(deviceId)}/results`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(result) },
+        60_000,
+      );
+      return response.json() as Promise<{ state: string; report: string }>;
+    },
   };
 }
 
 export type EzoClient = ReturnType<typeof createEzoClient>;
+
+export interface JarvisTaskView {
+  id: string;
+  state: string;
+  report: string;
+  steps: {
+    id: string;
+    action: string;
+    state: string;
+    scope_sha256: string | null;
+    output: { recipient?: string; telegram_name?: string; documents?: { filename: string; sha256: string }[] };
+  }[];
+}
