@@ -27,6 +27,8 @@ class Suite:
     failed: int = 0
     skipped: int = 0
     skip_reasons: Counter[str] = field(default_factory=Counter)
+    failures: list[tuple[str, str]] = field(default_factory=list)
+    """(test, first line of the failure message) so the checks API names what failed."""
     timings: list[tuple[str, str, str]] = field(default_factory=list)
     """(test, property, value) of JUnit "*_seconds*" properties (measured evidence)."""
 
@@ -40,8 +42,13 @@ def read_suite(label: str, path: Path) -> Suite:
     suite = Suite(label)
     for case in root.iter("testcase"):
         suite.collected += 1
-        if case.find("failure") is not None or case.find("error") is not None:
+        problem = case.find("failure")
+        if problem is None:
+            problem = case.find("error")
+        if problem is not None:
             suite.failed += 1
+            text = (problem.get("message") or problem.text or "no message").strip()
+            suite.failures.append((case.get("name") or "", text.splitlines()[0][:400]))
         skipped = case.find("skipped")
         if skipped is not None:
             suite.skipped += 1
@@ -62,6 +69,11 @@ def annotations(suites: list[Suite]) -> list[str]:
         for s in suites
     ]
     lines += [
+        f"::error title=Failed {s.label}::{test}: {message}"
+        for s in suites
+        for test, message in s.failures
+    ]
+    lines += [
         f"::notice title=Timing {s.label}::{test} {name}={value}"
         for s in suites
         for test, name, value in s.timings
@@ -76,6 +88,10 @@ def render(suites: list[Suite]) -> str:
     ]
     for s in suites:
         lines.append(f"| {s.label} | {s.collected} | {s.passed} | {s.failed} | {s.skipped} |")
+    failures = [(s.label, test, message) for s in suites for test, message in s.failures]
+    if failures:
+        lines += ["", "Failed tests:", ""]
+        lines += [f"- {label}: {test} — {message}" for label, test, message in failures]
     reasons = [(s.label, r, n) for s in suites for r, n in s.skip_reasons.items()]
     if reasons:
         lines += ["", "Skipped tests (reason → count):", ""]
