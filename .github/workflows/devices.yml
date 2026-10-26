@@ -50,6 +50,20 @@ jobs:
           Get-Content $report
           Copy-Item (Join-Path $folder "screen.png") $env:RUNNER_TEMP -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "self-test exit code $($p.ExitCode)" }
+      - name: Uninstall silently, as a user would, and verify nothing is left
+        shell: pwsh
+        run: |
+          $dir = Split-Path $env:EZO_EXE
+          $uninstaller = Join-Path $dir "Uninstall EZO.exe"
+          if (-not (Test-Path $uninstaller)) { throw "uninstaller missing in $dir" }
+          Start-Process $uninstaller -ArgumentList "/S" -Wait
+          # The NSIS uninstaller copies itself to %TEMP% and finishes from there.
+          $gone = $false
+          foreach ($i in 1..30) { if (-not (Test-Path $env:EZO_EXE)) { $gone = $true; break }; Start-Sleep -Seconds 2 }
+          if (-not $gone) { throw "EZO.exe still present after uninstall" }
+          $shortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "EZO.lnk"
+          "uninstalled: EZO.exe removed; desktop shortcut present after uninstall: $(Test-Path $shortcut)" | Tee-Object -FilePath $env:RUNNER_TEMP/install.txt -Append
+          if (Test-Path $shortcut) { throw "desktop shortcut left behind" }
       - name: Keep the evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -58,6 +72,7 @@ jobs:
           path: |
             apps/desktop/release/EZO-Setup-*.exe
             ${{ runner.temp }}/selftest.json
+            ${{ runner.temp }}/install.txt
             ${{ runner.temp }}/install.txt
             ${{ runner.temp }}/screen.png
           retention-days: 14
