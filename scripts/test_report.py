@@ -67,9 +67,11 @@ def failure_summary(problem: ET.Element) -> str:
     lines = [line.strip() for line in (problem.text or "").splitlines() if line.strip()]
     start = next((i for i, line in enumerate(lines) if "Error" in line or "expect(" in line), None)
     if start is None:
-        return (problem.get("message") or (lines[0] if lines else "no message"))[:400]
+        message = (problem.get("message") or "").strip().splitlines()
+        return (message[0] if message else lines[0] if lines else "no message")[:400]
+    detail = ("Received", "Expected", "Locator", "+ ", "- ", "Timeout", "Call log")
     keep = [lines[start]]
-    keep += [line for line in lines[start + 1 : start + 12] if line.startswith(("Received", "Expected", "Locator", "+ ", "- ", "Timeout", "Call log"))][:5]
+    keep += [line for line in lines[start + 1 : start + 12] if line.startswith(detail)][:5]
     return " | ".join(keep)[:600]
 
 
