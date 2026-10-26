@@ -19,13 +19,13 @@
   --line-strong: #c9c6bb;
   --ink: #16181d;
   --ink-muted: #5c606b;
-  --ink-faint: #9a9da6;
-  --accent: #0f8f86;
-  --accent-strong: #0b7a72;
+  --ink-faint: #646872; /* 4.8:1+ on every light surface (WCAG AA for small text) */
+  --accent: #0b7a72; /* white text on it reads at 5.2:1 */
+  --accent-strong: #086a62;
   --on-accent: #ffffff;
   --accent-2: #2f55c8;
   --success: #15803d;
-  --warning: #b45309;
+  --warning: #a2470a; /* 5.6:1 on the warning tint used by badges */
   --danger: #c2410c;
   --shadow-card: 0 1px 2px rgb(20 22 28 / 0.04), 0 8px 24px -12px rgb(20 22 28 / 0.12);
   color-scheme: light;
@@ -39,7 +39,7 @@
   --line-strong: #353b4b;
   --ink: #eceef3;
   --ink-muted: #9aa0ae;
-  --ink-faint: #646b7b;
+  --ink-faint: #848b9b; /* 5:1+ on the dark surfaces */
   --accent: #2ec4b6;
   --accent-strong: #25a99c;
   --on-accent: #041513;

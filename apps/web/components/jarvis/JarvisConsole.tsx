@@ -100,7 +100,7 @@ export function JarvisConsole() {
   return (
     <div className="space-y-6" data-testid="jarvis-console">
       {error && (
-        <p role="alert" className="rounded-lg border border-red-500/40 bg-red-500/5 px-3 py-2 text-sm text-red-600">
+        <p role="alert" className="rounded-lg border border-danger/40 bg-danger/8 px-3 py-2 text-sm text-danger">
           {error}
         </p>
       )}
@@ -133,7 +133,7 @@ function Devices({ devices, act }: { devices: JarvisDevice[] | null; act: Act })
           {devices.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium text-ink">{d.name}</span>
-              <span className={cn("rounded px-1.5 text-xs", d.status === "paired" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600")}>
+              <span className={cn("rounded px-1.5 text-xs", d.status === "paired" ? "bg-success/12 text-success" : "bg-warning/12 text-warning")}>
                 {d.status === "paired" ? t.statusPaired : d.status === "pending" ? t.statusPending : t.statusRevoked}
               </span>
               {d.status === "pending" && (
@@ -199,7 +199,7 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
           <li key={r.id} className="text-sm">
             <span className="font-medium text-ink">{r.label}</span>{" "}
             {r.status === "verified" ? (
-              <span className="text-xs text-emerald-600">{t.linked}{r.telegram_name ? ` (${r.telegram_name})` : ""}</span>
+              <span className="text-xs text-success">{t.linked}{r.telegram_name ? ` (${r.telegram_name})` : ""}</span>
             ) : pending[r.id] ? (
               <span className="inline-flex flex-wrap items-center gap-2">
                 <a className="text-xs text-accent underline" href={pending[r.id]!.link} target="_blank" rel="noreferrer">
@@ -214,7 +214,7 @@ function Recipients({ recipients, act }: { recipients: JarvisRecipient[]; act: A
                 </Button>
               </span>
             ) : (
-              <span className="text-xs text-amber-600">{t.notLinked}</span>
+              <span className="text-xs text-warning">{t.notLinked}</span>
             )}
           </li>
         ))}
@@ -263,7 +263,7 @@ function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act
       }),
     );
   return (
-    <div className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-sm" data-testid="jarvis-approval">
+    <div className="mt-2 rounded-lg border border-warning/40 bg-warning/8 p-3 text-sm" data-testid="jarvis-approval">
       <p className="font-medium text-ink">
         <Send className="mr-1 inline h-3.5 w-3.5" aria-hidden />
         {f(t.question, { recipient })}
@@ -306,7 +306,7 @@ function Tasks({ tasks, act }: { tasks: JarvisTask[]; act: Act }) {
             <ol className="mt-2 space-y-1 text-xs">
               {task.steps.map((step) => (
                 <li key={step.id}>
-                  <span className={cn(step.state === "completed" ? "text-emerald-600" : step.state === "failed" ? "text-red-600" : "text-ink-muted")}>
+                  <span className={cn(step.state === "completed" ? "text-success" : step.state === "failed" ? "text-danger" : "text-ink-muted")}>
                     {step.position}. {steps[step.action] ?? step.action} — {states[step.state] ?? step.state}
                     {step.error_message ? `: ${step.error_message}` : ""}
                   </span>

@@ -104,6 +104,8 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/api
       - run: pnpm --filter @ezo/e2e exec playwright install --with-deps chromium
+      - name: Build the desktop pill and the Android web app so the e2e suite scans them too
+        run: pnpm --filter @ezo/desktop build && pnpm --filter @ezo/mobile build
       - run: pnpm test:e2e
       - name: Keep the Playwright evidence when something failed
         if: failure()

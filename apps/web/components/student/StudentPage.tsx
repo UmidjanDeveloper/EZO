@@ -348,12 +348,12 @@ export function StudentPage() {
         {t.limits} {t.ocrNeedsWorker}
       </p>
       {!provider && (
-        <p role="status" className="mb-4 text-sm text-amber-600 dark:text-amber-400">
+        <p role="status" className="mb-4 text-sm text-warning">
           {t.noProvider}
         </p>
       )}
       {error && (
-        <p role="alert" className="mb-4 text-red-600">
+        <p role="alert" className="mb-4 text-danger">
           {error}
         </p>
       )}
@@ -514,7 +514,7 @@ export function StudentPage() {
               </div>
 
               {selected.job.error_message && (
-                <p role="alert" className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-600">
+                <p role="alert" className="mb-4 rounded-xl border border-danger/30 bg-danger/8 p-3 text-sm text-danger">
                   {selected.job.error_message}
                 </p>
               )}
@@ -786,7 +786,7 @@ export function StudentPage() {
                                   <p
                                     role="status"
                                     className={`mt-2 text-xs font-semibold ${
-                                      choices[i] === item.answer ? "text-success" : "text-amber-600"
+                                      choices[i] === item.answer ? "text-success" : "text-warning"
                                     }`}
                                   >
                                     {choices[i] === item.answer ? t.learn.correct : t.learn.incorrect}{" "}
@@ -873,7 +873,7 @@ export function StudentPage() {
                             <span className="rounded-full bg-accent/10 px-2.5 py-1 font-medium text-accent border border-accent/20">
                               {f(t.flashcards.active, { n: progress.active_cards })}
                             </span>
-                            <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 font-medium text-emerald-600 border border-emerald-500/20">
+                            <span className="rounded-full bg-success/12 px-2.5 py-1 font-medium text-success border border-success/30">
                               {f(t.flashcards.reviewed, { n: progress.reviewed_cards })}
                             </span>
                           </div>
@@ -936,7 +936,7 @@ export function StudentPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-amber-600 font-medium"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-warning font-medium"
                                       onClick={() => void handleReview(card, "hard")}
                                     >
                                       {t.flashcards.hard}
@@ -950,7 +950,7 @@ export function StudentPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-emerald-600 font-medium"
+                                      className="px-2 py-0.5 rounded bg-surface-3 hover:bg-surface-2 text-[11px] text-success font-medium"
                                       onClick={() => void handleReview(card, "easy")}
                                     >
                                       {t.flashcards.easy}

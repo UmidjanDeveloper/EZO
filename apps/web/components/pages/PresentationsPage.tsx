@@ -349,7 +349,7 @@ export function PresentationsPage() {
                     </span>
                   </p>
                   {outline.notice ? (
-                    <p className="mt-1 text-xs text-amber-600" data-testid="outline-notice">
+                    <p className="mt-1 text-xs text-warning" data-testid="outline-notice">
                       {outline.notice}
                     </p>
                   ) : null}

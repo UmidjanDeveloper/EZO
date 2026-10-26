@@ -38,7 +38,6 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
   const avatarRef = useRef<EzoAvatar | null>(null);
   const stateRef = useRef(state);
   const labels = useMemo(() => words(m), [m]);
-  const labelsRef = useRef(labels);
   const supported = useSyncExternalStore(noSubscription, supportedSnapshot, () => true);
 
   useEffect(() => {
@@ -47,13 +46,9 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
   }, [state]);
 
   useEffect(() => {
-    labelsRef.current = labels;
-  }, [labels]);
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !supported) return;
-    const avatar = new EzoAvatar(canvas, { framing, describe: (s) => labelsRef.current[s] });
+    const avatar = new EzoAvatar(canvas, { framing });
     avatar.setState(toAvatarState(stateRef.current));
     avatarRef.current = avatar;
     const unsubscribe = subscribeVoiceLevel((level) => avatar.setLevel(level));
@@ -88,11 +83,12 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
       data-testid="ezo-humanoid"
       data-state={state}
       role="img"
-      aria-label={label ?? labels[toAvatarState(state)]}
+      aria-label={`EZO — ${label ?? labels[toAvatarState(state)]}`}
       onPointerMove={onPointer}
       onPointerLeave={followPointer ? () => avatarRef.current?.setGaze(null) : undefined}
     >
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      {/* One accessible image: the wrapper names EZO and the state; the canvas stays decorative. */}
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
       {frame ? <div ref={frameRef} className="pointer-events-none absolute inset-0" data-testid="voice-frame" /> : null}
     </div>
   );

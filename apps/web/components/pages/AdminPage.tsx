@@ -287,13 +287,13 @@ export function AdminPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold text-ink">{m.admin.verifiedTitle}</h3>
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-600 font-medium border border-emerald-500/20">
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-success/12 text-success font-medium border border-success/30">
                       {m.admin.verifiedBadge}
                     </span>
                   </div>
                   <p className="text-xs text-ink-muted mt-0.5">
                     {m.admin.governanceMode}: <span className="font-mono text-ink">{govStatus.governance_mode}</span> | 
-                    {m.admin.autonomy}: <span className="text-emerald-600 font-medium">{m.admin.autonomyBlocked}</span>
+                    {m.admin.autonomy}: <span className="text-success font-medium">{m.admin.autonomyBlocked}</span>
                   </p>
                 </div>
               </div>
@@ -320,7 +320,7 @@ export function AdminPage() {
                   <span
                     className={cn(
                       "h-2.5 w-2.5 rounded-full",
-                      healthStatus?.database === "ok" ? "bg-emerald-500" : "bg-danger"
+                      healthStatus?.database === "ok" ? "bg-success" : "bg-danger"
                     )}
                   />
                   <span className="text-lg font-bold capitalize text-ink">
@@ -341,7 +341,7 @@ export function AdminPage() {
                   <span
                     className={cn(
                       "h-2.5 w-2.5 rounded-full",
-                      healthStatus?.status === "ok" ? "bg-emerald-500" : "bg-warning"
+                      healthStatus?.status === "ok" ? "bg-success" : "bg-warning"
                     )}
                   />
                   <span className="text-lg font-bold uppercase text-ink">
@@ -420,7 +420,7 @@ export function AdminPage() {
                         className={cn(
                           "px-2 py-0.5 text-xs rounded-full font-medium border",
                           agent.available
-                            ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            ? "bg-success/12 text-success border-success/30"
                             : "bg-surface-3 text-ink-faint border-line"
                         )}
                       >
@@ -478,7 +478,7 @@ export function AdminPage() {
                           className={cn(
                             "px-2.5 py-0.5 text-xs rounded-full font-medium border",
                             prop.status === "proposal_only"
-                              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                              ? "bg-warning/12 text-warning border-warning/30"
                               : prop.decision === "request_independent_review"
                               ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
                               : "bg-surface-3 text-ink-faint border-line"

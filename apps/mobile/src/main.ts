@@ -66,6 +66,7 @@ function applyStrings(): void {
   $<HTMLInputElement>("projectName").placeholder = t.more.newProject;
   $<HTMLInputElement>("memoryInput").placeholder = t.more.memoryPlaceholder;
   $<HTMLInputElement>("reminderText").placeholder = t.more.reminderPlaceholder;
+  $("reminderAt").setAttribute("aria-label", t.more.reminderWhen);
   $<HTMLInputElement>("token").placeholder = t.more.tokenPlaceholder;
   $("voiceStage").setAttribute("aria-label", t.voice.title);
   $("stageClose").setAttribute("aria-label", t.voice.close);

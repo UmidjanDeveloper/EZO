@@ -404,7 +404,7 @@ export function IeltsPage() {
                         size="sm"
                         icon={
                           isListening ? (
-                            <Square size={13} className="text-red-500 animate-pulse" />
+                            <Square size={13} className="text-danger animate-pulse" />
                           ) : (
                             <Mic size={13} />
                           )
@@ -417,7 +417,7 @@ export function IeltsPage() {
                         {f(m.ielts.wordCount, { count: answer.split(/\s+/).filter(Boolean).length })}
                         {speechSeconds ? ` · ${f(m.ielts.speechMeasured, { seconds: Math.round(speechSeconds) })}` : ""}
                       </p>
-                      {voiceNote ? <p className="text-xs text-red-500">{voiceNote}</p> : null}
+                      {voiceNote ? <p className="text-xs text-danger">{voiceNote}</p> : null}
                     </div>
                     <Button
                       variant="primary"
