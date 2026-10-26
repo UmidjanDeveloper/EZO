@@ -61,8 +61,18 @@ function extensionFor(type: string): string {
 /** Error codes reported through `onEnd`, matching the browser recogniser's where possible. */
 export const SERVER_FAILED = "server-failed";
 
+/**
+ * VAD for exam-style answers: an IELTS Part 2 long turn lasts up to two minutes with
+ * natural pauses, so a short silence must not end the recording.
+ */
+export const LONG_ANSWER_VAD = { ...DEFAULT_VAD, endSilenceMs: 3500, noSpeechMs: 12_000, maxMs: 130_000 };
+
 /** Record one utterance (until a pause) and transcribe it on the server. */
-export const listenWithServer: Listen = (language, handlers) => {
+export const listenWithServer = (
+  language: LanguageCode | null,
+  handlers: ListenHandlers,
+  vadConfig: typeof DEFAULT_VAD = DEFAULT_VAD,
+): (() => void) => {
   let cancelled = false;
   let finished = false;
   let cleanup = () => undefined as void;
@@ -101,7 +111,7 @@ export const listenWithServer: Listen = (language, handlers) => {
     const timer = window.setInterval(() => {
       analyser.getFloatTimeDomainData(samples);
       publishVoiceLevel(levelFromSamples(samples));
-      const [next, action] = vadStep(vad, rmsOf(samples), performance.now(), DEFAULT_VAD);
+      const [next, action] = vadStep(vad, rmsOf(samples), performance.now(), vadConfig);
       vad = next;
       if (vad.speechAt !== null && !heardSpeech) {
         heardSpeech = true;
