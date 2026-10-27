@@ -1,3 +1,5 @@
+import {runInNewContext} from 'node:vm';
+import {clapProcessorSource} from './microphone';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AttentionController, applyMotion, ClapDetector, acknowledgement, VoiceReaction, validateAssets, ClapMicrophone, CameraTracker, pose, createVisionEstimator, HandMotionTracker, faceFrame, MEDIAPIPE_ASSET_PINS, HumanoidPerception } from './index';
 import type { PerceptionFrame, HandTarget, ClapDetected, VisionAssets } from './index';
@@ -103,4 +105,25 @@ it('hand-only tracking status does not invent a legacy face frame; expired async
  const tracker=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:()=>null,hasTarget:()=>true,close:vi.fn()})});
  await tracker.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('tracking'));expect(onFrame.mock.lastCall![0]).toBeNull();tracker.stop();
  const stale=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:(_video,time)=>pose(identity,time-501),close:vi.fn()})});await stale.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('lost'));expect(onFrame.mock.lastCall![0]).toBeNull();stale.stop();
+});
+
+it('bounds audio-thread backlog to one unacknowledged PCM window',()=>{
+ let Processor:any;const postMessage=vi.fn();
+ runInNewContext(clapProcessorSource,{AudioWorkletProcessor:class {port={postMessage,onmessage:null};},registerProcessor:(_name:string,implementation:any)=>{Processor=implementation;},sampleRate:48000,currentFrame:0,Float32Array});
+ const instance=new Processor();const input=[[new Float32Array(128)]];
+ for(let i=0;i<100;i++)instance.process(input,[]);
+ expect(postMessage).toHaveBeenCalledOnce();
+ instance.port.onmessage({data:'ack'});
+ for(let i=0;i<4;i++)instance.process(input,[]);
+ expect(postMessage).toHaveBeenCalledTimes(2);
+});
+it('acknowledges dropped stale/suppressed audio without treating it as fresh clap evidence',async()=>{
+ environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
+ const port={onmessage:null as any,postMessage:vi.fn(),close:vi.fn()};
+ vi.stubGlobal('AudioContext',class {audioWorklet={addModule:async()=>{}};currentTime=0;destination={};sampleRate=48000;resume=async()=>{};close=async()=>{};createMediaStreamSource=()=>({connect:vi.fn(),disconnect:vi.fn()});});
+ vi.stubGlobal('AudioWorkletNode',class {port=port;connect=vi.fn();disconnect=vi.fn();});
+ const detector=new ClapDetector(),push=vi.spyOn(detector,'push');const mic=new ClapMicrophone({indicator:{} as HTMLElement,detector,onClap:vi.fn()});await mic.start();
+ port.onmessage({data:{samples:new Float32Array(480),time:-1000}});expect(push).not.toHaveBeenCalled();
+ mic.setSuppressed(true);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).not.toHaveBeenCalled();
+ mic.setSuppressed(false);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).toHaveBeenCalledOnce();expect(port.postMessage).toHaveBeenCalledTimes(3);mic.stop();
 });

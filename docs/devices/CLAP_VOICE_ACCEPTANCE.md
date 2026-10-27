@@ -4,7 +4,10 @@ Status: local detector/intent candidate. **Real audio/clap and heard trilingual
 provider playback BLOCKED** (no physical mic/speaker or configured provider used).
 
 The SDK uses a local AudioWorklet with zero output and bounded10ms mono windows.
-There is no continuous audio upload. ClapDetector requires a sharp broadband rise,
+There is no continuous audio upload. At most one PCM window is unacknowledged;
+a busy main thread causes input drops rather than an unbounded MessagePort queue.
+Audio windows older than250ms or more than50ms in the future are dropped.
+This can miss claps under UI load; it does not replay stale buffered sound. ClapDetector requires a sharp broadband rise,
 minimum amplitude, noise-relative contrast and rapid decay; repeated events have
 >=500ms configurable cooldown (default1200ms). Optional approaching-hand timing can
 corroborate audio, but cannot create an event without acoustic evidence. Default

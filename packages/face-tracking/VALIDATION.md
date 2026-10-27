@@ -13,7 +13,7 @@ Vite8.3.4 is an already locked dev tool exposed for the existing package's harne
 | Frozen pnpm10.28.0 install | PASS | install scripts disabled locally; no lockfile drift |
 | Workspace lint | PASS | includes web ESLint and package/client tsc |
 | Workspace TypeScript | PASS | including e2e, actual-avatar example and browser SDK fixture |
-| Sensing unit tests |49 passed,0 failed | synthetic landmarks/PCM and mocked lifecycle |
+| Sensing unit tests |51 passed,0 failed | synthetic landmarks/PCM and mocked lifecycle |
 | Avatar unit |15 passed,0 failed | current existing renderer contracts |
 | Shared unit |10 passed,0 failed | existing contracts |
 | Web unit |97 passed,0 failed | existing UI/API inventory |
@@ -27,7 +27,7 @@ Vite8.3.4 is an already locked dev tool exposed for the existing package's harne
 | Trilingual provider audio heard | BLOCKED | no configured provider/live paid call/physical playback |
 | Real <16GB hardware performance | BLOCKED | cloud host ~33.3GiB/5CPU, not owner PC |
 
-Workspace total: **259 passed,2 skipped,0 failed** (includes49 sensing tests).
+Workspace total: **261 passed,2 skipped,0 failed** (includes51 sensing tests).
 The exact tests exercise face/head position, hand landmark conversion/motion,
 attention ordering/smoothing/mirroring/reduced motion, low-confidence/stale input,
 malformed matrices, permission denial/revocation/interruption, async cancellation,

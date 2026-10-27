@@ -134,7 +134,8 @@ Worker requests have15s deadline, model files12MB each, WASM20MB, loader2MB boun
 On deadline/error worker terminates, capture closes, no main-thread executor fallback.
 CPU delegate/no-SIMD supports devices without a usable GPU; no camera/WASM means
 honest error and ordinary idle/manual interaction. Platforms without ImageBitmap,
-Worker or AudioWorklet are unsupported and fail closed. No continuous cloud audio.
+Worker or AudioWorklet are unsupported and fail closed. No continuous cloud audio. PCM uses one-window acknowledgement backpressure;
+busy UI drops input instead of accumulating windows.
 
 ## Asset selection and release gate
 

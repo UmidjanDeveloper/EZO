@@ -3,11 +3,15 @@ import { ClapDetector } from './clap';
 import type { ClapDetected } from './types';
 export type MicrophoneStatus = 'off' | 'requesting' | 'active' | 'error';
 /** Local PCM never leaves this audio graph. A worklet bounds audio-thread work to one 10ms window. */
-const processor = `class ClapPcm extends AudioWorkletProcessor {
- constructor(){super();this.data=new Float32Array(Math.round(sampleRate/100));this.used=0;}
+export const clapProcessorSource = `class ClapPcm extends AudioWorkletProcessor {
+ constructor(){super();this.data=new Float32Array(Math.round(sampleRate/100));this.used=0;this.waiting=false;
+ this.port.onmessage=()=>{this.waiting=false;this.used=0;};}
  process(inputs,outputs){for(const output of outputs)for(const ch of output)ch.fill(0);
+ if(this.waiting)return true;
  const input=inputs[0]?.[0];if(input)for(let i=0;i<input.length;i++){
- this.data[this.used++]=input[i];if(this.used===this.data.length){this.port.postMessage({samples:this.data,time:(currentFrame+i-this.data.length+1)/sampleRate*1000},[this.data.buffer]);this.data=new Float32Array(Math.round(sampleRate/100));this.used=0;}}
+ this.data[this.used++]=input[i];if(this.used===this.data.length){
+ this.port.postMessage({samples:this.data,time:(currentFrame+i-this.data.length+1)/sampleRate*1000},[this.data.buffer]);
+ this.waiting=true;this.data=new Float32Array(Math.round(sampleRate/100));this.used=0;break;}}
  return true;
  }} registerProcessor('ezo-clap-pcm',ClapPcm);`;
 export class ClapMicrophone {
@@ -71,7 +75,7 @@ export class ClapMicrophone {
             this.state('requesting');
             const context = new AudioContext({ latencyHint: 'interactive' });
             this.context = context;
-            const url = URL.createObjectURL(new Blob([processor], { type: 'text/javascript' }));
+            const url = URL.createObjectURL(new Blob([clapProcessorSource], { type: 'text/javascript' }));
             try {
                 await context.audioWorklet.addModule(url);
             }
@@ -86,17 +90,19 @@ export class ClapMicrophone {
             const origin = performance.now() - context.currentTime * 1000;
             const node = new AudioWorkletNode(context, 'ezo-clap-pcm', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
             this.node = node;
-            node.port.onmessage = (event: MessageEvent<{
-                samples: Float32Array;
-                time: number;
-            }>) => {
-                if (token !== this.generation || this.suppressed)
-                    return;
-                const { samples, time } = event.data;
-                if (!(samples instanceof Float32Array) || samples.length > 2048)
-                    return;
-                for (const clap of this.detector.push(samples, context.sampleRate, origin + time))
-                    this.options.onClap(clap);
+            node.port.onmessage = (event: MessageEvent<{ samples: Float32Array; time: number }>) => {
+                if(token!==this.generation)return;
+                try {
+                    if(this.suppressed)return;
+                    const {samples,time}=event.data;
+                    if(!(samples instanceof Float32Array)||samples.length>2048)return;
+                    const sampleTime=origin+time,now=performance.now();
+                    if(!Number.isFinite(sampleTime)||sampleTime>now+50||now-sampleTime>250)return;
+                    for(const clap of this.detector.push(samples,context.sampleRate,origin+time))this.options.onClap(clap);
+                } finally {
+                    // One message in flight. Busy UI drops input instead of growing the audio queue.
+                    if(token===this.generation)node.port.postMessage('ack');
+                }
             };
             this.source = context.createMediaStreamSource(stream);
             this.source.connect(node);
