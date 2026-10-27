@@ -115,6 +115,26 @@ Merged by the owner during the mission: [#37](https://github.com/UmidjanDevelope
 - AI/voice keys, a physical Windows PC, an Android phone, Telegram bot credentials and
   a recipient chat, signing certificates, any cloud project — none available here.
 
+## Ultimate Final Master Completion mission — verified baseline (2026-10-27)
+
+Integration head `b0d1606` (merge of [#57](https://github.com/UmidjanDeveloper/EZO/pull/57);
+[#58](https://github.com/UmidjanDeveloper/EZO/pull/58) merged before it). Measured in this
+session on that exact head, Linux container:
+
+| Suite | Result |
+|---|---|
+| Root `pnpm lint`, `pnpm typecheck` | clean |
+| `packages/face-tracking` / `shared` / `avatar` / `perception-client` | 57 / 10 / 25 / 3 passed |
+| `apps/mobile` / `apps/desktop` / `apps/web` vitest | 19 / 69 (+2 skipped) / 97 passed |
+| API: ruff, ruff format, mypy, pytest (SQLite) | clean; 1321 passed, 101 skipped (6 min 17 s) |
+| Playwright full suite (desktop + perception projects) | 94 passed (at `356ab9b`, the #57 head) |
+| Hosted CI / Devices / Security on `356ab9b` | all 9 checks green (runs 40476395022, 40476395181, 40476395063) |
+
+Work from here runs as separate, independently green PRs: D2 defect audit
+(`d2/defect-audit`), D3 user-facing completion, D4 backend-dependent features, D5 release
+candidate documents. Defects: `EZO_FINAL_DEFECT_REGISTER.md`; PR #57/#58 architecture:
+`EZO_FINAL_INTEGRATION_REPORT.md`.
+
 ## Checkpoint (resume here)
 
 - **Active workstream:** release documents are written (`EZO_FINAL_RELEASE_AUDIT.md`, acceptance, approvals, matrices, security status, install guides). Keep them current as PRs merge.
