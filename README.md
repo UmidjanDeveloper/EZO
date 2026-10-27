@@ -2,21 +2,19 @@
 
 # EZO OS
 
-### Your AI. Your workflow. One connected experience.
+**SEN BILAN O‘SADIGAN SUN’IY INTELLEKT**
 
-**EZO — Sen bilan o‘sadigan sun’iy intellekt.**
+*One intelligence. Every device. Real work.*
 
-Uzbek-first · Multilingual · Privacy-conscious · Multi-agent
+[**Get started**](#-quick-start) · [**Explore features**](#-built-for-real-work) · [**Architecture**](#-architecture) · [**Desktop & Mobile**](#-devices--installation)
 
-[![Status](https://img.shields.io/badge/status-alpha-2b7fff?style=flat-square)](./IMPLEMENTATION_STATUS.md)
-[![Platforms](https://img.shields.io/badge/platforms-web%20%7C%20Windows%20%7C%20Android-162b4a?style=flat-square)](./docs/devices/README.md)
-[![License](https://img.shields.io/badge/license-see%20repository-162b4a?style=flat-square)](./LICENSE)
+<img src="docs/devices/img/humanoid-web.jpg" width="780" alt="Actual EZO humanoid WebGL rendering captured in the project's browser test environment" />
 
-**[Quick start](#-quick-start) · [Features](#-built-for-real-work) · [Architecture](#-architecture) · [Device builds](#-devices--installation) · [Detailed guide](docs/README_DETAILED.md)**
+<sub>Actual EZO WebGL humanoid render from the project test environment — not a physical-device screenshot.</sub>
 
-<img src="docs/media/ezo-vision-30s.svg" alt="Animated 30-second EZO product-vision preview; not a real-device recording" width="100%" />
+**Uzbek-first** · **Voice-driven** · **Multi-agent** · **Web / Windows / Android**
 
-<sub>30-second product-vision animation — illustrative, not a captured or validated physical-device workflow. For actual code-rendered screenshots, see below.</sub>
+[Implementation status](IMPLEMENTATION_STATUS.md) · [Full technical guide](docs/README_DETAILED.md)
 
 </div>
 
