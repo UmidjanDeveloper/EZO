@@ -47,7 +47,10 @@ once available. Initial hosted browser runs exposed Not supported when opening f
 camera/microphone in the default headless shell. The harness now explicitly selects
 the full Chromium new-headless channel and a real button click for AudioContext
 activation; no capture/cleanup assertions were removed. Each browser case has a30s
-deadline and context cleanup, and the CI step has a5min limit. A green hosted run cannot close the model/hardware gates above.
+deadline and context cleanup, and the CI step has a5min limit. A later hosted lint run exposed a missing direct Node test-type dependency for
+the trusted-worklet node:vm regression. @types/node22.20.5 (already locked in the
+repository) is now explicit, with node types configured; no assertion or type
+checking was disabled. A green hosted run cannot close the model/hardware gates above.
 The earlier2026-10-24 mocked-only package evidence remains in Git history.
 
 ## Remaining review gates
