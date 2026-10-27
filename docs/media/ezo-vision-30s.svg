@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="480" viewBox="0 0 1000 480" role="img" aria-label="Illustrative EZO 30-second product vision animation">
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#071126"/><stop offset="1" stop-color="#0d263a"/></linearGradient><radialGradient id="core"><stop stop-color="#7aeaff" stop-opacity=".8"/><stop offset="1" stop-color="#156dbe" stop-opacity="0"/></radialGradient></defs>
+<rect width="1000" height="480" rx="28" fill="url(#bg)"/>
+<rect x="20" y="20" width="960" height="440" rx="23" fill="none" stroke="#28667a"/>
+<text x="70" y="100" font-family="Arial,sans-serif" font-size="61" fill="#fff" font-weight="bold">EZO <tspan fill="#5bddf0">OS</tspan></text>
+<text x="70" y="136" font-family="Arial,sans-serif" font-size="17" fill="#87c1d1" letter-spacing="3">SEN BILAN O'SADIGAN AI</text>
+<g font-family="Arial,sans-serif" font-weight="bold" font-size="33" fill="#f1fcff">
+<text x="70" y="231" opacity="0">MEET YOUR EZO<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;.18;.2;1" dur="30s" repeatCount="indefinite"/></text>
+<text x="70" y="231" opacity="0">NATURAL VOICE<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.19;.2;.38;.4;1" dur="30s" repeatCount="indefinite"/></text>
+<text x="70" y="231" opacity="0">PERSONAL INTELLIGENCE<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.39;.4;.58;.6;1" dur="30s" repeatCount="indefinite"/></text>
+<text x="70" y="231" opacity="0">CREATE &amp; ACT<animate attributeName="opacity" values="0;0;1;1;0;0" keyTimes="0;.59;.6;.78;.8;1" dur="30s" repeatCount="indefinite"/></text>
+<text x="70" y="231" opacity="0">ONE EZO. EVERYWHERE.<animate attributeName="opacity" values="0;0;1;1" keyTimes="0;.79;.8;1" dur="30s" repeatCount="indefinite"/></text>
+</g>
+<text x="70" y="272" font-family="Arial,sans-serif" font-size="19" fill="#b6d3e0">Web  ·  Windows  ·  Android  ·  AI agents</text>
+<ellipse cx="744" cy="200" rx="132" ry="163" fill="url(#core)"><animate attributeName="opacity" values=".35;.8;.35" dur="4s" repeatCount="indefinite"/></ellipse>
+<g stroke="#6ee1ff" fill="none" opacity=".8">
+<ellipse cx="745" cy="176" rx="77" ry="119"/><ellipse cx="745" cy="176" rx="67" ry="110"/><ellipse cx="745" cy="176" rx="55" ry="97"/>
+<path d="M695 252 Q677 287 624 304 Q583 318 565 391 M796 252 Q813 287 866 304 Q907 318 928 391 M655 334 Q743 368 837 334 M624 354 Q747 404 866 354"/>
+<path d="M705 173 Q727 160 738 175 M752 175 Q769 159 788 173 M720 225 Q744 238 768 225"/>
+<path d="M745 58 V292 M672 175 H819" opacity=".22"/>
+<animateTransform attributeName="transform" type="translate" values="0 0;5 -4;0 0;-5 2;0 0" dur="8s" repeatCount="indefinite"/>
+</g>
+<circle cx="720" cy="176" r="5" fill="#e1ffff"/><circle cx="770" cy="176" r="5" fill="#e1ffff"/>
+<rect x="70" y="398" width="860" height="5" rx="2" fill="#173b55"/><rect x="70" y="398" width="860" height="5" rx="2" fill="#51e3ee"><animate attributeName="width" from="0" to="860" dur="30s" repeatCount="indefinite"/></rect>
+<text x="70" y="430" font-family="Arial,sans-serif" font-size="14" fill="#7a9cae">30-SECOND PRODUCT VISION · ILLUSTRATION, NOT A PHYSICAL-DEVICE RECORDING</text>
+</svg>
