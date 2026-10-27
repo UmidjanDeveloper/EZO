@@ -42,7 +42,9 @@ hisobotini nusxalab qaytarish).
   aytilmadi» (hech qachon «ijro etildi» deb aldamaydi). Windows pill (dist xotiradan) va
   Android ilovasi (dist) ham o‘sha dvigatel bilan: 6/6 o‘tdi (mahalliy, to‘liq Playwright 94/94 bilan birga); skrinshotlar `docs/devices/img/section-c-simulation-*.jpg`.
 - **Emulyator** (Devices): haqiqiy APK, `CAMERA` berilgan, sahnada kamera tugmasi bosiladi,
-  worker emulyator sahnasida inference qiladi: **ulgurmadi** — dvigatelning qat’iy 15 soniyalik muddati («Vision deadline exceeded», x86 emulyator, nosimd WASM, CPU). Bu `packages/face-tracking` ichida; Codex’ga 5-so‘rov. APK o‘zi quriladi va yuklanadi; emulyator qadami hisobotga vaqt jadvalini yozadi.
+  worker emulyator sahnasida inference qiladi: **o‘tdi** (holat «yuz topilmadi», 1 kadr/s,
+  inference ≈1,2 s; dvigatel ≈17 s da ishga tushdi — bu dvigatelning qat’iy 15 s muddatiga
+  juda yaqin, oldingi head’da (55c489e) «Vision deadline exceeded» bo‘lgan edi; Codex’ga 5-so‘rov).
 - **ElevenLabs**: til bo‘yicha ovoz/model (`EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU`,
   `EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU`), tasdiqlangan tillar uchun ElevenLabs, qolganlari
   uchun OpenAI (ElevenLabs’ga HTTP so‘rov yuborilmaydi); o‘zbekcha sukut bo‘yicha o‘chiq.

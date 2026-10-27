@@ -118,7 +118,7 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   older than 500 ms, so on a machine where face+hand inference takes longer than that the
   figure stays neutral while Diagnostics still shows the FPS and inference time. The bundled
   WASM is the `nosimd` build (the only one pinned by the engine). Both are requests to Codex
-  in the Section C PR; the Android emulator in CI hit the 15 s deadline.
+  in the Section C PR; the Android emulator in CI hit the 15 s deadline once (55c489e) and passed the next run with the engine up after ≈17 s and 1.2 s per inference (ce27a47) — marginal.
 - The real engine is bundled in every app since Section C; the camera control is enabled
   once `vision-assets.json` validates and disabled with the exact reason otherwise. CI runs
   the engine with Chromium's fake camera and a fake microphone file of clap-like bursts
