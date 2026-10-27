@@ -131,7 +131,7 @@ Low-power capture requests320×240/8fps; normal640×480/15fps max. These are bro
 constraints, not achieved inference benchmarks. The serial adaptive interval is
 4–15Hz (4–8Hz low-power); at most one bitmap is in flight. Decode/inference costs
 can lower cadence further.15–30 measured inference FPS is **not achieved evidence**.
-Worker requests have15s deadline, model files12MB each, WASM20MB, loader2MB bounds.
+Worker requests have a 60s model-initialisation and 15s per-frame deadline (both overridable via `initTimeoutMs`/`frameTimeoutMs`), model files12MB each, WASM20MB, loader2MB bounds.
 On deadline/error worker terminates, capture closes, no main-thread executor fallback.
 CPU delegate/no-SIMD supports devices without a usable GPU; no camera/WASM means
 honest error and ordinary idle/manual interaction. Platforms without ImageBitmap,

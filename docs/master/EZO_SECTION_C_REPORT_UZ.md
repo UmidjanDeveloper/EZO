@@ -44,7 +44,7 @@ hisobotini nusxalab qaytarish).
 - **Emulyator** (Devices): haqiqiy APK, `CAMERA` berilgan, sahnada kamera tugmasi bosiladi,
   worker emulyator sahnasida inference qiladi: ce27a47 da **o‘tdi** (holat «yuz topilmadi»,
   1 kadr/s, inference ≈1,2 s, dvigatel ≈17 s da tayyor), 55c489e va 7776d42 da esa 15 s
-  muddatga ulgurmadi (23 s) — shuning uchun init muddati 60 s qilindi (5-band).
+  muddatga ulgurmadi (23 s) — shuning uchun init muddati sukut bo‘yicha 60 s qilindi (5-band).
 - **ElevenLabs**: til bo‘yicha ovoz/model (`EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU`,
   `EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU`), tasdiqlangan tillar uchun ElevenLabs, qolganlari
   uchun OpenAI (ElevenLabs’ga HTTP so‘rov yuborilmaydi); o‘zbekcha sukut bo‘yicha o‘chiq.
@@ -78,11 +78,11 @@ hisobotini nusxalab qaytarish).
 3. `ClapMicrophone` uchun mikrofon darajasi (`onLevel`) — Diagnostikada «mic level» ko‘rsatish uchun.
 4. `onStatus` xato matnlarini mashina o‘qiydigan kodga ajrating (`denied`, `revoked`,
    `interrupted`) — hozir UI regex bilan farqlaydi.
-5. **Ko‘rib chiqing:** `createVisionEstimator` ga qo‘shimcha `initTimeoutMs`/`frameTimeoutMs`
-   opsiyasi kiritildi (sukut 15 s o‘zgarmagan, 1–120 s chegara, 3 test) — bu #57 dagi
-   `packages/face-tracking` ga yagona o‘zgarish, #58 birlashgandan keyin qilindi. Sabab: CI
-   Android emulyatori dvigatelni 17–23 s da ishga tushiradi, 15 s muddat uni ikki marta
-   («Vision deadline exceeded») uzib qo‘ydi; `PerceptionSession` endi 60 s beradi.
+5. **Ko‘rib chiqing:** `createVisionEstimator` da init (sukut 60 s) va kadr (15 s) muddatlari
+   ajratildi, `initTimeoutMs`/`frameTimeoutMs` bilan sozlanadi, 1–120 s chegara, 3 test — bu
+   #57 dagi `packages/face-tracking` ga yagona o‘zgarish, #58 birlashgandan keyin qilindi
+   (ikki Claude sessiyasi bir xil tuzatishni kiritgan edi, bittaga birlashtirildi). Sabab: CI
+   Android emulyatori dvigatelni 17–23 s da ishga tushiradi, 15 s muddat uni ikki marta uzdi.
 6. `MEDIAPIPE_ASSET_PINS` ga SIMD WASM variantini ham qo‘shing (hozir faqat `nosimd`
    pin qilingan): zamonaviy telefon va kompyuterlarda inference 2–4 barobar tezlashadi.
 

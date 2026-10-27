@@ -108,10 +108,8 @@ export class PerceptionSession {
         createVisionEstimator(host.assets, (frame) => this.frame(frame), {
           signal,
           workerFactory: () => new Worker(`${host.base}vision.worker.js`),
-          // Initialization = fetch + SHA256 of 22 MB + WASM compile + two model loads: ≈9 s on a
-          // laptop, 17–23 s on the CI Android emulator (nosimd WASM, CPU). The engine's default
-          // 15 s cut the emulator off; frames keep the engine's default budget.
-          initTimeoutMs: 60_000,
+          // Engine defaults: 60 s for initialization (fetch + SHA256 of 22 MB + WASM compile + two
+          // model loads: ≈9 s on a laptop, 17–23 s on the CI Android emulator), 15 s per frame.
         }),
       onFrame: () => undefined,
       onStatus: (status, error) => {

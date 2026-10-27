@@ -26,10 +26,10 @@ export function validateAssets(assets: VisionAssets, origin: string) {
     }
 }
 /** One transferable bitmap at a time. Inference runs only in a dedicated, terminable worker. */
-const DEFAULT_DEADLINE_MS = 15000;
-function deadline(value: number | undefined): number {
+/** A deadline is a bounded scheduling budget (1–120 s); nonfinite or unbounded values are refused before any worker exists. */
+function deadline(value: number | undefined, fallback: number): number {
     if (value === undefined)
-        return DEFAULT_DEADLINE_MS;
+        return fallback;
     if (!Number.isFinite(value) || value < 1000 || value > 120000)
         throw new Error('Invalid vision deadline');
     return value;
@@ -37,13 +37,12 @@ function deadline(value: number | undefined): number {
 export async function createVisionEstimator(assets: VisionAssets, onFrame: (frame: PerceptionFrame) => void, options: {
     signal?: AbortSignal;
     workerFactory?: () => Worker;
-    /** Worker initialization budget (asset fetch + SHA256 + WASM compile + model load); default 15 s, 1–120 s. Slow phones and emulators need more. */
+    /** Model loading compiles WASM and builds two graphs: slow phones and CI emulators need well over 15 s. */
     initTimeoutMs?: number;
-    /** Per-frame inference budget; default 15 s, 1–120 s. */
     frameTimeoutMs?: number;
 } = {}): Promise<Estimator> {
     validateAssets(assets, location.href);
-    const initDeadline = deadline(options.initTimeoutMs), frameDeadline = deadline(options.frameTimeoutMs);
+    const initTimeoutMs = deadline(options.initTimeoutMs, 60000), frameTimeoutMs = deadline(options.frameTimeoutMs, 15000);
     if (options.signal?.aborted)
         throw new Error('Vision initialization cancelled');
     const worker = options.workerFactory?.() ?? new Worker(new URL('./vision.worker.ts', import.meta.url));
@@ -77,13 +76,13 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
         else
             p.resolve(e.data.frame);
     };
-    const request = (message: object, transfer: Transferable[] = [], budget = frameDeadline) => new Promise<PerceptionFrame>((resolve, reject) => {
+    const request = (message: object, timeoutMs: number, transfer: Transferable[] = []) => new Promise<PerceptionFrame>((resolve, reject) => {
         if (closed || pending) {
             reject(new Error('Vision unavailable or busy'));
             return;
         }
         pending = { resolve, reject };
-        timer = setTimeout(() => { pending?.reject(new Error('Vision deadline exceeded')); pending = null; close(); }, budget);
+        timer = setTimeout(() => { pending?.reject(new Error('Vision deadline exceeded')); pending = null; close(); }, timeoutMs);
         try {
             worker.postMessage({ ...message, id: ++sequence }, transfer);
         }
@@ -94,7 +93,7 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
         }
     });
     try {
-        await request({ type: 'init', assets, origin: location.href, }, [], initDeadline);
+        await request({ type: 'init', assets, origin: location.href, }, initTimeoutMs);
     }
     catch (e) {
         close();
@@ -110,7 +109,7 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
                 throw new Error('Vision worker closed');
             }
             try {
-                const frame = await request({ type: 'frame', bitmap, time }, [bitmap]);
+                const frame = await request({ type: 'frame', bitmap, time }, frameTimeoutMs, [bitmap]);
                 if (closed)
                     return null;
                 handTargetAt=frame.hands.some(h=>h.confidence>=0.6)?frame.timestampMs:-Infinity;

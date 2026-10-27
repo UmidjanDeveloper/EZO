@@ -8,7 +8,7 @@ verified evidence, not the existence of files. No completion percentages.
 | PR | Branch | Owner | State | Head | What it holds |
 |---|---|---|---|---|---|
 | [#58](https://github.com/UmidjanDeveloper/EZO/pull/58) | `feat/humanoid-perception` | Codex | **MERGED** into `claude/gifted-goodall-bpf01s` (merge `1e47ca0`) | `9a75c92` | The perception engine only: `packages/face-tracking` (MediaPipe Tasks Vision in a worker, `AttentionController`, `ClapMicrophone`/`ClapDetector`, `VoiceReaction`, asset pins and SHA256 verification), its tests (54), docs `docs/devices/HUMANOID_PERCEPTION_CONTRACT.md`, `CAMERA_GESTURE_ACCEPTANCE.md`, `CLAP_VOICE_ACCEPTANCE.md`, workflow changes for that package. No app is wired. |
-| [#57](https://github.com/UmidjanDeveloper/EZO/pull/57) | `section-c/perception-voice` | Claude | **OPEN**, built on the merged #56 and on #58 (the branch now contains `1e47ca0`, merged without conflicts) | see the PR | Wiring of that engine into web, Windows and Android (`@ezo/perception-client`, bundled verified assets, CSP, permissions, lifecycle), clap → spoken acknowledgement through the real `/api/voice/speak`, ElevenLabs per-language voices, the owner test kit (Diagnostics pages, artifacts, `EZO_OWNER_TEST_UZ.md`). The only change to `packages/face-tracking/**` is the additive deadline option in `vision.ts` (+ its test), made after #58 merged and flagged for Codex. |
+| [#57](https://github.com/UmidjanDeveloper/EZO/pull/57) | `section-c/perception-voice` | Claude | **OPEN**, built on the merged #56 and on #58 (the branch now contains `1e47ca0`, merged without conflicts) | see the PR | Wiring of that engine into web, Windows and Android (`@ezo/perception-client`, bundled verified assets, CSP, permissions, lifecycle), clap → spoken acknowledgement through the real `/api/voice/speak`, ElevenLabs per-language voices, the owner test kit (Diagnostics pages, artifacts, `EZO_OWNER_TEST_UZ.md`). The only change to `packages/face-tracking/**` is the split initialisation/frame deadline in `vision.ts` (+ its test), made after #58 merged and flagged for Codex. |
 
 There is no overlap in files between the two PRs after the merge: #58 owns
 `packages/face-tracking/**` and its docs; #57 touches only consumers. The former duplicate
@@ -58,7 +58,7 @@ engine's shape fails `packages/perception-client` typecheck and `packages/avatar
 | I2 | Pointer/touch fallback had no label without the engine (file:// pill, builds without assets) | The `MotionAdapter` was created only when the assets verified | Adapter is created with the figure on every client; the engine session is added once the bundle verified | `desktop-pill.spec.ts` ("ten times"), `mobile-stage.spec.ts` |
 | I3 | Diagnostics showed 0 FPS on a slow machine although the worker ran | Samples were counted only for frames the controller accepted as fresh (≤500 ms) | Count every inference; freshness still governs attention | `perception.spec.ts` (`data-fps > 0`, `data-inference-ms > 0`) |
 | I4 | Web clap acknowledgement reported no provider | Test double lacked `Access-Control-Expose-Headers`; the real API exposes `X-EZO-Voice-Provider` (`apps/api/src/ezo_api/main.py`) | Fixture fixed; production unchanged | `perception.spec.ts` (`data-tts-provider`) |
-| I5 | Android emulator: "Vision deadline exceeded" at `55c489e` and `7776d42` (engine up after 23 s), passed once at `ce27a47` (≈17 s, 1.2 s per inference) | The engine's fixed 15 s timer for worker initialisation and for each frame (`packages/face-tracking/src/vision.ts`), `nosimd` WASM only | **Additive engine option** `initTimeoutMs`/`frameTimeoutMs` (default unchanged, bounded 1–120 s, 3 unit tests) — the one change to `packages/face-tracking` in #57, after #58 merged, flagged for Codex's review; `PerceptionSession` passes 60 s for initialisation. The smoke records a start timeline. SIMD pin stays request 6 | `packages/face-tracking/src/vision.deadline.test.ts`, `tests/e2e/devices/android-smoke.mjs` |
+| I5 | Android emulator: "Vision deadline exceeded" at `55c489e` and `7776d42` (engine up after 23 s), passed once at `ce27a47` (≈17 s, 1.2 s per inference) | The engine's fixed 15 s timer for worker initialisation and for each frame (`packages/face-tracking/src/vision.ts`), `nosimd` WASM only | **Engine deadlines split**: initialisation 60 s by default, per frame 15 s, both overridable (`initTimeoutMs`/`frameTimeoutMs`) and bounded 1–120 s, 3 unit tests — the one change to `packages/face-tracking` in #57, after #58 merged, flagged for Codex's review. The smoke records a start timeline. SIMD pin stays request 6 | `packages/face-tracking/src/vision.deadline.test.ts`, `tests/e2e/devices/android-smoke.mjs` |
 | I6 | Next 16.4 Turbopack never finishes with the engine in the module graph | The engine's dead `import.meta.url` worker entry | Production build uses `next build --webpack` (documented in `next.config.ts`) | Web CI build |
 
 ## 4. Evidence by category (never interchangeable)
@@ -78,13 +78,13 @@ engine's shape fails `packages/perception-client` typecheck and `packages/avatar
 2. `validateAssets`: allow an app scheme besides `https?:` (drops the `https://ezo.desktop` intercept on Windows).
 3. Microphone level callback for Diagnostics.
 4. Machine-readable error codes in `onStatus`.
-5. Review the additive `initTimeoutMs`/`frameTimeoutMs` option added in #57 (default unchanged); consider exposing `maxAgeMs` tuning for slow devices.
+5. Review the split deadlines added in #57 (`initTimeoutMs` 60 s / `frameTimeoutMs` 15 s, bounded); consider exposing `maxAgeMs` tuning for slow devices.
 6. SIMD WASM pin with feature detection.
 
 ## 6. Remaining risks
 
-- Engine initialisation on the CI emulator takes 17–23 s (nosimd WASM on CPU); the session now
-  allows 60 s. A real slow phone shows the same cost once per camera start; the SIMD pin (request 6)
+- Engine initialisation on the CI emulator takes 17–23 s (nosimd WASM on CPU); the engine now
+  allows 60 s by default. A real slow phone shows the same cost once per camera start; the SIMD pin (request 6)
   is the real remedy.
 - Model licence: Apache-2.0 per Google's model cards, not re-fetched from this container;
   owner confirmation box in `scripts/vision/MODEL_LICENSE_REVIEW.txt`.

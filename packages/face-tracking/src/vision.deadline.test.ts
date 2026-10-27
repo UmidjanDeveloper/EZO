@@ -15,20 +15,20 @@ const silentWorker = () => ({ terminate: vi.fn(), onmessage: null as unknown, on
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('vision estimator deadlines', () => {
-    it('keeps the 15 s default when no budget is given', async () => {
+    it('gives initialization 60 s by default (slow phones and CI emulators need well over 15 s)', async () => {
         vi.useFakeTimers(); vi.stubGlobal('location', { href: 'https://ezo.test/' });
         const worker = silentWorker();
         const init = createVisionEstimator(assets, vi.fn(), { workerFactory: () => worker as unknown as Worker });
         const failed = expect(init).rejects.toThrow('Vision deadline exceeded');
-        await vi.advanceTimersByTimeAsync(14_999); expect(worker.terminate).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(59_999); expect(worker.terminate).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1); await failed; expect(worker.terminate).toHaveBeenCalledOnce();
     });
-    it('honours a longer initialization budget for slow devices', async () => {
+    it('honours an integrator budget for initialization', async () => {
         vi.useFakeTimers(); vi.stubGlobal('location', { href: 'https://ezo.test/' });
         const worker = silentWorker();
-        const init = createVisionEstimator(assets, vi.fn(), { workerFactory: () => worker as unknown as Worker, initTimeoutMs: 60_000 });
+        const init = createVisionEstimator(assets, vi.fn(), { workerFactory: () => worker as unknown as Worker, initTimeoutMs: 20_000 });
         const failed = expect(init).rejects.toThrow('Vision deadline exceeded');
-        await vi.advanceTimersByTimeAsync(59_999); expect(worker.terminate).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(19_999); expect(worker.terminate).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1); await failed; expect(worker.terminate).toHaveBeenCalledOnce();
     });
     it('rejects nonfinite or unbounded budgets before touching a worker', async () => {
