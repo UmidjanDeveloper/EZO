@@ -80,7 +80,18 @@ Rasmlar (kodning o‘zidan, Chromium SwiftShader): `docs/devices/img/humanoid-st
 | Playwright `accessibility` | 11/11 |
 | Playwright `avatar-modes` (demo sahifasida: kam harakat, 30 kadr/s, WebGL kontekst yo‘qolishi/tiklanishi, 9 holat yuzga yetadi) | 3/3 (yangi) |
 | Playwright to‘liq to‘plam (lokal, `pnpm test:e2e`) | 89/89 |
-| CI / Devices / Security (`0b3ed4a` yoki yakuniy head) | __CI__ |
+| CI / Devices / Security, head `0b3ed4a` | Web: Playwright **89/89**, web unit 97/97, shared 10/10 (CI run 40460438474); Windows: o‘rnatish + o‘z-o‘zini tekshirish + o‘chirish ✓, Android: APK emulyatorda, ovoz sahnasi ochildi — `renderer=webgl, points=19183, power=low, state=idle, cameraDisabled=true` (Devices run 40460438450); Security ✓ (run 40460438404); API ✓ |
+| CI / Devices / Security, yakuniy head `f559c7a` | __CI_FINAL__ |
+
+### O‘lchangan unumdorlik (CI, SwiftShader — GPU’siz eng yomon holat)
+
+| Profil | Nuqtalar | Qurish | Chizish p50/p95 | Kadr oralig‘i p50 | JS heap | Birinchi kadr |
+|---|---|---|---|---|---|---|
+| Desktop 1280×800 | 49,954 (byudjet 50,000) | 66 ms | 8.6 / 16 ms | 83 ms (≈13 kadr/s, dasturiy renderer) | 11.3 MB | ≈146 ms |
+| Pixel 7 profili | 19,183 (byudjet 20,000) | 29 ms | 7.8 / 16.4 ms | 50 ms (≈23 kadr/s) | 11.3 MB | ≈101 ms |
+
+Haqiqiy GPU’da bu yengil yuk; egasining kompyuteri/telefonida o‘lchov hali yo‘q (KUTILMOQDA).
+Yuz qatlami ~900 nuqta qo‘shdi; byudjetlar o‘zgarmadi.
 
 ## 7. Jismoniy kompyuter/telefon kerak bo‘lgan narsalar (KUTILMOQDA)
 
