@@ -3,7 +3,7 @@ import {pose,Smoother,mediaPipeEstimator,driveAvatar,CameraTracker} from './inde
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 describe('synthetic pose contracts (not camera validation)',()=>{
  it('neutral and invalid matrices',()=>{expect(pose(identity,1)?.yaw).toBe(0);expect(pose([NaN],1)).toBeNull();});
- it('rotation produces bounded signed head aim',()=>{const m=[...identity];m[8]=1;m[10]=0;expect(pose(m,1)?.yaw).toBe(1);});
+ it('rotation produces bounded signed head aim',()=>{const m=[...identity];m[0]=0;m[2]=-1;m[8]=1;m[10]=0;expect(pose(m,1)?.yaw).toBe(1);});
  it('smooths and fences stale timestamps',()=>{const s=new Smoother();const f=pose(identity,1)!;s.update(f);const n=s.update({...f,yaw:1,timestamp:11});expect(n.yaw).toBeGreaterThan(0);expect(n.yaw).toBeLessThan(1);expect(s.update(f)).toBe(n);s.reset();expect(s.update(f)).toEqual(f);});
  it('lost/multiple faces clear output and closes model',()=>{const close=vi.fn();const l={detectForVideo:()=>({faceLandmarks:[],facialTransformationMatrixes:[]}),close};const e=mediaPipeEstimator(l);expect(e.estimate({} as HTMLVideoElement,1)).toBeNull();e.close();expect(close).toHaveBeenCalledOnce();});
  it('adapter clamps and clears without touching avatar state',()=>{const setHeadAim=vi.fn();driveAvatar({setHeadAim},{...pose(identity,1)!,yaw:4});expect(setHeadAim).toHaveBeenLastCalledWith({yawRadians:0.25,pitchRadians:0,rollRadians:0});driveAvatar({setHeadAim},null);expect(setHeadAim).toHaveBeenLastCalledWith(null);});
@@ -38,5 +38,5 @@ it('granted stream emits a derived frame and hidden avatar stops capture',async(
  vi.useFakeTimers();vi.stubGlobal('document',{hidden:false,addEventListener:vi.fn(),removeEventListener:vi.fn()});vi.stubGlobal('isSecureContext',true);
  const stop=vi.fn(),close=vi.fn(),onFrame=vi.fn();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>({getTracks:()=>[{stop}],getVideoTracks:()=>[{addEventListener:vi.fn()}]})}});
  const video={pause:vi.fn(),play:async()=>{},readyState:2,currentTime:1} as unknown as HTMLVideoElement;
- const t=new CameraTracker({video,indicator:{} as HTMLElement,createEstimator:async()=>({estimate:(_v,time)=>pose(identity,time),close}),onFrame});await t.start();expect(onFrame.mock.lastCall?.[0]?.confidence).toBe(1);t.setVisible(false);expect(stop).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);expect(onFrame).toHaveBeenLastCalledWith(null);vi.useRealTimers();vi.unstubAllGlobals();
+ const t=new CameraTracker({video,indicator:{} as HTMLElement,createEstimator:async()=>({estimate:(_v,time)=>pose(identity,time),close}),onFrame});await t.start();await vi.waitFor(()=>expect(onFrame.mock.lastCall?.[0]?.confidence).toBe(1));t.setVisible(false);expect(stop).toHaveBeenCalledOnce();expect(close).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);expect(onFrame).toHaveBeenLastCalledWith(null);vi.useRealTimers();vi.unstubAllGlobals();
 });

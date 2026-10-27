@@ -1,0 +1,139 @@
+import {runInNewContext} from 'node:vm';
+import {clapProcessorSource} from './microphone';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { AttentionController, applyMotion, ClapDetector, acknowledgement, VoiceReaction, validateAssets, ClapMicrophone, CameraTracker, pose, createVisionEstimator, HandMotionTracker, faceFrame, MEDIAPIPE_ASSET_PINS, HumanoidPerception } from './index';
+import type { PerceptionFrame, HandTarget, ClapDetected, VisionAssets } from './index';
+const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+const hand = (x = 0.5, moving = true): HandTarget => ({ id: 'left', x, y: 0.2, confidence: 0.8, velocityX: moving ? 1 : 0, velocityY: 0, moving });
+const frame = (time = 100, hands: HandTarget[] = [], x = 0.4): PerceptionFrame => ({ face: { ...pose(identity, time)!, gazeX: x, gazeY: 0.3 }, hands, timestampMs: time, inferenceMs: 10 });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+describe('deterministic attention (synthetic landmarks, not hardware)', () => {
+    it.each([false, true])('maps x/y with mirror=%s', mirrored => { const c = new AttentionController({ mirrored }); c.ingest(frame()); const m = c.sample(250); expect(Math.sign(m.yaw)).toBe(mirrored ? -1 : 1); expect(m.pitch).toBeGreaterThan(0); expect(m.state).toBe('face_attention'); });
+    it.each([-0.8, 0.8])('preserves signed direction %s', x => { const c = new AttentionController(); c.ingest(frame(100, [], x)); expect(Math.sign(c.sample(200).yaw)).toBe(Math.sign(x)); });
+    it('responds to head rotation even with a centered face target', () => { const c = new AttentionController(); const f = frame(100, [], 0); f.face!.yaw = 0.8; f.face!.pitch = -0.8; f.face!.gazeY = 0; c.ingest(f); expect(c.sample(200).yaw).toBeGreaterThan(0); expect(c.sample(200).pitch).toBeLessThan(0); expect(c.sample(200).state).toBe('following_head'); });
+    it('requires moving hand dwell, releases after timeout, and reacquires', () => { const c = new AttentionController(); c.ingest(frame(100, [hand()])); expect(c.sample(100).source).toBe('face'); c.ingest(frame(180, [hand()])); expect(c.sample(180).source).toBe('hand'); c.ingest(frame(400, [hand(0.5, false)])); expect(c.sample(400).source).toBe('hand'); c.ingest(frame(900)); expect(c.sample(900).source).toBe('face'); c.ingest({ ...frame(1000), face: null }); expect(c.sample(1501).state).toBe('attention_lost'); expect(Math.abs(c.sample(2500).yaw)).toBeLessThan(0.1); c.ingest(frame(2600)); expect(c.sample(2700).source).toBe('face'); });
+    it('stationary hands do not steal attention', () => { const c = new AttentionController(); c.ingest(frame(100, [hand(0, false)])); c.ingest(frame(200, [hand(0, false)])); expect(c.sample(200).source).toBe('face'); });
+    it('explicit authorized interaction overrides hand focus', () => { const c = new AttentionController(); c.ingest(frame(100, [hand()])); c.ingest(frame(180, [hand()])); c.setInteraction('listening'); expect(c.sample(200).state).toBe('listening'); expect(c.sample(200).source).toBe('face'); c.setInteraction('speaking'); expect(c.sample(210).state).toBe('speaking'); c.setInteraction(null); expect(c.sample(220).source).toBe('hand'); });
+    it('rejects stale/future/invalid frames and low-confidence targets', () => { const c = new AttentionController(); expect(c.ingest(frame(100), 700)).toBe(false); expect(c.ingest(frame(100), 90)).toBe(false); expect(c.ingest(frame())).toBe(true); expect(c.ingest(frame(99))).toBe(false); const f = frame(200, [{ ...hand(), confidence: 0.2 }]); f.face!.confidence = 0.2; c.ingest(f); expect(c.sample(200).source).toBe('neutral'); f.timestampMs = 300; f.face!.confidence = 1; f.face!.gazeX = NaN; c.ingest(f); expect(c.sample(300).source).toBe('neutral'); expect(c.sample(NaN)).toEqual(c.sample(300)); });
+    it('reduced motion holds neutral coordinates and structural avatar port is compatible', () => { const c = new AttentionController({ reducedMotion: true }); c.ingest(frame()); const m = c.sample(200); expect(m.yaw).toBe(0); expect(m.pitch).toBe(0); const setGaze = vi.fn(); applyMotion({ setGaze }, m); expect(setGaze).toHaveBeenCalledWith({ yaw: 0, pitch: 0 }); c.reset(); applyMotion({ setGaze }, c.sample(300)); expect(setGaze).toHaveBeenLastCalledWith(null); });
+    it('rejects extreme, zero, reflective and nonfinite rotation matrices', () => { for (const m of [new Array(16).fill(0), identity.map(n => n * 1e100), identity.map((n, i) => i === 0 ? -1 : n), identity.map((n, i) => i === 5 ? NaN : n)])
+        expect(pose(m, 100)).toBeNull(); expect(pose(identity, Infinity)).toBeNull(); });
+});
+const pcm = (length: number, value = 0) => new Float32Array(length).map((_, i) => i % 2 ? value : -value);
+function clap(d: ClapDetector, time: number) { d.push(pcm(480), 48000, time); d.push(pcm(480, 0.7), 48000, time + 10); return d.push(pcm(960), 48000, time + 20); }
+describe('synthetic acoustic evidence, not real clap validation', () => {
+    it('emits only after short high-frequency transient decays', () => { const d = new ClapDetector(); d.push(pcm(480), 48000, 0); expect(d.push(pcm(480, 0.7), 48000, 10)).toEqual([]); expect(d.push(pcm(960), 48000, 20)).toMatchObject([{ type: 'clap_detected', authorization: 'acknowledgement_only', evidence: 'acoustic_transient' }]); });
+    it('rejects silence, low noise, sustained speech-like sine, and constant sharp noise', () => { const d = new ClapDetector(); let events: ClapDetected[] = []; for (let i = 0; i < 100; i++)
+        events.push(...d.push(pcm(480, 0.01), 48000, i * 10)); for (let i = 0; i < 100; i++)
+        events.push(...d.push(new Float32Array(480).map((_, j) => Math.sin((i * 480 + j) * 2 * Math.PI * 180 / 48000) * 0.5), 48000, 1000 + i * 10)); for (let i = 0; i < 100; i++)
+        events.push(...d.push(pcm(480, 0.7), 48000, 2000 + i * 10)); expect(events).toEqual([]); });
+    it('debounces repeated claps, allows a later clap, and rejects stale/invalid PCM', () => { const d = new ClapDetector(); expect(clap(d, 0)).toHaveLength(1); expect(clap(d, 100)).toHaveLength(0); expect(clap(d, 1500)).toHaveLength(1); expect(d.push(pcm(480, 0.9), 48000, 10)).toEqual([]); expect(d.push(new Float32Array([NaN]), 48000, 2000)).toEqual([]); expect(d.push(pcm(480), 0, 2010)).toEqual([]); });
+    it('optional visual corroboration never detects sound by itself', () => { const d = new ClapDetector({ requireHands: true }); expect(clap(d, 0)).toEqual([]); d.observeHands(0.6, 1500); d.observeHands(0.2, 1550); expect(clap(d, 1560)[0]?.evidence).toBe('audio_and_hands'); });
+    it('bounds input and validates sensitivity', () => { expect(() => new ClapDetector({ sensitivity: 0 })).toThrow(); expect(() => new ClapDetector({ cooldownMs: 10 })).toThrow(); expect(new ClapDetector().push(pcm(48001), 48000, 0)).toEqual([]); });
+});
+describe('acknowledgements and actual-playback boundary', () => {
+    const event: ClapDetected = { type: 'clap_detected', timestampMs: 1, confidence: 0.8, evidence: 'acoustic_transient', authorization: 'acknowledgement_only' };
+    it.each([['uz', 'Eshitaman seni.'], ['en', "I'm listening."], ['ru', 'Я тебя слушаю.']] as const)('uses selected language %s, no listening authorization', (lang, text) => { expect(acknowledgement(event, lang)).toMatchObject({ text, startListening: false, authorization: 'acknowledgement_only' }); });
+    it('provider unavailable is not pretend audio playback', async () => { const output = vi.fn(); await new VoiceReaction(null, output).react(acknowledgement(event, 'uz')); expect(output).toHaveBeenCalledOnce(); expect(output.mock.calls[0]![0].type).toBe('unavailable'); });
+    it('forwards only real bounded audio levels and cancels stale playback', async () => { const output = vi.fn(); let send!: (event: any) => void; let resolve!: () => void; const reaction = new VoiceReaction({ play: async (_i, _s, emit) => { send = emit; await new Promise<void>(r => { resolve = r; }); } }, output); const pending = reaction.react(acknowledgement(event, 'en')); send({ type: 'level', level: 1, timestampMs: 0 }); expect(output).not.toHaveBeenCalled(); send({ type: 'start', timestampMs: 1 }); send({ type: 'level', level: 3, timestampMs: 2 }); expect(output.mock.lastCall![0].level).toBe(1); reaction.stop(); const count = output.mock.calls.length; send({ type: 'level', level: 1, timestampMs: 4 }); expect(output).toHaveBeenCalledTimes(count); resolve(); await pending; });
+    it('rejects unverified confidence and reports player errors', async () => { expect(() => acknowledgement({ ...event, confidence: 0.2 }, 'uz')).toThrow(); const output = vi.fn(); await new VoiceReaction({ play: async () => { throw new Error('offline'); } }, output).react(acknowledgement(event, 'en')); expect(output.mock.lastCall![0].type).toBe('error'); });
+});
+function environment() { const doc = new EventTarget() as EventTarget & {
+    hidden: boolean;
+}; doc.hidden = false; vi.stubGlobal('document', doc); vi.stubGlobal('isSecureContext', true); return doc; }
+const video = () => ({ pause: vi.fn(), play: async () => { }, readyState: 2, currentTime: 1, srcObject: null }) as unknown as HTMLVideoElement;
+function streamMock() { const track = Object.assign(new EventTarget(), { stop: vi.fn() }); return { track, stream: { getTracks: () => [track], getVideoTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream }; }
+describe('sensor privacy lifecycle', () => {
+    it('camera permission denial closes output without retries', async () => { environment(); const getUserMedia = vi.fn(async () => { throw new DOMException('denied', 'NotAllowedError'); }); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } }); const status = vi.fn(); const t = new CameraTracker({ video: video(), indicator: {} as HTMLElement, createEstimator: vi.fn(), onFrame: vi.fn(), onStatus: status }); await t.start(); expect(getUserMedia).toHaveBeenCalledOnce(); expect(status.mock.lastCall![0]).toBe('error'); t.stop(); });
+    it('camera ended removes listeners and immediately releases inference/stream', async () => { environment(); const { track, stream } = streamMock(); const remove = vi.spyOn(track, 'removeEventListener'), close = vi.fn(); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } }); const t = new CameraTracker({ video: video(), indicator: {} as HTMLElement, createEstimator: async () => ({ estimate: () => null, close }), onFrame: vi.fn() }); await t.start(); track.dispatchEvent(new Event('ended')); expect(track.stop).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalled(); });
+    it('late async inference cannot emit or restart after disable', async () => { environment(); const { track, stream } = streamMock(); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } }); let resolve!: (f: ReturnType<typeof pose>) => void; const onFrame = vi.fn(); const t = new CameraTracker({ video: video(), indicator: {} as HTMLElement, createEstimator: async () => ({ estimate: () => new Promise(r => { resolve = r; }), close: vi.fn() }), onFrame }); await t.start(); t.stop(); const calls = onFrame.mock.calls.length; resolve(pose(identity, 100)); await Promise.resolve(); expect(onFrame).toHaveBeenCalledTimes(calls); expect(track.stop).toHaveBeenCalledOnce(); });
+    it('camera permission revocation releases tracks and removes permission listener', async () => { environment(); const { track, stream } = streamMock(); const permission = Object.assign(new EventTarget(), { state: 'granted' }); const remove = vi.spyOn(permission, 'removeEventListener'); vi.stubGlobal('navigator', { permissions: { query: async () => permission }, mediaDevices: { getUserMedia: async () => stream } }); const status = vi.fn(); const t = new CameraTracker({ video: video(), indicator: {} as HTMLElement, createEstimator: async () => ({ estimate: () => null, close: vi.fn() }), onFrame: vi.fn(), onStatus: status }); await t.start(); permission.state = 'denied'; permission.dispatchEvent(new Event('change')); expect(track.stop).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalled(); expect(status.mock.lastCall).toEqual(['error', 'Camera permission revoked']); });
+    it('microphone is separate and OFF on construction; late grant is stopped', async () => { environment(); let resolve!: (s: MediaStream) => void; const getUserMedia = vi.fn(() => new Promise<MediaStream>(r => { resolve = r; })); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } }); const t = new ClapMicrophone({ indicator: {} as HTMLElement, onClap: vi.fn() }); expect(getUserMedia).not.toHaveBeenCalled(); const pending = t.start(); expect(getUserMedia.mock.calls[0]).toEqual([{ video: false, audio: expect.any(Object) }]); t.stop(); const { track, stream } = streamMock(); resolve(stream); await pending; expect(track.stop).toHaveBeenCalledOnce(); });
+    it('microphone denial does not enable camera or retry', async () => { environment(); const getUserMedia = vi.fn(async () => { throw new Error('denied'); }); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } }); const status = vi.fn(); await new ClapMicrophone({ indicator: {} as HTMLElement, onClap: vi.fn(), onStatus: status }).start(); expect(getUserMedia).toHaveBeenCalledOnce(); expect(status.mock.lastCall).toEqual(['error', 'denied']); });
+    it('audio initialization failure releases granted microphone', async () => { environment(); const { track, stream } = streamMock(); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } }); vi.stubGlobal('AudioContext', class {
+        constructor() { throw new Error('worklet unavailable'); }
+    }); const status = vi.fn(); await new ClapMicrophone({ indicator: {} as HTMLElement, onClap: vi.fn(), onStatus: status }).start(); expect(track.stop).toHaveBeenCalledOnce(); expect(status.mock.lastCall).toEqual(['error', 'worklet unavailable']); });
+    it('audio hide/revocation and repeated start/stop close graph, port and tracks', async () => { const doc = environment(); const { track, stream } = streamMock(); vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } }); const disconnect = vi.fn(), close = vi.fn(async () => { }), portClose = vi.fn(); vi.stubGlobal('AudioContext', class {
+        audioWorklet = { addModule: async () => { } };
+        currentTime = 0;
+        destination = {};
+        sampleRate = 48000;
+        resume = async () => { };
+        close = close;
+        createMediaStreamSource = () => ({ connect: vi.fn(), disconnect });
+    }); vi.stubGlobal('AudioWorkletNode', class {
+        port = { onmessage: null, close: portClose };
+        connect = vi.fn();
+        disconnect = disconnect;
+    }); const t = new ClapMicrophone({ indicator: {} as HTMLElement, onClap: vi.fn() }); for (let i = 0; i < 3; i++) {
+        await t.start();
+        t.stop();
+    } expect(close).toHaveBeenCalledTimes(3); expect(portClose).toHaveBeenCalledTimes(3); await t.start(); doc.hidden = true; doc.dispatchEvent(new Event('visibilitychange')); expect(close).toHaveBeenCalledTimes(4); doc.hidden = false; await t.start(); track.dispatchEvent(new Event('ended')); expect(close).toHaveBeenCalledTimes(5); });
+});
+const assets: VisionAssets = { face: { url: '/face.task', sha256: 'a'.repeat(64) }, hand: { url: '/hand.task', sha256: 'b'.repeat(64) }, wasmLoader: { url: '/loader.js', sha256: MEDIAPIPE_ASSET_PINS.loaderSha256 }, wasmBinary: { url: '/vision.wasm', sha256: MEDIAPIPE_ASSET_PINS.binarySha256 }, modelLicenseReview: 'TEST ONLY, not real approved models' };
+describe('pinned worker trust and bounded requests (mocked inference)', () => {
+    it('rejects remote/unpinned/unreviewed assets before loading a worker', () => { expect(() => validateAssets(assets, 'https://ezo.test')).not.toThrow(); expect(() => validateAssets({ ...assets, modelLicenseReview: '' }, 'https://ezo.test')).toThrow(); expect(() => validateAssets({ ...assets, face: { url: 'https://untrusted.test/model', sha256: 'a'.repeat(64) } }, 'https://ezo.test')).toThrow(); expect(() => validateAssets({ ...assets, face: { url: '/model', sha256: 'no' } }, 'https://ezo.test')).toThrow(); expect(() => validateAssets({ ...assets, wasmLoader: { url: '/evil.js', sha256: 'a'.repeat(64) } }, 'https://ezo.test')).toThrow(); });
+    it('aborts pending initialization without waiting for model load or permission hardware', async () => { vi.stubGlobal('location', { href: 'https://ezo.test/' }); const abort = new AbortController(); const worker = { terminate: vi.fn(), onmessage: null, onerror: null, postMessage: vi.fn() }; const init = createVisionEstimator(assets, vi.fn(), { signal: abort.signal, workerFactory: () => worker as unknown as Worker }); abort.abort(); await expect(init).rejects.toThrow('closed'); expect(worker.terminate).toHaveBeenCalledOnce(); });
+    it('closes pending work and terminates exactly once; no stale model output', async () => { vi.stubGlobal('location', { href: 'https://ezo.test/' }); let worker: any; const terminate = vi.fn(); worker = { terminate, onmessage: null, onerror: null, postMessage: (message: any) => { if (message.type === 'init')
+            queueMicrotask(() => worker.onmessage({ data: { type: 'ready', id: message.id } })); } }; const close = vi.fn(); vi.stubGlobal('createImageBitmap', async () => ({ close })); const onFrame = vi.fn(); const estimator = await createVisionEstimator(assets, onFrame, { workerFactory: () => worker }); const pending = estimator.estimate(video(), 100); await Promise.resolve(); estimator.close(); await expect(pending).rejects.toThrow('closed'); estimator.close(); expect(terminate).toHaveBeenCalledOnce(); expect(close).toHaveBeenCalled(); expect(onFrame).not.toHaveBeenCalled(); });
+});
+describe('actual estimator mapping with SYNTHETIC landmarks', () => {
+    const points = (x: number, y = 0.5) => Array.from({ length: 21 }, () => ({ x, y }));
+    const category = [[{ categoryName: 'Left', score: 0.9 }]];
+    it('derives movement from repeated landmarks, expires disappeared hands, rejects stale times', () => { const h = new HandMotionTracker(); expect(h.update([points(0.2)], category, 100)[0]).toMatchObject({ x: -0.6, moving: false }); expect(h.update([points(0.4)], category, 200)[0]).toMatchObject({ moving: true }); expect(h.update([points(0.4)], category, 300)[0]?.moving).toBe(false); expect(h.update([], [], 400)).toEqual([]); expect(h.update([points(0.8)], category, 500)[0]?.moving).toBe(false); expect(h.update([points(0.2)], category, 400)).toEqual([]); });
+    it('maps vertical direction, rejects occluded/invalid/low-confidence palms', () => { const h = new HandMotionTracker(); expect(h.update([points(0.5, 0.2)], category, 100)[0]!.y).toBeCloseTo(0.6); expect(h.update([points(NaN)], category, 200)).toEqual([]); expect(h.update([points(0.5)], [[{ categoryName: 'Left', score: 0.2 }]], 300)).toEqual([]); expect(h.update([[]], category, 400)).toEqual([]); });
+    it('maps actual nose coordinate shape and matrices, never invents eye gaze', () => { const f = faceFrame([points(0.2, 0.8)], [{ data: identity }], 100); expect(f?.gazeX).toBeCloseTo(-0.6); expect(f?.gazeY).toBeCloseTo(-0.6); expect(faceFrame([], [], 200)).toBeNull(); expect(faceFrame([points(0.2), points(0.2)], [{ data: identity }], 300)).toBeNull(); expect(faceFrame([points(2)], [{ data: identity }], 400)).toBeNull(); });
+});
+
+describe('composite SDK wiring with simulated worker (not model/hardware evidence)',()=>{
+ it('shares one camera owner, delivers motion and releases worker/render/tracks on hide',async()=>{
+  environment();vi.stubGlobal('location',{href:'https://ezo.test/'});vi.stubGlobal('addEventListener',vi.fn());vi.stubGlobal('removeEventListener',vi.fn());
+  const {track,stream}=streamMock();const getUserMedia=vi.fn(async()=>stream);vi.stubGlobal('navigator',{mediaDevices:{getUserMedia}});
+  vi.stubGlobal('createImageBitmap',async()=>({close:vi.fn()}));const terminate=vi.fn();
+  vi.stubGlobal('Worker',class {onmessage:((event:any)=>void)|null=null;onerror=null;terminate=terminate;postMessage(message:any){queueMicrotask(()=>this.onmessage?.({data:message.type==='init'?{type:'ready',id:message.id}:{type:'frame',id:message.id,frame:frame(message.time)}}));}});
+  const cancel=vi.fn();vi.stubGlobal('requestAnimationFrame',vi.fn(()=>123));vi.stubGlobal('cancelAnimationFrame',cancel);
+  const onMotionIntent=vi.fn(),onHandMovement=vi.fn();
+  const sdk=new HumanoidPerception({video:video(),cameraIndicator:{} as HTMLElement,microphoneIndicator:{} as HTMLElement,assets,onMotionIntent,onHandMovement,clap:{sensitivity:1}});
+  expect(getUserMedia).not.toHaveBeenCalled();await sdk.startTracking();await vi.waitFor(()=>expect(onHandMovement).toHaveBeenCalled());expect(getUserMedia).toHaveBeenCalledOnce();expect(getUserMedia.mock.calls[0]).toEqual([{audio:false,video:expect.any(Object)}]);sdk.setVisible(false);expect(track.stop).toHaveBeenCalledOnce();expect(terminate).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledWith(123);expect(sdk.trackingStatus).toBe('off');expect(onMotionIntent.mock.lastCall![0].source).toBe('neutral');sdk.setVisible(true);expect(getUserMedia).toHaveBeenCalledOnce();
+ });
+ it('rejects nonfinite/unbounded attention retention',()=>{expect(()=>new AttentionController({maxAgeMs:Infinity})).toThrow();expect(()=>new AttentionController({maxAgeMs:0})).toThrow();});
+});
+
+it('hand-only tracking status does not invent a legacy face frame; expired async faces are rejected',async()=>{
+ environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
+ const onFrame=vi.fn(),onStatus=vi.fn();
+ const tracker=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:()=>null,hasTarget:()=>true,close:vi.fn()})});
+ await tracker.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('tracking'));expect(onFrame.mock.lastCall![0]).toBeNull();tracker.stop();
+ const stale=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:(_video,time)=>pose(identity,time-501),close:vi.fn()})});await stale.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('lost'));expect(onFrame.mock.lastCall![0]).toBeNull();stale.stop();
+});
+
+it('bounds audio-thread backlog to one unacknowledged PCM window',()=>{
+ let Processor:any;const postMessage=vi.fn();
+ runInNewContext(clapProcessorSource,{AudioWorkletProcessor:class {port={postMessage,onmessage:null};},registerProcessor:(_name:string,implementation:any)=>{Processor=implementation;},sampleRate:48000,currentFrame:0,Float32Array});
+ const instance=new Processor();const input=[[new Float32Array(128)]];
+ for(let i=0;i<100;i++)instance.process(input,[]);
+ expect(postMessage).toHaveBeenCalledOnce();
+ instance.port.onmessage({data:'ack'});
+ for(let i=0;i<4;i++)instance.process(input,[]);
+ expect(postMessage).toHaveBeenCalledTimes(2);
+});
+it('acknowledges dropped stale/suppressed audio without treating it as fresh clap evidence',async()=>{
+ vi.spyOn(performance,'now').mockReturnValue(1000);environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
+ const port={onmessage:null as any,postMessage:vi.fn(),close:vi.fn()};
+ vi.stubGlobal('AudioContext',class {audioWorklet={addModule:async()=>{}};currentTime=0;destination={};sampleRate=48000;resume=async()=>{};close=async()=>{};createMediaStreamSource=()=>({connect:vi.fn(),disconnect:vi.fn()});});
+ vi.stubGlobal('AudioWorkletNode',class {port=port;connect=vi.fn();disconnect=vi.fn();});
+ const detector=new ClapDetector(),push=vi.spyOn(detector,'push');const mic=new ClapMicrophone({indicator:{} as HTMLElement,detector,onClap:vi.fn()});await mic.start();
+ port.onmessage({data:{samples:new Float32Array(480),time:-1000}});expect(push).not.toHaveBeenCalled();
+ mic.setSuppressed(true);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).not.toHaveBeenCalled();
+ mic.setSuppressed(false);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).toHaveBeenCalledOnce();expect(port.postMessage).toHaveBeenCalledTimes(3);mic.stop();
+});
+it.each(['camera','microphone'] as const)('cancels pending %s permission on backgrounding, before a late grant',async sensor=>{
+ const doc=environment();let resolve!:(stream:MediaStream)=>void;const getUserMedia=vi.fn(()=>new Promise<MediaStream>(r=>{resolve=r;}));vi.stubGlobal('navigator',{mediaDevices:{getUserMedia}});
+ const status=vi.fn();const model=vi.fn();const tracker=sensor==='camera'?new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame:vi.fn(),onStatus:status,createEstimator:model}):new ClapMicrophone({indicator:{} as HTMLElement,onClap:vi.fn(),onStatus:status});
+ const pending=tracker.start();doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));expect(status.mock.lastCall![0]).toBe('off');
+ const {track,stream}=streamMock();resolve(stream);await pending;expect(track.stop).toHaveBeenCalledOnce();expect(model).not.toHaveBeenCalled();
+});
+it('expires a frozen camera frame without false loss on a single duplicate, then reacquires',async()=>{
+ vi.useFakeTimers();environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});const v=video(),status=vi.fn(),onFrame=vi.fn();
+ const tracker=new CameraTracker({video:v,indicator:{} as HTMLElement,onFrame,onStatus:status,createEstimator:async()=>({estimate:(_v,time)=>pose(identity,time),close:vi.fn()})});await tracker.start();await Promise.resolve();expect(status.mock.lastCall![0]).toBe('tracking');await vi.advanceTimersByTimeAsync(100);expect(status.mock.lastCall![0]).toBe('tracking');await vi.advanceTimersByTimeAsync(500);expect(status.mock.lastCall![0]).toBe('lost');expect(onFrame.mock.lastCall![0]).toBeNull();Object.defineProperty(v,'currentTime',{value:2});await vi.advanceTimersByTimeAsync(150);expect(status.mock.lastCall![0]).toBe('tracking');tracker.stop();
+});
