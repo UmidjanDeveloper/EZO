@@ -127,6 +127,17 @@
         </div>
         <p class="muted" data-i18n="more.settingsNote"></p>
         <button id="showWelcome" class="ghost" data-i18n="more.showWelcome"></button>
+
+        <details id="diagnostics">
+          <summary data-i18n="more.diagnostics"></summary>
+          <p class="muted" data-i18n="more.diagnosticsNote"></p>
+          <pre id="diagnosticsText" class="diag"></pre>
+          <div class="row">
+            <button type="button" id="diagnosticsRefresh" class="ghost" data-i18n="more.diagnosticsRefresh"></button>
+            <button type="button" id="diagnosticsCopy" data-i18n="more.diagnosticsCopy"></button>
+            <span id="diagnosticsState" class="muted" role="status"></span>
+          </div>
+        </details>
       </section>
     </main>
 

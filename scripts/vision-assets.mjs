@@ -60,7 +60,7 @@ writeFileSync(resolve(out, "vision-assets.json"), JSON.stringify(assets, null, 2
 writeFileSync(resolve(out, "MODEL_LICENSE_REVIEW.txt"), review);
 
 // The engine's worker, as a classic (importScripts-capable) bundle served next to the assets.
-const { build } = createRequire(resolve(root, "apps/desktop/package.json"))("esbuild");
+const { build } = createRequire(resolve(root, "packages/perception-client/package.json"))("esbuild"); // pinned there
 await build({
   entryPoints: [resolve(root, "packages/face-tracking/src/vision.worker.ts")],
   bundle: true,

@@ -1126,6 +1126,23 @@ function wire(): void {
     if (!prefs.apiUrl) setStatus(t.status.enterServer);
   });
   $("showWelcome").addEventListener("click", showWelcome);
+  // Diagnostics: plain-text numbers the owner pastes back (no images, audio or landmarks).
+  const renderDiagnostics = () => {
+    $("diagnosticsText").textContent = diagnosticsReport();
+  };
+  $("diagnostics").addEventListener("toggle", () => {
+    if (($("diagnostics") as HTMLDetailsElement).open) renderDiagnostics();
+  });
+  $("diagnosticsRefresh").addEventListener("click", renderDiagnostics);
+  $("diagnosticsCopy").addEventListener("click", async () => {
+    renderDiagnostics();
+    try {
+      await navigator.clipboard.writeText($("diagnosticsText").textContent ?? "");
+      $("diagnosticsState").textContent = t.more.diagnosticsCopied;
+    } catch {
+      $("diagnosticsState").textContent = "—";
+    }
+  });
   document.addEventListener("visibilitychange", () => {
     // In the background nothing senses: camera and clap microphone stop; nothing restarts by itself.
     perception?.setVisible(!document.hidden);
@@ -1160,3 +1177,36 @@ async function start(): Promise<void> {
 }
 
 void start();
+
+/** One key per line; nothing but numbers and words. */
+function diagnosticsReport(): string {
+  const report: Record<string, unknown> = {
+    app: "EZO Android",
+    version: __EZO_VERSION__,
+    sha: __EZO_BUILD_SHA__,
+    at: new Date().toISOString(),
+    language: prefs.language,
+    server: { url: prefs.apiUrl ? "set" : "missing", online: server.online, ai: server.ai, voice: server.voice },
+    stage: $("voiceStage").hidden ? "closed" : "open",
+    figure: avatar
+      ? { renderer: avatar.renderer, points: avatar.canvas.dataset.points, power: avatar.canvas.dataset.power, frames: avatar.getFrameCount(), level: Number(avatar.getLevel().toFixed(2)), liveLevel: avatar.hasLiveLevel() }
+      : null,
+    vision: readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking",
+    camera: vision.camera,
+    microphone: microphone.status,
+    ...(diagnostics ?? {}),
+    tts: lastTts,
+    clapConsent: prefs.clapListening,
+    clapStartsListening: prefs.clapStartsListening,
+    lowPower: prefs.lowPower,
+    userAgent: navigator.userAgent,
+  };
+  const lines: string[] = [];
+  const walk = (prefix: string, value: unknown) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [key, inner] of Object.entries(value as Record<string, unknown>)) walk(prefix ? `${prefix}.${key}` : key, inner);
+    } else lines.push(`${prefix}: ${Array.isArray(value) ? value.join(",") : String(value ?? "—")}`);
+  };
+  walk("", report);
+  return lines.join("\n");
+}

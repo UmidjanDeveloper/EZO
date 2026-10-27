@@ -28,7 +28,9 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @ezo/desktop...
       - name: Unit tests
         run: pnpm --filter @ezo/desktop test
-      - name: Build the NSIS installer (unsigned)
+      - name: Build the NSIS installer (unsigned; bundles the SHA256-pinned perception assets)
+        env:
+          EZO_BUILD_SHA: ${{ github.sha }}
         run: pnpm --filter @ezo/desktop run dist:win
       - name: Install silently, as a user would
         shell: pwsh
@@ -97,7 +99,9 @@ jobs:
         working-directory: apps/mobile
         env:
           EZO_ANDROID_ALLOW_LAN_HTTP: "1" # debug test build: may reach an EZO server on the LAN
-        run: pnpm build && pnpm exec cap sync android
+        run: |
+          export EZO_BUILD_SHA="${{ github.sha }}"
+          pnpm build && pnpm exec cap sync android
       - name: Gradle assembleDebug (JDK 21, runner's Android SDK)
         working-directory: apps/mobile/android
         run: |
@@ -110,12 +114,14 @@ jobs:
           aapt2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -1)
           "$aapt2" dump badging "$apk" | grep -E "^package|sdkVersion|uses-permission|application-label" | tee "$RUNNER_TEMP/apk-badging.txt"
           sha256sum "$apk" | tee -a "$RUNNER_TEMP/apk-badging.txt"
-          cp "$apk" "$RUNNER_TEMP/EZO-debug.apk"
+          version=$(node -p "require('./apps/mobile/package.json').version")
+          cp "$apk" "$RUNNER_TEMP/EZO-$version-debug.apk"
+          cp "$apk" "$RUNNER_TEMP/EZO-debug.apk" # kept for the emulator step below
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ezo-android
           path: |
-            ${{ runner.temp }}/EZO-debug.apk
+            ${{ runner.temp }}/EZO-*-debug.apk
             ${{ runner.temp }}/apk-badging.txt
           retention-days: 14
       - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
