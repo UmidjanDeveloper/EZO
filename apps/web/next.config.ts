@@ -9,10 +9,12 @@ const nextConfig: NextConfig = {
   // Do not generate AGENTS.md files during `next dev`.
   agentRules: false,
   reactStrictMode: true,
-  // The perception engine's own worker entry (new Worker(new URL("./vision.worker.ts")))
-  // is never loaded by the web app, which serves the pre-bundled /vision/vision.worker.js
-  // instead; the MediaPipe bundle is kept out of that dead worker chunk (Turbopack otherwise
-  // stalls on it). See lib/vision-worker-stub.ts.
+  // Production builds use webpack (`next build --webpack`, see package.json): with
+  // @ezo/face-tracking in the graph — its `new Worker(new URL("./vision.worker.ts",
+  // import.meta.url))` entry pulls the 1 MB MediaPipe bundle — Turbopack 16.4 never finishes
+  // (reproduced with and without public/vision; an alias to lib/vision-worker-stub.ts did not
+  // help), while webpack compiles the same app in about 20 s. The web app never loads that
+  // worker entry anyway: it serves the engine's worker pre-bundled at /vision/vision.worker.js.
   turbopack: {
     resolveAlias: { "@mediapipe/tasks-vision": "./lib/vision-worker-stub.ts" },
   },

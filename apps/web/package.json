@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "node ../../scripts/vision-assets.mjs public/vision && next build",
+    "build": "node ../../scripts/vision-assets.mjs public/vision && next build --webpack",
     "start": "next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
