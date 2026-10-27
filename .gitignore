@@ -47,3 +47,4 @@ Thumbs.db
 /apps/desktop/release/
 # Mobile build output
 /apps/mobile/dist/
+tests/e2e/.demo/

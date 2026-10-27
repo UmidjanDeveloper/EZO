@@ -113,6 +113,7 @@ export class EzoAvatar {
   private time = 0;
   private last = 0;
   private frame = 0;
+  private frames = 0;
   private running = false;
   private destroyed = false;
   private readonly reduced: boolean;
@@ -151,6 +152,7 @@ export class EzoAvatar {
     canvas.dataset.points = String(this.figure.count);
     canvas.dataset.buildMs = buildMs.toFixed(1);
     canvas.dataset.power = this.lowPower ? "low" : "high";
+    canvas.dataset.motion = this.reduced ? "reduced" : "full";
     canvas.dataset.state = this.state;
     this.label();
     canvas.addEventListener("webglcontextlost", this.onLost);
@@ -195,6 +197,11 @@ export class EzoAvatar {
   setActive(active: boolean): void {
     this.active = active;
     this.syncRunning();
+  }
+
+  /** Frames drawn so far (still redraws included): proves the loop survives a context loss. */
+  getFrameCount(): number {
+    return this.frames;
   }
 
   /** The facial amounts drawn now (blink, eye direction, jaw…): for tests and the voice frame. */
@@ -432,6 +439,7 @@ export class EzoAvatar {
 
   private draw(): void {
     if (this.destroyed) return;
+    this.frames += 1;
     const { width, height, cssHeight, dpr } = this.resize();
     const camera = frameCamera(this.framing, width / height);
     if (!this.glState) {
