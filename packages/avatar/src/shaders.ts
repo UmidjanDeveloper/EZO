@@ -44,9 +44,17 @@ uniform float uOffline;
 uniform float uPx;
 uniform float uGlowPx;
 uniform float uRef;
+uniform float uBlink;
+uniform float uDroop;
+uniform float uEyeX;
+uniform float uEyeY;
+uniform float uBrow;
+uniform float uMouth;
+uniform float uSmile;
 varying vec3 vColor;
 varying float vAlpha;
 ${TURN}
+const vec3 KEY_DIR = vec3(-0.42, 0.55, 0.72); // soft key light from the upper left, in front
 const vec3 BLUE = vec3(0.12, 0.48, 1.0);
 const vec3 CYAN = vec3(0.45, 0.9, 1.0);
 const vec3 WARM = vec3(1.0, 0.33, 0.05);
@@ -79,19 +87,24 @@ void main() {
     p.y += face * (0.003 + 0.045 * uLevel * uSpeak + 0.012 * uLevel * uListen) * wave;
     p.z += face * 0.025 * uLevel * uSpeak * sin(t * 14.0 + p.y * 26.0);
     p.y += breath * 0.5;
+    // The jaw drops with the voice: the front of the head below the lips moves down.
+    float jaw = smoothstep(0.38, 0.12, p.y) * smoothstep(-0.1, 0.35, aExtra.y);
+    p.y -= jaw * uMouth * 0.055;
     vec3 n = turnDir(vec3(aExtra.x, 0.0, aExtra.y));
     float rim = 1.0 - abs(n.z);
+    float key = max(0.0, dot(normalize(vec3(aExtra.x, 0.25, aExtra.y)), normalize(KEY_DIR)));
     float w = clamp(face * uWarmth * (0.9 + 0.8 * uLevel), 0.0, 1.0);
-    col = mix(mix(BLUE, CYAN, rim * 0.5 + scan), mix(WARM, GOLD, face * face * (0.3 + 0.7 * uLevel)), w);
-    alpha = bright * (0.3 + 0.75 * rim * rim) * smoothstep(-0.55, 0.05, n.z) + w * 0.55 + scan * 0.6;
+    col = mix(mix(BLUE, CYAN, rim * 0.5 + scan + key * 0.25), mix(WARM, GOLD, face * face * (0.3 + 0.7 * uLevel)), w);
+    alpha = bright * (0.26 + 0.7 * rim * rim + 0.22 * key) * smoothstep(-0.55, 0.05, n.z) + w * 0.55 + scan * 0.6;
     size = 2.1 + w;
   } else if (kind < 1.5) {
     // Neck rings and chest arcs.
     p.y += breath;
     vec3 n = turnDir(vec3(aExtra.x, 0.0, aExtra.y));
     float rim = 1.0 - abs(n.z);
-    col = mix(BLUE, CYAN, 0.25 * bright + scan);
-    alpha = bright * (0.38 + 0.6 * rim * rim) + scan * 0.5;
+    float key = max(0.0, dot(normalize(vec3(aExtra.x, 0.2, aExtra.y)), normalize(KEY_DIR)));
+    col = mix(BLUE, CYAN, 0.25 * bright + scan + 0.2 * key);
+    alpha = bright * (0.34 + 0.6 * rim * rim + 0.18 * key) + scan * 0.5;
     size = 1.9;
   } else if (kind < 2.5) {
     // Silhouette edge.
@@ -125,19 +138,70 @@ void main() {
     p.y += cos(t * 1.1 + seed * 30.0) * 0.012 + breath * 0.5;
     col = mix(WARM, GOLD, warm * (0.4 + 0.6 * uLevel));
     alpha = bright * (0.05 + 0.05 * warm) * uWarmth * (0.75 + 0.8 * uLevel);
-    size = 12.0 + 16.0 * bright * (0.7 + 0.6 * uLevel);
+    size = 10.0 + 13.0 * bright * (0.7 + 0.6 * uLevel);
   } else if (kind < 6.5) {
     // Mountains: twinkling crests, a few warm sparks.
     float twinkle = 0.65 + 0.35 * sin(t * (1.0 + seed * 2.0) + seed * 60.0);
     col = mix(mix(vec3(0.1, 0.35, 0.95), CYAN, bright * 0.6), mix(WARM, GOLD, seed), warm);
     alpha = (bright * 1.1 + warm * 0.8) * twinkle * (0.8 + 0.25 * uLevel);
     size = 3.6 + warm * 1.6;
-  } else {
+  } else if (kind < 7.5) {
     // Chest light: beats faster and brighter while EZO works.
     p.y += breath;
     col = mix(mix(CYAN, vec3(1.0), warm), GOLD, uWork * 0.5);
     alpha = bright * (0.6 + 0.4 * sin(t * (2.2 + 4.0 * uWork))) * (0.7 + 0.3 * uEnergy + 0.5 * uWork);
     size = 2.6 + warm * 3.0 + uWork * 1.5;
+  } else if (kind < 8.5) {
+    // Eyes. Outline (warm 0) squashes shut with the blink; iris (0.5) and pupil (1) follow
+    // the gaze and hide behind the lid. Brighter, whiter and sharper than the contours.
+    float part = warm;
+    float shut = max(uBlink, uDroop * 0.6);
+    vec2 local = aExtra;
+    float side = sign(aPos.x);
+    if (part < 0.25) {
+      local.y *= 1.0 - 0.92 * shut;
+      col = mix(vec3(0.7, 0.9, 1.0), CYAN, 0.4);
+      alpha = bright * 0.8;
+      size = 2.2;
+    } else {
+      // The iris slides with the gaze inside the almond and darkens towards the pupil.
+      local.x += uEyeX * 0.42;
+      local.y += uEyeY * 0.32;
+      float edge = clamp(1.0 - abs(local.x) * 0.9, 0.0, 1.0);
+      float lidCover = smoothstep(1.0 - 0.92 * shut - 0.15, 1.0 - 0.92 * shut, abs(local.y)) * (1.0 - 0.1 * step(0.5, shut));
+      col = part > 0.75 ? vec3(0.05, 0.08, 0.2) * 0.2 + CYAN * 0.15 : mix(vec3(0.3, 0.75, 1.0), GOLD, 0.25 * uWarmth * uSpeak);
+      alpha = (part > 0.75 ? 0.35 : bright * 0.9) * edge * (1.0 - lidCover) * (1.0 - 0.9 * shut);
+      size = part > 0.75 ? 2.6 : 2.2 + 0.6 * bright;
+    }
+    p.x = aPos.x + (local.x - aExtra.x) * 0.082; // EYE.rx / EYE.ry in figure.ts
+    p.y = aPos.y + (local.y - aExtra.y) * 0.046 + breath * 0.5;
+    col = mix(col, vec3(0.85, 0.95, 1.0), 0.5 * uListen);
+  } else if (kind < 9.5) {
+    // Upper lid: comes down over the eye when blinking; a little heavier when drooping.
+    float shut = max(uBlink, uDroop);
+    float v = aExtra.y - (aExtra.y + 0.7) * shut * 0.96;
+    p.y = aPos.y + (v - aExtra.y) * 0.046 + breath * 0.5 + 0.01 * uBrow;
+    col = mix(CYAN, vec3(0.8, 0.95, 1.0), shut);
+    alpha = bright * (0.55 + 0.45 * shut);
+    size = 2.2 + 0.8 * shut;
+  } else if (kind < 10.5) {
+    // Brows rise with attention, lower (inner ends most) with concentration.
+    float inner = 1.0 - (aExtra.x + 1.0) * 0.5;
+    p.y += uBrow * (0.02 + 0.015 * inner) + breath * 0.5;
+    col = mix(BLUE, CYAN, 0.6 + 0.3 * uListen);
+    alpha = bright * 0.8;
+    size = 2.3;
+  } else {
+    // Lips: the lower lip and the jaw open with the voice; corners lift with a smile.
+    float lower = aExtra.y;
+    float corner = aExtra.x * aExtra.x;
+    p.y += lower > 0.5 ? -uMouth * 0.06 : uMouth * 0.006;
+    p.y += uSmile * 0.012 * corner;
+    p.y += breath * 0.5;
+    float open = uMouth * (1.0 - corner);
+    col = mix(GOLD, vec3(1.0, 0.95, 0.85), 0.45 + 0.5 * open);
+    alpha = bright * (0.7 + 0.3 * uWarmth) * (0.8 + 0.2 * uSpeak) + open * 0.3;
+    size = 2.9 + open * 1.4;
   }
 
   if (abs(kind - 6.0) > 0.5) p = turn(p);

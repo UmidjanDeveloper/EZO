@@ -18,6 +18,10 @@ export const KIND = {
   core: 5, // soft glow sprites in the face: EZO's "voice"
   terrain: 6, // particle mountains behind the figure
   emblem: 7, // the small light on the chest
+  eye: 8, // eye outline, iris and pupil (extra = local eye coordinates)
+  lid: 9, // upper eyelid line (closes with the blink)
+  brow: 10, // eyebrow arcs
+  mouth: 11, // lips and the jaw line below them
 } as const;
 export type KindName = keyof typeof KIND;
 
@@ -37,6 +41,7 @@ export interface Figure {
   /**
    * Two extra values per point. Head/body/outline: the surface normal (x, z).
    * Halo: drift direction (x, y). Vein: position along the vein (0..1), 0.
+   * Eye/lid/brow: local coordinates u (-1..1 across) and v (-1..1 up). Mouth: u, lower (0/1).
    */
   extra: Float32Array;
   counts: Record<KindName, number>;
@@ -179,7 +184,7 @@ class Builder {
   positions: number[] = [];
   data: number[] = [];
   extra: number[] = [];
-  counts: Record<KindName, number> = { head: 0, body: 0, outline: 0, halo: 0, vein: 0, core: 0, terrain: 0, emblem: 0 };
+  counts: Record<KindName, number> = { head: 0, body: 0, outline: 0, halo: 0, vein: 0, core: 0, terrain: 0, emblem: 0, eye: 0, lid: 0, brow: 0, mouth: 0 };
 
   constructor(readonly random: () => number) {}
 
@@ -323,13 +328,13 @@ function addVeins(b: Builder, step: number): void {
 function addCore(b: Builder, count: number): void {
   const r = b.random;
   for (let i = 0; i < count; i++) {
-    const x = gaussian(r) * 0.12;
-    const y = 0.5 + gaussian(r) * 0.15;
+    const x = gaussian(r) * 0.11;
+    const y = 0.54 + gaussian(r) * 0.13; // between the eyes and the lips, leaving the mouth readable
     const w = headWidth(y);
     if (Math.abs(x) > w * 0.8) continue;
     const u = x / Math.max(w, 1e-3);
     const z = headDepth(y) * Math.sqrt(Math.max(0, 1 - u * u)) + faceRelief(x, y) + 0.02;
-    const centre = Math.exp(-((x / 0.12) ** 2 + ((y - 0.5) / 0.15) ** 2));
+    const centre = Math.exp(-((x / 0.11) ** 2 + ((y - 0.54) / 0.13) ** 2));
     b.push("core", x, y, z, 0.4 + 0.6 * r(), centre);
   }
 }
@@ -343,6 +348,108 @@ function addEmblem(b: Builder): void {
   }
   for (let i = 0; i < 40; i++) {
     b.push("emblem", CHEST.x + gaussian(r) * 0.015, CHEST.y + gaussian(r) * 0.015, z, 1, 0.3, 0, 0);
+  }
+}
+
+/** Depth of the front of the face at (x, y): the head surface plus its relief. */
+export function faceZ(x: number, y: number): number {
+  const w = headWidth(y);
+  if (w <= 0) return 0;
+  const u = clamp(x / w, -1, 1);
+  const facing = Math.sqrt(Math.max(0, 1 - u * u));
+  return headDepth(y) * facing + faceRelief(x, y) * facing;
+}
+
+/** Eye centres and size, shared with the shader's gaze offsets (face units). */
+export const EYE = { x: 0.17, y: 0.675, rx: 0.082, ry: 0.046, iris: 0.034, pupil: 0.016 } as const;
+export const MOUTH = { y: 0.33, halfWidth: 0.15 } as const;
+
+/** Almond eye outline: fuller upper lid, flatter lower lid. */
+export function eyeOutline(u: number, upper: boolean): number {
+  const arc = Math.sqrt(Math.max(0, 1 - u * u));
+  return upper ? arc : -0.62 * arc;
+}
+
+/**
+ * Explicit facial features drawn over the contour rings: eyes with iris and pupil, upper
+ * lids, brows and lips. Each point carries local coordinates so the shader can move the
+ * iris with the gaze, close the lids, raise the brows and open the jaw with the voice.
+ */
+function addFeatures(b: Builder, density: number): void {
+  const r = b.random;
+  const lift = 0.018; // features sit just in front of the surface
+  for (const side of [-1, 1]) {
+    const cx = side * EYE.x;
+    // Eye outline (upper and lower), brightness 0 → outline, warm channel tags the part.
+    const n = Math.round(48 * density);
+    for (let i = 0; i < n; i++) {
+      const u = -1 + (2 * (i + r() * 0.5)) / n;
+      for (const upper of [true, false]) {
+        const v = eyeOutline(u, upper);
+        const x = cx + u * EYE.rx;
+        const y = EYE.y + v * EYE.ry;
+        b.push("eye", x, y, faceZ(x, y) + lift, 0.75 + 0.25 * r(), 0, u, v);
+      }
+    }
+    // Iris ring + fill, pupil fill. warm = 0.5 iris, 1 pupil.
+    const irisRing = Math.round(40 * density);
+    for (let i = 0; i < irisRing; i++) {
+      const a = ((i + r() * 0.5) / irisRing) * Math.PI * 2;
+      const u = (Math.cos(a) * EYE.iris) / EYE.rx;
+      const v = (Math.sin(a) * EYE.iris) / EYE.ry;
+      const x = cx + u * EYE.rx;
+      const y = EYE.y + v * EYE.ry;
+      b.push("eye", x, y, faceZ(x, y) + lift, 0.85 + 0.15 * r(), 0.5, u, v);
+    }
+    const irisFill = Math.round(90 * density);
+    for (let i = 0; i < irisFill; i++) {
+      const a = r() * Math.PI * 2;
+      const rad = EYE.pupil + (EYE.iris - EYE.pupil) * Math.sqrt(r());
+      const u = (Math.cos(a) * rad) / EYE.rx;
+      const v = (Math.sin(a) * rad) / EYE.ry;
+      const x = cx + u * EYE.rx;
+      const y = EYE.y + v * EYE.ry;
+      b.push("eye", x, y, faceZ(x, y) + lift, 0.35 + 0.45 * r(), 0.5, u, v);
+    }
+    const pupil = Math.round(50 * density);
+    for (let i = 0; i < pupil; i++) {
+      const a = r() * Math.PI * 2;
+      const rad = EYE.pupil * Math.sqrt(r());
+      const u = (Math.cos(a) * rad) / EYE.rx;
+      const v = (Math.sin(a) * rad) / EYE.ry;
+      const x = cx + u * EYE.rx;
+      const y = EYE.y + v * EYE.ry;
+      b.push("eye", x, y, faceZ(x, y) + lift, 0.9, 1, u, v);
+    }
+    // Upper lid: a second, slightly higher arc that comes down over the eye when blinking.
+    const lid = Math.round(44 * density);
+    for (let i = 0; i < lid; i++) {
+      const u = -1.05 + (2.1 * (i + r() * 0.5)) / lid;
+      const v = eyeOutline(clamp(u, -1, 1), true) * 1.12 + 0.08;
+      const x = cx + u * EYE.rx;
+      const y = EYE.y + v * EYE.ry;
+      b.push("lid", x, y, faceZ(x, y) + lift * 1.2, 0.7 + 0.3 * r(), 0, u, v);
+    }
+    // Brow: an arch from the inner corner outwards, thicker in the middle.
+    const brow = Math.round(60 * density);
+    for (let i = 0; i < brow; i++) {
+      const u = -1 + (2 * (i + r() * 0.5)) / brow; // -1 inner … 1 outer
+      const x = side * (0.045 + 0.125 * (u + 1)); // |x| 0.045 (inner) … 0.295 (outer)
+      const arch = 0.76 + 0.045 * Math.sin(((u + 1) / 2) * Math.PI) - 0.01 * u;
+      const y = arch + (r() - 0.5) * 0.008;
+      b.push("brow", x, y, faceZ(x, y) + lift, 0.6 + 0.4 * r(), 0, u, 0);
+    }
+  }
+  // Lips: upper and lower lines; the lower line and the jaw move with the voice.
+  const lips = Math.round(80 * density);
+  for (let i = 0; i < lips; i++) {
+    const u = -1 + (2 * (i + r() * 0.5)) / lips;
+    const x = u * MOUTH.halfWidth;
+    const bow = 0.012 * Math.cos(u * Math.PI * 1.5) * (1 - u * u); // cupid's bow hint
+    const yUpper = MOUTH.y + 0.006 + bow * 0.5;
+    const yLower = MOUTH.y - 0.012 - 0.01 * (1 - u * u);
+    b.push("mouth", x, yUpper, faceZ(x, yUpper) + lift, 0.65 + 0.35 * r(), 0, u, 0);
+    b.push("mouth", x, yLower, faceZ(x, yLower) + lift, 0.65 + 0.35 * r(), 0, u, 1);
   }
 }
 
@@ -397,9 +504,10 @@ export function buildFigure(options: FigureOptions): Figure {
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);
+  addFeatures(b, high ? 1 : 0.6);
   if (options.terrain) addTerrain(b, high ? 0.016 : 0.028, high ? 5 : 2, seed);
   return {
-    count: b.counts.head + b.counts.body + b.counts.outline + b.counts.halo + b.counts.vein + b.counts.core + b.counts.terrain + b.counts.emblem,
+    count: Object.values(b.counts).reduce((sum, n) => sum + n, 0),
     positions: new Float32Array(b.positions),
     data: new Float32Array(b.data),
     extra: new Float32Array(b.extra),

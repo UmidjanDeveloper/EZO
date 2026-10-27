@@ -8,6 +8,14 @@
   </head>
   <body>
     <h1 data-i18n="title">EZO sozlamalari</h1>
+    <section id="welcome" class="welcome" hidden>
+      <h2 data-i18n="welcome">Xush kelibsiz!</h2>
+      <p data-i18n="welcomeBody">EZO — kompyuteringizdagi shaxsiy yordamchi. Uch qadam yetarli:</p>
+      <p data-i18n="welcomeStep1">1. Serverni ulang: manzil va token (pastda).</p>
+      <p data-i18n="welcomeStep2">2. Ruxsat bering: faqat kerakli ilovalar, papkalar va mikrofon.</p>
+      <p id="welcomeStep3"></p>
+      <button id="welcomeDone" data-i18n="welcomeDone">Tushundim, boshlaymiz</button>
+    </section>
     <section>
       <h2 data-i18n="server">EZO serveri</h2>
       <label><span data-i18n="serverUrl">Server manzili</span> <input id="apiUrl" placeholder="https://api.sizning-domen.uz" /></label>
@@ -33,9 +41,18 @@
       <label class="check"><input type="checkbox" id="allowTyping" /> <span data-i18n="allowTyping">Aytilgan matnni faol oynaga yozish (“Yoz: …”)</span></label>
       <label class="check"><input type="checkbox" id="allowScreen" /> <span data-i18n="allowScreen">Ekranni tahlil qilish (har safar alohida so‘raladi)</span></label>
       <label class="check"><input type="checkbox" id="speakReplies" /> <span data-i18n="speakReplies">Javoblarni ovozda o‘qish</span></label>
+      <label class="check"><input type="checkbox" id="lowPower" /> <span data-i18n="lowPower">Tejamkor rejim</span></label>
+      <label><span data-i18n="voiceVolume">EZO ovozi balandligi</span> <input type="range" id="voiceVolume" min="0" max="1" step="0.05" /></label>
       <label><span data-i18n="shortcut">Tugma</span>
         <select id="shortcut"></select>
       </label>
+    </section>
+    <section>
+      <h2 data-i18n="media">Mikrofon va kamera</h2>
+      <p class="muted" data-i18n="mediaNote">Ikkalasi ham faqat siz bosganda ishlaydi va istalgan vaqt o‘chiriladi.</p>
+      <label class="check"><input type="checkbox" id="allowMicrophone" /> <span data-i18n="allowMicrophone">Mikrofon (gapirish uchun)</span></label>
+      <label class="check"><input type="checkbox" id="allowCamera" /> <span data-i18n="allowCamera">Kamera (ixtiyoriy)</span></label>
+      <p class="muted" data-i18n="allowCameraNote">Kamera kuzatuvi uchun sensing dvigateli kerak; u hali ulanmagan.</p>
     </section>
     <section>
       <h2 data-i18n="folders">Qidirish mumkin bo‘lgan papkalar</h2>

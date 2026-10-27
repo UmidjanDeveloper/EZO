@@ -18,6 +18,8 @@ const WORDS: Record<AvatarState, string> = {
 const avatar = new EzoAvatar(canvas, {
   framing: params.get("framing") === "head" ? "head" : "bust",
   quality: params.get("quality") === "low" ? "low" : "auto",
+  power: params.get("power") === "low" ? "low" : params.get("power") === "high" ? "high" : "auto",
+  ...(params.has("reduced") ? { reducedMotion: params.get("reduced") === "1" } : {}),
   describe: (s) => `EZO: ${WORDS[s]}`,
 });
 const state = (params.get("state") ?? "idle") as AvatarState;

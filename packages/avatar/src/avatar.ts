@@ -10,7 +10,8 @@
  * unavailable. Respects prefers-reduced-motion (renders still frames only) and
  * pauses while the page is hidden.
  */
-import { buildFigure, type Figure } from "./figure";
+import { blinkCurve, BLINK_LENGTH, browFor, CLOSED_FACE, droopFor, eyeTarget, mouthFor, nextBlinkDelay, smileFor, type FaceAmounts } from "./face";
+import { buildFigure, EYE, type Figure } from "./figure";
 import { followLevel, syntheticSpeech } from "./level";
 import { frameCamera, project, type Framing } from "./math";
 import { MASK_FRAGMENT, MASK_VERTEX, POINT_FRAGMENT, POINT_VERTEX } from "./shaders";
@@ -26,6 +27,11 @@ export interface AvatarOptions {
   reducedMotion?: boolean;
   /** Accessible name per state, in the app's language; applied to the canvas as aria-label. */
   describe?: (state: AvatarState) => string;
+  /**
+   * Low-power mode halves the frame rate (30 fps cap) and stills the halo drift; "auto"
+   * turns it on for devices that report little memory or a data-saver preference.
+   */
+  power?: "auto" | "low" | "high";
 }
 
 /** Where EZO looks, from camera tracking or a pointer. Normalised: -1 (left/down) .. 1. */
@@ -37,7 +43,11 @@ export interface Gaze {
 /** How long a gaze stays before the head drifts back to its idle sway. */
 const GAZE_HOLD_SECONDS = 1.5;
 
-const UNIFORMS = ["uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef"] as const;
+const UNIFORMS = [
+  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef",
+  "uBlink", "uDroop", "uEyeX", "uEyeY", "uBrow", "uMouth", "uSmile",
+] as const;
+const LOW_POWER_FRAME_MS = 1000 / 30;
 type UniformName = (typeof UNIFORMS)[number];
 
 interface GlState {
@@ -94,10 +104,16 @@ export class EzoAvatar {
   private gaze: Gaze = { yaw: 0, pitch: 0 };
   private gazeAt = -Infinity;
   private stateAt = 0;
+  private face: FaceAmounts = { ...CLOSED_FACE, eye: { yaw: 0, pitch: 0 } };
+  private blinkStart = -Infinity;
+  private nextBlink = 1.2;
+  private lowPower = false;
+  private active = true;
   private readonly describe: ((state: AvatarState) => string) | null;
   private time = 0;
   private last = 0;
   private frame = 0;
+  private frames = 0;
   private running = false;
   private destroyed = false;
   private readonly reduced: boolean;
@@ -123,6 +139,7 @@ export class EzoAvatar {
     const small = Math.max(rect.width, rect.height) < 260;
     const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
     const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
+    this.lowPower = options.power === "low" || (options.power !== "high" && EzoAvatar.prefersLowPower());
     const started = typeof performance !== "undefined" ? performance.now() : 0;
     this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust" });
     const buildMs = typeof performance !== "undefined" ? performance.now() - started : 0;
@@ -134,6 +151,8 @@ export class EzoAvatar {
     canvas.dataset.quality = quality;
     canvas.dataset.points = String(this.figure.count);
     canvas.dataset.buildMs = buildMs.toFixed(1);
+    canvas.dataset.power = this.lowPower ? "low" : "high";
+    canvas.dataset.motion = this.reduced ? "reduced" : "full";
     canvas.dataset.state = this.state;
     this.label();
     canvas.addEventListener("webglcontextlost", this.onLost);
@@ -153,6 +172,41 @@ export class EzoAvatar {
     } catch {
       return false;
     }
+  }
+
+  /** The device asks for economy: little memory, a data-saver preference or a coarse, dense phone screen. */
+  static prefersLowPower(): boolean {
+    if (typeof navigator === "undefined") return false;
+    const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean }; hardwareConcurrency?: number };
+    if (typeof nav.deviceMemory === "number" && nav.deviceMemory <= 4) return true;
+    if (nav.connection?.saveData) return true;
+    return typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 2;
+  }
+
+  /** Switch the 30 fps economy mode on or off at runtime (e.g. on battery). */
+  setLowPower(on: boolean): void {
+    this.lowPower = on;
+    this.canvas.dataset.power = on ? "low" : "high";
+  }
+
+  isLowPower(): boolean {
+    return this.lowPower;
+  }
+
+  /** A hidden host (an Electron window that is hidden, a collapsed stage) stops drawing entirely. */
+  setActive(active: boolean): void {
+    this.active = active;
+    this.syncRunning();
+  }
+
+  /** Frames drawn so far (still redraws included): proves the loop survives a context loss. */
+  getFrameCount(): number {
+    return this.frames;
+  }
+
+  /** The facial amounts drawn now (blink, eye direction, jaw…): for tests and the voice frame. */
+  getFace(): FaceAmounts {
+    return { ...this.face, eye: { ...this.face.eye } };
   }
 
   setState(state: AvatarState): void {
@@ -279,7 +333,7 @@ export class EzoAvatar {
 
   private syncRunning(): void {
     const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
-    if (!this.destroyed && !this.reduced && this.glState && visible) this.startLoop();
+    if (!this.destroyed && !this.reduced && this.glState && visible && this.active) this.startLoop();
     else {
       this.stopLoop();
       this.redrawIfStill();
@@ -292,11 +346,13 @@ export class EzoAvatar {
     this.last = performance.now();
     const tick = (now: number) => {
       if (!this.running) return;
+      this.frame = requestAnimationFrame(tick);
+      // Economy: skip every other display frame rather than draw a lighter figure.
+      if (this.lowPower && now - this.last < LOW_POWER_FRAME_MS - 2) return;
       const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
       this.last = now;
       this.step(dt);
       this.draw();
-      this.frame = requestAnimationFrame(tick);
     };
     this.frame = requestAnimationFrame(tick);
   }
@@ -320,6 +376,27 @@ export class EzoAvatar {
     const fresh = this.time - this.levelAt < 0.4;
     const target = fresh ? this.levelTarget : this.state === "speaking" ? syntheticSpeech(this.time) : this.state === "listening" ? 0.08 : 0;
     this.level = followLevel(this.level, target, dt);
+    this.stepFace(dt, held ? this.gazeTarget : null);
+  }
+
+  /** Blinks, eye direction, brows and the jaw for this frame. */
+  private stepFace(dt: number, gaze: Gaze | null): void {
+    const look = this.look;
+    if (this.time >= this.nextBlink && this.state !== "offline") {
+      this.blinkStart = this.time;
+      this.nextBlink = this.time + BLINK_LENGTH + nextBlinkDelay(Math.random(), look.listen);
+    }
+    const eye = eyeTarget(look, gaze, this.time);
+    const k = 1 - Math.exp(-dt * 14); // the eyes move faster than the head
+    const current = this.face.eye;
+    this.face = {
+      blink: blinkCurve(this.time - this.blinkStart),
+      droop: droopFor(look),
+      eye: { yaw: current.yaw + (eye.yaw - current.yaw) * k, pitch: current.pitch + (eye.pitch - current.pitch) * k },
+      brow: browFor(look),
+      mouth: mouthFor(this.level, look),
+      smile: smileFor(look),
+    };
   }
 
   private redrawIfStill(): void {
@@ -327,6 +404,9 @@ export class EzoAvatar {
     if (this.reduced || !this.glState) {
       this.time = STILL_TIME;
       this.level = this.state === "speaking" ? 0.5 : 0;
+      const look = lookFor(this.state);
+      const held = this.time - this.gazeAt < GAZE_HOLD_SECONDS;
+      this.face = { blink: 0, droop: droopFor(look), eye: eyeTarget(look, held ? this.gazeTarget : null, 0), brow: browFor(look), mouth: mouthFor(this.level, look), smile: smileFor(look) };
     }
     this.draw();
   }
@@ -359,6 +439,7 @@ export class EzoAvatar {
 
   private draw(): void {
     if (this.destroyed) return;
+    this.frames += 1;
     const { width, height, cssHeight, dpr } = this.resize();
     const camera = frameCamera(this.framing, width / height);
     if (!this.glState) {
@@ -409,6 +490,14 @@ export class EzoAvatar {
     gl.uniform1f(u.uOffline, look.offline);
     gl.uniform1f(u.uYaw, yaw);
     gl.uniform1f(u.uPitch, pitch);
+    const face = this.face;
+    gl.uniform1f(u.uBlink, face.blink);
+    gl.uniform1f(u.uDroop, face.droop);
+    gl.uniform1f(u.uEyeX, face.eye.yaw);
+    gl.uniform1f(u.uEyeY, face.eye.pitch);
+    gl.uniform1f(u.uBrow, face.brow);
+    gl.uniform1f(u.uMouth, face.mouth);
+    gl.uniform1f(u.uSmile, face.smile);
     // Point size follows the view size; small faces (pill, home screen) keep visible lines.
     const reference = this.framing === "head" ? 380 : 720;
     gl.uniform1f(u.uPx, dpr * Math.min(1.5, Math.max(0.6, cssHeight / reference)));
@@ -437,14 +526,37 @@ export class EzoAvatar {
     const tint =
       this.state === "error" ? "255,70,80" : this.state === "offline" ? "90,100,120" : this.state === "success" ? "255,200,90" : "70,170,255";
     const warm = this.state === "speaking" || this.state === "success" ? "255,170,60" : this.state === "offline" ? "110,100,90" : "255,110,30";
-    const { positions, data, count } = this.figure;
+    const { positions, data, extra, count } = this.figure;
     const dot = Math.max(1, height / 500);
+    const face = this.face;
     for (let i = 0; i < count; i++) {
       const kind = data[i * 4]!;
       if (kind === 6 || kind === 3 || kind === 5) continue;
-      const [x, y] = project(viewProjection, positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!);
+      let px = positions[i * 3]!;
+      let py = positions[i * 3 + 1]!;
       const w = data[i * 4 + 3]!;
-      ctx.fillStyle = `rgba(${w > 0.35 ? warm : tint},${0.25 + 0.5 * data[i * 4 + 2]!})`;
+      let colour = w > 0.35 ? warm : tint;
+      let alpha = 0.25 + 0.5 * data[i * 4 + 2]!;
+      if (kind === 8) {
+        // Eyes: the iris follows the gaze; the outline is the brightest line of the face.
+        if (w > 0.25) {
+          px += face.eye.yaw * 0.42 * EYE.rx;
+          py += face.eye.pitch * 0.32 * EYE.ry;
+        }
+        colour = w > 0.75 ? "10,20,40" : w > 0.25 ? "80,190,255" : "190,235,255";
+        alpha = w > 0.75 ? 0.9 : 0.85;
+      } else if (kind === 9) {
+        colour = "120,200,255";
+      } else if (kind === 10) {
+        colour = "90,160,255";
+        py += face.brow * 0.02;
+      } else if (kind === 11) {
+        colour = "255,170,90";
+        if (extra[i * 2 + 1]! > 0.5) py -= face.mouth * 0.06;
+        alpha = 0.8;
+      }
+      const [x, y] = project(viewProjection, px, py, positions[i * 3 + 2]!);
+      ctx.fillStyle = `rgba(${colour},${alpha})`;
       ctx.fillRect(((x + 1) / 2) * width, ((1 - y) / 2) * height, dot, dot);
     }
     ctx.globalCompositeOperation = "source-over";
