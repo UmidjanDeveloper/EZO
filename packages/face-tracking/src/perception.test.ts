@@ -118,7 +118,7 @@ it('bounds audio-thread backlog to one unacknowledged PCM window',()=>{
  expect(postMessage).toHaveBeenCalledTimes(2);
 });
 it('acknowledges dropped stale/suppressed audio without treating it as fresh clap evidence',async()=>{
- environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
+ vi.spyOn(performance,'now').mockReturnValue(1000);environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
  const port={onmessage:null as any,postMessage:vi.fn(),close:vi.fn()};
  vi.stubGlobal('AudioContext',class {audioWorklet={addModule:async()=>{}};currentTime=0;destination={};sampleRate=48000;resume=async()=>{};close=async()=>{};createMediaStreamSource=()=>({connect:vi.fn(),disconnect:vi.fn()});});
  vi.stubGlobal('AudioWorkletNode',class {port=port;connect=vi.fn();disconnect=vi.fn();});
@@ -132,4 +132,8 @@ it.each(['camera','microphone'] as const)('cancels pending %s permission on back
  const status=vi.fn();const model=vi.fn();const tracker=sensor==='camera'?new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame:vi.fn(),onStatus:status,createEstimator:model}):new ClapMicrophone({indicator:{} as HTMLElement,onClap:vi.fn(),onStatus:status});
  const pending=tracker.start();doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));expect(status.mock.lastCall![0]).toBe('off');
  const {track,stream}=streamMock();resolve(stream);await pending;expect(track.stop).toHaveBeenCalledOnce();expect(model).not.toHaveBeenCalled();
+});
+it('expires a frozen camera frame without false loss on a single duplicate, then reacquires',async()=>{
+ vi.useFakeTimers();environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});const v=video(),status=vi.fn(),onFrame=vi.fn();
+ const tracker=new CameraTracker({video:v,indicator:{} as HTMLElement,onFrame,onStatus:status,createEstimator:async()=>({estimate:(_v,time)=>pose(identity,time),close:vi.fn()})});await tracker.start();await Promise.resolve();expect(status.mock.lastCall![0]).toBe('tracking');await vi.advanceTimersByTimeAsync(100);expect(status.mock.lastCall![0]).toBe('tracking');await vi.advanceTimersByTimeAsync(500);expect(status.mock.lastCall![0]).toBe('lost');expect(onFrame.mock.lastCall![0]).toBeNull();Object.defineProperty(v,'currentTime',{value:2});await vi.advanceTimersByTimeAsync(150);expect(status.mock.lastCall![0]).toBe('tracking');tracker.stop();
 });

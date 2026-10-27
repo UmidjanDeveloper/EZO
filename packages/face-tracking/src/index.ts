@@ -36,6 +36,7 @@ export class CameraTracker {
   private visible=true;
   private interval=100;
   private lastVideoTime=-1;
+  private lastSampleTime=-Infinity;
   private status:TrackingStatus='off';
   private trackListeners:{track:MediaStreamTrack;listener:()=>void}[]=[];
   private readonly pagehide=()=>this.stop();
@@ -79,14 +80,16 @@ export class CameraTracker {
       const video=this.options.video;
       const start=performance.now();
       if(video.readyState>=2 && video.currentTime!==this.lastVideoTime){
-        this.lastVideoTime=video.currentTime;
+        this.lastVideoTime=video.currentTime;this.lastSampleTime=start;
         const f=await this.estimator!.estimate(video,start);
         if(token!==this.generation)return;
         const valid=f && Object.values(f).every(Number.isFinite) && f.confidence>=0.5 && f.timestamp<=performance.now() && performance.now()-f.timestamp<=500;
         this.state(valid||this.estimator?.hasTarget?.()?'tracking':'lost');
         this.options.onFrame(valid?this.smooth.update(f):null);
         if(!valid)this.smooth.reset();
-      } // Repeated video timestamps do not invent frames; attention ages on its own clock.
+      }else if(start-this.lastSampleTime>500){
+        this.state('lost');this.options.onFrame(null);this.smooth.reset();
+      } // A single duplicate is normal; a frozen stream expires on the monotonic clock.
       if(token!==this.generation)return;
       this.interval=Math.min(250,Math.max(this.options.lowPower?125:66,0.8*this.interval+0.2*(performance.now()-start)*2));
       this.timer=setTimeout(()=>void this.tick(token),this.interval);
@@ -101,7 +104,7 @@ export class CameraTracker {
     if(this.timer!==undefined)clearTimeout(this.timer);this.timer=undefined;
     this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;
     this.options.video.pause();this.options.video.srcObject=null;
-    try{this.estimator?.close();}catch{/* Camera tracks are already released; finish disposal even if model close fails. */}finally{this.estimator=null;this.smooth.reset();this.lastVideoTime=-1;this.interval=100;document.removeEventListener('visibilitychange',this.hide);this.state('off');this.options.onFrame(null);}
+    try{this.estimator?.close();}catch{/* Camera tracks are already released; finish disposal even if model close fails. */}finally{this.estimator=null;this.smooth.reset();this.lastVideoTime=-1;this.lastSampleTime=-Infinity;this.interval=100;document.removeEventListener('visibilitychange',this.hide);this.state('off');this.options.onFrame(null);}
   }
 }
 export interface Landmarker {

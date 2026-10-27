@@ -117,7 +117,8 @@ CameraTracker now accepts sync **or async** estimators. Its factory receives an
 AbortSignal; old zero-argument factories remain valid. Optional Estimator.hasTarget reports
 hand-only target availability without fabricating a legacy TrackingFrame; status
 tracking includes accepted hands while onFrame stays face|null. Expired async face
-frames (>500ms) are rejected. Stop aborts pending worker
+frames (>500ms) are rejected. A frozen video timestamp transitions to lost after
+500ms; a single ordinary duplicate does not falsely reset tracking. Stop aborts pending worker
 initialization/inference, terminates it, releases media tracks, detaches video,
 removes track/visibility/pagehide/permission listeners and cancels timers. Visibility/pagehide guards are installed before permission is requested, not
 only after grant. Late permission grants after hide/disable are stopped; returning to foreground requires another action.
