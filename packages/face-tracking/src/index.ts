@@ -56,12 +56,12 @@ export class CameraTracker {
       if(document.hidden || !this.visible) throw new Error('Tracking view is hidden');
       if(!globalThis.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Secure camera API unavailable');
       this.state('requesting');
-      const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:this.options.lowPower?320:640,max:640},height:{ideal:this.options.lowPower?240:480,max:480},frameRate:{ideal:this.options.lowPower?8:15,max:this.options.lowPower?8:15}}});
-      if(token!==this.generation){stream.getTracks().forEach(t=>t.stop());return;}
-      this.stream=stream;this.state('requesting');
-      watchRevocation('camera',abort.signal,()=>{if(token===this.generation)this.fail('Camera permission revoked');});
       document.addEventListener('visibilitychange',this.hide);
       globalThis.addEventListener?.('pagehide',this.pagehide);
+      const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:this.options.lowPower?320:640,max:640},height:{ideal:this.options.lowPower?240:480,max:480},frameRate:{ideal:this.options.lowPower?8:15,max:this.options.lowPower?8:15}}});
+      if(token!==this.generation||document.hidden||!this.visible){stream.getTracks().forEach(t=>t.stop());if(token===this.generation)this.stop();return;}
+      this.stream=stream;this.state('requesting');
+      watchRevocation('camera',abort.signal,()=>{if(token===this.generation)this.fail('Camera permission revoked');});
       for(const track of stream.getVideoTracks()) { const listener=()=>{if(token===this.generation)this.fail('Camera disconnected or interrupted');}; track.addEventListener('ended',listener,{once:true});track.addEventListener('mute',listener,{once:true}); this.trackListeners.push({track,listener}); }
       this.options.video.srcObject=stream;this.options.video.muted=true;this.options.video.playsInline=true;
       await this.options.video.play();

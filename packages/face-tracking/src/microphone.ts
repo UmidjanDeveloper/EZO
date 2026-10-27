@@ -51,9 +51,12 @@ export class ClapMicrophone {
             if (document.hidden || !globalThis.isSecureContext || !navigator.mediaDevices?.getUserMedia)
                 throw new Error('Visible secure microphone API unavailable');
             this.state('requesting');
+            document.addEventListener('visibilitychange',this.hide);
+            globalThis.addEventListener?.('pagehide',this.pagehide);
             const stream = await navigator.mediaDevices.getUserMedia({ video: false, audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-            if (token !== this.generation) {
+            if (token !== this.generation || document.hidden) {
                 stream.getTracks().forEach(t => t.stop());
+                if(token===this.generation)this.stop();
                 return;
             }
             this.stream = stream;
@@ -61,8 +64,6 @@ export class ClapMicrophone {
                 this.stop();
                 this.state('error', 'Microphone permission revoked');
             } });
-            document.addEventListener('visibilitychange', this.hide);
-            globalThis.addEventListener?.('pagehide', this.pagehide);
             for (const track of stream.getAudioTracks()) {
                 const listener = () => { if (token === this.generation) {
                     this.stop();

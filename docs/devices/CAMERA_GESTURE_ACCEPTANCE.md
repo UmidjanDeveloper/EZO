@@ -8,7 +8,7 @@ Claude Max. Existing API methods are used through a structural adapter.
 ## What ran locally
 
 - TypeScript checking, including the **actual** avatar example and browser fixture.
-- 51 sensing unit tests: synthetic matrices/landmarks and deterministic lifecycle
+- 53 sensing unit tests: synthetic matrices/landmarks and deterministic lifecycle
   mocks. Includes real estimator result-shape conversion (nose/palm/velocity),
   invalid/extreme matrices, face/hand loss/reacquisition, stationary/moving hand,
   mirrored signed coordinates, stale/low-confidence frames, explicit-mode priority,

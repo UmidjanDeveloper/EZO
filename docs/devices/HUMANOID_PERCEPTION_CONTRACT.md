@@ -119,8 +119,8 @@ hand-only target availability without fabricating a legacy TrackingFrame; status
 tracking includes accepted hands while onFrame stays face|null. Expired async face
 frames (>500ms) are rejected. Stop aborts pending worker
 initialization/inference, terminates it, releases media tracks, detaches video,
-removes track/visibility/pagehide/permission listeners and cancels timers. Late
-permission grants are stopped; returning to foreground requires another action.
+removes track/visibility/pagehide/permission listeners and cancels timers. Visibility/pagehide guards are installed before permission is requested, not
+only after grant. Late permission grants after hide/disable are stopped; returning to foreground requires another action.
 Track ended/mute stops capture; Permissions API denied transitions additionally
 report confirmed revocation where supported. Other interruptions are onError and
 must not be mislabeled confirmed permission revocation. Unsupported permission

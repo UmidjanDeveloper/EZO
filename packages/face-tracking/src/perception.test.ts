@@ -127,3 +127,9 @@ it('acknowledges dropped stale/suppressed audio without treating it as fresh cla
  mic.setSuppressed(true);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).not.toHaveBeenCalled();
  mic.setSuppressed(false);port.onmessage({data:{samples:new Float32Array(480),time:0}});expect(push).toHaveBeenCalledOnce();expect(port.postMessage).toHaveBeenCalledTimes(3);mic.stop();
 });
+it.each(['camera','microphone'] as const)('cancels pending %s permission on backgrounding, before a late grant',async sensor=>{
+ const doc=environment();let resolve!:(stream:MediaStream)=>void;const getUserMedia=vi.fn(()=>new Promise<MediaStream>(r=>{resolve=r;}));vi.stubGlobal('navigator',{mediaDevices:{getUserMedia}});
+ const status=vi.fn();const model=vi.fn();const tracker=sensor==='camera'?new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame:vi.fn(),onStatus:status,createEstimator:model}):new ClapMicrophone({indicator:{} as HTMLElement,onClap:vi.fn(),onStatus:status});
+ const pending=tracker.start();doc.hidden=true;doc.dispatchEvent(new Event('visibilitychange'));expect(status.mock.lastCall![0]).toBe('off');
+ const {track,stream}=streamMock();resolve(stream);await pending;expect(track.stop).toHaveBeenCalledOnce();expect(model).not.toHaveBeenCalled();
+});
