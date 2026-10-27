@@ -37,7 +37,8 @@ Tayyorgarlik (5 daqiqa, bir marta):
 | B3 | Chat → 🎤 → sahna → «Kamerani yoqish» → Android ruxsat → «Ruxsat». | «Kamera: yuz ko‘rinmoqda», EZO sizga qaraydi, bosh/qo‘l harakatiga ergashadi. | «Kamera xatosi: …» matnini yozing. Ruxsat rad etilsa — Android sozlamalari → EZO → Ruxsatlar. |
 | B4 | «Qarsakni tinglash» → qarsak. | «Qarsak eshitildi», «Eshitaman seni.» aytiladi. | B6 dagi hisobot. |
 | B5 | Ilovani fonga oling (Home) → qaytib keling. | Kamera va mikrofon o‘chgan, o‘zi yoqilmaydi. | — |
-| B6 | Ko‘proq → **Diagnostika** → «Hisobotni nusxalash». | Buferda matn. | — |
+| B6 | Ko‘proq → **Diagnostika** → «Hisobotni nusxalash». | Buferda matn (fps, kadr vaqti, xotira ham). | — |
+| B7 | Telefon sozlamalarida EZO uchun **Kamera** ruxsatini o‘chiring → ilovani oching → sahna → «Kamerani yoqish». | Tizim so‘rovi; «Ruxsat berilmadi» holati, ilova yopilib qolmaydi. Ruxsatni qaytarsangiz, kamera yana ishlaydi. | Ilova yopilib qolsa — B6 hisobotini yuboring. |
 
 ## C. Veb (2 daqiqa)
 
@@ -46,6 +47,14 @@ Tayyorgarlik (5 daqiqa, bir marta):
 | C1 | Brauzerda EZO → «Gaplashish» → «Kamerani yoqish» → ruxsat. | «Kamera: yuz ko‘rinmoqda», EZO sizga qaraydi. |
 | C2 | «Qarsakni tinglash» → qarsak. | «Qarsak eshitildi», javob aytiladi. |
 | C3 | Tabni almashtiring → qaytib keling. | Kamera o‘chgan, o‘zi yoqilmaydi. |
+| C4 | Sahnada pastdagi **Diagnostika** → «Hisobotni nusxalash». | Buferda matn: versiya, sha, fps, kamera, TTS provayder. |
+
+### Ixtiyoriy: ovoz aniqligi (server kalitlari bilan)
+
+Serverda `OPENAI_API_KEY` va/yoki `ELEVENLABS_API_KEY` bo‘lsa, kompyuterda:
+`python scripts/voice_phrase_check.py --api http://<server> --token <token>` — 15 ta jumla
+(uz/en/ru) sintez qilinadi, qayta tanib olinadi, har biri uchun WER/CER chiqadi. Bu faqat
+«tanib olish aniqligi»; ovoz tabiiyligini o‘zingiz eshitib baholaysiz (D bo‘limi).
 
 ## D. Natijani qaytaring
 
