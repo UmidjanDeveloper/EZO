@@ -114,11 +114,13 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   Windows: `pill.html` meta + the `vision.worker.js` response header in `main/index.ts`.
   No remote host appears in any directive.
 - Engine limits known from CI: `createVisionEstimator` gives the worker 15 s for its
-  initialisation and for each frame (fixed in the engine); the controller ignores frames
+  initialisation and for each frame by default; `PerceptionSession` raises the initialisation
+  budget to 60 s (`initTimeoutMs`, additive option) because the CI emulator needs 17–23 s; the controller ignores frames
   older than 500 ms, so on a machine where face+hand inference takes longer than that the
   figure stays neutral while Diagnostics still shows the FPS and inference time. The bundled
-  WASM is the `nosimd` build (the only one pinned by the engine). Both are requests to Codex
-  in the Section C PR; the Android emulator in CI hit the 15 s deadline once (55c489e) and passed the next run with the engine up after ≈17 s and 1.2 s per inference (ce27a47) — marginal.
+  WASM is the `nosimd` build (the only one pinned by the engine; SIMD pin is a request to Codex).
+  The Android emulator in CI hit the 15 s default at 55c489e and 7776d42 (engine up after 23 s)
+  and passed at ce27a47 (≈17 s, 1.2 s per inference) — hence the 60 s budget.
 - The real engine is bundled in every app since Section C; the camera control is enabled
   once `vision-assets.json` validates and disabled with the exact reason otherwise. CI runs
   the engine with Chromium's fake camera and a fake microphone file of clap-like bursts
