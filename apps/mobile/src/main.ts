@@ -339,7 +339,7 @@ function openStage(): void {
   $("voiceStage").hidden = false;
   if (!avatar) {
     avatar = new EzoAvatar($<HTMLCanvasElement>("avatar"), { framing: "bust", power: prefs.lowPower === "on" ? "low" : "auto", describe: (s) => t.voice.words[s] });
-    frame = createVoiceFrame($("avatarBox"), { words: t.voice.words });
+    frame = createVoiceFrame($("avatarBox"), { words: t.voice.words, showWord: false }); // the status line below says the state
     frame.follow(avatar);
     attention = new AttentionDriver(avatar, { onIntent: renderAttention });
     attention.setVision(vision);
