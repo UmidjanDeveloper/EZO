@@ -43,7 +43,8 @@ pnpm --filter @ezo/face-tracking build:acceptance
 ```
 
 In this managed environment only, set EZO_CHROMIUM_PATH=/usr/bin/chromium when
-running test:browser. CI uses the pinned Playwright browser. EZO_BROWSER_REPORT
+running test:browser. CI uses the pinned full Playwright Chromium new-headless channel (not the legacy
+headless shell, which rejected fake media in the first hosted runs). EZO_BROWSER_REPORT
 optionally writes JSON. The browser fixture is confined to tests/browser and is
 not part of the real integration example or shipping clients. The example itself
 has **no synthetic camera/hand/frame fallback**.

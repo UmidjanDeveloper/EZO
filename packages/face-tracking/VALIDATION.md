@@ -43,7 +43,9 @@ sample and environment limits are documented in CAMERA_GESTURE_ACCEPTANCE.md.
 The full backend/database/native Docker suites and shipping E2E are delegated to
 unchanged hosted CI jobs for this branch; they were not rerun locally for this
 isolated TypeScript change. Hosted status and exact head are recorded separately
-once available. A green hosted run cannot close the model/hardware gates above.
+once available. Initial hosted browser runs exposed Not supported when opening fake
+camera/microphone in the default headless shell. The harness now explicitly selects
+the full Chromium new-headless channel; no capture/cleanup assertions were removed. A green hosted run cannot close the model/hardware gates above.
 The earlier2026-10-24 mocked-only package evidence remains in Git history.
 
 ## Remaining review gates
