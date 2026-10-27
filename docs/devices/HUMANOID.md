@@ -79,6 +79,28 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   through `setHeadAim()`. A gaze older than 1.5 s drifts back to the idle sway, so a
   stale camera frame never looks like attention.
 
+**One attention engine (Section C decision, 2026-10-27)**
+- The perception engine's `AttentionController` (`packages/face-tracking/src/attention.ts`,
+  owned by Codex) is the only attention state machine: it arbitrates explicit
+  listening/speaking mode → a moving hand after a 60 ms dwell → the face position plus head
+  rotation → neutral, with 140 ms smoothing and 500 ms frame expiry. The avatar package's
+  former `AttentionDriver` (its own hand/head/stale/deadband rules) was deleted.
+- `packages/avatar/src/sensing.ts` keeps `MotionAdapter` only: it applies the engine's
+  `MotionIntent` to `EzoAvatar.setGaze`, adds the labelled pointer/touch fallback when the
+  engine says `neutral`, and releases the gaze when hidden or stopped. The types are
+  structural mirrors of the engine's, so neither package depends on the other.
+- Each app composes the engine's own parts through `@ezo/perception-client`
+  (`PerceptionSession`): `CameraTracker` → worker estimator (the app's bundled
+  `vision.worker.js`) → `AttentionController` → `MotionAdapter`; `ClapMicrophone` →
+  `ClapDetector`. The engine's `HumanoidPerception` is not used only because it constructs
+  its worker with `new URL("./vision.worker.ts", import.meta.url)`, which esbuild (Windows)
+  cannot bundle — see the request to Codex in the PR.
+- Assets: `scripts/vision-assets.mjs` copies the pinned MediaPipe 0.10.32 WASM from
+  node_modules and downloads the two official landmark models at build time into
+  `.cache/`, verifying SHA256 and size against `scripts/vision/pins.json`; each app serves
+  them from its own origin (`/vision/`), the worker re-verifies every byte before use, and
+  nothing is fetched at runtime. Licence note: `scripts/vision/MODEL_LICENSE_REVIEW.txt`.
+
 **Sensing contract and attention** (`sensing.ts`)
 - The camera/gesture engine (owned separately: `packages/face-tracking` today, hand, gesture
   and clap recognition as they land) and EZO's surfaces meet on structural types:
@@ -89,10 +111,11 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   the camera reports `tracking` and the view is visible; a frame older than 400 ms,
   below 0.5 confidence or non-finite releases the gaze; a 0.03 deadband stops jitter;
   `stop()` lets go of everything. Hidden views never track.
-- Each app has a provider slot (`apps/{desktop,web,mobile}/src/.../sensing.ts`). **No engine
-  is bundled in this build**, so every camera control is disabled and says so. Test
-  fixtures are explicitly simulated (`sensing.fixtures.ts`, `simulated: true`) and the UI
-  prints "SIMULATED — not a real camera" whenever such a frame drives the gaze.
+- The real engine is bundled in every app since Section C; the camera control is enabled
+  once `vision-assets.json` validates and disabled with the exact reason otherwise. CI runs
+  the engine with Chromium's fake camera and a fake microphone file of clap-like bursts
+  (`tests/e2e/specs/perception.spec.ts`, project `perception`): a SIMULATION that proves
+  wiring, honesty and cleanup, never that a real face, hand or clap is recognised.
 - Economy: `power: "low"` caps drawing at 30 fps (auto on devices reporting ≤4 GB,
   data-saver or ≤2 cores; a setting on Windows and Android); `setActive(false)` stops the
   loop in hidden hosts.
