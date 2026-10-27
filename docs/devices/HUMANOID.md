@@ -132,6 +132,15 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
 |---|---|---|
 | ![windows](img/windows-stage.jpg) | ![android](img/android-stage.jpg) | ![welcome](img/android-welcome.jpg) |
 
+**Section C, the real engine on Chromium's fake camera (SIMULATION, `tests/e2e/specs/perception.spec.ts`)**
+— the synthetic picture has no face, so the honest state is "camera active — lost"; the
+Windows pill is mid-acknowledgement after a clap from the fake microphone file. None of this
+is a real camera, microphone or phone.
+
+| Web voice stage | Windows pill stage (speaking after a clap) | Android web app stage |
+|---|---|---|
+| ![web simulation](img/section-c-simulation-web-stage.jpg) | ![windows simulation](img/section-c-simulation-windows-pill-stage.jpg) | ![android simulation](img/section-c-simulation-android-stage.jpg) |
+
 Real renders of the built renderers (Electron pill HTML in Chromium with a fake bridge;
 the APK's web layer in a Pixel-7-sized Chromium). Not photos of a PC or a phone.
 

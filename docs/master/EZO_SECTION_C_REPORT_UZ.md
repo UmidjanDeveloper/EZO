@@ -1,8 +1,7 @@
 # EZO — C bo‘lim: haqiqiy idrok (kamera/qo‘l/qarsak) + premium ovoz — egasi uchun hisobot
 
 Sana: 2026-10-27. Tarmoq: `section-c/perception-voice` (B bo‘lim `section-b/humanoid-product`
-ustiga, Codex’ning `feat/humanoid-perception` birlashtirilgan). PR: __PR__. Yakuniy head: __HEAD__.
-CI: __CI__.
+ustiga, Codex’ning `feat/humanoid-perception` birlashtirilgan). PR: https://github.com/UmidjanDeveloper/EZO/pull/57. Yakuniy head va CI run ID’lari PR’ning oxirgi hisobot izohida (bu fayl head’dan oldin yoziladi).
 
 Hech narsa birlashtirilmadi, joylanmadi, hech qanday xizmat sotib olinmadi, hech qanday
 kalit yaratilmadi.
@@ -41,13 +40,13 @@ hisobotini nusxalab qaytarish).
   → haqiqiy `/api/voice/speak` yo‘li (mock) → «Eshitaman seni.» ijro etildi (jag‘ o‘lchangan
   ovoz bilan) → ikkinchi qarsak keshdan, qayta sintez yo‘q; provayder yo‘q → «javob
   aytilmadi» (hech qachon «ijro etildi» deb aldamaydi). Windows pill (dist xotiradan) va
-  Android ilovasi (dist) ham o‘sha dvigatel bilan: __PERCEPTION_RESULTS__.
+  Android ilovasi (dist) ham o‘sha dvigatel bilan: 6/6 o‘tdi (mahalliy, to‘liq Playwright 94/94 bilan birga); skrinshotlar `docs/devices/img/section-c-simulation-*.jpg`.
 - **Emulyator** (Devices): haqiqiy APK, `CAMERA` berilgan, sahnada kamera tugmasi bosiladi,
-  worker emulyator sahnasida inference qiladi: __EMULATOR__.
+  worker emulyator sahnasida inference qiladi: **ulgurmadi** — dvigatelning qat’iy 15 soniyalik muddati («Vision deadline exceeded», x86 emulyator, nosimd WASM, CPU). Bu `packages/face-tracking` ichida; Codex’ga 5-so‘rov. APK o‘zi quriladi va yuklanadi; emulyator qadami hisobotga vaqt jadvalini yozadi.
 - **ElevenLabs**: til bo‘yicha ovoz/model (`EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU`,
   `EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU`), tasdiqlangan tillar uchun ElevenLabs, qolganlari
   uchun OpenAI (ElevenLabs’ga HTTP so‘rov yuborilmaydi); o‘zbekcha sukut bo‘yicha o‘chiq.
-  Mock HTTP testlari: uz/en/ru, fallback, mavjud emas yo‘li — __API_TESTS__.
+  Mock HTTP testlari: uz/en/ru, fallback, mavjud emas yo‘li — 850 o‘tdi, 10 o‘tkazib yuborildi (ruff, ruff format, mypy toza).
 
 ## 3. Faqat egasi tasdiqlaydi (KUTILMOQDA)
 
@@ -87,7 +86,21 @@ hisobotini nusxalab qaytarish).
 
 ## 6. Raqamlar
 
-__NUMBERS__
+| Nima | Natija |
+|---|---|
+| `packages/avatar` | 25/25 |
+| `packages/face-tracking` (Codex, o‘zgartirilmagan) | 51/51 |
+| `packages/perception-client` | 3/3 |
+| `apps/web` (lint, tsc, vitest) | 97/97 |
+| `apps/desktop` (vitest, tsc, build) | 69/69 (+2 o‘tkazib yuborilgan) |
+| `apps/mobile` (vitest, tsc, build, `cap sync`) | 19/19 |
+| API (ruff, mypy, pytest) | 850 o‘tdi, 10 o‘tkazib yuborildi |
+| Playwright (to‘liq, `perception` loyihasi bilan) | 94/94, 6.2 daqiqa |
+| Vision assets | face 3 758 596 B, hand 7 819 105 B, WASM 10 647 962 B — SHA256 mos |
+
+Topilgan va tuzatilgan xato: `connect-src` da `blob:` yo‘qligi sababli worker uchala
+mijozda start paytida o‘lardi (CSP). Topilmagan bo‘lsa, egasida kamera tugmasi doim
+«xato» ko‘rsatardi — simulyatsiya shu uchun kerak edi.
 
 «Tirik humanoid tayyor» deyilmaydi: ko‘z/qo‘l/kamera va jismoniy ovoz testlari egasi
 tomonidan o‘tkazilmagan. «100% xatosiz» yoki «fotorealistik» da’volar yo‘q.

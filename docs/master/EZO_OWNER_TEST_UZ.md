@@ -60,3 +60,8 @@ Ishlamagan qadamlar: A?, B? — nima ko‘rindi
 ```
 
 Hisobotda rasm, ovoz yozuvi yoki yuz nuqtalari yo‘q — faqat raqamlar va so‘zlar.
+
+Sahna qanday ko‘rinishi kerak (CI dagi SIMULYATSIYA — soxta kamera, yuz yo‘q, shuning uchun
+«yuz topilmadi»): `docs/devices/img/section-c-simulation-web-stage.jpg`,
+`…-windows-pill-stage.jpg` (qarsakdan keyin gapirmoqda), `…-android-stage.jpg`. Sizda haqiqiy
+kamera oldida «Kamera: yuz ko‘rinmoqda» bo‘lishi kerak.
