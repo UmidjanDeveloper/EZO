@@ -104,3 +104,29 @@ describe("avatar without a browser", () => {
     avatar.destroy();
   });
 });
+
+describe("measured performance", () => {
+  it("reports zeros before the loop ran and finite numbers afterwards; heap only where exposed", async () => {
+    const { EzoAvatar } = await import("./avatar");
+    const canvas = {
+      width: 64,
+      height: 64,
+      dataset: {} as Record<string, string>,
+      getBoundingClientRect: () => ({ width: 64, height: 64 }),
+      getContext: () => null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      setAttribute: () => undefined,
+    } as unknown as HTMLCanvasElement;
+    const avatar = new EzoAvatar(canvas, { reducedMotion: true, describe: (s) => s });
+    expect(avatar.getPerformance()).toEqual({ frameMs: 0, drawMs: 0, fps: 0, heapMb: null });
+    const memory = (performance as unknown as { memory?: unknown }).memory;
+    (performance as unknown as { memory?: unknown }).memory = { usedJSHeapSize: 52_428_800 };
+    try {
+      expect(avatar.getPerformance().heapMb).toBe(50);
+    } finally {
+      (performance as unknown as { memory?: unknown }).memory = memory;
+    }
+    avatar.destroy();
+  });
+});

@@ -192,6 +192,48 @@ try {
   await page.click("#stageClose");
   await page.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
   step("voice stage closed; figure and any media released");
+
+  // 10. Negative scenario: the camera permission is taken away. Android kills the process on
+  // `pm revoke`, so the app is relaunched (its settings persist); the camera button then opens
+  // the system prompt, which is dismissed with BACK (= not allowed) — the honest state is
+  // "denied", nothing crashes, and the stage still closes cleanly. A SIMULATION of refusal.
+  await device.shell("pm revoke uz.ezo.mobile android.permission.CAMERA");
+  await device.shell("am force-stop uz.ezo.mobile").catch(() => {});
+  await device.shell("am start -W -n uz.ezo.mobile/.MainActivity");
+  const webview2 = await device.webView({ pkg: "uz.ezo.mobile" }, { timeout: 120_000 });
+  const page2 = await webview2.page();
+  await page2.locator('[data-tab="chat"]').waitFor({ state: "visible", timeout: 60_000 });
+  step("relaunched after the camera permission was revoked; settings persisted", (await page2.textContent("#status")) ?? "");
+  await page2.click('nav button[data-go="chat"]').catch(() => {});
+  await page2.click("#mic");
+  await page2.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
+  await page2.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
+  await page2.click("#cameraToggle");
+  await new Promise((r) => setTimeout(r, 2500)); // the system permission prompt
+  await device.screenshot({ path: path.join(shotsDir, "6-camera-permission-prompt.png") }).catch(() => {});
+  await device.shell("input keyevent KEYCODE_BACK"); // dismiss = not allowed
+  await page2.waitForFunction(() => ["denied", "error", "off"].includes(document.getElementById("cameraState")?.dataset.camera ?? ""), undefined, { timeout: 30_000 });
+  const denied = await page2.evaluate(() => ({
+    state: document.getElementById("cameraState")?.dataset.camera,
+    text: document.getElementById("cameraState")?.textContent,
+    stageOpen: !document.getElementById("voiceStage")?.hidden,
+  }));
+  step("camera refused on the device (SIMULATION: system prompt dismissed)", JSON.stringify(denied));
+  if (denied.state === "tracking" || denied.state === "lost") throw new Error("camera ran without the permission");
+  await page2.click("#stageClose");
+  await page2.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
+  // Granted again: the app recovers without a reinstall.
+  await device.shell("pm grant uz.ezo.mobile android.permission.CAMERA").catch(() => {});
+  await page2.click("#mic");
+  await page2.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
+  await page2.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
+  await page2.click("#cameraToggle");
+  await page2.waitForFunction(() => ["tracking", "lost", "error", "denied"].includes(document.getElementById("cameraState")?.dataset.camera ?? ""), undefined, { timeout: 120_000 });
+  const regranted = await page2.evaluate(() => document.getElementById("cameraState")?.dataset.camera);
+  step("camera after the permission was granted again (SIMULATION)", String(regranted));
+  if (regranted !== "tracking" && regranted !== "lost") throw new Error(`camera did not recover after re-grant: ${regranted}`);
+  await page2.click("#cameraToggle");
+  await page2.click("#stageClose");
   report.ok = true;
 } catch (error) {
   report.error = String(error?.stack ?? error);
