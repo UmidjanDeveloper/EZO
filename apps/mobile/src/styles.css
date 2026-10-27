@@ -88,3 +88,8 @@ textarea { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px sol
 .link { background: none; border: 1px solid #475569; color: #e2e8f0; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
 .link:disabled { opacity: .5; }
 .privacy { margin: 4px 0 8px; font-size: 11px; color: #94a3b8; line-height: 1.35; }
+.hidden-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.indicator { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
+.clap-heard { font-size: 12px; color: #fde68a; }
+.check.small { justify-content: center; font-size: 12px; color: #cbd5e1; margin: 2px 0; }
+.camera-row { flex-wrap: wrap; }

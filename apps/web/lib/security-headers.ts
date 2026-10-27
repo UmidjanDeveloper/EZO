@@ -10,7 +10,10 @@ export function contentSecurityPolicy(nonce: string, apiOrigin: string, dev = fa
   const api = apiOrigin ? ` ${apiOrigin}` : "";
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
+    // 'wasm-unsafe-eval': the perception worker compiles the bundled MediaPipe WASM (same origin, SHA256-pinned).
+    // blob: lets that worker importScripts its verified loader and the clap AudioWorklet load its module.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' blob:${dev ? " 'unsafe-eval'" : ""}`,
+    "worker-src 'self' blob:",
     // React sets style attributes (animations, sizes); styles cannot run code.
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' blob: data:${api}`,
@@ -30,6 +33,6 @@ export const STATIC_SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "X-Frame-Options": "DENY",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  // The microphone is used by voice mode on this origin only.
-  "Permissions-Policy": "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)",
+  // The microphone (voice mode, clap) and the camera (attention) are used on this origin only.
+  "Permissions-Policy": "camera=(self), geolocation=(), payment=(), usb=(), microphone=(self)",
 };

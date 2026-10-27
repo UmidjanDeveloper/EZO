@@ -1,5 +1,6 @@
 // Bundles the main process, the preload scripts and the renderer into dist/.
 import { build } from "esbuild";
+import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync } from "node:fs";
 
 const common = { bundle: true, sourcemap: false, logLevel: "warning", legalComments: "none" };
@@ -12,6 +13,7 @@ await build({
   format: "cjs",
   target: "node22",
   external: ["electron"],
+  define: { "process.env.EZO_BUILD_SHA": JSON.stringify(process.env.EZO_BUILD_SHA ?? process.env.GITHUB_SHA ?? "dev") },
 });
 await build({
   ...common,
@@ -33,3 +35,5 @@ await build({
 for (const file of ["pill.html", "pill.css", "settings.html", "settings.css"]) {
   cpSync(`src/renderer/${file}`, `dist/${file}`);
 }
+// Perception assets (pinned MediaPipe WASM + models, SHA256-verified) and the engine's worker, served from the app origin.
+execFileSync(process.execPath, ["../../scripts/vision-assets.mjs", "dist/vision", "--base", "/vision/"], { stdio: "inherit" });

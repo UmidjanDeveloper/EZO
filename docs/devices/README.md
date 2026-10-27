@@ -19,7 +19,11 @@ Both apps need a running EZO API.
   from the main process and needs no CORS entry.
 - **Voice and screen/photo understanding need keys on the server.**
   - Voice in Uzbek needs `OPENAI_API_KEY` or `ELEVENLABS_API_KEY`. Speaking replies with
-    ElevenLabs also needs `EZO_ELEVENLABS_VOICE_ID`.
+    ElevenLabs also needs `EZO_ELEVENLABS_VOICE_ID` (or per-language
+    `EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU`, models `EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU`).
+    ElevenLabs speaks only the languages in `EZO_ELEVENLABS_TTS_LANGUAGES` (default `en,ru`);
+    the others go to OpenAI. Uzbek through ElevenLabs is off until the owner has heard it and
+    added `uz` to that list.
   - Screen and photo understanding need `GEMINI_API_KEY`, `OPENAI_API_KEY` or
     `ANTHROPIC_API_KEY`.
   - Without keys, both apps still work for text. They then say clearly that voice or vision

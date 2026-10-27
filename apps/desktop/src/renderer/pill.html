@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; img-src 'self' data:"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self'; style-src 'self'; media-src blob:; img-src 'self' data:"
     />
     <title>EZO</title>
     <link rel="stylesheet" href="pill.css" />
@@ -34,11 +34,20 @@
         <div id="stageFrame" class="stage-frame"></div>
       </div>
       <p id="attention" class="attention" aria-live="polite"></p>
+      <video id="perceptionVideo" class="hidden-video" muted playsinline aria-hidden="true"></video>
       <div class="camera-row">
         <span id="cameraState" class="camera-state" role="status" data-camera="off"></span>
         <button type="button" id="cameraToggle" class="link"></button>
+        <span id="cameraIndicator" class="indicator"></span>
       </div>
       <p id="cameraPrivacy" class="privacy"></p>
+      <div class="camera-row">
+        <span id="clapState" class="camera-state" role="status" data-microphone="off"></span>
+        <button type="button" id="clapToggle" class="link"></button>
+        <span id="microphoneIndicator" class="indicator"></span>
+        <span id="clapHeard" class="clap-heard"></span>
+      </div>
+      <p id="clapPrivacy" class="privacy"></p>
     </section>
     <section id="panel" class="panel" hidden>
       <form id="ask">

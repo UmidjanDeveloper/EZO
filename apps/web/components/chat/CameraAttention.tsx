@@ -1,167 +1,287 @@
 "use client";
 
-import { AttentionDriver, type EzoAvatar, type Gaze, type MotionIntent, type VisionStatus } from "@ezo/avatar";
+import { MotionAdapter, type AttentionView, type EzoAvatar, type Gaze, type VisionStatus } from "@ezo/avatar";
+import type { MicrophoneStatus } from "@ezo/face-tracking";
+import { acknowledgement, loadVisionAssets, PerceptionSession, VoiceReaction, type AcknowledgementSpeaker, type AssetsReadiness, type ClapDetected, type Diagnostics, type Language } from "@ezo/perception-client";
 import { cn } from "@ezo/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { sensingProvider, type SensingSession } from "@/lib/sensing";
+import { createAcknowledgementSpeaker, storedClapListening, storedClapStartsListening, VISION_BASE, type TtsInfo } from "@/lib/perception";
 
-const OFF: VisionStatus = { camera: "off", faces: 0, hands: 0, since: 0 };
+const OFF: VisionStatus = { camera: "off", since: 0 };
+
+export interface AcknowledgementHooks {
+  /** The acknowledgement clip started / ended / could not be produced. */
+  onPlayback: (phase: "start" | "end" | "unavailable" | "error") => void;
+  /** Spoken language for the acknowledgement (the UI language). */
+  language: Language;
+  /** Changes when the server's voice provider changes (drops the clip cache). */
+  providerKey: string;
+  /** While EZO listens or speaks, the engine follows that mode and ignores claps while speaking. */
+  interaction: "listening" | "speaking" | null;
+}
 
 /**
- * Camera attention for the voice stage: EZO looks at the person (and at a raised hand)
- * through the sensing engine, only after an explicit press, with a truthful status, a
- * clear stop and a labelled pointer/touch fallback. Nothing is recorded or uploaded.
+ * Camera attention and the clap acknowledgement on the voice stage, on the real perception
+ * engine (@ezo/face-tracking in a worker, assets served from this origin and verified by
+ * SHA256). The camera button is enabled only once the bundled assets validate; the clap
+ * microphone is a separate consent, off by default, with its own Stop. Nothing is recorded,
+ * uploaded or identified. A simulated (CI) camera is labelled as such by the engine status.
  */
-export function useCameraAttention(avatar: EzoAvatar | null) {
-  const { m } = useI18n();
+export function useCameraAttention(avatar: EzoAvatar | null, hooks: AcknowledgementHooks) {
+  const { m, f } = useI18n();
   const t = m.voice.camera;
-  const driverRef = useRef<AttentionDriver | null>(null);
-  const sessionRef = useRef<SensingSession | null>(null);
-  const generation = useRef(0);
+  const tc = m.voice.clap;
+  const adapterRef = useRef<MotionAdapter | null>(null);
+  const sessionRef = useRef<PerceptionSession | null>(null);
+  const speakerRef = useRef<AcknowledgementSpeaker | null>(null);
+  const reactionRef = useRef<VoiceReaction | null>(null);
+  const hooksRef = useRef(hooks);
+  // The row registers its DOM nodes (hidden video, the engine's indicator spans) once mounted.
+  const [nodes, setNodes] = useState<{ video?: HTMLVideoElement; camera?: HTMLElement; microphone?: HTMLElement }>({});
+  const register = useCallback((key: "video" | "camera" | "microphone", element: HTMLElement | null) => {
+    if (!element) return;
+    setNodes((previous) => (previous[key] === element ? previous : { ...previous, [key]: element }));
+  }, []);
+  const [readiness, setReadiness] = useState<AssetsReadiness | null>(null);
   const [vision, setVision] = useState<VisionStatus>(OFF);
-  const [running, setRunning] = useState(false);
-  const [intent, setIntent] = useState<MotionIntent>({ kind: "rest", source: "none" });
-  const provider = sensingProvider();
+  const [microphone, setMicrophone] = useState<{ status: MicrophoneStatus; error?: string }>({ status: "off" });
+  const [view, setView] = useState<AttentionView>({ source: "none", state: "neutral", confidence: 0 });
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
+  const [lastClap, setLastClap] = useState<{ at: number; evidence: ClapDetected["evidence"] } | null>(null);
+  const [tts, setTts] = useState<TtsInfo | null>(null);
+  const clapConsent = storedClapListening.useValue();
+  const clapStartsListening = storedClapStartsListening.useValue();
 
-  const stop = useCallback(() => {
-    generation.current += 1;
-    sessionRef.current?.stop();
-    sessionRef.current = null;
-    setRunning(false);
-    driverRef.current?.headFrame(null);
-    driverRef.current?.handFrame(null);
-    const next = { ...OFF, since: performance.now() };
-    driverRef.current?.setVision(next);
-    setVision(next);
+  useEffect(() => {
+    hooksRef.current = hooks;
+    sessionRef.current?.setInteraction(hooks.interaction);
+  }, [hooks]);
+
+  // The bundled assets are checked once per page (the heavy files load only on the camera press).
+  useEffect(() => {
+    let alive = true;
+    void loadVisionAssets(VISION_BASE).then((result) => alive && setReadiness(result));
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // One driver per avatar; it is released with the avatar (stage closed, mode changed).
+  // One engine session per mounted figure; released with it (stage closed, mode changed).
   useEffect(() => {
-    if (!avatar) return;
-    const driver = new AttentionDriver(avatar, { onIntent: setIntent });
-    driverRef.current = driver;
-    const onVisibility = () => {
-      driver.setVisible(!document.hidden);
-      if (document.hidden) stop();
-    };
+    if (!avatar || !readiness?.ready || !nodes.video || !nodes.camera || !nodes.microphone) return;
+    const adapter = new MotionAdapter(avatar, { onChange: setView });
+    adapterRef.current = adapter;
+    const speaker = createAcknowledgementSpeaker(() => hooksRef.current.providerKey, setTts);
+    speakerRef.current = speaker;
+    const reaction = new VoiceReaction(speaker, (event) => {
+      if (event.type === "start") hooksRef.current.onPlayback("start");
+      else if (event.type === "end") hooksRef.current.onPlayback("end");
+      else if (event.type === "unavailable") hooksRef.current.onPlayback("unavailable");
+      else if (event.type === "error") hooksRef.current.onPlayback("error");
+    });
+    reactionRef.current = reaction;
+    const session = new PerceptionSession({
+      base: VISION_BASE,
+      assets: readiness.assets,
+      video: nodes.video,
+      cameraIndicator: nodes.camera,
+      microphoneIndicator: nodes.microphone,
+      adapter,
+      lowPower: avatar.isLowPower(),
+      reducedMotion: typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
+      onVision: setVision,
+      onMicrophone: (status, error) => setMicrophone({ status, error }),
+      onDiagnostics: setDiagnostics,
+      onClap: (event) => {
+        // Acknowledgement only: a short spoken "I'm listening." in the UI language. Never a tool, a send or listening by itself.
+        setLastClap({ at: event.timestampMs, evidence: event.evidence });
+        try {
+          void reaction.react(acknowledgement(event, hooksRef.current.language));
+        } catch {
+          // below the engine's confidence floor: ignored
+        }
+      },
+    });
+    sessionRef.current = session;
+    session.setInteraction(hooksRef.current.interaction);
+    const onVisibility = () => session.setVisible(!document.hidden);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
-      stop();
-      driver.stop();
-      driverRef.current = null;
+      reaction.stop();
+      speaker.stop();
+      session.stop();
+      sessionRef.current = null;
+      adapterRef.current = null;
+      setVision(OFF);
+      setMicrophone({ status: "off" });
     };
-  }, [avatar, stop]);
+  }, [avatar, readiness, nodes]);
 
-  const start = useCallback(async () => {
-    const engine = sensingProvider();
-    if (!engine || sessionRef.current || !driverRef.current) return;
-    const mine = ++generation.current;
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    const requesting: VisionStatus = { camera: "requesting", faces: 0, hands: 0, since: performance.now(), simulated: engine.simulated };
-    driverRef.current.setVision(requesting);
-    setVision(requesting);
-    try {
-      const session = await engine.start({
-        video,
-        onStatus: (status) => {
-          if (mine !== generation.current) return;
-          const next = { ...status, simulated: engine.simulated || status.simulated };
-          driverRef.current?.setVision(next);
-          setVision(next);
-        },
-        onHead: (frame) => driverRef.current?.headFrame(frame),
-        onHand: (hand) => driverRef.current?.handFrame(hand),
-      });
-      if (mine !== generation.current || document.hidden) {
-        session.stop();
-        return;
-      }
-      sessionRef.current = session;
-      setRunning(true);
-    } catch (error) {
-      if (mine !== generation.current) return;
-      const next: VisionStatus = { camera: "error", faces: 0, hands: 0, since: performance.now(), message: (error as Error).message, simulated: engine.simulated };
-      driverRef.current?.setVision(next);
-      setVision(next);
+  const pointer = useCallback((gaze: Gaze | null, source: "pointer" | "touch") => {
+    if (adapterRef.current) adapterRef.current.pointerGaze(gaze, source);
+    else avatar?.setGaze(gaze);
+  }, [avatar]);
+
+  const cameraRunning = vision.camera !== "off";
+  const toggleCamera = () => (cameraRunning ? sessionRef.current?.stopCamera() : void sessionRef.current?.startCamera());
+  const micRunning = microphone.status === "active" || microphone.status === "requesting";
+  const toggleClap = () => {
+    if (micRunning) {
+      sessionRef.current?.stopClap();
+      return;
     }
-  }, []);
+    storedClapListening.set("on");
+    void sessionRef.current?.startClap();
+  };
+  const disableClap = () => {
+    sessionRef.current?.stopClap();
+    storedClapListening.set("off");
+  };
+  useEffect(() => {
+    if (clapConsent === "off") sessionRef.current?.stopClap();
+  }, [clapConsent]);
 
-  const pointer = useCallback((gaze: Gaze | null, source: "pointer" | "touch") => driverRef.current?.pointerGaze(gaze, source), []);
-
-  const words: Record<VisionStatus["camera"], string> = {
+  const simulated = Boolean(vision.simulated);
+  const cameraWords: Record<VisionStatus["camera"], string> = {
     off: t.off,
     requesting: t.requesting,
     denied: t.denied,
     unavailable: t.unavailable,
     tracking: t.tracking,
     lost: t.lost,
-    error: vision.message ?? t.denied,
+    error: f(t.cameraError, { detail: vision.message ?? "" }),
   };
-  const attention =
-    intent.kind !== "look"
+  const unavailableReason = !readiness
+    ? ""
+    : readiness.ready
       ? ""
-      : intent.source === "hand"
-        ? t.attentionHand
-        : intent.source === "head"
-          ? t.attentionHead
-          : intent.source === "touch"
-            ? t.attentionTouch
-            : t.attentionPointer;
-  const simulatedNote = vision.simulated && intent.kind === "look" && (intent.source === "hand" || intent.source === "head") ? ` — ${t.simulated}` : "";
+      : readiness.reason === "missing"
+        ? t.assetsMissing
+        : readiness.reason === "invalid"
+          ? f(t.assetsInvalid, { detail: readiness.detail })
+          : f(t.cameraError, { detail: readiness.detail });
+  const attention =
+    view.source === "hand" ? t.attentionHand : view.source === "face" ? t.attentionHead : view.source === "touch" ? t.attentionTouch : view.source === "pointer" ? t.attentionPointer : "";
+  const micWords: Record<MicrophoneStatus, string> = {
+    off: tc.off,
+    requesting: tc.requesting,
+    active: tc.active,
+    error: /denied|NotAllowed|permission/i.test(microphone.error ?? "") ? tc.denied : f(tc.error, { detail: microphone.error ?? "" }),
+  };
 
   return {
     pointer,
-    running,
-    vision,
-    attention: attention + simulatedNote,
-    statusText: words[vision.camera] + (vision.simulated ? ` (${t.simulated})` : ""),
-    available: Boolean(provider),
-    toggle: () => (running ? stop() : void start()),
-    buttonText: running ? t.stop : t.on,
-    privacy: provider ? t.privacy : t.unavailable,
-    activeLabel: t.active,
+    register,
+    camera: {
+      available: Boolean(readiness?.ready),
+      running: cameraRunning,
+      state: vision.camera,
+      text: cameraWords[vision.camera] + (simulated ? ` (${t.simulated})` : ""),
+      buttonText: cameraRunning ? t.stop : t.on,
+      privacy: readiness?.ready ? `${t.privacy} ${t.engine}` : unavailableReason || t.unavailable,
+      toggle: toggleCamera,
+    },
+    clap: {
+      available: Boolean(readiness?.ready),
+      consent: clapConsent === "on",
+      running: micRunning,
+      status: microphone.status,
+      text: micWords[microphone.status],
+      buttonText: micRunning ? tc.stop : tc.listen,
+      privacy: tc.privacy,
+      toggle: toggleClap,
+      disable: disableClap,
+      startsListening: clapStartsListening === "on",
+      setStartsListening: (on: boolean) => storedClapStartsListening.set(on ? "on" : "off"),
+      last: lastClap,
+      heardText: tc.heard,
+      count: diagnostics?.clapCount ?? 0,
+    },
+    attention,
+    diagnostics,
+    tts,
   };
 }
 
 export function CameraAttentionRow({ camera }: { camera: ReturnType<typeof useCameraAttention> }) {
+  const dot = (state: string) =>
+    cn(
+      "inline-block h-2 w-2 rounded-full",
+      state === "tracking" || state === "active"
+        ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.9)]"
+        : state === "lost"
+          ? "bg-sky-700"
+          : state === "requesting"
+            ? "bg-amber-400"
+            : state === "denied" || state === "error"
+              ? "bg-red-400"
+              : "bg-slate-500",
+    );
   return (
-    <div className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-1 text-xs text-slate-300" data-testid="camera-attention">
+    <div
+      className="relative z-10 flex w-full max-w-2xl flex-col items-center gap-1 text-xs text-slate-300"
+      data-testid="camera-attention"
+      data-fps={camera.diagnostics?.cameraFps ?? 0}
+      data-inference-ms={camera.diagnostics?.inferenceMs ?? ""}
+      data-attention={camera.diagnostics?.attention ?? "neutral"}
+      data-clap-count={camera.diagnostics?.clapCount ?? 0}
+      data-tts-provider={camera.tts?.provider ?? ""}
+    >
+      {/* The engine draws into this hidden element; it never appears on screen. */}
+      <video ref={(el) => camera.register("video", el)} className="hidden" muted playsInline aria-hidden />
       <p className="min-h-4 text-slate-200/80" aria-live="polite" data-testid="attention">
         {camera.attention}
       </p>
-      <div className="flex items-center gap-3">
-        <span className="flex items-center gap-1.5" role="status" data-testid="camera-state" data-camera={camera.vision.camera}>
-          <span
-            className={cn(
-              "inline-block h-2 w-2 rounded-full",
-              camera.vision.camera === "tracking" || camera.vision.camera === "lost"
-                ? "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.9)]"
-                : camera.vision.camera === "requesting"
-                  ? "bg-amber-400"
-                  : camera.vision.camera === "denied" || camera.vision.camera === "error"
-                    ? "bg-red-400"
-                    : "bg-slate-500",
-            )}
-            aria-hidden
-          />
-          {camera.statusText}
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <span className="flex items-center gap-1.5" role="status" data-testid="camera-state" data-camera={camera.camera.state}>
+          <span className={dot(camera.camera.state)} aria-hidden />
+          {camera.camera.text}
         </span>
         <button
           type="button"
-          onClick={camera.toggle}
-          disabled={!camera.available}
-          title={camera.available ? "" : camera.privacy}
+          onClick={camera.camera.toggle}
+          disabled={!camera.camera.available}
           className="rounded-full border border-slate-600 px-2.5 py-0.5 text-slate-100 transition-colors hover:border-sky-300 disabled:cursor-default disabled:opacity-50"
           data-testid="camera-toggle"
         >
-          {camera.buttonText}
+          {camera.camera.buttonText}
         </button>
+        <span ref={(el) => camera.register("camera", el)} className="text-[10px] uppercase tracking-wide text-slate-500" data-testid="camera-indicator" />
       </div>
-      <p className="max-w-md text-center text-[11px] text-slate-400">{camera.privacy}</p>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <span className="flex items-center gap-1.5" role="status" data-testid="clap-state" data-microphone={camera.clap.status}>
+          <span className={dot(camera.clap.status)} aria-hidden />
+          {camera.clap.text}
+        </span>
+        <button
+          type="button"
+          onClick={camera.clap.toggle}
+          disabled={!camera.clap.available}
+          className="rounded-full border border-slate-600 px-2.5 py-0.5 text-slate-100 transition-colors hover:border-sky-300 disabled:cursor-default disabled:opacity-50"
+          data-testid="clap-toggle"
+        >
+          {camera.clap.buttonText}
+        </button>
+        <label className="flex items-center gap-1 text-[11px] text-slate-400">
+          <input type="checkbox" checked={camera.clap.startsListening} onChange={(e) => camera.clap.setStartsListening(e.target.checked)} data-testid="clap-starts-listening" />
+          {useI18nWord("startsListening")}
+        </label>
+        <span ref={(el) => camera.register("microphone", el)} className="text-[10px] uppercase tracking-wide text-slate-500" data-testid="microphone-indicator" />
+        {camera.clap.last ? (
+          <span className="text-amber-200" data-testid="clap-heard">
+            {camera.clap.heardText} ×{camera.clap.count}
+          </span>
+        ) : null}
+      </div>
+      <p className="max-w-md text-center text-[11px] text-slate-400">{camera.camera.privacy}</p>
+      <p className="max-w-md text-center text-[11px] text-slate-500">{camera.clap.privacy}</p>
     </div>
   );
+}
+
+function useI18nWord(key: "startsListening"): string {
+  const { m } = useI18n();
+  return m.voice.clap[key];
 }

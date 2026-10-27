@@ -314,6 +314,11 @@ export function createApiClient(options: ApiClientOptions) {
       const response = await send("/api/voice/speak", { method: "POST", ...json({ text, language }), signal });
       return response.blob();
     },
+    /** As `speak`, plus which provider actually produced the audio (the X-EZO-Voice-Provider header). */
+    speakWithProvider: async (text: string, language?: string | null, signal?: AbortSignal): Promise<{ audio: Blob; provider: string | null }> => {
+      const response = await send("/api/voice/speak", { method: "POST", ...json({ text, language }), signal });
+      return { audio: await response.blob(), provider: response.headers.get("X-EZO-Voice-Provider") };
+    },
 
     listArtifacts: (filter: { projectId?: string; conversationId?: string; type?: ArtifactType } = {}) => {
       const params = new URLSearchParams();

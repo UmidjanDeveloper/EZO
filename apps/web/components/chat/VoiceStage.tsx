@@ -63,7 +63,28 @@ export function VoiceStage({ session }: { session: Session }) {
 
   const stopListeningRef = useRef<(() => void) | null>(null);
   const [avatar, setAvatar] = useState<EzoAvatar | null>(null);
-  const camera = useCameraAttention(avatar);
+  const ackRef = useRef(false); // an acknowledgement clip is playing (not a conversation turn)
+  const listenAfterAckRef = useRef<() => void>(() => undefined);
+  const camera = useCameraAttention(avatar, {
+    language: uiLanguage,
+    providerKey: (voiceStatus?.text_to_speech ?? []).join(","),
+    interaction: phase === "listening" || phase === "recognizing" ? "listening" : phase === "speaking" ? "speaking" : null,
+    onPlayback: (event) => {
+      if (event === "start") {
+        ackRef.current = true;
+        stopVoice();
+        setNotice(null);
+        setPhase("speaking");
+      } else if (event === "unavailable" || event === "error") {
+        // Not spoken: no provider, or the provider failed. Never a pretended playback.
+        setNotice(m.voice.clap.unavailable);
+      } else if (ackRef.current) {
+        ackRef.current = false;
+        setPhase("idle");
+        listenAfterAckRef.current();
+      }
+    },
+  });
   const turnRef = useRef(0); // increments on every user action; stale callbacks check it
   const mountedRef = useRef(true);
   const listenRef = useRef<() => void>(() => undefined);
@@ -164,6 +185,13 @@ export function VoiceStage({ session }: { session: Session }) {
       setPhase("idle");
     }
   }, [listen, phase, stopStreaming, supported]);
+
+  useEffect(() => {
+    // Only when the owner switched it on: after the spoken acknowledgement EZO starts listening.
+    listenAfterAckRef.current = () => {
+      if (camera.clap.startsListening && supported) listen();
+    };
+  }, [camera.clap.startsListening, listen, supported]);
 
   useEffect(() => {
     mountedRef.current = true;

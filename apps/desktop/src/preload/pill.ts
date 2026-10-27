@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("ezo", {
   switchConversation: (id: string | null) => ipcRenderer.invoke("history:switch", id),
   tasks: () => ipcRenderer.invoke("jarvis:tasks"),
   cancelTask: (id: string) => ipcRenderer.invoke("jarvis:cancel-task", id),
+  speak: (text: string, language: string) => ipcRenderer.invoke("voice:speak", text, language),
+  reportDiagnostics: (diagnostics: unknown) => ipcRenderer.send("diag:update", diagnostics),
   onToggle: (callback: () => void) => ipcRenderer.on("shortcut:toggle", () => callback()),
   onNotice: on("notice"),
   onError: on("error"),

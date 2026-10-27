@@ -21,9 +21,13 @@ export interface Prefs {
   lowPower: "auto" | "on";
   /** EZO's voice volume 0..1. */
   voiceVolume: number;
+  /** Clap listening consent (separate from the voice microphone); off until the owner presses Listen. */
+  clapListening: "off" | "on";
+  /** After the spoken acknowledgement, start listening — only when the owner enabled it. */
+  clapStartsListening: "off" | "on";
 }
 
-const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false, lowPower: "auto", voiceVolume: 1 };
+const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false, lowPower: "auto", voiceVolume: 1, clapListening: "off", clapStartsListening: "off" };
 
 export function loadPrefs(): Prefs {
   try {

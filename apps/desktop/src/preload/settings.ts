@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld("ezoSettings", {
   jarvisPair: () => ipcRenderer.invoke("jarvis:pair"),
   jarvisUnpair: () => ipcRenderer.invoke("jarvis:unpair"),
   jarvisStatus: () => ipcRenderer.invoke("jarvis:status"),
+  diagnostics: () => ipcRenderer.invoke("diag:get"),
 });

@@ -16,3 +16,6 @@ li button { margin-left: 8px; padding: 2px 8px; }
 #testResult.bad { color: #c0392b; }
 .welcome { border: 1px solid rgba(91,140,255,.5); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; background: rgba(91,140,255,.08); }
 .welcome p { margin: 6px 0; }
+details { padding: 14px 0; border-top: 1px solid rgba(128,128,128,.3); }
+summary { cursor: pointer; font-size: 15px; font-weight: 600; }
+.diag { font-size: 12px; white-space: pre-wrap; background: rgba(128,128,128,.12); padding: 8px 10px; border-radius: 8px; user-select: text; max-height: 320px; overflow: auto; }

@@ -188,6 +188,11 @@ export function createApi(baseUrl: string, token: string | null, fetchImpl: type
     async speak(text: string, language: Lang | null = "uz"): Promise<Blob> {
       return (await call("/api/voice/speak", post({ text: text.slice(0, 2000), language }))).blob();
     },
+    /** As `speak`, plus which provider produced the audio (X-EZO-Voice-Provider), for Diagnostics. */
+    async speakWithProvider(text: string, language: Lang | null = "uz"): Promise<{ audio: Blob; provider: string | null }> {
+      const response = await call("/api/voice/speak", post({ text: text.slice(0, 2000), language }));
+      return { audio: await response.blob(), provider: response.headers.get("X-EZO-Voice-Provider") };
+    },
     /** Raw bytes to EZO Student; parsing happens only in the isolated worker. */
     async uploadStudent(name: string, bytes: Uint8Array): Promise<StudentJob> {
       return json<StudentJob>(`/api/student/uploads?filename=${encodeURIComponent(name)}`, {

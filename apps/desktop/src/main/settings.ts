@@ -24,6 +24,10 @@ export interface DesktopSettings {
   onboarded: boolean;
   /** EZO's voice volume 0..1. */
   voiceVolume: number;
+  /** Clap listening consent (separate from the voice microphone); off until switched on. */
+  clapListening: boolean;
+  /** After the spoken acknowledgement, start listening — only when the owner enabled it. */
+  clapStartsListening: boolean;
   shortcut: string;
   conversationId: string | null;
   /** The one folder JARVIS tasks may read the newest documents from (owner-chosen). */
@@ -46,6 +50,8 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   lowPower: false,
   onboarded: false,
   voiceVolume: 1,
+  clapListening: false,
+  clapStartsListening: false,
   shortcut: "Control+Alt+Space",
   conversationId: null,
   jarvisFolder: null,
@@ -94,6 +100,8 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     allowCamera: bool("allowCamera", false),
     lowPower: bool("lowPower", false),
     onboarded: bool("onboarded", false),
+    clapListening: bool("clapListening", false),
+    clapStartsListening: bool("clapStartsListening", false),
     voiceVolume: typeof input.voiceVolume === "number" && Number.isFinite(input.voiceVolume) ? Math.min(1, Math.max(0, input.voiceVolume)) : 1,
     shortcut: typeof input.shortcut === "string" && SHORTCUTS.has(input.shortcut) ? input.shortcut : DEFAULT_SETTINGS.shortcut,
     conversationId:

@@ -155,6 +155,26 @@ class Settings(BaseSettings):
     elevenlabs_tts_languages: Annotated[list[str], NoDecode] = Field(
         default=["en", "ru"], alias="EZO_ELEVENLABS_TTS_LANGUAGES"
     )
+    # Per-language voice and model (each falls back to the single setting above). Uzbek is
+    # only spoken by ElevenLabs once the owner heard it and added "uz" to the languages list.
+    elevenlabs_voice_id_uz: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_VOICE_ID_UZ"
+    )
+    elevenlabs_voice_id_en: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_VOICE_ID_EN"
+    )
+    elevenlabs_voice_id_ru: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_VOICE_ID_RU"
+    )
+    elevenlabs_tts_model_uz: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_TTS_MODEL_UZ"
+    )
+    elevenlabs_tts_model_en: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_TTS_MODEL_EN"
+    )
+    elevenlabs_tts_model_ru: str = Field(
+        default="", pattern=r"^[A-Za-z0-9_-]{0,100}$", alias="EZO_ELEVENLABS_TTS_MODEL_RU"
+    )
     voice_calls_per_day: int = Field(default=100, ge=1, le=10000, alias="EZO_VOICE_CALLS_PER_DAY")
     voice_concurrency: int = Field(default=1, ge=1, le=4, alias="EZO_VOICE_CONCURRENCY")
     voice_max_text_chars: int = Field(default=4000, ge=1, le=4000, alias="EZO_VOICE_MAX_TEXT_CHARS")
