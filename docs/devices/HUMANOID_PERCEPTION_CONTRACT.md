@@ -82,7 +82,7 @@ const reaction = new VoiceReaction(player, event => {
 const perception = new HumanoidPerception({
   video, cameraIndicator, microphoneIndicator, assets: reviewedAssets as VisionAssets,
   mirrored: true, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
-  lowPower: true,
+  lowPower: true, clap: { sensitivity: 1, requireHands: false },
   onMotionIntent: intent => applyMotion(avatar, intent),
   onHandMovement: hands => showEphemeralHandStatus(hands),
   onClapDetected: event => void reaction.react(acknowledgement(event, selectedLanguage as Language)),

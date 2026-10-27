@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AttentionController, applyMotion, ClapDetector, acknowledgement, VoiceReaction, validateAssets, ClapMicrophone, CameraTracker, pose, createVisionEstimator, HandMotionTracker, faceFrame, MEDIAPIPE_ASSET_PINS } from './index';
+import { AttentionController, applyMotion, ClapDetector, acknowledgement, VoiceReaction, validateAssets, ClapMicrophone, CameraTracker, pose, createVisionEstimator, HandMotionTracker, faceFrame, MEDIAPIPE_ASSET_PINS, HumanoidPerception } from './index';
 import type { PerceptionFrame, HandTarget, ClapDetected, VisionAssets } from './index';
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 const hand = (x = 0.5, moving = true): HandTarget => ({ id: 'left', x, y: 0.2, confidence: 0.8, velocityX: moving ? 1 : 0, velocityY: 0, moving });
@@ -81,4 +81,18 @@ describe('actual estimator mapping with SYNTHETIC landmarks', () => {
     it('derives movement from repeated landmarks, expires disappeared hands, rejects stale times', () => { const h = new HandMotionTracker(); expect(h.update([points(0.2)], category, 100)[0]).toMatchObject({ x: -0.6, moving: false }); expect(h.update([points(0.4)], category, 200)[0]).toMatchObject({ moving: true }); expect(h.update([points(0.4)], category, 300)[0]?.moving).toBe(false); expect(h.update([], [], 400)).toEqual([]); expect(h.update([points(0.8)], category, 500)[0]?.moving).toBe(false); expect(h.update([points(0.2)], category, 400)).toEqual([]); });
     it('maps vertical direction, rejects occluded/invalid/low-confidence palms', () => { const h = new HandMotionTracker(); expect(h.update([points(0.5, 0.2)], category, 100)[0]!.y).toBeCloseTo(0.6); expect(h.update([points(NaN)], category, 200)).toEqual([]); expect(h.update([points(0.5)], [[{ categoryName: 'Left', score: 0.2 }]], 300)).toEqual([]); expect(h.update([[]], category, 400)).toEqual([]); });
     it('maps actual nose coordinate shape and matrices, never invents eye gaze', () => { const f = faceFrame([points(0.2, 0.8)], [{ data: identity }], 100); expect(f?.gazeX).toBeCloseTo(-0.6); expect(f?.gazeY).toBeCloseTo(-0.6); expect(faceFrame([], [], 200)).toBeNull(); expect(faceFrame([points(0.2), points(0.2)], [{ data: identity }], 300)).toBeNull(); expect(faceFrame([points(2)], [{ data: identity }], 400)).toBeNull(); });
+});
+
+describe('composite SDK wiring with simulated worker (not model/hardware evidence)',()=>{
+ it('shares one camera owner, delivers motion and releases worker/render/tracks on hide',async()=>{
+  environment();vi.stubGlobal('location',{href:'https://ezo.test/'});vi.stubGlobal('addEventListener',vi.fn());vi.stubGlobal('removeEventListener',vi.fn());
+  const {track,stream}=streamMock();const getUserMedia=vi.fn(async()=>stream);vi.stubGlobal('navigator',{mediaDevices:{getUserMedia}});
+  vi.stubGlobal('createImageBitmap',async()=>({close:vi.fn()}));const terminate=vi.fn();
+  vi.stubGlobal('Worker',class {onmessage:((event:any)=>void)|null=null;onerror=null;terminate=terminate;postMessage(message:any){queueMicrotask(()=>this.onmessage?.({data:message.type==='init'?{type:'ready',id:message.id}:{type:'frame',id:message.id,frame:frame(message.time)}}));}});
+  const cancel=vi.fn();vi.stubGlobal('requestAnimationFrame',vi.fn(()=>123));vi.stubGlobal('cancelAnimationFrame',cancel);
+  const onMotionIntent=vi.fn(),onHandMovement=vi.fn();
+  const sdk=new HumanoidPerception({video:video(),cameraIndicator:{} as HTMLElement,microphoneIndicator:{} as HTMLElement,assets,onMotionIntent,onHandMovement,clap:{sensitivity:1}});
+  expect(getUserMedia).not.toHaveBeenCalled();await sdk.startTracking();await vi.waitFor(()=>expect(onHandMovement).toHaveBeenCalled());expect(getUserMedia).toHaveBeenCalledOnce();expect(getUserMedia.mock.calls[0]).toEqual([{audio:false,video:expect.any(Object)}]);sdk.setVisible(false);expect(track.stop).toHaveBeenCalledOnce();expect(terminate).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledWith(123);expect(sdk.trackingStatus).toBe('off');expect(onMotionIntent.mock.lastCall![0].source).toBe('neutral');sdk.setVisible(true);expect(getUserMedia).toHaveBeenCalledOnce();
+ });
+ it('rejects nonfinite/unbounded attention retention',()=>{expect(()=>new AttentionController({maxAgeMs:Infinity})).toThrow();expect(()=>new AttentionController({maxAgeMs:0})).toThrow();});
 });

@@ -1,6 +1,7 @@
 import { CameraTracker } from './index';
 import { AttentionController } from './attention';
 import { ClapMicrophone } from './microphone';
+import {ClapDetector,type ClapOptions} from './clap';
 import { createVisionEstimator } from './vision';
 import type { VisionAssets } from './vision';
 import type { TrackingStatus } from './index';
@@ -14,6 +15,7 @@ export interface PerceptionOptions {
     mirrored?: boolean;
     reducedMotion?: boolean;
     lowPower?: boolean;
+    clap?:ClapOptions;
     onMotionIntent: (intent: MotionIntent) => void;
     onHandMovement?: (hands: readonly HandTarget[]) => void;
     onClapDetected?: (event: ClapDetected) => void;
@@ -42,7 +44,7 @@ export class HumanoidPerception {
         const error = (sensor: 'camera' | 'microphone', message?: string) => { if (!message)
             return; options.onError?.(sensor, message); if (message.includes('revoked'))
             options.onPermissionRevoked?.(sensor); };
-        this.microphone = new ClapMicrophone({ indicator: options.microphoneIndicator, onClap: event => options.onClapDetected?.(event), onStatus: (s, e) => { options.onStatus?.('microphone', s); error('microphone', e); } });
+        this.microphone = new ClapMicrophone({ indicator: options.microphoneIndicator, detector:new ClapDetector(options.clap), onClap: event => options.onClapDetected?.(event), onStatus: (s, e) => { options.onStatus?.('microphone', s); error('microphone', e); } });
         this.camera = new CameraTracker({ video: options.video, indicator: options.cameraIndicator, lowPower: options.lowPower,
             createEstimator: (signal) => createVisionEstimator(options.assets, frame => this.frame(frame), { signal }), onFrame: () => { },
             onStatus: (s, e) => { this.status = s; options.onStatus?.('camera', s); error('camera', e); if (s === 'error') {
@@ -72,5 +74,5 @@ export class HumanoidPerception {
     /** Hidden/disabled view stops BOTH sensors; showing never silently restarts them. */
     setVisible(visible: boolean) { this.camera.setVisible(visible); if (!visible)
         this.stop(); }
-    stop() { this.stopTracking(); this.stopClapDetection(); }
+    stop() { this.stopTracking(); this.stopClapDetection(); this.microphone.setSuppressed(false); }
 }

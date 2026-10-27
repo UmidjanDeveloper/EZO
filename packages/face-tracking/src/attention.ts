@@ -15,7 +15,7 @@ export class AttentionController {
         mirrored?: boolean;
         reducedMotion?: boolean;
         maxAgeMs?: number;
-    } = {}) { }
+    } = {}) { const maxAge=options.maxAgeMs??500; if(!Number.isFinite(maxAge)||maxAge<50||maxAge>2000)throw new Error('Invalid attention freshness budget'); }
     setInteraction(mode: 'listening' | 'speaking' | null) { this.mode = mode; }
     ingest(frame: PerceptionFrame, now = frame.timestampMs): boolean {
         if (!Number.isFinite(now) || !Number.isFinite(frame.timestampMs) || frame.timestampMs <= this.lastTime || frame.timestampMs > now || now - frame.timestampMs > (this.options.maxAgeMs ?? 500))

@@ -108,6 +108,13 @@ jobs:
         env:
           EZO_BROWSER_REPORT: reports/browser.json
         run: pnpm --filter @ezo/face-tracking test:browser
+      - name: Keep simulated perception evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: perception-browser-simulation
+          path: packages/face-tracking/reports/browser.json
+          if-no-files-found: ignore
       - name: Build the desktop pill and the Android web app so the e2e suite scans them too
         run: pnpm --filter @ezo/desktop build && pnpm --filter @ezo/mobile build
       - run: pnpm test:e2e
