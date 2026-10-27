@@ -77,7 +77,7 @@ Rasmlar (kodning o‘zidan, Chromium SwiftShader): `docs/devices/img/humanoid-st
 | Playwright `camera-attention` (veb) | 3/3 (yangi) |
 | Playwright `mobile-stage` | 2/2 (yangi) |
 | Playwright `accessibility` | 11/11 |
-| Playwright to‘liq to‘plam (lokal) | __E2E_TOTAL__ |
+| Playwright to‘liq to‘plam (lokal, `pnpm test:e2e`) | 89/89 |
 | CI / Devices / Security (`0b3ed4a` yoki yakuniy head) | __CI__ |
 
 ## 7. Jismoniy kompyuter/telefon kerak bo‘lgan narsalar (KUTILMOQDA)
