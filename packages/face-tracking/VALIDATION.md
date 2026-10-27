@@ -1,19 +1,59 @@
-# Validation — 2026-10-24
+# Perception validation — 2026-10-27
 
-Base2d97025ccc1b6428da3a79b4b6eda9de370212ec, branch feat/isolated-face-tracking.
-Local TypeScript `apps/web/node_modules/.bin/tsc -p packages/face-tracking/tsconfig.json`: PASS.
-Local `apps/web/node_modules/.bin/vitest run packages/face-tracking/src/tracking.test.ts packages/avatar/src`:24 passed,0 failed,3 files.
-Tests use synthetic matrices/mocked media streams, never physical-camera evidence.
-The first run exposed signed-zero output; normalization was corrected, then tests
-rerun. Initial package tooling could not write HOME and refused an unrelated module
-purge; used writable XDG cache, lockfile-only generation and existing installed tools.
-Lockfile change is only9-line importer; no dependency upgrades or app installs.
+Base `abb9016859acc002f31029212dc2e4a13946b435`; feature branch
+`feat/humanoid-perception`. Existing merged backend/UI work is preserved.
+No production avatar, web, desktop, mobile or voice-provider files changed.
+One additive MediaPipe runtime dependency0.10.32 (no transitive npm dependency);
+Vite8.3.4 is an already locked dev tool exposed for the existing package's harness.
 
-Hardware validation: **BLOCKED**, no /dev/video devices. Model asset/card/license
-and SHA approval remain outstanding. SDK interface checked against published
-0.10.32 declarations; actual WASM/model inference and CPU/GPU/browser performance
-NOT run. Permissioned localhost test steps and exact remaining checks in README.
-Hosted checks are not claimed run/passed here. No whole-backend/E2E rerun: existing
-implementations unchanged. Renderer integration is a proposed port requiring
-Claude review, not a working renderer setter or shipping avatar camera feature.
-No merge/deploy/purchase/production config changes or video uploads.
+## Local evidence
+
+| Check | Result | Scope/limitation |
+|---|---|---|
+| Frozen pnpm10.28.0 install | PASS | install scripts disabled locally; no lockfile drift |
+| Workspace lint | PASS | includes web ESLint and package/client tsc |
+| Workspace TypeScript | PASS | including e2e, actual-avatar example and browser SDK fixture |
+| Sensing unit tests |46 passed,0 failed | synthetic landmarks/PCM and mocked lifecycle |
+| Avatar unit |15 passed,0 failed | current existing renderer contracts |
+| Shared unit |10 passed,0 failed | existing contracts |
+| Web unit |97 passed,0 failed | existing UI/API inventory |
+| Android unit |19 passed,0 failed | not a physical Android run |
+| Windows unit |69 passed,2 skipped,0 failed | Windows-only live tests skipped on Linux |
+| Chromium browser |6 passed,0 failed | five simulated sensor/runtime checks plus synthetic performance sample |
+| Existing-avatar acceptance bundle | PASS | Vite bundled classic worker, not live model acceptance |
+| npm full audit |0 HIGH,0 CRITICAL,1 MODERATE | existing uuid7.0.3 via Capacitor CLI/xcode; GHSA-w5hq-g745-h8pq |
+| Physical webcam/mic/speakers | BLOCKED | no /dev/video* or /dev/snd |
+| Actual face/hand model inference | BLOCKED | official model fetches policy403; no reviewed weights/hashes |
+| Trilingual provider audio heard | BLOCKED | no configured provider/live paid call/physical playback |
+| Real <16GB hardware performance | BLOCKED | cloud host ~33.3GiB/5CPU, not owner PC |
+
+Workspace total: **256 passed,2 skipped,0 failed** (includes46 sensing tests).
+The exact tests exercise face/head position, hand landmark conversion/motion,
+attention ordering/smoothing/mirroring/reduced motion, low-confidence/stale input,
+malformed matrices, permission denial/revocation/interruption, async cancellation,
+late grants, repeated cleanup, local PCM evidence and safe voice-unavailable behavior.
+
+Browser automation uses Chromium154.0.8037.57 with explicitly fake capture devices.
+Actual pinned CPU WASM loads in a worker and rejects invalid fixture model bytes.
+This does not prove valid-model inference, real clap recognition or physical motion.
+No synthetic event/frame fallback exists in the real-avatar example. No raw images,
+landmarks or audio recordings are in test evidence. Synthetic-only performance
+sample and environment limits are documented in CAMERA_GESTURE_ACCEPTANCE.md.
+
+The full backend/database/native Docker suites and shipping E2E are delegated to
+unchanged hosted CI jobs for this branch; they were not rerun locally for this
+isolated TypeScript change. Hosted status and exact head are recorded separately
+once available. A green hosted run cannot close the model/hardware gates above.
+The earlier2026-10-24 mocked-only package evidence remains in Git history.
+
+## Remaining review gates
+
+1. Approved official weight license/card/security review + actual SHA256 values.
+2. Successful real landmark inference and <16GB PC benchmark.
+3. Claude shipping bundler/CSP/permission and avatar/voice integration review.
+4. Real clap/noise/speech corpus and trilingual natural provider playback acceptance.
+5. Existing platform/backend security risks remain subject to their master report;
+   this PR does not claim to close native libxml2/K4/general product release gates.
+
+No merge, deployment, paid activation, real provider API call, production credential
+creation or settings/protection change occurred.
