@@ -114,7 +114,10 @@ never face/head data. Callback samples contain no identity or durable tracking k
 ## Lifecycle and bounded work
 
 CameraTracker now accepts sync **or async** estimators. Its factory receives an
-AbortSignal; old zero-argument factories remain valid. Stop aborts pending worker
+AbortSignal; old zero-argument factories remain valid. Optional Estimator.hasTarget reports
+hand-only target availability without fabricating a legacy TrackingFrame; status
+tracking includes accepted hands while onFrame stays face|null. Expired async face
+frames (>500ms) are rejected. Stop aborts pending worker
 initialization/inference, terminates it, releases media tracks, detaches video,
 removes track/visibility/pagehide/permission listeners and cancels timers. Late
 permission grants are stopped; returning to foreground requires another action.

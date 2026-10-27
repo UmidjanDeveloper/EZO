@@ -8,7 +8,7 @@ Claude Max. Existing API methods are used through a structural adapter.
 ## What ran locally
 
 - TypeScript checking, including the **actual** avatar example and browser fixture.
-- 48 sensing unit tests: synthetic matrices/landmarks and deterministic lifecycle
+- 49 sensing unit tests: synthetic matrices/landmarks and deterministic lifecycle
   mocks. Includes real estimator result-shape conversion (nose/palm/velocity),
   invalid/extreme matrices, face/hand loss/reacquisition, stationary/moving hand,
   mirrored signed coordinates, stale/low-confidence frames, explicit-mode priority,
@@ -24,7 +24,7 @@ Claude Max. Existing API methods are used through a structural adapter.
 Environment: Linux cloud, Node24.19.0,5 logical CPUs, MemTotal34,906,016KiB
 (~33.3GiB), managed Chromium154. This is **not** the owner's <16GB PC, Android,
 Windows Electron or a4/8GB VM. A synthetic browser sample of10,000 attention updates
-measured9.5ms and100 seconds of zero PCM measured38.1ms CPU elapsed at one checkpoint;
+measured12.2ms and100 seconds of zero PCM measured41.4ms CPU elapsed at one checkpoint;
 these are single-run bookkeeping costs, **not camera FPS/CPU/GPU/RAM/latency figures**.
 Raw repeated measurements vary. No meaningful real-inference memory/GPU/battery or
 clap-to-voice latency measurement is available; none is inferred from those numbers.

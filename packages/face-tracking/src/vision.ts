@@ -41,6 +41,7 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
     } | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let sequence = 0;
+    let handTargetAt=-Infinity;
     const clear = () => { if (timer !== undefined)
         clearTimeout(timer); timer = undefined; };
     const close = () => { if (closed)
@@ -99,12 +100,13 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
                 const frame = await request({ type: 'frame', bitmap, time }, [bitmap]);
                 if (closed)
                     return null;
+                handTargetAt=frame.hands.some(h=>h.confidence>=0.6)?frame.timestampMs:-Infinity;
                 onFrame(frame);
                 return frame.face;
             }
             finally {
                 bitmap.close();
             }
-        }, close,
+        }, hasTarget:()=>!closed&&performance.now()-handTargetAt<=500, close,
     };
 }

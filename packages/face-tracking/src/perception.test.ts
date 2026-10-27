@@ -96,3 +96,11 @@ describe('composite SDK wiring with simulated worker (not model/hardware evidenc
  });
  it('rejects nonfinite/unbounded attention retention',()=>{expect(()=>new AttentionController({maxAgeMs:Infinity})).toThrow();expect(()=>new AttentionController({maxAgeMs:0})).toThrow();});
 });
+
+it('hand-only tracking status does not invent a legacy face frame; expired async faces are rejected',async()=>{
+ environment();const {stream}=streamMock();vi.stubGlobal('navigator',{mediaDevices:{getUserMedia:async()=>stream}});
+ const onFrame=vi.fn(),onStatus=vi.fn();
+ const tracker=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:()=>null,hasTarget:()=>true,close:vi.fn()})});
+ await tracker.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('tracking'));expect(onFrame.mock.lastCall![0]).toBeNull();tracker.stop();
+ const stale=new CameraTracker({video:video(),indicator:{} as HTMLElement,onFrame,onStatus,createEstimator:async()=>({estimate:(_video,time)=>pose(identity,time-501),close:vi.fn()})});await stale.start();await vi.waitFor(()=>expect(onStatus.mock.lastCall![0]).toBe('lost'));expect(onFrame.mock.lastCall![0]).toBeNull();stale.stop();
+});

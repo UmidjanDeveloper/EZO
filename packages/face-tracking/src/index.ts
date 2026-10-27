@@ -2,7 +2,7 @@ import {watchRevocation} from './permissions';
 /** All angles/targets are normalized [-1,1], NOT measured gaze or degrees. */
 export interface TrackingFrame { yaw:number; pitch:number; roll:number; gazeX:number; gazeY:number; confidence:number; timestamp:number }
 export type TrackingStatus = 'off'|'requesting'|'tracking'|'lost'|'error';
-export interface Estimator { estimate(video:HTMLVideoElement,time:number):TrackingFrame|null|Promise<TrackingFrame|null>; close():void }
+export interface Estimator { estimate(video:HTMLVideoElement,time:number):TrackingFrame|null|Promise<TrackingFrame|null>; hasTarget?():boolean; close():void }
 import { clamp, pose } from './pose';
 export { clamp, pose } from './pose';
 export class Smoother {
@@ -82,8 +82,8 @@ export class CameraTracker {
         this.lastVideoTime=video.currentTime;
         const f=await this.estimator!.estimate(video,start);
         if(token!==this.generation)return;
-        const valid=f && Object.values(f).every(Number.isFinite) && f.confidence>=0.5;
-        this.state(valid?'tracking':'lost');
+        const valid=f && Object.values(f).every(Number.isFinite) && f.confidence>=0.5 && f.timestamp<=performance.now() && performance.now()-f.timestamp<=500;
+        this.state(valid||this.estimator?.hasTarget?.()?'tracking':'lost');
         this.options.onFrame(valid?this.smooth.update(f):null);
         if(!valid)this.smooth.reset();
       } // Repeated video timestamps do not invent frames; attention ages on its own clock.
