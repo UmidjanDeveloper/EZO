@@ -29,7 +29,12 @@ export function validateAssets(assets: VisionAssets, origin: string) {
 export async function createVisionEstimator(assets: VisionAssets, onFrame: (frame: PerceptionFrame) => void, options: {
     signal?: AbortSignal;
     workerFactory?: () => Worker;
+    /** Model loading compiles WASM and builds two graphs: slow phones and CI emulators need well over 15 s. */
+    initTimeoutMs?: number;
+    frameTimeoutMs?: number;
 } = {}): Promise<Estimator> {
+    const initTimeoutMs = options.initTimeoutMs ?? 60000;
+    const frameTimeoutMs = options.frameTimeoutMs ?? 15000;
     validateAssets(assets, location.href);
     if (options.signal?.aborted)
         throw new Error('Vision initialization cancelled');
@@ -64,13 +69,13 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
         else
             p.resolve(e.data.frame);
     };
-    const request = (message: object, transfer: Transferable[] = []) => new Promise<PerceptionFrame>((resolve, reject) => {
+    const request = (message: object, timeoutMs: number, transfer: Transferable[] = []) => new Promise<PerceptionFrame>((resolve, reject) => {
         if (closed || pending) {
             reject(new Error('Vision unavailable or busy'));
             return;
         }
         pending = { resolve, reject };
-        timer = setTimeout(() => { pending?.reject(new Error('Vision deadline exceeded')); pending = null; close(); }, 15000);
+        timer = setTimeout(() => { pending?.reject(new Error('Vision deadline exceeded')); pending = null; close(); }, timeoutMs);
         try {
             worker.postMessage({ ...message, id: ++sequence }, transfer);
         }
@@ -81,7 +86,7 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
         }
     });
     try {
-        await request({ type: 'init', assets, origin: location.href, });
+        await request({ type: 'init', assets, origin: location.href, }, initTimeoutMs);
     }
     catch (e) {
         close();
@@ -97,7 +102,7 @@ export async function createVisionEstimator(assets: VisionAssets, onFrame: (fram
                 throw new Error('Vision worker closed');
             }
             try {
-                const frame = await request({ type: 'frame', bitmap, time }, [bitmap]);
+                const frame = await request({ type: 'frame', bitmap, time }, frameTimeoutMs, [bitmap]);
                 if (closed)
                     return null;
                 handTargetAt=frame.hands.some(h=>h.confidence>=0.6)?frame.timestampMs:-Infinity;
