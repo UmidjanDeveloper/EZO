@@ -2,7 +2,8 @@ import "./styles.css";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
-import { createLevelMeter, createVoiceFrame, EzoAvatar, type AvatarState, type LevelMeter, type VoiceFrame } from "@ezo/avatar";
+import { AttentionDriver, createLevelMeter, createVoiceFrame, EzoAvatar, type AvatarState, type LevelMeter, type MotionIntent, type VisionStatus, type VoiceFrame } from "@ezo/avatar";
+import { sensingProvider, type SensingSession } from "./sensing";
 import { ApiError, createApi, type Api, type IeltsAdvance, type JarvisTask, type Lang, type Message, type ServerStatus } from "./api";
 import { base64Bytes, documentPrompt, isStudentDocument, jobMessage, MAX_STUDENT_BYTES } from "./documents";
 import { Recorder } from "./recorder";
@@ -255,14 +256,96 @@ function renderLanguage(): void {
   }
 }
 
+// Where EZO looks on the stage: the camera engine after an explicit press, else the finger.
+let attention: AttentionDriver | null = null;
+let vision: VisionStatus = { camera: "off", faces: 0, hands: 0, since: 0 };
+let camera: SensingSession | null = null;
+let cameraGeneration = 0;
+
+function renderAttention(intent: MotionIntent): void {
+  const line = $("attention");
+  if (intent.kind !== "look") line.textContent = "";
+  else if (intent.source === "hand") line.textContent = t.voice.attentionHand;
+  else if (intent.source === "head") line.textContent = t.voice.attentionHead;
+  else line.textContent = t.voice.attentionTouch;
+  if (vision.simulated && intent.kind === "look" && (intent.source === "hand" || intent.source === "head")) line.textContent += ` — ${t.voice.attentionSimulated}`;
+}
+
+function renderCamera(): void {
+  const stateBox = $("cameraState");
+  const button = $<HTMLButtonElement>("cameraToggle");
+  const provider = sensingProvider();
+  stateBox.dataset.camera = vision.camera;
+  const words: Record<VisionStatus["camera"], string> = {
+    off: t.voice.cameraOff,
+    requesting: t.voice.cameraRequesting,
+    denied: t.voice.cameraDenied,
+    unavailable: t.voice.cameraUnavailable,
+    tracking: t.voice.cameraTracking,
+    lost: t.voice.cameraLost,
+    error: vision.message ?? t.voice.cameraDenied,
+  };
+  stateBox.textContent = words[vision.camera] + (vision.simulated ? ` (${t.voice.attentionSimulated})` : "");
+  button.disabled = !provider;
+  button.textContent = camera ? t.voice.cameraStop : t.voice.cameraOn;
+  $("cameraPrivacy").textContent = provider ? t.voice.cameraPrivacy : t.voice.cameraUnavailable;
+}
+
+function setVision(next: VisionStatus): void {
+  vision = next;
+  attention?.setVision(next);
+  renderCamera();
+}
+
+async function startCamera(): Promise<void> {
+  const provider = sensingProvider();
+  if (!provider || camera || !attention) return;
+  const generation = ++cameraGeneration;
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  setVision({ camera: "requesting", faces: 0, hands: 0, since: performance.now(), simulated: provider.simulated });
+  try {
+    const session = await provider.start({
+      video,
+      onStatus: (status) => {
+        if (generation === cameraGeneration) setVision({ ...status, simulated: provider.simulated || status.simulated });
+      },
+      onHead: (frameIn) => attention?.headFrame(frameIn),
+      onHand: (hand) => attention?.handFrame(hand),
+    });
+    if (generation !== cameraGeneration || document.hidden) {
+      session.stop();
+      return;
+    }
+    camera = session;
+  } catch (error) {
+    if (generation !== cameraGeneration) return;
+    setVision({ camera: "error", faces: 0, hands: 0, since: performance.now(), message: (error as Error).message, simulated: provider.simulated });
+  }
+  renderCamera();
+}
+
+function stopCamera(): void {
+  cameraGeneration += 1;
+  camera?.stop();
+  camera = null;
+  attention?.headFrame(null);
+  attention?.handFrame(null);
+  setVision({ camera: "off", faces: 0, hands: 0, since: performance.now() });
+}
+
 function openStage(): void {
   $("voiceStage").hidden = false;
   if (!avatar) {
-    avatar = new EzoAvatar($<HTMLCanvasElement>("avatar"), { framing: "bust", describe: (s) => t.voice.words[s] });
+    avatar = new EzoAvatar($<HTMLCanvasElement>("avatar"), { framing: "bust", power: prefs.lowPower === "on" ? "low" : "auto", describe: (s) => t.voice.words[s] });
     frame = createVoiceFrame($("avatarBox"), { words: t.voice.words });
     frame.follow(avatar);
+    attention = new AttentionDriver(avatar, { onIntent: renderAttention });
+    attention.setVision(vision);
   }
   renderLanguage();
+  renderCamera();
   if (!server.online) stageState("offline", t.voice.offline);
   else stageState("idle", t.voice.tapToTalk);
 }
@@ -272,11 +355,15 @@ function closeStage(): void {
   turn?.abort(); // an in-flight transcription, answer or voice stops with the stage
   player?.pause();
   followLevel(null);
+  stopCamera(); // the camera never outlives the stage
+  attention?.stop();
+  attention = null;
   frame?.destroy();
   frame = null;
   avatar?.destroy(); // frees the GPU while the stage is closed
   avatar = null;
   voiceBusy = false;
+  $("attention").textContent = "";
   $("voiceStage").hidden = true;
 }
 
@@ -804,7 +891,8 @@ async function scheduleReminder(): Promise<void> {
 async function saveSettings(): Promise<void> {
   const url = normalizeApiUrl($<HTMLInputElement>("apiUrl").value);
   if (!url) return setStatus(t.more.urlInvalid, "error");
-  prefs = { ...prefs, apiUrl: url, speakReplies: $<HTMLInputElement>("speakReplies").checked };
+  prefs = { ...prefs, apiUrl: url, speakReplies: $<HTMLInputElement>("speakReplies").checked, lowPower: $<HTMLInputElement>("lowPower").checked ? "on" : "auto" };
+  avatar?.setLowPower(prefs.lowPower === "on" || EzoAvatar.prefersLowPower());
   savePrefs(prefs);
   const token = $<HTMLInputElement>("token").value.trim();
   if (token) await writeToken(token);
@@ -849,8 +937,12 @@ function wire(): void {
   $("stageClose").addEventListener("click", closeStage);
   $("avatarBox").addEventListener("pointermove", (event) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    avatar?.setGaze({ yaw: ((event.clientX - rect.left) / rect.width) * 2 - 1, pitch: (1 - ((event.clientY - rect.top) / rect.height) * 2) * 0.6 });
+    const gaze = { yaw: ((event.clientX - rect.left) / rect.width) * 2 - 1, pitch: (1 - ((event.clientY - rect.top) / rect.height) * 2) * 0.6 };
+    if (attention) attention.pointerGaze(gaze, event.pointerType === "mouse" ? "pointer" : "touch");
+    else avatar?.setGaze(gaze);
   });
+  $("avatarBox").addEventListener("pointerleave", () => attention?.pointerGaze(null));
+  $("cameraToggle").addEventListener("click", () => (camera ? stopCamera() : void startCamera()));
   for (const button of document.querySelectorAll<HTMLButtonElement>(".langs button")) {
     button.addEventListener("click", () => {
       prefs = { ...prefs, voiceLanguage: (button.dataset.lang ?? "auto") as Prefs["voiceLanguage"] };
@@ -934,6 +1026,9 @@ function wire(): void {
   });
   $("showWelcome").addEventListener("click", showWelcome);
   document.addEventListener("visibilitychange", () => {
+    // In the background nothing senses: the camera stops and the figure stops drawing.
+    attention?.setVisible(!document.hidden);
+    if (document.hidden) stopCamera();
     // Coming back to the app shows what was said on the desktop in the meantime.
     if (!document.hidden && !$("chatTab").hidden) void refreshConversations();
   });
@@ -944,6 +1039,7 @@ async function start(): Promise<void> {
   applyStrings();
   $<HTMLInputElement>("apiUrl").value = prefs.apiUrl;
   $<HTMLInputElement>("speakReplies").checked = prefs.speakReplies;
+  $<HTMLInputElement>("lowPower").checked = prefs.lowPower === "on";
   if (!prefs.onboarded) return showWelcome();
   if (await connect()) {
     showTab("chat");

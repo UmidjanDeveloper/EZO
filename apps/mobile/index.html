@@ -119,6 +119,7 @@
           <select id="language"></select>
         </label>
         <label class="check"><input id="speakReplies" type="checkbox" /> <span data-i18n="more.speakReplies"></span></label>
+        <label class="check"><input id="lowPower" type="checkbox" /> <span data-i18n="more.lowPower"></span></label>
         <div class="row">
           <button id="saveSettings" data-i18n="more.saveConnect"></button>
           <button id="clearToken" class="ghost" data-i18n="more.clearToken"></button>
@@ -140,6 +141,12 @@
         <button type="button" id="stageClose" class="round" aria-label="">✕</button>
       </div>
       <div class="stage-text">
+        <p id="attention" class="attention" aria-live="polite"></p>
+        <div class="camera-row">
+          <span id="cameraState" class="camera-state" role="status" data-camera="off"></span>
+          <button type="button" id="cameraToggle" class="link"></button>
+        </div>
+        <p id="cameraPrivacy" class="privacy"></p>
         <p id="stageStatus" class="stage-status" aria-live="polite"></p>
         <p id="stageHeard" class="stage-heard"></p>
         <p id="stageReply" class="stage-reply"></p>

@@ -17,9 +17,11 @@ export interface Prefs {
   language: "uz" | "en" | "ru";
   /** The welcome page was seen once. */
   onboarded: boolean;
+  /** Economy drawing (30 fps); "auto" follows the device's memory/data-saver signals. */
+  lowPower: "auto" | "on";
 }
 
-const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false };
+const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false, lowPower: "auto" };
 
 export function loadPrefs(): Prefs {
   try {
