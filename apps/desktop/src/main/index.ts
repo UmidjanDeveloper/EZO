@@ -42,6 +42,10 @@ const SHOW_HIDE_SHORTCUT = "Control+Alt+H";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 let pill: BrowserWindow | null = null;
+/** Small pill (one row) or the expanded stage with the full humanoid. */
+let expanded = false;
+const PILL_SIZE = { width: 360, height: 72 } as const;
+const STAGE_SIZE = { width: 420, height: 640 } as const;
 let settingsWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let settings: DesktopSettings = sanitizeSettings({});
@@ -113,7 +117,7 @@ interface PillStatus {
 }
 let lastStatus: PillStatus = { online: false, ai: false, voice: false, text: "" };
 
-function tell(channel: "notice" | "error" | "stage" | "status" | "tasks" | "init", payload: unknown): void {
+function tell(channel: "notice" | "error" | "stage" | "status" | "tasks" | "init" | "visibility", payload: unknown): void {
   pill?.webContents.send(channel, payload);
 }
 
@@ -134,8 +138,27 @@ async function refreshStatus(): Promise<PillStatus> {
   return next;
 }
 
-function pillInit(): { strings: ReturnType<typeof strings>["pill"]; shortcut: string; language: Lang; status: PillStatus } {
-  return { strings: t().pill, shortcut: settings.shortcut.replace("Control", "Ctrl"), language: settings.language, status: lastStatus };
+interface PillInit {
+  strings: ReturnType<typeof strings>["pill"];
+  shortcut: string;
+  language: Lang;
+  status: PillStatus;
+  /** What the owner allowed in settings; the renderer never asks the OS for more. */
+  media: { microphone: boolean; camera: boolean };
+  lowPower: boolean;
+  voiceVolume: number;
+}
+
+function pillInit(): PillInit {
+  return {
+    strings: t().pill,
+    shortcut: settings.shortcut.replace("Control", "Ctrl"),
+    language: settings.language,
+    status: lastStatus,
+    media: { microphone: settings.allowMicrophone, camera: settings.allowCamera },
+    lowPower: settings.lowPower,
+    voiceVolume: settings.voiceVolume,
+  };
 }
 
 // --- JARVIS companion ----------------------------------------------------------------------
@@ -394,12 +417,25 @@ function createPill(): void {
   secureWindow(pill);
   void pill.loadFile(path.join(__dirname, "pill.html"));
   pill.once("ready-to-show", () => pill?.showInactive());
+  // Hidden means hidden: the renderer stops the microphone, the camera and the drawing loop.
+  pill.on("hide", () => tell("visibility", false));
+  pill.on("show", () => tell("visibility", true));
 }
 
 function togglePill(): void {
   if (!pill) return;
   if (pill.isVisible()) pill.hide();
   else pill.showInactive();
+}
+
+/** Grows the window into the stage (the full humanoid) or back to the one-row pill. */
+function setExpanded(next: boolean): void {
+  if (!pill) return;
+  expanded = next;
+  const size = next ? STAGE_SIZE : PILL_SIZE;
+  pill.setSize(size.width, size.height);
+  pill.webContents.send("expanded", next);
+  createTrayMenu();
 }
 
 function openSettings(): void {
@@ -467,7 +503,11 @@ function registerIpc(): void {
   ipcMain.on("pill:height", (_event, height: unknown) => {
     if (!pill || typeof height !== "number") return;
     const [width] = pill.getSize();
-    pill.setSize(width ?? 360, Math.max(72, Math.min(520, Math.round(height))));
+    const min = expanded ? STAGE_SIZE.height : PILL_SIZE.height;
+    pill.setSize(width ?? PILL_SIZE.width, Math.max(min, Math.min(expanded ? 900 : 520, Math.round(height))));
+  });
+  ipcMain.on("pill:expand", (_event, next: unknown) => {
+    if (typeof next === "boolean") setExpanded(next);
   });
   ipcMain.on("settings:open", openSettings);
   ipcMain.handle("status:refresh", () => refreshStatus());
@@ -622,14 +662,17 @@ function registerIpc(): void {
   });
 }
 
-function allowOnlyMicrophone(): void {
+/** Only the pill may use media, and only what the owner allowed in settings: the microphone
+ * (on by default, can be switched off) and the camera (off until switched on). */
+function allowOnlyAllowedMedia(): void {
+  const allowedType = (type: string) => (type === "audio" ? settings.allowMicrophone : type === "video" ? settings.allowCamera : false);
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const fromPill = pill !== null && contents.id === pill.webContents.id;
-    const audioOnly = permission === "media" && (details as { mediaTypes?: string[] }).mediaTypes?.every((t) => t === "audio");
-    callback(Boolean(fromPill && audioOnly));
+    const types = (details as { mediaTypes?: string[] }).mediaTypes ?? [];
+    callback(Boolean(fromPill && permission === "media" && types.length > 0 && types.every(allowedType)));
   });
   session.defaultSession.setPermissionCheckHandler((contents, permission) =>
-    Boolean(pill && contents?.id === pill.webContents.id && permission === "media"),
+    Boolean(pill && contents?.id === pill.webContents.id && permission === "media" && (settings.allowMicrophone || settings.allowCamera)),
   );
 }
 
@@ -637,6 +680,7 @@ function createTrayMenu(): void {
   tray?.setContextMenu(
     Menu.buildFromTemplate([
       { label: `${t().tray.showHide}  (Ctrl+Alt+H)`, click: togglePill },
+      { label: expanded ? t().tray.collapse : t().tray.expand, click: () => setExpanded(!expanded) },
       { label: t().tray.settings, click: openSettings },
       { type: "separator" },
       { label: t().tray.quit, click: () => app.quit() },
@@ -666,7 +710,7 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
       return;
     }
     const firstRun = !loadSettings();
-    allowOnlyMicrophone();
+    allowOnlyAllowedMedia();
     registerIpc();
     createPill();
     createTray();
@@ -675,8 +719,9 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
     setInterval(() => void refreshStatus(), STATUS_POLL_MS);
     void refreshStatus();
     // A new install, or a remote server without a token: the owner must see where to connect.
-    if (firstRun || (!readToken() && settings.apiUrl.startsWith("https:"))) openSettings();
+    if (firstRun || !settings.onboarded || (!readToken() && settings.apiUrl.startsWith("https:"))) openSettings();
   });
+  app.on("before-quit", () => tell("visibility", false)); // release the microphone/camera first
   app.on("will-quit", () => globalShortcut.unregisterAll());
   app.on("window-all-closed", () => {
     // Stay in the tray; quitting is explicit.

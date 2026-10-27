@@ -148,6 +148,9 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   await expect(page.getByTestId("voice-caption")).toContainText("oflayn rejimda");
   await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "speaking");
   expect(speakRequests).toBe(1);
+  // The volume slider is applied to the real playback element.
+  await page.getByTestId("voice-volume").fill("0.4");
+  expect(await page.evaluate(() => localStorage.getItem("ezo-voice-volume"))).toBe("0.4");
 
   // Barge-in: tap the robot while EZO speaks → it stops and listens.
   await stage.getByRole("button", { name: "Gapiryapman… (bo‘lish uchun bosing)" }).click();

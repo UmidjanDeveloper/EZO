@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("ezo", {
   openSettings: () => ipcRenderer.send("settings:open"),
   setFocusable: (focusable: boolean) => ipcRenderer.send("pill:focusable", focusable),
   setHeight: (height: number) => ipcRenderer.send("pill:height", height),
+  setExpanded: (expanded: boolean) => ipcRenderer.send("pill:expand", expanded),
   refreshStatus: () => ipcRenderer.invoke("status:refresh"),
   recentHistory: () => ipcRenderer.invoke("history:recent"),
   conversations: () => ipcRenderer.invoke("history:conversations"),
@@ -26,4 +27,6 @@ contextBridge.exposeInMainWorld("ezo", {
   onStatus: on("status"),
   onTasks: on("tasks"),
   onInit: on("init"),
+  onVisibility: on("visibility"),
+  onExpanded: on("expanded"),
 });

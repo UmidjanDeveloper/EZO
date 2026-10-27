@@ -33,6 +33,29 @@ in Next.js, Electron and the Android WebView.
   - ridge lines of mountains.
 - A filled silhouette writes depth only, so the mountains do not shine through the body.
 
+**Face** (`face.ts`, `figure.ts` addFeatures; Section B, 2026-10-27)
+- Explicit features drawn in front of the contour surface: two almond eyes (outline, iris
+  ring and fill, pupil) whose irises follow the gaze — the eyes lead the head and go a
+  little further; upper lids that blink every 2–6 s (more often when attentive), fully
+  close in 0.07 s and reopen in 0.13 s, and droop half shut when offline; brows that rise
+  with attention and lower (inner ends most) in thought and work; lips whose lower line
+  and the jaw of the contour rings below open with the **measured** voice level (the
+  microphone level never opens EZO's mouth; only its own speech does), with the corners
+  lifting on success and dropping on error.
+- A soft key light from the upper left shades the head and neck by their normals.
+- Without a live level (the browser's own voice), the speech rhythm is animation only and
+  is drawn fainter; nothing presents it as a measurement.
+- `face.ts` is pure (blink curve, eye target, brow/mouth/smile/droop amounts) and tested
+  without a GPU; the 2D still fallback draws the features too.
+
+| Nine states, bust framing | Nine states, head framing (pill) |
+|---|---|
+| ![states](img/humanoid-states-bust.jpg) | ![head](img/humanoid-states-head.jpg) |
+
+Row by row: idle, listening, recognizing / thinking, working, speaking / success, error,
+offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with a gaze of
+(0.6, 0.2) in the head sheet so the eyes and head turn.
+
 **Motion** (`shaders.ts`)
 - All animation runs on the GPU.
 - The face lines ripple with the voice level, and the halo drifts. While EZO listens the
@@ -55,6 +78,31 @@ in Next.js, Electron and the Android WebView.
   pointer over the figure on the web voice stage, or a `packages/face-tracking` frame
   through `setHeadAim()`. A gaze older than 1.5 s drifts back to the idle sway, so a
   stale camera frame never looks like attention.
+
+**Sensing contract and attention** (`sensing.ts`)
+- The camera/gesture engine (owned separately: `packages/face-tracking` today, hand, gesture
+  and clap recognition as they land) and EZO's surfaces meet on structural types:
+  `TrackingFrame` (identical in shape to the face-tracking package's), `HeadPose`,
+  `HandTarget`, `MotionIntent`, `ClapEvent`, `VisionStatus`, `VoiceIntent`.
+- `AttentionDriver` turns frames into one gaze: a raised hand before the tracked face
+  before the pointer/touch fallback (labelled as such) before rest. Frames count only while
+  the camera reports `tracking` and the view is visible; a frame older than 400 ms,
+  below 0.5 confidence or non-finite releases the gaze; a 0.03 deadband stops jitter;
+  `stop()` lets go of everything. Hidden views never track.
+- Each app has a provider slot (`apps/{desktop,web,mobile}/src/.../sensing.ts`). **No engine
+  is bundled in this build**, so every camera control is disabled and says so. Test
+  fixtures are explicitly simulated (`sensing.fixtures.ts`, `simulated: true`) and the UI
+  prints "SIMULATED — not a real camera" whenever such a frame drives the gaze.
+- Economy: `power: "low"` caps drawing at 30 fps (auto on devices reporting ≤4 GB,
+  data-saver or ≤2 cores; a setting on Windows and Android); `setActive(false)` stops the
+  loop in hidden hosts.
+
+| Windows stage (expanded pill) | Android voice stage | Android welcome |
+|---|---|---|
+| ![windows](img/windows-stage.jpg) | ![android](img/android-stage.jpg) | ![welcome](img/android-welcome.jpg) |
+
+Real renders of the built renderers (Electron pill HTML in Chromium with a fake bridge;
+the APK's web layer in a Pixel-7-sized Chromium). Not photos of a PC or a phone.
 
 **Voice frame** (`frame.ts`)
 - A thin ring, an equaliser and a state word around the figure, framework-free SVG. The
@@ -159,6 +207,8 @@ It records frame times but does not assert them.
 - The full API suite passes.
 
 **Not verified**
+- Any camera behaviour: no engine is bundled, no camera exists here. The attention driver
+  and every camera control are proven with simulated frames only.
 - Real speech recognition and voices for all three languages on real hardware. This needs
   the owner's provider keys and a microphone.
 - How natural the provider voices sound in Uzbek, which depends on the provider (OpenAI,

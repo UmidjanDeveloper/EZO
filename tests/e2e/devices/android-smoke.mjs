@@ -38,6 +38,9 @@ try {
   if (!device) throw new Error("no Android device");
   step("device", `${device.model()} ${device.serial()}`);
   await device.shell("am force-stop uz.ezo.mobile");
+  // The microphone is granted up front so the voice stage can be opened without a system
+  // dialog; the camera is deliberately NOT granted (no sensing engine in this build).
+  await device.shell("pm grant uz.ezo.mobile android.permission.RECORD_AUDIO").catch(() => {});
   await device.shell("am start -W -n uz.ezo.mobile/.MainActivity");
   const webview = await device.webView({ pkg: "uz.ezo.mobile" }, { timeout: 120_000 });
   const page = await webview.page();
@@ -115,6 +118,30 @@ try {
   await page.waitForFunction(() => document.querySelector('nav button[data-go="chat"]')?.textContent === "Chat", undefined, { timeout: 10_000 });
   step("language switched to English", (await page.getAttribute("#dot", "aria-label")) ?? "");
   await device.screenshot({ path: path.join(shotsDir, "4-english.png") });
+
+  // 8. The voice stage on the real device: the humanoid draws (WebGL in the WebView), the
+  // camera control is disabled and says why, the microphone state is whatever the device
+  // reports (no pretending).
+  await page.click('nav button[data-go="chat"]');
+  await page.click("#mic");
+  await page.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
+  await page.waitForFunction(() => document.getElementById("avatar")?.dataset.ezoAvatar !== undefined, undefined, { timeout: 30_000 });
+  const stage = await page.evaluate(() => ({
+    renderer: document.getElementById("avatar")?.dataset.ezoAvatar,
+    points: document.getElementById("avatar")?.dataset.points,
+    power: document.getElementById("avatar")?.dataset.power,
+    state: document.getElementById("avatar")?.dataset.state,
+    status: document.getElementById("stageStatus")?.textContent,
+    cameraDisabled: document.getElementById("cameraToggle")?.disabled,
+    cameraText: document.getElementById("cameraPrivacy")?.textContent?.slice(0, 80),
+  }));
+  step("voice stage on the device", JSON.stringify(stage));
+  if (stage.renderer !== "webgl" && stage.renderer !== "2d") throw new Error(`avatar renderer ${stage.renderer}`);
+  if (stage.cameraDisabled !== true) throw new Error("camera control must be disabled without a sensing engine");
+  await device.screenshot({ path: path.join(shotsDir, "5-voice-stage.png") });
+  await page.click("#stageClose");
+  await page.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
+  step("voice stage closed; figure and any media released");
   report.ok = true;
 } catch (error) {
   report.error = String(error?.stack ?? error);

@@ -15,6 +15,15 @@ export interface DesktopSettings {
   allowScreen: boolean;
   allowVolume: boolean;
   speakReplies: boolean;
+  /** The microphone can be switched off entirely; the camera is off until the owner turns it on. */
+  allowMicrophone: boolean;
+  allowCamera: boolean;
+  /** Economy drawing (30 fps) for laptops on battery or little RAM. */
+  lowPower: boolean;
+  /** The first-run welcome was read. */
+  onboarded: boolean;
+  /** EZO's voice volume 0..1. */
+  voiceVolume: number;
   shortcut: string;
   conversationId: string | null;
   /** The one folder JARVIS tasks may read the newest documents from (owner-chosen). */
@@ -32,6 +41,11 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   allowScreen: false,
   allowVolume: false,
   speakReplies: true,
+  allowMicrophone: true,
+  allowCamera: false,
+  lowPower: false,
+  onboarded: false,
+  voiceVolume: 1,
   shortcut: "Control+Alt+Space",
   conversationId: null,
   jarvisFolder: null,
@@ -76,6 +90,11 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     allowScreen: bool("allowScreen", false),
     allowVolume: bool("allowVolume", false),
     speakReplies: bool("speakReplies", true),
+    allowMicrophone: bool("allowMicrophone", true),
+    allowCamera: bool("allowCamera", false),
+    lowPower: bool("lowPower", false),
+    onboarded: bool("onboarded", false),
+    voiceVolume: typeof input.voiceVolume === "number" && Number.isFinite(input.voiceVolume) ? Math.min(1, Math.max(0, input.voiceVolume)) : 1,
     shortcut: typeof input.shortcut === "string" && SHORTCUTS.has(input.shortcut) ? input.shortcut : DEFAULT_SETTINGS.shortcut,
     conversationId:
       typeof input.conversationId === "string" && /^[0-9a-f-]{36}$/.test(input.conversationId)

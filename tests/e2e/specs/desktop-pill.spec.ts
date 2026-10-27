@@ -22,21 +22,60 @@ const STRINGS = {
     taskRunning: "JARVIS vazifasi: {step}", taskWaiting: "JARVIS: sizning tasdig‘ingizni kutyapti", cancelTask: "Vazifani bekor qilish",
     talk: "Gapirishni boshlash yoki to‘xtatish", type: "Yozib so‘rash", stop: "To‘xtatish", settings: "Sozlamalar", typePlaceholder: "Masalan: Kalkulyatorni och",
     acted: "Bajarildi", showHideHint: "Ko‘rsatish/yashirish: Ctrl+Alt+H",
+    expand: "Kattalashtirish", collapse: "Kichraytirish", micActive: "Mikrofon faol", micOff: "Mikrofon sozlamalarda o‘chirilgan", cameraActive: "Kamera faol",
+    cameraOff: "Kamera o‘chiq", cameraOn: "Kamerani yoqish", cameraStop: "Kamerani to‘xtatish", cameraSettings: "Kamera sozlamalarda o‘chirilgan — avval u yerda yoqing.",
+    cameraUnavailable: "Kamera kuzatuvi bu versiyada yo‘q: sensing dvigateli (yuz/qo‘l) hali ulanmagan.", cameraDenied: "Kameraga ruxsat berilmadi.", cameraRequesting: "Kamera so‘ralmoqda…",
+    cameraTracking: "Kamera: yuz ko‘rinmoqda", cameraLost: "Kamera: yuz topilmadi", cameraPrivacy: "Tasvir kompyuteringizdan chiqmaydi, yozib olinmaydi, yuz tanilmaydi.",
+    attentionPointer: "EZO sichqonchaga qaraydi (kamera emas)", attentionHand: "EZO qo‘lingizga qaraydi", attentionHead: "EZO sizga qaraydi", attentionSimulated: "SIMULYATSIYA — haqiqiy kamera emas",
+    lowPower: "Tejamkor rejim: 30 kadr/s", clap: "Qarsak eshitildi",
   },
   en: { idle: "EZO", idleHint: "{shortcut} — speak", thinking: "Thinking…", thinkingHint: "Request sent", offline: "EZO offline", offlineHint: "Cannot reach the server", stopped: "Stopped", you: "You", talk: "Start or stop talking", type: "Ask by typing", stop: "Stop", settings: "Settings", typePlaceholder: "For example: open the calculator", history: "Conversation history", newConversation: "New conversation", noHistory: "No messages yet.", showHideHint: "Show/hide: Ctrl+Alt+H" },
 };
 
-async function openPill(page: Page, options: { language?: "uz" | "en"; online?: boolean; ai?: boolean; replyDelayMs?: number } = {}) {
+interface PillOptions {
+  language?: "uz" | "en";
+  online?: boolean;
+  ai?: boolean;
+  replyDelayMs?: number;
+  media?: { microphone: boolean; camera: boolean };
+  /** Installs a SIMULATED sensing provider (window.ezoSensingProvider): invented frames, no camera. */
+  simulatedSensing?: boolean;
+}
+
+async function openPill(page: Page, options: PillOptions = {}) {
   await page.addInitScript(
-    ({ strings, language, online, ai, replyDelayMs }) => {
+    ({ strings, language, online, ai, replyDelayMs, media, simulatedSensing }) => {
       const listeners: Record<string, ((payload: unknown) => void)[]> = {};
       const on = (channel: string) => (callback: (payload: unknown) => void) => (listeners[channel] ??= []).push(callback);
       const w = window as unknown as Record<string, unknown>;
       w.__calls = [] as string[];
       w.__emit = (channel: string, payload: unknown) => (listeners[channel] ?? []).forEach((cb) => cb(payload));
       let cancelled = false;
+      if (simulatedSensing) {
+        // Test-only provider: reports tracking and feeds a slowly turning, invented face.
+        w.ezoSensingProvider = {
+          simulated: true,
+          start: async (o: { onStatus: (s: unknown) => void; onHead: (f: unknown) => void; onHand?: (h: unknown) => void }) => {
+            (w.__calls as string[]).push("camera:start");
+            let phase = 0;
+            o.onStatus({ camera: "tracking", faces: 1, hands: 0, since: performance.now(), simulated: true });
+            const timer = setInterval(() => {
+              phase += 0.1;
+              const yaw = 0.5 * Math.sin(phase);
+              o.onHead({ yaw, pitch: 0.1, roll: 0, gazeX: yaw, gazeY: 0.1, confidence: 1, timestamp: performance.now() });
+            }, 50);
+            w.__simulatedHand = (x: number, y: number) => o.onHand?.({ x, y, hand: "right", raised: true, confidence: 0.9, timestamp: performance.now() });
+            return {
+              stop: () => {
+                clearInterval(timer);
+                (w.__calls as string[]).push("camera:stop");
+              },
+            };
+          },
+        };
+      }
       w.ezo = {
-        init: async () => ({ strings, shortcut: "Ctrl+Alt+Space", language, status: { online, ai, voice: ai, text: online ? (ai ? "ready" : "no ai") : "offline" } }),
+        init: async () => ({ strings, shortcut: "Ctrl+Alt+Space", language, status: { online, ai, voice: ai, text: online ? (ai ? "ready" : "no ai") : "offline" }, media, lowPower: false }),
         sendText: async (text: string) => {
           (w.__calls as string[]).push(`text:${text}`);
           cancelled = false;
@@ -52,6 +91,10 @@ async function openPill(page: Page, options: { language?: "uz" | "en"; online?: 
         openSettings: () => (w.__calls as string[]).push("settings"),
         setFocusable: () => undefined,
         setHeight: (h: number) => (w.__calls as string[]).push(`height:${h}`),
+        setExpanded: (next: boolean) => {
+          (w.__calls as string[]).push(`expanded:${next}`);
+          (listeners.expanded ?? []).forEach((cb) => cb(next));
+        },
         refreshStatus: async () => ({ online, ai, voice: ai, text: "" }),
         recentHistory: async () => ({ ok: true, conversationId: "c1", messages: [{ role: "user", content: "Salom" }, { role: "assistant", content: "Salom! Qanday yordam beray?" }] }),
         conversations: async () => ({ ok: true, conversations: [{ id: "c1", title: "Salom" }, { id: "c2", title: "Hisobot" }] }),
@@ -71,9 +114,19 @@ async function openPill(page: Page, options: { language?: "uz" | "en"; online?: 
         onStatus: on("status"),
         onTasks: on("tasks"),
         onInit: on("init"),
+        onVisibility: on("visibility"),
+        onExpanded: on("expanded"),
       };
     },
-    { strings: STRINGS[options.language ?? "uz"], language: options.language ?? "uz", online: options.online ?? true, ai: options.ai ?? true, replyDelayMs: options.replyDelayMs ?? 50 },
+    {
+      strings: STRINGS[options.language ?? "uz"],
+      language: options.language ?? "uz",
+      online: options.online ?? true,
+      ai: options.ai ?? true,
+      replyDelayMs: options.replyDelayMs ?? 50,
+      media: options.media ?? { microphone: true, camera: false },
+      simulatedSensing: options.simulatedSensing ?? false,
+    },
   );
   await page.goto(`file://${PILL}`);
   await expect(page.locator("#pill")).toHaveClass(/idle|offline/);
@@ -172,4 +225,82 @@ test("desktop pill: JARVIS progress is shown honestly and can be cancelled; noti
   await expect(page.locator("#pill")).not.toHaveClass(/error/);
   await emit(page, "error", "Telegram javob bermadi.");
   await expect(page.locator("#pill")).toHaveClass(/error/);
+});
+
+test("desktop stage: expands to the full humanoid and collapses back, ten times, without leaking", async ({ page }) => {
+  await openPill(page);
+  await expect(page.locator("#face")).toHaveAttribute("data-ezo-avatar", "webgl");
+  const heap = () => page.evaluate(() => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0);
+  const before = await heap();
+  for (let i = 0; i < 10; i++) {
+    await page.locator("#expand").click();
+    await expect(page.locator("#stage")).toBeVisible();
+    await expect(page.locator("#stageFace")).toHaveAttribute("data-ezo-avatar", "webgl");
+    await expect(page.locator("#stageFace")).toHaveAttribute("data-state", "idle");
+    await expect(page.locator("#stageFrame svg")).toHaveCount(1);
+    await page.locator("#expand").click();
+    await expect(page.locator("#stage")).toBeHidden();
+  }
+  expect((await calls(page)).filter((c) => c === "expanded:true")).toHaveLength(10);
+  // One voice frame at most, never ten stacked, and no runaway heap.
+  await page.locator("#expand").click();
+  await expect(page.locator("#stageFrame svg")).toHaveCount(1);
+  const after = await heap();
+  expect(after - before).toBeLessThan(40 * 1024 * 1024);
+  // The pointer is a labelled fallback for the camera.
+  await page.locator("#stageFace").hover({ position: { x: 20, y: 20 } });
+  await expect(page.locator("#attention")).toHaveText("EZO sichqonchaga qaraydi (kamera emas)");
+});
+
+test("desktop stage: without a sensing engine the camera button is disabled and says why", async ({ page }) => {
+  await openPill(page, { media: { microphone: true, camera: true } });
+  await page.locator("#expand").click();
+  await expect(page.locator("#cameraToggle")).toBeDisabled();
+  await expect(page.locator("#cameraPrivacy")).toContainText("sensing dvigateli");
+  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "off");
+  await expect(page.locator("#media")).toBeEmpty(); // no camera, no microphone: no indicator
+});
+
+test("desktop stage: a (simulated) sensing engine drives EZO's gaze, is labelled, and stops when hidden or revoked", async ({ page }) => {
+  await openPill(page, { media: { microphone: true, camera: false }, simulatedSensing: true });
+  await page.locator("#expand").click();
+  // Allowed only once the owner switched the camera on in settings.
+  await expect(page.locator("#cameraToggle")).toBeDisabled();
+  await expect(page.locator("#cameraPrivacy")).toContainText("sozlamalarda o‘chirilgan");
+  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: true }, lowPower: true });
+  await expect(page.locator("#cameraToggle")).toBeEnabled();
+  await expect(page.locator("#stageFace")).toHaveAttribute("data-power", "low");
+  await page.locator("#cameraToggle").click();
+  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
+  await expect(page.locator("#cameraState")).toContainText("SIMULYATSIYA");
+  await expect(page.locator("#attention")).toHaveText("EZO sizga qaraydi — SIMULYATSIYA — haqiqiy kamera emas");
+  await expect(page.locator("#media span.cam")).toHaveText("CAM");
+  await page.evaluate(() => (window as unknown as { __simulatedHand: (x: number, y: number) => void }).__simulatedHand(-0.7, 0.3));
+  await expect(page.locator("#attention")).toContainText("EZO qo‘lingizga qaraydi");
+  // Hidden (Ctrl+Alt+H): the engine is stopped at once and the indicator goes.
+  await emit(page, "visibility", false);
+  expect(await calls(page)).toContain("camera:stop");
+  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "off");
+  await expect(page.locator("#media")).toBeEmpty();
+  await emit(page, "visibility", true);
+  await page.locator("#cameraToggle").click();
+  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
+  // Revoked in settings: stopped without a click.
+  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: false }, lowPower: false });
+  expect((await calls(page)).filter((c) => c === "camera:stop")).toHaveLength(2);
+  await expect(page.locator("#cameraToggle")).toBeDisabled();
+  // Collapsing the stage also stops the camera.
+  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: true }, lowPower: false });
+  await page.locator("#cameraToggle").click();
+  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
+  await page.locator("#expand").click();
+  expect((await calls(page)).filter((c) => c === "camera:stop")).toHaveLength(3);
+});
+
+test("desktop pill: with the microphone switched off in settings, talking is refused honestly", async ({ page }) => {
+  await openPill(page, { media: { microphone: false, camera: false } });
+  await page.locator("#orb").click();
+  await expect(page.locator("#pill")).toHaveClass(/error/);
+  await expect(page.locator("#hint")).toHaveText("Mikrofon sozlamalarda o‘chirilgan");
+  await expect(page.locator("#media")).toBeEmpty();
 });
