@@ -16,6 +16,8 @@ interface DesktopSettings {
   lowPower: boolean;
   onboarded: boolean;
   voiceVolume: number;
+  clapListening: boolean;
+  clapStartsListening: boolean;
   shortcut: string;
   conversationId: string | null;
   jarvisFolder: string | null;
@@ -45,11 +47,12 @@ interface SettingsBridge {
   jarvisPair(): Promise<{ ok: boolean; code?: string; message: string }>;
   jarvisUnpair(): Promise<DesktopSettings>;
   jarvisStatus(): Promise<{ paired: boolean; status: string; message?: string }>;
+  diagnostics(): Promise<Record<string, unknown>>;
 }
 
 const bridge = (window as unknown as { ezoSettings: SettingsBridge }).ezoSettings;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "allowCamera", "lowPower"] as const;
+const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "allowCamera", "lowPower", "clapListening", "clapStartsListening"] as const;
 let t: SettingsStrings = {};
 let secure = true;
 let pairingPoll: number | undefined;
@@ -153,6 +156,24 @@ async function init(): Promise<void> {
     box.checked = settings[flag];
     box.addEventListener("change", () => void bridge.save({ [flag]: box.checked }));
   }
+  // Diagnostics: the pill's numbers, as plain text the owner can paste back (no images, audio or landmarks).
+  const renderDiagnostics = async () => {
+    const report = await bridge.diagnostics();
+    byId("diagnosticsText").textContent = diagnosticsReport(report);
+  };
+  byId("diagnosticsRefresh").addEventListener("click", () => void renderDiagnostics());
+  byId("diagnostics").addEventListener("toggle", () => {
+    if ((byId("diagnostics") as HTMLDetailsElement).open) void renderDiagnostics();
+  });
+  byId("diagnosticsCopy").addEventListener("click", async () => {
+    await renderDiagnostics();
+    try {
+      await navigator.clipboard.writeText(byId("diagnosticsText").textContent ?? "");
+      byId("diagnosticsState").textContent = fmt("diagnosticsCopied");
+    } catch {
+      byId("diagnosticsState").textContent = "—";
+    }
+  });
   const volume = byId<HTMLInputElement>("voiceVolume");
   volume.value = String(settings.voiceVolume);
   volume.addEventListener("change", () => void bridge.save({ voiceVolume: Number(volume.value) }));
@@ -217,3 +238,15 @@ async function init(): Promise<void> {
 }
 
 void init();
+
+/** Plain-text report: one key per line, nested objects flattened; nothing but numbers and words. */
+function diagnosticsReport(report: Record<string, unknown>): string {
+  const lines: string[] = ["EZO Windows diagnostics"];
+  const walk = (prefix: string, value: unknown) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      for (const [key, inner] of Object.entries(value as Record<string, unknown>)) walk(prefix ? `${prefix}.${key}` : key, inner);
+    } else lines.push(`${prefix}: ${Array.isArray(value) ? value.join(",") : String(value ?? "—")}`);
+  };
+  walk("", report);
+  return lines.join("\n");
+}

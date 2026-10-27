@@ -26,7 +26,7 @@ test("every page runs under a nonce content security policy without violations",
   const headers = response?.headers() ?? {};
   const csp = headers["content-security-policy"] ?? "";
   expect(csp).toMatch(/script-src 'self' 'nonce-[^']+' 'strict-dynamic'/);
-  expect(csp).toContain("connect-src 'self' http://localhost:8100");
+  expect(csp).toContain("connect-src 'self' blob: http://localhost:8100");
   expect(csp).toContain("frame-ancestors 'none'");
   expect(headers["x-frame-options"]).toBe("DENY");
   // The inline theme script and /ezo-config only run because they carry the nonce.

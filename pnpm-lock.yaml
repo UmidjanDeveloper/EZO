@@ -13,6 +13,12 @@ importers:
       '@ezo/avatar':
         specifier: workspace:*
         version: link:../../packages/avatar
+      '@ezo/face-tracking':
+        specifier: workspace:*
+        version: link:../../packages/face-tracking
+      '@ezo/perception-client':
+        specifier: workspace:*
+        version: link:../../packages/perception-client
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -61,6 +67,12 @@ importers:
       '@ezo/avatar':
         specifier: workspace:*
         version: link:../../packages/avatar
+      '@ezo/face-tracking':
+        specifier: workspace:*
+        version: link:../../packages/face-tracking
+      '@ezo/perception-client':
+        specifier: workspace:*
+        version: link:../../packages/perception-client
     devDependencies:
       '@capacitor/cli':
         specifier: 8.5.3
@@ -80,6 +92,12 @@ importers:
       '@ezo/avatar':
         specifier: workspace:*
         version: link:../../packages/avatar
+      '@ezo/face-tracking':
+        specifier: workspace:*
+        version: link:../../packages/face-tracking
+      '@ezo/perception-client':
+        specifier: workspace:*
+        version: link:../../packages/perception-client
       '@ezo/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -160,6 +178,28 @@ importers:
       vite:
         specifier: 8.3.4
         version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/perception-client:
+    dependencies:
+      '@ezo/avatar':
+        specifier: workspace:*
+        version: link:../avatar
+      '@ezo/face-tracking':
+        specifier: workspace:*
+        version: link:../face-tracking
+    devDependencies:
+      '@types/node':
+        specifier: 22.20.5
+        version: 22.20.5
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@types/node@22.20.5)(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0))

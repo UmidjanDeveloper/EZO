@@ -144,7 +144,7 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       return { conversationId: body.conversation_id, text: body.message.content, language: asLang(body.language) };
     },
 
-    async speak(text: string, language: Lang = "uz"): Promise<{ mimeType: string; data: Uint8Array }> {
+    async speak(text: string, language: Lang = "uz"): Promise<{ mimeType: string; data: Uint8Array; provider: string | null }> {
       const response = await request("/api/voice/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -153,6 +153,7 @@ export function createEzoClient(baseUrl: string, token: string | null, fetchImpl
       return {
         mimeType: response.headers.get("content-type") ?? "audio/mpeg",
         data: new Uint8Array(await response.arrayBuffer()),
+        provider: response.headers.get("x-ezo-voice-provider"),
       };
     },
 

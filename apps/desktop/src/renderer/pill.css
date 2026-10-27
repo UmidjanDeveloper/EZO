@@ -76,3 +76,7 @@ button { -webkit-app-region: no-drag; cursor: pointer; }
 .camera-state[data-camera="denied"]::before, .camera-state[data-camera="error"]::before { background: #f87171; }
 .privacy { margin: 6px 0 0; font-size: 11px; opacity: .6; line-height: 1.35; }
 .link:disabled { opacity: .5; cursor: default; text-decoration: none; }
+.hidden-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.indicator { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+.clap-heard { font-size: 12px; color: #ffd36b; }
+.camera-row { flex-wrap: wrap; }

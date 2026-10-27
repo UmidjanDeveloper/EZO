@@ -28,6 +28,11 @@ const STRINGS = {
     cameraTracking: "Kamera: yuz ko‘rinmoqda", cameraLost: "Kamera: yuz topilmadi", cameraPrivacy: "Tasvir kompyuteringizdan chiqmaydi, yozib olinmaydi, yuz tanilmaydi.",
     attentionPointer: "EZO sichqonchaga qaraydi (kamera emas)", attentionHand: "EZO qo‘lingizga qaraydi", attentionHead: "EZO sizga qaraydi", attentionSimulated: "SIMULYATSIYA — haqiqiy kamera emas",
     lowPower: "Tejamkor rejim: 30 kadr/s", clap: "Qarsak eshitildi",
+    cameraAssetsMissing: "Kamera modeli bu buildga qo‘shilmagan (vision assets yo‘q).", cameraAssetsInvalid: "Kamera modeli tekshiruvdan o‘tmadi: {detail}",
+    cameraEngine: "Yuz/qo‘l kuzatuvi: MediaPipe, shu kompyuterda; kadrlar hech qayerga yuborilmaydi.", cameraError: "Kamera xatosi: {detail}",
+    clapListen: "Qarsakni tinglash", clapStop: "Tinglashni to‘xtatish", clapOff: "Qarsak mikrofoni o‘chiq", clapRequesting: "Mikrofon so‘ralmoqda…", clapActive: "Mikrofon (qarsak) faol",
+    clapDenied: "Mikrofonga ruxsat berilmadi — «Qarsakni tinglash»ni qayta bosing.", clapError: "Mikrofon xatosi: {detail}", clapPrivacy: "Faqat qarsak kabi qisqa tovushlar aniqlanadi.",
+    clapSettings: "Qarsakni tinglash sozlamalarda o‘chiq — avval u yerda yoqing.", clapUnavailable: "Ovoz provayderi yo‘q — javob aytilmadi.",
   },
   en: { idle: "EZO", idleHint: "{shortcut} — speak", thinking: "Thinking…", thinkingHint: "Request sent", offline: "EZO offline", offlineHint: "Cannot reach the server", stopped: "Stopped", you: "You", talk: "Start or stop talking", type: "Ask by typing", stop: "Stop", settings: "Settings", typePlaceholder: "For example: open the calculator", history: "Conversation history", newConversation: "New conversation", noHistory: "No messages yet.", showHideHint: "Show/hide: Ctrl+Alt+H" },
 };
@@ -38,42 +43,17 @@ interface PillOptions {
   ai?: boolean;
   replyDelayMs?: number;
   media?: { microphone: boolean; camera: boolean };
-  /** Installs a SIMULATED sensing provider (window.ezoSensingProvider): invented frames, no camera. */
-  simulatedSensing?: boolean;
 }
 
 async function openPill(page: Page, options: PillOptions = {}) {
   await page.addInitScript(
-    ({ strings, language, online, ai, replyDelayMs, media, simulatedSensing }) => {
+    ({ strings, language, online, ai, replyDelayMs, media }) => {
       const listeners: Record<string, ((payload: unknown) => void)[]> = {};
       const on = (channel: string) => (callback: (payload: unknown) => void) => (listeners[channel] ??= []).push(callback);
       const w = window as unknown as Record<string, unknown>;
       w.__calls = [] as string[];
       w.__emit = (channel: string, payload: unknown) => (listeners[channel] ?? []).forEach((cb) => cb(payload));
       let cancelled = false;
-      if (simulatedSensing) {
-        // Test-only provider: reports tracking and feeds a slowly turning, invented face.
-        w.ezoSensingProvider = {
-          simulated: true,
-          start: async (o: { onStatus: (s: unknown) => void; onHead: (f: unknown) => void; onHand?: (h: unknown) => void }) => {
-            (w.__calls as string[]).push("camera:start");
-            let phase = 0;
-            o.onStatus({ camera: "tracking", faces: 1, hands: 0, since: performance.now(), simulated: true });
-            const timer = setInterval(() => {
-              phase += 0.1;
-              const yaw = 0.5 * Math.sin(phase);
-              o.onHead({ yaw, pitch: 0.1, roll: 0, gazeX: yaw, gazeY: 0.1, confidence: 1, timestamp: performance.now() });
-            }, 50);
-            w.__simulatedHand = (x: number, y: number) => o.onHand?.({ x, y, hand: "right", raised: true, confidence: 0.9, timestamp: performance.now() });
-            return {
-              stop: () => {
-                clearInterval(timer);
-                (w.__calls as string[]).push("camera:stop");
-              },
-            };
-          },
-        };
-      }
       w.ezo = {
         init: async () => ({ strings, shortcut: "Ctrl+Alt+Space", language, status: { online, ai, voice: ai, text: online ? (ai ? "ready" : "no ai") : "offline" }, media, lowPower: false }),
         sendText: async (text: string) => {
@@ -125,7 +105,6 @@ async function openPill(page: Page, options: PillOptions = {}) {
       ai: options.ai ?? true,
       replyDelayMs: options.replyDelayMs ?? 50,
       media: options.media ?? { microphone: true, camera: false },
-      simulatedSensing: options.simulatedSensing ?? false,
     },
   );
   await page.goto(`file://${PILL}`);
@@ -252,49 +231,16 @@ test("desktop stage: expands to the full humanoid and collapses back, ten times,
   await expect(page.locator("#attention")).toHaveText("EZO sichqonchaga qaraydi (kamera emas)");
 });
 
-test("desktop stage: without a sensing engine the camera button is disabled and says why", async ({ page }) => {
+test("desktop stage: served from file:// (no app origin) the camera and clap controls stay disabled and say why", async ({ page }) => {
+  // The real app serves itself from https://ezo.desktop; here vision-assets.json cannot be
+  // fetched, so the honest state is "disabled with a reason", never a pretended camera.
   await openPill(page, { media: { microphone: true, camera: true } });
   await page.locator("#expand").click();
   await expect(page.locator("#cameraToggle")).toBeDisabled();
-  await expect(page.locator("#cameraPrivacy")).toContainText("sensing dvigateli");
+  await expect(page.locator("#cameraPrivacy")).toContainText("Kamera xatosi");
   await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "off");
+  await expect(page.locator("#clapToggle")).toBeDisabled();
   await expect(page.locator("#media")).toBeEmpty(); // no camera, no microphone: no indicator
-});
-
-test("desktop stage: a (simulated) sensing engine drives EZO's gaze, is labelled, and stops when hidden or revoked", async ({ page }) => {
-  await openPill(page, { media: { microphone: true, camera: false }, simulatedSensing: true });
-  await page.locator("#expand").click();
-  // Allowed only once the owner switched the camera on in settings.
-  await expect(page.locator("#cameraToggle")).toBeDisabled();
-  await expect(page.locator("#cameraPrivacy")).toContainText("sozlamalarda o‘chirilgan");
-  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: true }, lowPower: true });
-  await expect(page.locator("#cameraToggle")).toBeEnabled();
-  await expect(page.locator("#stageFace")).toHaveAttribute("data-power", "low");
-  await page.locator("#cameraToggle").click();
-  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
-  await expect(page.locator("#cameraState")).toContainText("SIMULYATSIYA");
-  await expect(page.locator("#attention")).toHaveText("EZO sizga qaraydi — SIMULYATSIYA — haqiqiy kamera emas");
-  await expect(page.locator("#media span.cam")).toHaveText("CAM");
-  await page.evaluate(() => (window as unknown as { __simulatedHand: (x: number, y: number) => void }).__simulatedHand(-0.7, 0.3));
-  await expect(page.locator("#attention")).toContainText("EZO qo‘lingizga qaraydi");
-  // Hidden (Ctrl+Alt+H): the engine is stopped at once and the indicator goes.
-  await emit(page, "visibility", false);
-  expect(await calls(page)).toContain("camera:stop");
-  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "off");
-  await expect(page.locator("#media")).toBeEmpty();
-  await emit(page, "visibility", true);
-  await page.locator("#cameraToggle").click();
-  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
-  // Revoked in settings: stopped without a click.
-  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: false }, lowPower: false });
-  expect((await calls(page)).filter((c) => c === "camera:stop")).toHaveLength(2);
-  await expect(page.locator("#cameraToggle")).toBeDisabled();
-  // Collapsing the stage also stops the camera.
-  await emit(page, "init", { strings: STRINGS.uz, shortcut: "Ctrl+Alt+Space", language: "uz", status: { online: true, ai: true, voice: true, text: "ready" }, media: { microphone: true, camera: true }, lowPower: false });
-  await page.locator("#cameraToggle").click();
-  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "tracking");
-  await page.locator("#expand").click();
-  expect((await calls(page)).filter((c) => c === "camera:stop")).toHaveLength(3);
 });
 
 test("desktop pill: with the microphone switched off in settings, talking is refused honestly", async ({ page }) => {

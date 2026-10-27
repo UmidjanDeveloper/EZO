@@ -79,20 +79,53 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   through `setHeadAim()`. A gaze older than 1.5 s drifts back to the idle sway, so a
   stale camera frame never looks like attention.
 
-**Sensing contract and attention** (`sensing.ts`)
-- The camera/gesture engine (owned separately: `packages/face-tracking` today, hand, gesture
-  and clap recognition as they land) and EZO's surfaces meet on structural types:
-  `TrackingFrame` (identical in shape to the face-tracking package's), `HeadPose`,
-  `HandTarget`, `MotionIntent`, `ClapEvent`, `VisionStatus`, `VoiceIntent`.
-- `AttentionDriver` turns frames into one gaze: a raised hand before the tracked face
-  before the pointer/touch fallback (labelled as such) before rest. Frames count only while
-  the camera reports `tracking` and the view is visible; a frame older than 400 ms,
-  below 0.5 confidence or non-finite releases the gaze; a 0.03 deadband stops jitter;
-  `stop()` lets go of everything. Hidden views never track.
-- Each app has a provider slot (`apps/{desktop,web,mobile}/src/.../sensing.ts`). **No engine
-  is bundled in this build**, so every camera control is disabled and says so. Test
-  fixtures are explicitly simulated (`sensing.fixtures.ts`, `simulated: true`) and the UI
-  prints "SIMULATED — not a real camera" whenever such a frame drives the gaze.
+**One attention engine (Section C decision, 2026-10-27)**
+- The perception engine's `AttentionController` (`packages/face-tracking/src/attention.ts`,
+  owned by Codex) is the only attention state machine: it arbitrates explicit
+  listening/speaking mode → a moving hand after a 60 ms dwell → the face position plus head
+  rotation → neutral, with 140 ms smoothing and 500 ms frame expiry. The avatar package's
+  former `AttentionDriver` (its own hand/head/stale/deadband rules) was deleted.
+- `packages/avatar/src/sensing.ts` keeps `MotionAdapter` only: it applies the engine's
+  `MotionIntent` to `EzoAvatar.setGaze`, adds the labelled pointer/touch fallback when the
+  engine says `neutral`, and releases the gaze when hidden or stopped. The types are
+  structural mirrors of the engine's, so neither package depends on the other.
+- Each app composes the engine's own parts through `@ezo/perception-client`
+  (`PerceptionSession`): `CameraTracker` → worker estimator (the app's bundled
+  `vision.worker.js`) → `AttentionController` → `MotionAdapter`; `ClapMicrophone` →
+  `ClapDetector`. The engine's `HumanoidPerception` is not used only because it constructs
+  its worker with `new URL("./vision.worker.ts", import.meta.url)`, which esbuild (Windows)
+  cannot bundle — see the request to Codex in the PR.
+- Assets: `scripts/vision-assets.mjs` copies the pinned MediaPipe 0.10.32 WASM from
+  node_modules and downloads the two official landmark models at build time into
+  `.cache/`, verifying SHA256 and size against `scripts/vision/pins.json`; each app serves
+  them from its own origin (`/vision/`), the worker re-verifies every byte before use, and
+  nothing is fetched at runtime. Licence note: `scripts/vision/MODEL_LICENSE_REVIEW.txt`.
+
+**Sensing contract, security and limits** (`sensing.ts`, `@ezo/perception-client`)
+- The engine and EZO's surfaces meet on structural types only: `MotionIntent`,
+  `AttentionState`, `VisionStatus`, `AttentionView`. The adapter lives with the figure in
+  every stage (with or without the engine), so the pointer/touch fallback is always labelled
+  "(not the camera)"; the engine session is added once the bundled assets verified.
+- CSP for the engine: `script-src … 'wasm-unsafe-eval' blob:` (the worker compiles the
+  bundled WASM and `importScripts` the verified loader from a blob it made itself),
+  `worker-src 'self' blob:` (the worker and the clap AudioWorklet), and `connect-src … blob:`
+  (the WASM runtime reads the verified binary blob; without it the worker dies with
+  "Failed to execute 'send' on 'XMLHttpRequest'"). Web: `apps/web/lib/security-headers.ts`;
+  Windows: `pill.html` meta + the `vision.worker.js` response header in `main/index.ts`.
+  No remote host appears in any directive.
+- Engine limits known from CI: `createVisionEstimator` gives the worker 60 s for its
+  initialisation and 15 s for each frame (`initTimeoutMs`/`frameTimeoutMs`, bounded 1–120 s)
+  because the CI emulator needs 17–23 s to start; the controller ignores frames
+  older than 500 ms, so on a machine where face+hand inference takes longer than that the
+  figure stays neutral while Diagnostics still shows the FPS and inference time. The bundled
+  WASM is the `nosimd` build (the only one pinned by the engine; SIMD pin is a request to Codex).
+  The Android emulator in CI hit the 15 s default at 55c489e and 7776d42 (engine up after 23 s)
+  and passed at ce27a47 (≈17 s, 1.2 s per inference) — hence the 60 s initialisation budget.
+- The real engine is bundled in every app since Section C; the camera control is enabled
+  once `vision-assets.json` validates and disabled with the exact reason otherwise. CI runs
+  the engine with Chromium's fake camera and a fake microphone file of clap-like bursts
+  (`tests/e2e/specs/perception.spec.ts`, project `perception`): a SIMULATION that proves
+  wiring, honesty and cleanup, never that a real face, hand or clap is recognised.
 - Economy: `power: "low"` caps drawing at 30 fps (auto on devices reporting ≤4 GB,
   data-saver or ≤2 cores; a setting on Windows and Android); `setActive(false)` stops the
   loop in hidden hosts.
@@ -100,6 +133,15 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
 | Windows stage (expanded pill) | Android voice stage | Android welcome |
 |---|---|---|
 | ![windows](img/windows-stage.jpg) | ![android](img/android-stage.jpg) | ![welcome](img/android-welcome.jpg) |
+
+**Section C, the real engine on Chromium's fake camera (SIMULATION, `tests/e2e/specs/perception.spec.ts`)**
+— the synthetic picture has no face, so the honest state is "camera active — lost"; the
+Windows pill is mid-acknowledgement after a clap from the fake microphone file. None of this
+is a real camera, microphone or phone.
+
+| Web voice stage | Windows pill stage (speaking after a clap) | Android web app stage |
+|---|---|---|
+| ![web simulation](img/section-c-simulation-web-stage.jpg) | ![windows simulation](img/section-c-simulation-windows-pill-stage.jpg) | ![android simulation](img/section-c-simulation-android-stage.jpg) |
 
 Real renders of the built renderers (Electron pill HTML in Chromium with a fake bridge;
 the APK's web layer in a Pixel-7-sized Chromium). Not photos of a PC or a phone.

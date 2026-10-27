@@ -1,7 +1,9 @@
 """Bounded ElevenLabs REST adapter; server-only credentials, no SDK dependency.
 
 STT and TTS are separate capabilities. TTS needs an explicitly selected voice.
-A language is advertised only after the operator verifies their model supports it.
+A language is advertised only after the operator verifies their model supports it; the
+voice and the model may differ per language (EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU,
+EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU), each falling back to the single setting.
 """
 
 from __future__ import annotations
@@ -37,13 +39,18 @@ class ElevenLabsProvider(SpeechToTextProvider, TextToSpeechProvider):
         max_audio: int,
         max_text: int,
         transport: httpx.AsyncBaseTransport | None = None,
+        voice_ids: dict[str, str] | None = None,
+        tts_models: dict[str, str] | None = None,
     ) -> None:
-        for identifier in (stt_model, tts_model):
-            if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", identifier):
+        for identifier in (stt_model, tts_model, *(tts_models or {}).values()):
+            if identifier and not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", identifier):
                 raise ValueError("Invalid ElevenLabs model identifier")
-        if voice_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", voice_id):
-            raise ValueError("Invalid ElevenLabs voice identifier")
+        for identifier in (voice_id, *(voice_ids or {}).values()):
+            if identifier and not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", identifier):
+                raise ValueError("Invalid ElevenLabs voice identifier")
         self._key, self.voice_id = api_key, voice_id
+        self.voice_ids = {k: v for k, v in (voice_ids or {}).items() if v}
+        self.tts_models = {k: v for k, v in (tts_models or {}).items() if v}
         self.stt_model, self.tts_model, self.languages = stt_model, tts_model, languages
         self.timeout, self.max_audio, self.max_text = timeout, max_audio, max_text
         self.transport = transport
@@ -110,18 +117,32 @@ class ElevenLabsProvider(SpeechToTextProvider, TextToSpeechProvider):
         except (ValueError, AttributeError):
             raise VoiceError("failed", "ElevenLabs returned an invalid transcript.") from None
 
+    def voice_for(self, language: str | None) -> str:
+        """The voice for a language, else the default voice ('' when none is configured)."""
+        return (self.voice_ids.get(language) if language else None) or self.voice_id
+
+    def model_for(self, language: str | None) -> str:
+        return (self.tts_models.get(language) if language else None) or self.tts_model
+
+    def supports_language(self, language: str | None) -> bool:
+        """True when this language was verified by the operator AND has a voice."""
+        if not self.voice_for(language):
+            return False
+        return language is None or language in self.languages
+
     async def synthesize(self, text: str, language: str | None) -> SpeechAudio:
-        if not self.voice_id:
+        voice = self.voice_for(language)
+        if not voice:
             raise VoiceError("unavailable", "ElevenLabs TTS needs a configured voice.")
         if language and language not in self.languages:
             raise VoiceError("unavailable", "This ElevenLabs model language has not been verified.")
         if not text.strip() or len(text) > self.max_text:
             raise VoiceError("bad_audio", "Speech text exceeds the configured limit.")
         data, mime = await self._request(
-            "/v1/text-to-speech/" + self.voice_id,
+            "/v1/text-to-speech/" + voice,
             self.max_audio,
             params={"output_format": "mp3_44100_128"},
-            json={"text": text, "model_id": self.tts_model},
+            json={"text": text, "model_id": self.model_for(language)},
         )
         if mime != "audio/mpeg" or not data:
             raise VoiceError("failed", "ElevenLabs returned invalid audio.")

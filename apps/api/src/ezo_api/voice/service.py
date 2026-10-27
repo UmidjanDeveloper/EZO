@@ -101,7 +101,26 @@ class VoiceService:
             raise AllVoiceProvidersFailedError(
                 [VoiceAttempt("limits", False, "bad_audio", "Speech text limit exceeded.")]
             )
-        return await self._first_working(self.tts, lambda p: p.synthesize(text, language))
+        # A provider that says up front it cannot speak this language (ElevenLabs for an
+        # unverified language) is skipped without an HTTP call; the next one (OpenAI) speaks.
+        able = [p for p in self.tts if _supports(p, language)]
+        skipped = [
+            VoiceAttempt(p.name, False, "unavailable", f"{p.name} is not verified for {language}.")
+            for p in self.tts
+            if not _supports(p, language)
+        ]
+        if not able:
+            raise AllVoiceProvidersFailedError(
+                skipped or [VoiceAttempt("none", False, "unavailable", "No voice provider.")]
+            )
+        result = await self._first_working(able, lambda p: p.synthesize(text, language))
+        result.attempts = skipped + result.attempts
+        return result
+
+
+def _supports(provider: TextToSpeechProvider, language: str | None) -> bool:
+    check = getattr(provider, "supports_language", None)
+    return bool(check(language)) if callable(check) else True
 
 
 def build_voice_service(settings: Settings) -> VoiceService:
@@ -132,6 +151,16 @@ def build_voice_service(settings: Settings) -> VoiceService:
             timeout=settings.voice_timeout_seconds,
             max_audio=settings.voice_max_audio_mb * 1024 * 1024,
             max_text=settings.voice_max_text_chars,
+            voice_ids={
+                "uz": settings.elevenlabs_voice_id_uz,
+                "en": settings.elevenlabs_voice_id_en,
+                "ru": settings.elevenlabs_voice_id_ru,
+            },
+            tts_models={
+                "uz": settings.elevenlabs_tts_model_uz,
+                "en": settings.elevenlabs_tts_model_en,
+                "ru": settings.elevenlabs_tts_model_ru,
+            },
         )
     if settings.openai_api_key:
         available["openai"] = OpenAIAudioProvider(
@@ -154,7 +183,9 @@ def build_voice_service(settings: Settings) -> VoiceService:
     chosen = [available[name] for name in order if name in available]
     return VoiceService(
         stt=chosen,
-        tts=[p for p in chosen if not isinstance(p, ElevenLabsProvider) or p.voice_id],
+        tts=[
+            p for p in chosen if not isinstance(p, ElevenLabsProvider) or p.voice_id or p.voice_ids
+        ],
         budget=CallBudget(
             settings.voice_calls_per_day, settings.voice_concurrency, settings.voice_timeout_seconds
         ),

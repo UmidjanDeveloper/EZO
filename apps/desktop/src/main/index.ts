@@ -17,6 +17,8 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  net,
+  protocol,
   safeStorage,
   screen,
   session,
@@ -40,6 +42,40 @@ const JARVIS_POLL_MS = 5_000;
 const STATUS_POLL_MS = 30_000;
 const SHOW_HIDE_SHORTCUT = "Control+Alt+H";
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+
+/**
+ * The renderers load from https://ezo.desktop/, served from dist/ by a protocol handler.
+ * A real https origin (not file://) is what the perception worker needs to fetch the
+ * bundled, SHA256-pinned vision assets from "the same origin" with a strict CSP; nothing
+ * ever goes to the network for that host, and every other https request from a renderer
+ * is passed through untouched (renderers have connect-src 'self' anyway).
+ */
+const APP_ORIGIN = "https://ezo.desktop";
+const CONTENT_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".wasm": "application/wasm",
+  ".task": "application/octet-stream",
+  ".txt": "text/plain; charset=utf-8",
+  ".png": "image/png",
+};
+
+function serveAppOrigin(): void {
+  protocol.handle("https", (request) => {
+    const url = new URL(request.url);
+    if (url.origin !== APP_ORIGIN) return net.fetch(request, { bypassCustomProtocolHandlers: true });
+    const relative = path.normalize(decodeURIComponent(url.pathname)).replace(/^([/\\])+/, "");
+    const file = path.join(__dirname, relative);
+    if (!file.startsWith(__dirname + path.sep) || !existsSync(file)) return new Response("not found", { status: 404 });
+    const extension = path.extname(file).toLowerCase();
+    const headers: Record<string, string> = { "Content-Type": CONTENT_TYPES[extension] ?? "application/octet-stream", "Cache-Control": "no-store" };
+    // The perception worker may compile the bundled WASM and importScripts its verified loader (a blob it made itself); nothing remote.
+    if (relative.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self' blob:";
+    return new Response(readFileSync(file), { headers });
+  });
+}
 
 let pill: BrowserWindow | null = null;
 /** Small pill (one row) or the expanded stage with the full humanoid. */
@@ -147,7 +183,10 @@ interface PillInit {
   media: { microphone: boolean; camera: boolean };
   lowPower: boolean;
   voiceVolume: number;
+  clap: { listening: boolean; startsListening: boolean };
+  build: { version: string; sha: string };
 }
+const BUILD_SHA = process.env.EZO_BUILD_SHA ?? "dev";
 
 function pillInit(): PillInit {
   return {
@@ -158,8 +197,13 @@ function pillInit(): PillInit {
     media: { microphone: settings.allowMicrophone, camera: settings.allowCamera },
     lowPower: settings.lowPower,
     voiceVolume: settings.voiceVolume,
+    clap: { listening: settings.clapListening, startsListening: settings.clapStartsListening },
+    build: { version: app.getVersion(), sha: BUILD_SHA },
   };
 }
+
+/** The pill's latest Diagnostics numbers (no images, audio or landmarks), shown in the settings window. */
+let diagnostics: Record<string, unknown> = {};
 
 // --- JARVIS companion ----------------------------------------------------------------------
 
@@ -415,7 +459,7 @@ function createPill(): void {
   });
   pill.setAlwaysOnTop(true, "screen-saver");
   secureWindow(pill);
-  void pill.loadFile(path.join(__dirname, "pill.html"));
+  void pill.loadURL(`${APP_ORIGIN}/pill.html`);
   pill.once("ready-to-show", () => pill?.showInactive());
   // Hidden means hidden: the renderer stops the microphone, the camera and the drawing loop.
   pill.on("hide", () => tell("visibility", false));
@@ -453,7 +497,7 @@ function openSettings(): void {
     },
   });
   secureWindow(settingsWindow);
-  void settingsWindow.loadFile(path.join(__dirname, "settings.html"));
+  void settingsWindow.loadURL(`${APP_ORIGIN}/settings.html`);
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
@@ -494,6 +538,30 @@ function registerIpc(): void {
     }),
   );
   ipcMain.on("turn:cancel", () => currentTurn?.abort());
+  // The clap acknowledgement: a short phrase through the real server voice (token stays here).
+  ipcMain.handle("voice:speak", async (_event, text: unknown, language: unknown) => {
+    if (typeof text !== "string" || !text.trim() || text.length > 200) return { error: t().pill.badText };
+    const lang: Lang = language === "en" || language === "ru" ? language : "uz";
+    try {
+      const audio = await client().speak(text.trim(), lang);
+      return { mimeType: audio.mimeType, data: audio.data, provider: audio.provider ?? null };
+    } catch (error) {
+      return { error: error instanceof EzoApiError ? error.message : String(error) };
+    }
+  });
+  ipcMain.on("diag:update", (_event, next: unknown) => {
+    if (next && typeof next === "object") diagnostics = { ...(next as Record<string, unknown>), at: new Date().toISOString() };
+  });
+  ipcMain.handle("diag:get", () => ({
+    ...diagnostics,
+    version: app.getVersion(),
+    sha: BUILD_SHA,
+    electron: process.versions.electron,
+    platform: `${process.platform} ${process.arch}`,
+    server: lastStatus,
+    language: settings.language,
+    media: { microphone: settings.allowMicrophone, camera: settings.allowCamera, clap: settings.clapListening },
+  }));
   ipcMain.on("pill:focusable", (_event, focusable: unknown) => {
     if (!pill || typeof focusable !== "boolean") return;
     pill.setFocusable(focusable);
@@ -710,6 +778,7 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
       return;
     }
     const firstRun = !loadSettings();
+    serveAppOrigin();
     allowOnlyAllowedMedia();
     registerIpc();
     createPill();

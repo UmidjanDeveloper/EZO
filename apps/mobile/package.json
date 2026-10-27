@@ -5,7 +5,7 @@
   "description": "EZO — Android app (Capacitor): voice conversation, camera, documents, reminders.",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "node ../../scripts/vision-assets.mjs public/vision && vite build",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
@@ -22,7 +22,9 @@
     "@capacitor/local-notifications": "8.3.1",
     "@capacitor/share": "8.0.3",
     "@capawesome/capacitor-file-picker": "8.1.0",
-    "@ezo/avatar": "workspace:*"
+    "@ezo/avatar": "workspace:*",
+    "@ezo/face-tracking": "workspace:*",
+    "@ezo/perception-client": "workspace:*"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",

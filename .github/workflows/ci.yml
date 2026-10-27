@@ -100,7 +100,7 @@ jobs:
       - run: pnpm typecheck
       - name: Unit tests
         run: pnpm test --reporter=default --reporter=junit --outputFile=reports/vitest.xml
-      - run: pnpm build:web
+      - run: pnpm build:web # also prepares apps/web/public/vision (pinned, SHA256-verified perception assets)
       - run: uv sync --frozen
         working-directory: apps/api
       - run: pnpm --filter @ezo/e2e exec playwright install --with-deps chromium

@@ -6,7 +6,7 @@ import pytest
 from ezo_api.settings import Settings
 from ezo_api.voice.base import VoiceError
 from ezo_api.voice.elevenlabs import ElevenLabsProvider
-from ezo_api.voice.service import AllVoiceProvidersFailedError, build_voice_service
+from ezo_api.voice.service import AllVoiceProvidersFailedError, VoiceService, build_voice_service
 from tests.fakes import FakeVoice
 
 
@@ -135,3 +135,91 @@ async def test_trickled_response_has_whole_operation_deadline_and_is_closed() ->
     with pytest.raises(VoiceError) as caught:
         await provider.synthesize("Hello", "en")
     assert caught.value.kind == "timeout" and body.closed
+
+
+# --- Section C: per-language voices and models, ElevenLabs-then-OpenAI ordering ---------
+
+
+async def test_per_language_voice_and_model_with_fallback_to_the_single_setting() -> None:
+    seen: list[tuple[str, str]] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.path, json.loads(request.content)["model_id"]))
+        return httpx.Response(200, content=b"ID3audio", headers={"content-type": "audio/mpeg"})
+
+    provider = adapter(
+        handle,
+        languages=["uz", "en", "ru"],
+        voice_ids={"uz": "uz_voice", "ru": "ru_voice"},
+        tts_models={"uz": "eleven_v3"},
+    )
+    for lang in ("uz", "en", "ru"):
+        assert (await provider.synthesize("Salom", lang)).provider == "elevenlabs"
+    assert seen == [
+        ("/v1/text-to-speech/uz_voice", "eleven_v3"),
+        ("/v1/text-to-speech/reviewed_voice", "eleven_multilingual_v2"),  # en: single settings
+        ("/v1/text-to-speech/ru_voice", "eleven_multilingual_v2"),
+    ]
+
+
+def test_supports_language_needs_both_verification_and_a_voice() -> None:
+    provider = adapter(lambda _: httpx.Response(500), languages=["en", "ru"], voice_ids={"uz": "v"})
+    assert provider.supports_language("en") and provider.supports_language("ru")
+    assert not provider.supports_language("uz")  # a voice exists, but "uz" was not verified
+    no_default = adapter(
+        lambda _: httpx.Response(500), voice_id="", languages=["uz", "en"], voice_ids={"uz": "v"}
+    )
+    assert no_default.supports_language("uz") and not no_default.supports_language("en")
+
+
+async def test_service_speaks_uzbek_with_openai_until_elevenlabs_uzbek_is_verified() -> None:
+    calls: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(200, content=b"ID3audio", headers={"content-type": "audio/mpeg"})
+
+    eleven = adapter(handle, languages=["en", "ru"])
+    openai = FakeVoice("openai")
+    service = VoiceService(tts=[eleven, openai])
+    uz = await service.synthesize("Eshitaman seni.", "uz")
+    assert uz.value.provider == "openai" and calls == []  # no ElevenLabs HTTP call for Uzbek
+    assert [a.provider for a in uz.attempts] == ["elevenlabs", "openai"]
+    assert uz.attempts[0].kind == "unavailable"
+    en = await service.synthesize("I'm listening.", "en")
+    assert en.value.provider == "elevenlabs" and calls == ["/v1/text-to-speech/reviewed_voice"]
+    ru = await service.synthesize("Я тебя слушаю.", "ru")
+    assert ru.value.provider == "elevenlabs" and len(calls) == 2
+    # The owner verified Uzbek: one env var flips it to ElevenLabs.
+    verified = adapter(handle, languages=["en", "ru", "uz"], voice_ids={"uz": "uz_voice"})
+    assert (
+        await VoiceService(tts=[verified, openai]).synthesize("Eshitaman seni.", "uz")
+    ).value.provider == "elevenlabs"
+    assert calls[-1] == "/v1/text-to-speech/uz_voice"
+
+
+async def test_service_reports_unavailable_when_no_provider_can_speak_the_language() -> None:
+    eleven = adapter(lambda _: httpx.Response(500), languages=["en"])
+    with pytest.raises(AllVoiceProvidersFailedError) as caught:
+        await VoiceService(tts=[eleven]).synthesize("Salom", "uz")
+    assert [a.kind for a in caught.value.attempts] == ["unavailable"]
+    with pytest.raises(AllVoiceProvidersFailedError):
+        await VoiceService(tts=[]).synthesize("Salom", "uz")
+
+
+def test_build_voice_service_reads_per_language_settings() -> None:
+    conf = Settings(
+        _env_file=None,
+        ELEVENLABS_API_KEY="fixture-secret",
+        EZO_VOICE_PROVIDERS="elevenlabs",
+        EZO_ELEVENLABS_VOICE_ID_UZ="uz_voice",
+        EZO_ELEVENLABS_TTS_MODEL_UZ="eleven_v3",
+        EZO_ELEVENLABS_TTS_LANGUAGES="en,ru,uz",
+    )  # type: ignore[call-arg]
+    service = build_voice_service(conf)
+    assert [p.name for p in service.tts] == ["elevenlabs"]  # a per-language voice is enough
+    provider = service.tts[0]
+    assert isinstance(provider, ElevenLabsProvider)
+    assert provider.voice_for("uz") == "uz_voice" and provider.model_for("uz") == "eleven_v3"
+    assert provider.voice_for("en") == "" and not provider.supports_language("en")
+    assert "fixture-secret" not in repr(conf)

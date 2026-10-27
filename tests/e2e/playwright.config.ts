@@ -30,8 +30,29 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile\.spec\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|perception)\.spec\.ts/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ },
+    {
+      // The real perception engine with Chromium's FAKE camera and a FAKE microphone file
+      // (short clap-like bursts): a SIMULATION that proves wiring and cleanup, never a device.
+      name: "perception",
+      testMatch: /perception\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        permissions: ["camera", "microphone"],
+        launchOptions: {
+          args: [
+            "--use-angle=swiftshader",
+            "--enable-unsafe-swiftshader",
+            "--ignore-gpu-blocklist",
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            `--use-file-for-fake-audio-capture=${path.resolve(__dirname, "fixtures/media/fake-claps.wav")}`,
+          ],
+          ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : {}),
+        },
+      },
+    },
   ],
   webServer: [
     {

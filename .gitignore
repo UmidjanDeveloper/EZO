@@ -1,50 +1,48 @@
-# Secrets
-.env
-.env.*
+
 !.env.example
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-*.egg-info/
-
+!.vscode/extensions.json
 # Databases created in quick (SQLite) mode
+# Desktop build output
+# JUnit test reports (scripts/test_report.py)
+# JavaScript
+# Local storage for development uploads (from Milestone 2)
+# Mobile build output
+# OS / editors
+# Python
+# Secrets
+# Tests
 *.db
 *.db-journal
-
-# JavaScript
-node_modules/
-.next/
-next-env.d.ts
+*.egg-info/
+*.py[cod]
 *.tsbuildinfo
-.turbo/
-
-# Tests
-tests/e2e/test-results/
-tests/e2e/playwright-report/
-# JUnit test reports (scripts/test_report.py)
-reports/
-requirements-audit.txt
-coverage/
-
-# Local storage for development uploads (from Milestone 2)
-/apps/api/storage/
-/storage/
-
-# OS / editors
 .DS_Store
-Thumbs.db
+.cache/
+.env
+.env.*
 .idea/
+.mypy_cache/
+.next/
+.pytest_cache/
+.ruff_cache/
+.turbo/
+.venv/
 .vscode/*
-!.vscode/extensions.json
-
-# Desktop build output
+/apps/api/storage/
 /apps/desktop/dist/
 /apps/desktop/release/
-# Mobile build output
 /apps/mobile/dist/
+/storage/
+Thumbs.db
+__pycache__/
+apps/desktop/dist/
+apps/mobile/public/vision/
+apps/web/public/vision/
+coverage/
+next-env.d.ts
+node_modules/
+reports/
+requirements-audit.txt
 tests/e2e/.demo/
+tests/e2e/playwright-report/
+tests/e2e/test-results/

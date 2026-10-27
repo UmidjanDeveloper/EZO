@@ -4,9 +4,11 @@ import { contentSecurityPolicy, STATIC_SECURITY_HEADERS } from "./security-heade
 describe("content security policy", () => {
   it("allows only nonce scripts and the EZO API, and forbids framing", () => {
     const csp = contentSecurityPolicy("abc", "https://api.ezo.example");
-    expect(csp).toContain("script-src 'self' 'nonce-abc' 'strict-dynamic'");
-    expect(csp).not.toContain("unsafe-eval");
-    expect(csp).toContain("connect-src 'self' https://api.ezo.example");
+    expect(csp).toContain("script-src 'self' 'nonce-abc' 'strict-dynamic' 'wasm-unsafe-eval' blob:");
+    expect(csp).not.toContain("'unsafe-eval'"); // WASM may compile; JavaScript eval stays forbidden
+    expect(csp).toContain("worker-src 'self' blob:"); // the perception worker from this origin
+    expect(STATIC_SECURITY_HEADERS["Permissions-Policy"]).toContain("camera=(self)");
+    expect(csp).toContain("connect-src 'self' blob: https://api.ezo.example");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("upgrade-insecure-requests");

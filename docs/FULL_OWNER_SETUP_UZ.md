@@ -61,7 +61,11 @@ OpenAI/Gemini/ElevenLabs, owner token va DB URL’ni `NEXT_PUBLIC_*`ga yozmang.
   barcha mavjud product route’lar saqlanadi. Bu yetishmayotgan funksiyani tayyor qilmaydi.
 - Gemini/OpenAI adapterlari mavjud. Claude ixtiyoriy. `config/models.toml`dagi model
   ID’lari aynan sizning hisobingizda mavjudligini kelajakdagi ruxsatli sinovda tekshiring.
-- ElevenLabs: `ELEVENLABS_API_KEY`; TTS uchun qo‘shimcha `EZO_ELEVENLABS_VOICE_ID`.
+- ElevenLabs: `ELEVENLABS_API_KEY`; TTS uchun qo‘shimcha `EZO_ELEVENLABS_VOICE_ID` (yoki
+  til bo‘yicha `EZO_ELEVENLABS_VOICE_ID_UZ/_EN/_RU`, modellar `EZO_ELEVENLABS_TTS_MODEL_UZ/_EN/_RU`).
+  O‘zbekcha: `EZO_ELEVENLABS_TTS_MODEL_UZ=eleven_v3` (ElevenLabs model sahifasida o‘zbek tili
+  borligini o‘zingiz tekshiring), o‘zbekcha ovoz tanlang, bir marta eshiting, keyin
+  `EZO_ELEVENLABS_TTS_LANGUAGES=en,ru,uz`. Ungacha o‘zbekcha OpenAI orqali aytiladi.
   Voice’ni ishlatishga huquqingiz bo‘lsin. Defaults: `scribe_v1` va
   `eleven_multilingual_v2`; mavjudligi live tekshirilmagan. Default TTS faqat en/ru
   uchun ruxsatlangan. Uzbek qo‘llovi tasdiqlanmaguncha `uz`ni ro‘yxatga qo‘shmang;

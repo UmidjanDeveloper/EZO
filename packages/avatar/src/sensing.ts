@@ -1,246 +1,136 @@
 /**
- * Sensing contract between EZO's surfaces (web, Windows, Android) and the sensing engine
- * (packages/face-tracking today; hand, gesture and clap recognition as they land).
+ * How EZO's figure consumes the perception engine (`@ezo/face-tracking`, owned separately).
  *
- * The engine produces the frames and events below; the surfaces consume them through
- * `AttentionDriver`, which decides where the humanoid looks and never trusts a frame that
- * is stale, low-confidence, or arrived while the view was hidden. Everything is structural
- * TypeScript: no runtime dependency in either direction. All angles/positions are
- * normalised -1..1 (left/down negative … right/up positive) as the *user* sees them, so a
- * hand on the user's right makes EZO look to the user's right. Nothing here identifies a
- * person: there is no face identity, no biometrics, no recording.
+ * Decision (Section C): there is ONE attention state machine, the engine's
+ * `AttentionController`, which arbitrates face/hand/explicit-mode and smooths the target.
+ * This module no longer arbitrates anything. `MotionAdapter` applies the engine's
+ * `MotionIntent` to the figure, adds the labelled pointer/touch fallback when the engine
+ * has nothing (`source: "neutral"`), and guarantees that a hidden view or `stop()` releases
+ * the gaze. Types below are structural mirrors of the engine's (no package dependency in
+ * either direction), so the avatar package stays framework- and engine-free.
+ * Nothing here identifies a person: no face identity, no biometrics, no recording.
  */
 import type { Gaze } from "./avatar";
 
-/** One head-tracking frame (identical in shape to packages/face-tracking's TrackingFrame). */
-export interface TrackingFrame {
-  yaw: number;
-  pitch: number;
-  roll: number;
-  /** Where the face sits in the camera view, not calibrated eye tracking. */
-  gazeX: number;
-  gazeY: number;
-  /** 1 = a single model-accepted face; below `minConfidence` the frame is ignored. */
-  confidence: number;
-  /** Monotonic browser milliseconds (performance.now()). */
-  timestamp: number;
-}
-
-export interface HeadPose {
+/** Mirror of the engine's `MotionIntent` (packages/face-tracking/src/types.ts). */
+export type AttentionState = "neutral" | "face_attention" | "hand_attention" | "following_head" | "listening" | "speaking" | "attention_lost";
+export interface MotionIntent {
+  source: "face" | "hand" | "eye" | "neutral";
   yaw: number;
   pitch: number;
   roll: number;
   confidence: number;
-  timestamp: number;
-}
-
-/** A hand the engine is confident about; EZO looks towards it while it is raised. */
-export interface HandTarget {
-  /** Hand centre in the user's view, -1..1. */
-  x: number;
-  y: number;
-  hand: "left" | "right" | "unknown";
-  /** True while the hand is held up (wrist below the fingers); a resting hand is not a target. */
-  raised: boolean;
-  confidence: number;
-  timestamp: number;
-}
-
-/** What the driver decided for this moment, for the UI and for tests. */
-export type MotionIntent =
-  | { kind: "look"; target: Gaze; source: "head" | "hand" | "pointer" | "touch"; confidence: number }
-  | { kind: "rest"; source: "stale" | "hidden" | "stopped" | "none" | "low-confidence" | "camera-off" };
-
-/** A verified clap (the engine owns the audio/visual verification; this is only the result). */
-export interface ClapEvent {
-  timestamp: number;
-  confidence: number;
-  /** One clap or a double clap. */
-  count: 1 | 2;
+  timestampMs: number;
+  state: AttentionState;
 }
 
 export type CameraState = "off" | "requesting" | "denied" | "unavailable" | "tracking" | "lost" | "error";
 
-/** Truthful camera status for the UI: it mirrors the OS/browser permission, never guesses. */
+/** Truthful camera status for the UI: it mirrors the engine/OS, never guesses. */
 export interface VisionStatus {
   camera: CameraState;
-  faces: 0 | 1;
-  hands: number;
   /** Set when the status comes from a test fixture rather than a device. */
   simulated?: boolean;
   message?: string;
   since: number;
 }
 
-/** Spoken intents the voice pipeline recognised (the provider owns recognition). */
-export interface VoiceIntent {
-  kind: "wake" | "stop" | "confirm" | "cancel";
-  transcript?: string;
-  language?: "uz" | "en" | "ru";
+/** What drives the gaze right now, for the words on screen and for tests. */
+export interface AttentionView {
+  source: "face" | "hand" | "pointer" | "touch" | "none";
+  state: AttentionState | "hidden" | "stopped";
   confidence: number;
-  timestamp: number;
 }
 
-/** The part of EzoAvatar the driver needs. */
+/** The part of EzoAvatar the adapter needs. */
 export interface GazeTarget {
   setGaze(gaze: Gaze | null): void;
 }
 
-export interface AttentionOptions {
-  /** A sensor frame older than this is ignored (default 400 ms). */
-  staleMs?: number;
-  /** Frames below this confidence are ignored (default 0.5). */
-  minConfidence?: number;
-  /** Changes smaller than this (in -1..1 units) do not move the target: no jitter (default 0.03). */
-  deadband?: number;
-  /** A raised hand keeps priority over the head for this long after its last frame (default 1200 ms). */
-  handHoldMs?: number;
-  /** Clock, replaceable in tests. */
-  now?: () => number;
-  /** Called whenever the intent changes kind or source. */
-  onIntent?: (intent: MotionIntent) => void;
+export interface MotionAdapterOptions {
+  /** Called whenever the source or state changes (not on every frame). */
+  onChange?: (view: AttentionView) => void;
 }
 
+const REST: AttentionView = { source: "none", state: "neutral", confidence: 0 };
+
 /**
- * Turns sensing frames into one gaze for the humanoid.
- *
- * Priority: a raised hand → the head → the pointer/touch fallback → rest. Sensor frames
- * only count while the camera reports tracking and the view is visible; `tick()` must be
- * called regularly (the host's animation frame) so stale frames release the gaze.
+ * Applies the engine's intent to the figure. Engine first; when the engine says
+ * "neutral", the pointer/touch fallback (labelled as such); otherwise rest.
  */
-export class AttentionDriver {
+export class MotionAdapter {
   private readonly target: GazeTarget;
-  private readonly staleMs: number;
-  private readonly minConfidence: number;
-  private readonly deadband: number;
-  private readonly handHoldMs: number;
-  private readonly clock: () => number;
-  private readonly onIntent: ((intent: MotionIntent) => void) | null;
-  private head: TrackingFrame | HeadPose | null = null;
-  private hand: HandTarget | null = null;
+  private readonly onChange: ((view: AttentionView) => void) | null;
+  private engine: MotionIntent | null = null;
   private pointer: { gaze: Gaze; source: "pointer" | "touch" } | null = null;
-  private vision: VisionStatus = { camera: "off", faces: 0, hands: 0, since: 0 };
   private visible = true;
   private stopped = false;
-  private current: MotionIntent = { kind: "rest", source: "none" };
   private applied: Gaze | null = null;
+  private current: AttentionView = REST;
 
-  constructor(target: GazeTarget, options: AttentionOptions = {}) {
+  constructor(target: GazeTarget, options: MotionAdapterOptions = {}) {
     this.target = target;
-    this.staleMs = options.staleMs ?? 400;
-    this.minConfidence = options.minConfidence ?? 0.5;
-    this.deadband = options.deadband ?? 0.03;
-    this.handHoldMs = options.handHoldMs ?? 1200;
-    this.clock = options.now ?? (() => (typeof performance !== "undefined" ? performance.now() : Date.now()));
-    this.onIntent = options.onIntent ?? null;
+    this.onChange = options.onChange ?? null;
   }
 
-  /** The engine's camera status; sensor frames are ignored unless it is "tracking". */
-  setVision(status: VisionStatus): void {
-    this.vision = status;
-    if (status.camera !== "tracking") {
-      this.head = null;
-      this.hand = null;
-    }
-    this.tick();
+  /** The engine's sample for this frame (HumanoidPerception.onMotionIntent). */
+  apply(intent: MotionIntent): void {
+    this.stopped = false;
+    this.engine = intent;
+    this.update();
   }
 
-  getVision(): VisionStatus {
-    return this.vision;
-  }
-
-  /** A head frame from the engine (null = no face this frame). */
-  headFrame(frame: TrackingFrame | HeadPose | null): void {
-    this.head = frame && this.accept(frame.confidence, frame.timestamp) ? frame : null;
-    this.tick();
-  }
-
-  /** A hand frame from the engine (null = no hand this frame). */
-  handFrame(hand: HandTarget | null): void {
-    this.hand = hand && hand.raised && this.accept(hand.confidence, hand.timestamp) ? hand : null;
-    this.tick();
-  }
-
-  /** Pointer/touch fallback (labelled as such in the intent); null when the pointer leaves. */
+  /** Pointer/touch fallback; null when the pointer leaves. */
   pointerGaze(gaze: Gaze | null, source: "pointer" | "touch" = "pointer"): void {
     this.pointer = gaze ? { gaze, source } : null;
-    this.tick();
+    this.update();
   }
 
-  /** Hidden views never track: frames arriving while hidden are dropped. */
+  /** Hidden views never move the figure; the engine stops itself when hidden. */
   setVisible(visible: boolean): void {
     this.visible = visible;
-    if (!visible) {
-      this.head = null;
-      this.hand = null;
-    }
-    this.tick();
+    if (!visible) this.engine = null;
+    this.update();
   }
 
-  /** Releases the gaze and ignores everything until frames arrive again. */
+  /** Releases the gaze; the next engine intent resumes. */
   stop(): void {
     this.stopped = true;
-    this.head = null;
-    this.hand = null;
+    this.engine = null;
     this.pointer = null;
-    this.tick();
-    this.stopped = false;
+    this.update();
   }
 
-  intent(): MotionIntent {
+  view(): AttentionView {
     return this.current;
   }
 
-  /** Re-evaluates with the clock: call every animation frame so stale frames let go. */
-  tick(): void {
+  private update(): void {
     const next = this.decide();
-    const gaze = next.kind === "look" ? next.target : null;
-    const moved =
-      (gaze === null) !== (this.applied === null) ||
-      (gaze && this.applied && (Math.abs(gaze.yaw - this.applied.yaw) > this.deadband || Math.abs(gaze.pitch - this.applied.pitch) > this.deadband));
+    const gaze = next.gaze;
+    const moved = (gaze === null) !== (this.applied === null) || (gaze && this.applied && (Math.abs(gaze.yaw - this.applied.yaw) > 0.004 || Math.abs(gaze.pitch - this.applied.pitch) > 0.004));
     if (moved) {
       this.applied = gaze ? { ...gaze } : null;
       this.target.setGaze(this.applied);
     }
-    if (next.kind !== this.current.kind || next.source !== this.current.source) {
-      this.current = next;
-      this.onIntent?.(next);
-    } else if (next.kind === "look" && this.current.kind === "look") {
-      this.current = next;
+    if (next.view.source !== this.current.source || next.view.state !== this.current.state) {
+      this.current = next.view;
+      this.onChange?.(next.view);
+    } else this.current = next.view;
+  }
+
+  private decide(): { gaze: Gaze | null; view: AttentionView } {
+    if (this.stopped) return { gaze: null, view: { source: "none", state: "stopped", confidence: 0 } };
+    if (!this.visible) return { gaze: null, view: { source: "none", state: "hidden", confidence: 0 } };
+    const engine = this.engine;
+    if (engine && engine.source !== "neutral") {
+      return {
+        gaze: { yaw: clamp1(engine.yaw), pitch: clamp1(engine.pitch) },
+        view: { source: engine.source === "eye" ? "face" : engine.source, state: engine.state, confidence: clamp1(engine.confidence) },
+      };
     }
-  }
-
-  private accept(confidence: number, timestamp: number): boolean {
-    return Number.isFinite(confidence) && confidence >= this.minConfidence && Number.isFinite(timestamp) && this.clock() - timestamp <= this.staleMs;
-  }
-
-  private decide(): MotionIntent {
-    if (this.stopped) return { kind: "rest", source: "stopped" };
-    if (!this.visible) return { kind: "rest", source: "hidden" };
-    const now = this.clock();
-    if (this.vision.camera === "tracking") {
-      if (this.hand && now - this.hand.timestamp <= this.handHoldMs) {
-        return { kind: "look", target: { yaw: clamp1(this.hand.x), pitch: clamp1(this.hand.y) }, source: "hand", confidence: this.hand.confidence };
-      }
-      if (this.head) {
-        if (now - this.head.timestamp > this.staleMs) {
-          this.head = null;
-          return this.fallback("stale");
-        }
-        // The face position says where the person is; the head angles say where they turned.
-        const frame = this.head as Partial<TrackingFrame>;
-        const yaw = typeof frame.gazeX === "number" ? frame.gazeX : this.head.yaw;
-        const pitch = typeof frame.gazeY === "number" ? frame.gazeY : this.head.pitch;
-        return { kind: "look", target: { yaw: clamp1(yaw), pitch: clamp1(pitch) }, source: "head", confidence: this.head.confidence };
-      }
-      return this.fallback("none");
-    }
-    return this.fallback(this.vision.camera === "off" ? "none" : "camera-off");
-  }
-
-  private fallback(reason: "stale" | "none" | "camera-off"): MotionIntent {
-    if (this.pointer) return { kind: "look", target: this.pointer.gaze, source: this.pointer.source, confidence: 1 };
-    return { kind: "rest", source: reason };
+    if (this.pointer) return { gaze: this.pointer.gaze, view: { source: this.pointer.source, state: engine?.state ?? "neutral", confidence: 1 } };
+    return { gaze: null, view: { source: "none", state: engine?.state ?? "neutral", confidence: 0 } };
   }
 }
 

@@ -43,6 +43,8 @@
       <label class="check"><input type="checkbox" id="speakReplies" /> <span data-i18n="speakReplies">Javoblarni ovozda o‘qish</span></label>
       <label class="check"><input type="checkbox" id="lowPower" /> <span data-i18n="lowPower">Tejamkor rejim</span></label>
       <label><span data-i18n="voiceVolume">EZO ovozi balandligi</span> <input type="range" id="voiceVolume" min="0" max="1" step="0.05" /></label>
+      <label class="check"><input type="checkbox" id="clapListening" /> <span data-i18n="clapListening">Qarsakni tinglash</span></label>
+      <label class="check"><input type="checkbox" id="clapStartsListening" /> <span data-i18n="clapStartsListening">Qarsakdan keyin tinglashni boshlasin</span></label>
       <label><span data-i18n="shortcut">Tugma</span>
         <select id="shortcut"></select>
       </label>
@@ -80,6 +82,16 @@
       <p class="muted" data-i18n="conversationNote">Desktop suhbati EZO serverida saqlanadi va telefon/veb ilovada ham ko‘rinadi.</p>
       <button id="newConversation" class="secondary" data-i18n="newConversation">Yangi suhbat boshlash</button>
     </section>
+    <details id="diagnostics">
+      <summary data-i18n="diagnostics">Diagnostika</summary>
+      <p class="muted" data-i18n="diagnosticsNote">Faqat raqamlar.</p>
+      <pre id="diagnosticsText" class="diag"></pre>
+      <div class="row">
+        <button id="diagnosticsRefresh" class="secondary" data-i18n="diagnosticsRefresh">Yangilash</button>
+        <button id="diagnosticsCopy" data-i18n="diagnosticsCopy">Hisobotni nusxalash</button>
+        <span id="diagnosticsState" class="muted" role="status"></span>
+      </div>
+    </details>
     <script src="settings.js"></script>
   </body>
 </html>

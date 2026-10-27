@@ -38,9 +38,11 @@ try {
   if (!device) throw new Error("no Android device");
   step("device", `${device.model()} ${device.serial()}`);
   await device.shell("am force-stop uz.ezo.mobile");
-  // The microphone is granted up front so the voice stage can be opened without a system
-  // dialog; the camera is deliberately NOT granted (no sensing engine in this build).
+  // Microphone and camera are granted up front so the voice stage and the camera button can
+  // be exercised without system dialogs. The emulator's camera is a synthetic scene: this is
+  // a SIMULATION of the engine running on a device, not a face/hand recognition test.
   await device.shell("pm grant uz.ezo.mobile android.permission.RECORD_AUDIO").catch(() => {});
+  await device.shell("pm grant uz.ezo.mobile android.permission.CAMERA").catch(() => {});
   await device.shell("am start -W -n uz.ezo.mobile/.MainActivity");
   const webview = await device.webView({ pkg: "uz.ezo.mobile" }, { timeout: 120_000 });
   const page = await webview.page();
@@ -50,7 +52,15 @@ try {
   // 2. First launch shows the welcome page, then asks for the server — go through it like a user.
   await page.locator("#welcomeStart").waitFor({ state: "visible", timeout: 60_000 });
   step("welcome page shown", (await page.textContent("#welcomeTab h1")) ?? "");
-  await page.click("#welcomeStart");
+  // The WebView sometimes reports a button below the fold as "outside of the viewport" even
+  // after scrolling (seen once on the CI emulator at d97cad7); a real tap is tried first and
+  // the fallback is the element's own click handler, recorded as such.
+  try {
+    await page.click("#welcomeStart", { timeout: 10_000 });
+  } catch (error) {
+    step("welcome button: real tap refused by the WebView viewport, clicked through the DOM", String(error).split("\n")[0].slice(0, 160));
+    await page.evaluate(() => document.getElementById("welcomeStart")?.click());
+  }
   await page.locator("#apiUrl").waitFor({ state: "visible", timeout: 60_000 });
   await page.fill("#apiUrl", "http://10.0.2.2:8000");
   await page.fill("#token", token);
@@ -137,8 +147,48 @@ try {
   }));
   step("voice stage on the device", JSON.stringify(stage));
   if (stage.renderer !== "webgl" && stage.renderer !== "2d") throw new Error(`avatar renderer ${stage.renderer}`);
-  if (stage.cameraDisabled !== true) throw new Error("camera control must be disabled without a sensing engine");
+  // 9. The real perception engine on the device: the bundled assets must verify (button enabled),
+  // the camera must open through the WebView and the worker must run inference on the emulator's
+  // synthetic scene. The honest state is tracking or lost; an error is recorded, not hidden.
+  await page.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
+  // A timeline of the engine start on the device (state changes + the worker's own console
+  // lines, seconds since the press) so a slow emulator is diagnosable from the job annotations.
+  const timeline = [];
+  const pressedAt = Date.now();
+  const since = () => `${((Date.now() - pressedAt) / 1000).toFixed(1)}s`;
+  const onConsole = (message) => {
+    const text = message.text();
+    if (/Graph successfully started|XNNPACK|Aborted|deadline|Vision|wasm/i.test(text)) timeline.push(`${since()} console: ${text.slice(0, 120)}`);
+  };
+  page.on("console", onConsole);
+  await page.click("#cameraToggle");
+  let last = "";
+  for (let i = 0; i < 120; i++) {
+    const state = await page.evaluate(() => document.getElementById("cameraState")?.dataset.camera ?? "");
+    if (state !== last) {
+      timeline.push(`${since()} state: ${state}`);
+      last = state;
+    }
+    if (["tracking", "lost", "error", "denied"].includes(state)) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  await new Promise((r) => setTimeout(r, 5000));
+  page.off("console", onConsole);
+  step("camera engine timeline on the device (SIMULATION)", timeline.join(" | "));
+  const camera = await page.evaluate(() => ({
+    state: document.getElementById("cameraState")?.dataset.camera,
+    text: document.getElementById("cameraState")?.textContent,
+    indicator: document.getElementById("cameraIndicator")?.textContent,
+    fps: document.getElementById("voiceStage")?.dataset.fps,
+    inferenceMs: document.getElementById("voiceStage")?.dataset.inferenceMs,
+    attention: document.getElementById("voiceStage")?.dataset.attention,
+  }));
+  step("camera on the device (SIMULATION: emulator scene)", JSON.stringify(camera));
+  if (camera.state !== "tracking" && camera.state !== "lost") throw new Error(`camera state ${camera.state}: ${camera.text}`);
+  if (!(Number(camera.fps) > 0)) throw new Error(`no inference samples on the device (fps=${camera.fps})`);
   await device.screenshot({ path: path.join(shotsDir, "5-voice-stage.png") });
+  await page.click("#cameraToggle");
+  await page.waitForFunction(() => document.getElementById("cameraState")?.dataset.camera === "off", undefined, { timeout: 10_000 });
   await page.click("#stageClose");
   await page.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
   step("voice stage closed; figure and any media released");
