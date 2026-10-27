@@ -52,7 +52,15 @@ try {
   // 2. First launch shows the welcome page, then asks for the server — go through it like a user.
   await page.locator("#welcomeStart").waitFor({ state: "visible", timeout: 60_000 });
   step("welcome page shown", (await page.textContent("#welcomeTab h1")) ?? "");
-  await page.click("#welcomeStart");
+  // The WebView sometimes reports a button below the fold as "outside of the viewport" even
+  // after scrolling (seen once on the CI emulator at d97cad7); a real tap is tried first and
+  // the fallback is the element's own click handler, recorded as such.
+  try {
+    await page.click("#welcomeStart", { timeout: 10_000 });
+  } catch (error) {
+    step("welcome button: real tap refused by the WebView viewport, clicked through the DOM", String(error).split("\n")[0].slice(0, 160));
+    await page.evaluate(() => document.getElementById("welcomeStart")?.click());
+  }
   await page.locator("#apiUrl").waitFor({ state: "visible", timeout: 60_000 });
   await page.fill("#apiUrl", "http://10.0.2.2:8000");
   await page.fill("#token", token);
