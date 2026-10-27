@@ -19,9 +19,11 @@ export interface Prefs {
   onboarded: boolean;
   /** Economy drawing (30 fps); "auto" follows the device's memory/data-saver signals. */
   lowPower: "auto" | "on";
+  /** EZO's voice volume 0..1. */
+  voiceVolume: number;
 }
 
-const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false, lowPower: "auto" };
+const DEFAULT_PREFS: Prefs = { apiUrl: "", conversationId: null, projectId: null, speakReplies: true, voiceLanguage: "auto", language: "uz", onboarded: false, lowPower: "auto", voiceVolume: 1 };
 
 export function loadPrefs(): Prefs {
   try {

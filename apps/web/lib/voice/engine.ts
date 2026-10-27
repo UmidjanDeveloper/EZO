@@ -11,6 +11,7 @@
  * following turns. Nothing is faked: unsupported paths report an error.
  */
 
+import { createStoredValue } from "@/lib/stored-value";
 import type { LanguageCode, VoiceStatus } from "@ezo/shared";
 import { ApiError } from "@ezo/shared";
 import { api } from "../api";
@@ -168,6 +169,12 @@ export const listenWithServer = (
 export const listenWithBrowser: Listen = (language, handlers) => listenOnce(language ?? "uz", handlers);
 
 let currentAudio: HTMLAudioElement | null = null;
+/** EZO's voice volume 0..1 (the stage slider); applied to every server-voice playback. */
+export const storedVoiceVolume = createStoredValue<string>("ezo-voice-volume", "1", (value): value is string => /^(0(\.\d+)?|1)$/.test(value));
+export function voiceVolume(): number {
+  const value = Number(storedVoiceVolume.get());
+  return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+}
 let currentRequest: AbortController | null = null;
 
 /** Stop whatever EZO is saying (server or browser voice). */
@@ -210,6 +217,7 @@ function playBlob(blob: Blob): Promise<void> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.volume = voiceVolume();
     currentAudio = audio;
     let frame = 0;
     let meter: ReturnType<typeof createLevelMeter> = null;

@@ -22,6 +22,7 @@ interface PillInit {
   status: PillStatus;
   media?: { microphone: boolean; camera: boolean };
   lowPower?: boolean;
+  voiceVolume?: number;
 }
 interface PillStatus {
   online: boolean;
@@ -100,6 +101,7 @@ let settleTimer: number | undefined;
 const SUCCESS_MS = 1600; // the figure's own gold burst lasts this long
 let media: { microphone: boolean; camera: boolean } = { microphone: true, camera: false };
 let lowPower = false;
+let voiceVolume = 1;
 let expanded = false;
 let visible = true;
 
@@ -426,6 +428,7 @@ function handle(response: TurnResponse, turn: number): void {
   if (response.audio && response.audio.data.byteLength > 0) {
     const url = URL.createObjectURL(new Blob([response.audio.data.slice()], { type: response.audio.mimeType }));
     const current = new Audio(url);
+    current.volume = voiceVolume;
     player = current;
     current.onplaying = () => followLevel(current);
     current.onended = () => {
@@ -534,6 +537,8 @@ function applyInit(init: PillInit): void {
   document.documentElement.lang = init.language;
   media = init.media ?? media;
   lowPower = init.lowPower ?? false;
+  voiceVolume = typeof init.voiceVolume === "number" ? Math.min(1, Math.max(0, init.voiceVolume)) : 1;
+  if (player) player.volume = voiceVolume;
   face?.setLowPower(lowPower);
   if (!media.camera) stopCamera();
   if (!media.microphone && state === "listening") stopListening(true);

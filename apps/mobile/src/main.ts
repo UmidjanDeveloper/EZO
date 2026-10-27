@@ -374,6 +374,7 @@ async function speak(run: Api, text: string, language: Lang | null): Promise<voi
     const audio = await run.speak(text, language);
     player?.pause();
     const current = new Audio(URL.createObjectURL(audio));
+    current.volume = prefs.voiceVolume;
     player = current;
     await new Promise<void>((resolve) => {
       current.onplaying = () => followLevel(current);
@@ -891,7 +892,14 @@ async function scheduleReminder(): Promise<void> {
 async function saveSettings(): Promise<void> {
   const url = normalizeApiUrl($<HTMLInputElement>("apiUrl").value);
   if (!url) return setStatus(t.more.urlInvalid, "error");
-  prefs = { ...prefs, apiUrl: url, speakReplies: $<HTMLInputElement>("speakReplies").checked, lowPower: $<HTMLInputElement>("lowPower").checked ? "on" : "auto" };
+  const volume = Number($<HTMLInputElement>("voiceVolume").value);
+  prefs = {
+    ...prefs,
+    apiUrl: url,
+    speakReplies: $<HTMLInputElement>("speakReplies").checked,
+    lowPower: $<HTMLInputElement>("lowPower").checked ? "on" : "auto",
+    voiceVolume: Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : 1,
+  };
   avatar?.setLowPower(prefs.lowPower === "on" || EzoAvatar.prefersLowPower());
   savePrefs(prefs);
   const token = $<HTMLInputElement>("token").value.trim();
@@ -1040,6 +1048,7 @@ async function start(): Promise<void> {
   $<HTMLInputElement>("apiUrl").value = prefs.apiUrl;
   $<HTMLInputElement>("speakReplies").checked = prefs.speakReplies;
   $<HTMLInputElement>("lowPower").checked = prefs.lowPower === "on";
+  $<HTMLInputElement>("voiceVolume").value = String(prefs.voiceVolume);
   if (!prefs.onboarded) return showWelcome();
   if (await connect()) {
     showTab("chat");

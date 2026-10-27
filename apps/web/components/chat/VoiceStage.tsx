@@ -17,6 +17,7 @@ import {
   serverRecordingSupported,
   speakReply,
   stopVoice,
+  storedVoiceVolume,
 } from "@/lib/voice/engine";
 import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
@@ -43,6 +44,7 @@ const storedVoiceLanguage = createStoredValue<VoiceLanguage | "">(
 export function VoiceStage({ session }: { session: Session }) {
   const { m, f, language: uiLanguage } = useI18n();
   const storedLanguage = storedVoiceLanguage.useValue();
+  const volume = storedVoiceVolume.useValue();
   // "auto": EZO hears uz, en or ru and answers in the language it heard.
   const choice: VoiceLanguage = storedLanguage || "auto";
   const lastHeardRef = useRef<LanguageCode | null>(null);
@@ -194,7 +196,20 @@ export function VoiceStage({ session }: { session: Session }) {
       data-engine={engine ?? "none"}
     >
       <EzoHumanoid state={visible} framing="bust" label={status} frame followPointer onPointerGaze={camera.pointer} onAvatar={setAvatar} className="absolute inset-0" />
-      <div className="relative z-10 flex w-full max-w-2xl justify-end gap-1" role="group" aria-label={m.voice.language}>
+      <div className="relative z-10 flex w-full max-w-2xl items-center justify-between gap-2">
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          aria-label={m.voice.volume}
+          title={m.voice.volume}
+          onChange={(event) => storedVoiceVolume.set(event.target.value)}
+          className="h-1 w-24 cursor-pointer accent-sky-300"
+          data-testid="voice-volume"
+        />
+      <div className="flex justify-end gap-1" role="group" aria-label={m.voice.language}>
         {LANGUAGES.map((code) => (
           <button
             key={code}
@@ -210,6 +225,7 @@ export function VoiceStage({ session }: { session: Session }) {
             {code === "auto" ? m.voice.auto : code}
           </button>
         ))}
+      </div>
       </div>
 
       {/* The whole stage is the talk button: tap EZO to talk, interrupt or stop. */}

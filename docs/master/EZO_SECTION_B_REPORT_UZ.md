@@ -18,6 +18,7 @@ ular bilan bog‘liq hamma narsa **KUTILMOQDA** deb belgilangan.
 | Android | Ovoz sahnasida kamera qatori (holat, tugma, maxfiylik matni), barmoq — «kamera emas» deb belgilangan zaxira; sahna yopilganda yoki ilova fonga o‘tganda kamera va figura to‘xtaydi; tejamkor rejim sozlamasi; emulyator testi endi sahnani haqiqiy qurilmada ochadi. |
 | Veb | O‘sha sahna, o‘sha qoidalar: kamera qatori, belgilangan sichqoncha zaxirasi, yashirin tab — kamera to‘xtaydi; 10 marta ochib-yopishda xotira oshmaydi. |
 | Kamera/imo-ishora | **KUTILMOQDA (Codex)**. Shartnoma (`TrackingFrame, HeadPose, HandTarget, MotionIntent, ClapEvent, VisionStatus, VoiceIntent`) va `AttentionDriver` tayyor, uchala ilovada ulanish joyi bor. Bu build’da dvigatel yo‘q — shuning uchun kamera tugmasi o‘chiq va sababini aytadi. Testlar faqat **simulyatsiya** kadrlari bilan; ekranda ham «SIMULYATSIYA» yozuvi chiqadi. |
+| Ovoz balandligi | **BAJARILDI**: veb sahnasida slayder, Android va Windows sozlamalarida — EZO ovozining haqiqiy ijro elementiga qo‘llanadi (uz/en/ru). |
 | Ovoz | Pipeline avvalgidek haqiqiy API bilan ishlaydi; jag‘ animatsiyasi EZO’ning o‘z nutqi o‘lchovidan (`captureStream`) boshqariladi, o‘lchov bo‘lmasa — ritm, lekin xira va «o‘lchov» deb ko‘rsatilmaydi. Haqiqiy o‘zbekcha ovoz — serverda kalit (OpenAI/ElevenLabs) bo‘lsa. |
 
 ## 2. `packages/avatar` da nima yaxshilandi (BAJARILDI)
@@ -77,6 +78,7 @@ Rasmlar (kodning o‘zidan, Chromium SwiftShader): `docs/devices/img/humanoid-st
 | Playwright `camera-attention` (veb) | 3/3 (yangi) |
 | Playwright `mobile-stage` | 2/2 (yangi) |
 | Playwright `accessibility` | 11/11 |
+| Playwright `avatar-modes` (demo sahifasida: kam harakat, 30 kadr/s, WebGL kontekst yo‘qolishi/tiklanishi, 9 holat yuzga yetadi) | 3/3 (yangi) |
 | Playwright to‘liq to‘plam (lokal, `pnpm test:e2e`) | 89/89 |
 | CI / Devices / Security (`0b3ed4a` yoki yakuniy head) | __CI__ |
 

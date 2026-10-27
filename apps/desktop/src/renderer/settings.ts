@@ -15,6 +15,7 @@ interface DesktopSettings {
   allowCamera: boolean;
   lowPower: boolean;
   onboarded: boolean;
+  voiceVolume: number;
   shortcut: string;
   conversationId: string | null;
   jarvisFolder: string | null;
@@ -152,6 +153,9 @@ async function init(): Promise<void> {
     box.checked = settings[flag];
     box.addEventListener("change", () => void bridge.save({ [flag]: box.checked }));
   }
+  const volume = byId<HTMLInputElement>("voiceVolume");
+  volume.value = String(settings.voiceVolume);
+  volume.addEventListener("change", () => void bridge.save({ voiceVolume: Number(volume.value) }));
   const select = byId<HTMLSelectElement>("shortcut");
   select.replaceChildren(
     ...shortcuts.map((s) => {

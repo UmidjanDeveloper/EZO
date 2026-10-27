@@ -146,6 +146,7 @@ interface PillInit {
   /** What the owner allowed in settings; the renderer never asks the OS for more. */
   media: { microphone: boolean; camera: boolean };
   lowPower: boolean;
+  voiceVolume: number;
 }
 
 function pillInit(): PillInit {
@@ -156,6 +157,7 @@ function pillInit(): PillInit {
     status: lastStatus,
     media: { microphone: settings.allowMicrophone, camera: settings.allowCamera },
     lowPower: settings.lowPower,
+    voiceVolume: settings.voiceVolume,
   };
 }
 
