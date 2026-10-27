@@ -27,6 +27,7 @@ reproduced stays in §C._
 
 | ID | Sev | Reproduction | Root cause | Fix | Regression test | Status |
 |---|---|---|---|---|---|---|
+| D-007 | P3 | Second `pnpm --filter @ezo/web build` after switching branches: "Failed to compile. RealContentHashPlugin … An asset was cached with a reference to another asset that's not in the compilation anymore" (seen twice in this session; a fresh CI checkout never hits it) | webpack 5 persistent cache (`.next/cache/webpack`) keeps content-hash references across builds with different chunk graphs | The web build script removes `.next/cache/webpack` before `next build --webpack` (the vision-assets step already runs first) | `pnpm --filter @ezo/web build` twice in a row on two branches | FIXED (PR #62) |
 
 ## C. Unconfirmed suspicions (not defects until reproduced)
 
