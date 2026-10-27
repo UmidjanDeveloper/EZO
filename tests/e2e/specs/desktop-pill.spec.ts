@@ -28,6 +28,11 @@ const STRINGS = {
     cameraTracking: "Kamera: yuz ko‘rinmoqda", cameraLost: "Kamera: yuz topilmadi", cameraPrivacy: "Tasvir kompyuteringizdan chiqmaydi, yozib olinmaydi, yuz tanilmaydi.",
     attentionPointer: "EZO sichqonchaga qaraydi (kamera emas)", attentionHand: "EZO qo‘lingizga qaraydi", attentionHead: "EZO sizga qaraydi", attentionSimulated: "SIMULYATSIYA — haqiqiy kamera emas",
     lowPower: "Tejamkor rejim: 30 kadr/s", clap: "Qarsak eshitildi",
+    cameraAssetsMissing: "Kamera modeli bu buildga qo‘shilmagan (vision assets yo‘q).", cameraAssetsInvalid: "Kamera modeli tekshiruvdan o‘tmadi: {detail}",
+    cameraEngine: "Yuz/qo‘l kuzatuvi: MediaPipe, shu kompyuterda; kadrlar hech qayerga yuborilmaydi.", cameraError: "Kamera xatosi: {detail}",
+    clapListen: "Qarsakni tinglash", clapStop: "Tinglashni to‘xtatish", clapOff: "Qarsak mikrofoni o‘chiq", clapRequesting: "Mikrofon so‘ralmoqda…", clapActive: "Mikrofon (qarsak) faol",
+    clapDenied: "Mikrofonga ruxsat berilmadi — «Qarsakni tinglash»ni qayta bosing.", clapError: "Mikrofon xatosi: {detail}", clapPrivacy: "Faqat qarsak kabi qisqa tovushlar aniqlanadi.",
+    clapSettings: "Qarsakni tinglash sozlamalarda o‘chiq — avval u yerda yoqing.", clapUnavailable: "Ovoz provayderi yo‘q — javob aytilmadi.",
   },
   en: { idle: "EZO", idleHint: "{shortcut} — speak", thinking: "Thinking…", thinkingHint: "Request sent", offline: "EZO offline", offlineHint: "Cannot reach the server", stopped: "Stopped", you: "You", talk: "Start or stop talking", type: "Ask by typing", stop: "Stop", settings: "Settings", typePlaceholder: "For example: open the calculator", history: "Conversation history", newConversation: "New conversation", noHistory: "No messages yet.", showHideHint: "Show/hide: Ctrl+Alt+H" },
 };

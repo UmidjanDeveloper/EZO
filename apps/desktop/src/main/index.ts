@@ -72,7 +72,7 @@ function serveAppOrigin(): void {
     const extension = path.extname(file).toLowerCase();
     const headers: Record<string, string> = { "Content-Type": CONTENT_TYPES[extension] ?? "application/octet-stream", "Cache-Control": "no-store" };
     // The perception worker may compile the bundled WASM and importScripts its verified loader (a blob it made itself); nothing remote.
-    if (relative.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self'";
+    if (relative.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self' blob:";
     return new Response(readFileSync(file), { headers });
   });
 }

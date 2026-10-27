@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 // The REAL perception engine (@ezo/face-tracking: MediaPipe in a worker, assets served from
 // this origin and SHA256-verified) on the voice stage, driven by Chromium's FAKE camera and a
@@ -28,6 +30,15 @@ const SILENT_WAV = (() => {
 
 test.setTimeout(120_000);
 
+// Screenshots for docs/devices/img when EZO_SHOTS_DIR is set (CI never sets it). They show the
+// SIMULATED camera (Chromium's synthetic picture) and are labelled so in the file name.
+const SHOTS = process.env.EZO_SHOTS_DIR;
+const shot = async (page: Page, name: string) => {
+  if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `section-c-simulation-${name}.png`), fullPage: false });
+};
+// MediaPipe prints its TensorFlow Lite "INFO" line on stderr/console.error; it is not an error.
+const realErrors = (errors: string[]) => errors.filter((e) => !/favicon|^INFO: Created TensorFlow Lite XNNPACK delegate/.test(e));
+
 test("perception (simulated camera): assets verify, the worker runs inference, the status is honest, three open/close cycles leak nothing", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
@@ -45,12 +56,13 @@ test("perception (simulated camera): assets verify, the worker runs inference, t
     await expect(row.getByTestId("camera-indicator")).toContainText("Camera active");
     await expect.poll(async () => Number(await row.getAttribute("data-fps")), { timeout: 30_000 }).toBeGreaterThan(0);
     expect(Number(await row.getAttribute("data-inference-ms"))).toBeGreaterThan(0);
+    if (cycle === 0) await shot(page, "web-stage");
     await row.getByTestId("camera-toggle").click();
     await expect(row.getByTestId("camera-state")).toHaveAttribute("data-camera", "off");
     await expect(row.getByTestId("camera-indicator")).toContainText("Camera off");
     expect(await page.evaluate(() => (document.querySelector("video") as HTMLVideoElement).srcObject)).toBeNull();
   }
-  expect(errors.filter((e) => !/favicon/.test(e))).toEqual([]);
+  expect(realErrors(errors)).toEqual([]);
 });
 
 test("perception (simulated camera): a hidden tab stops the camera at once; leaving the stage releases everything", async ({ page }) => {
@@ -84,7 +96,7 @@ test("clap (simulated microphone file): separate consent, a clap is heard, EZO a
     synthesized += 1;
     const body = route.request().postDataJSON() as { text: string; language: string };
     expect(body).toEqual({ text: "Eshitaman seni.", language: "uz" });
-    await route.fulfill({ body: SILENT_WAV, contentType: "audio/wav", headers: { "X-EZO-Voice-Provider": "fixture-tts" } });
+    await route.fulfill({ body: SILENT_WAV, contentType: "audio/wav", headers: { "X-EZO-Voice-Provider": "fixture-tts", "Access-Control-Expose-Headers": "X-EZO-Voice-Provider" } });
   });
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
@@ -124,8 +136,6 @@ test("clap (simulated microphone file): without a voice provider the reply is no
 // app's https://ezo.desktop protocol handler does) and the Android web app (apps/mobile/dist),
 // both on the same real engine with the same fake camera. SIMULATION, not a PC or a phone.
 
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
 
 const DESKTOP_DIST = path.resolve(__dirname, "../../../apps/desktop/dist");
 const MOBILE_DIST = path.resolve(__dirname, "../../../apps/mobile/dist");
@@ -137,7 +147,7 @@ async function serveFromMemory(page: Page, origin: string, root: string) {
     const ext = path.extname(file);
     const type = ext === ".js" ? "text/javascript" : ext === ".css" ? "text/css" : ext === ".json" ? "application/json" : ext === ".wasm" ? "application/wasm" : ext === ".html" ? "text/html" : "application/octet-stream";
     const headers: Record<string, string> = {};
-    if (file.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self'";
+    if (file.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self' blob:";
     return route.fulfill({ body: readFileSync(file), contentType: type, headers });
   });
 }
@@ -197,6 +207,7 @@ test("Windows pill (simulated camera): the stage on the real engine — assets v
   await page.locator("#clapToggle").click();
   await expect(page.locator("#clapState")).toHaveAttribute("data-microphone", "active", { timeout: 20_000 });
   await expect(page.locator("#clapHeard")).toContainText("Qarsak eshitildi", { timeout: 30_000 });
+  await shot(page, "windows-pill-stage");
   await expect.poll(async () => (await page.evaluate(() => (window as unknown as { __calls: string[] }).__calls)).filter((c) => c.startsWith("speak:")), { timeout: 15_000 }).toEqual(["speak:uz:Eshitaman seni."]);
   await expect(page.locator("#pill")).toHaveClass(/speaking/, { timeout: 10_000 });
   await expect(page.locator("#pill")).toHaveClass(/idle/, { timeout: 15_000 });
@@ -225,6 +236,7 @@ test("Android web app (simulated camera): the stage on the real engine — camer
   await page.locator("#cameraToggle").click();
   await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", /tracking|lost/, { timeout: 60_000 });
   await expect.poll(async () => Number(await page.locator("#voiceStage").getAttribute("data-fps")), { timeout: 30_000 }).toBeGreaterThan(0);
+  await shot(page, "android-stage");
   await page.locator("#stageClose").click();
   await expect(page.locator("#voiceStage")).toBeHidden();
   expect(await page.evaluate(() => (document.getElementById("perceptionVideo") as HTMLVideoElement).srcObject)).toBeNull();

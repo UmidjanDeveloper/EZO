@@ -29,7 +29,8 @@ hisobotini nusxalab qaytarish).
   `scripts/vision/pins.json` ga solishtiradi (nomuvofiq bo‘lsa rad etadi), pin qilingan WASM’ni
   `node_modules` dan nusxalaydi, dvigatel worker’ini bundle qiladi. Ish vaqtida CDN yo‘q.
   Worker har bir baytni yana tekshiradi. Veb: `public/vision`; Windows: `dist/vision`
-  (`https://ezo.desktop` origin’idan beriladi, CSP qat’iy: `wasm-unsafe-eval`, `worker-src 'self' blob:`);
+  (`https://ezo.desktop` origin’idan beriladi, CSP qat’iy: `wasm-unsafe-eval`, `worker-src 'self' blob:`,
+  `connect-src 'self' blob:` — oxirgisi bo‘lmasa WASM runtime tekshirilgan blob’ni o‘qiy olmaydi);
   Android: `dist/vision`, manifestda `CAMERA` ruxsati.
 - **Kamera tugmasi** faqat `vision-assets.json` tekshiruvdan o‘tganda yoqiladi; aks holda
   aniq sabab bilan o‘chiq («model yo‘q», «tekshiruvdan o‘tmadi», «tarmoq»).
@@ -76,6 +77,13 @@ hisobotini nusxalab qaytarish).
 3. `ClapMicrophone` uchun mikrofon darajasi (`onLevel`) — Diagnostikada «mic level» ko‘rsatish uchun.
 4. `onStatus` xato matnlarini mashina o‘qiydigan kodga ajrating (`denied`, `revoked`,
    `interrupted`) — hozir UI regex bilan farqlaydi.
+5. `createVisionEstimator` dagi 15 soniyalik qat’iy muddat (init va har bir kadr uchun bir xil)
+   sozlanadigan bo‘lsin (`initTimeoutMs`, `frameTimeoutMs`): CI dagi Android emulyatori
+   (x86, nosimd WASM, CPU) shu muddatga ulgurmadi — «Vision deadline exceeded». Sekin
+   telefonlarda ham xuddi shu bo‘ladi. `AttentionController` ning `maxAgeMs` (500 ms) ham
+   sekin qurilmalar uchun sozlanadigan bo‘lishi kerak.
+6. `MEDIAPIPE_ASSET_PINS` ga SIMD WASM variantini ham qo‘shing (hozir faqat `nosimd`
+   pin qilingan): zamonaviy telefon va kompyuterlarda inference 2–4 barobar tezlashadi.
 
 ## 6. Raqamlar
 

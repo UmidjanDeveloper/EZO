@@ -302,7 +302,7 @@ const reaction = new VoiceReaction(speaker, (event) => {
 function renderAttention(view: AttentionView): void {
   const line = $("attention");
   line.textContent =
-    view.source === "hand" ? t.voice.attentionHand : view.source === "face" ? t.voice.attentionHead : view.source === "touch" ? t.voice.attentionTouch : "";
+    view.source === "hand" ? t.voice.attentionHand : view.source === "face" ? t.voice.attentionHead : view.source === "touch" || view.source === "pointer" ? t.voice.attentionTouch : "";
 }
 
 function renderCamera(): void {
@@ -380,8 +380,11 @@ async function toggleClap(): Promise<void> {
 
 /** Mounts the engine for the open stage; one session per figure, released with it. */
 function mountPerception(): void {
-  if (!avatar || !readiness?.ready || perception) return;
-  adapter = new MotionAdapter(avatar, { onChange: renderAttention });
+  if (!avatar) return;
+  // The adapter (engine first, labelled touch/pointer fallback) lives with the figure even when
+  // the engine is not available in this build; the session is added once the assets verified.
+  adapter ??= new MotionAdapter(avatar, { onChange: renderAttention });
+  if (!readiness?.ready || perception) return;
   perception = new PerceptionSession({
     base: VISION_BASE,
     assets: readiness.assets,

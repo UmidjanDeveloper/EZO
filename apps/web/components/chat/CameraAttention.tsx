@@ -67,11 +67,22 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
     };
   }, []);
 
-  // One engine session per mounted figure; released with it (stage closed, mode changed).
+  // The adapter (engine first, labelled pointer/touch fallback) lives with the figure, with or
+  // without the engine; it is the only thing that moves the figure's eyes and head.
   useEffect(() => {
-    if (!avatar || !readiness?.ready || !nodes.video || !nodes.camera || !nodes.microphone) return;
+    if (!avatar) return;
     const adapter = new MotionAdapter(avatar, { onChange: setView });
     adapterRef.current = adapter;
+    return () => {
+      adapter.stop();
+      if (adapterRef.current === adapter) adapterRef.current = null;
+    };
+  }, [avatar]);
+
+  // One engine session per mounted figure; released with it (stage closed, mode changed).
+  useEffect(() => {
+    const adapter = adapterRef.current;
+    if (!avatar || !adapter || !readiness?.ready || !nodes.video || !nodes.camera || !nodes.microphone) return;
     const speaker = createAcknowledgementSpeaker(() => hooksRef.current.providerKey, setTts);
     speakerRef.current = speaker;
     const reaction = new VoiceReaction(speaker, (event) => {
@@ -113,7 +124,6 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
       speaker.stop();
       session.stop();
       sessionRef.current = null;
-      adapterRef.current = null;
       setVision(OFF);
       setMicrophone({ status: "off" });
     };

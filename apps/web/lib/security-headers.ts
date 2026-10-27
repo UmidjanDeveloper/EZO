@@ -11,14 +11,15 @@ export function contentSecurityPolicy(nonce: string, apiOrigin: string, dev = fa
   const directives = [
     "default-src 'self'",
     // 'wasm-unsafe-eval': the perception worker compiles the bundled MediaPipe WASM (same origin, SHA256-pinned).
-    // blob: lets that worker importScripts its verified loader and the clap AudioWorklet load its module.
+    // blob: lets that worker importScripts its verified loader and the clap AudioWorklet load its module;
+    // connect-src blob: lets the WASM runtime read the verified binary blob the worker made itself.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' blob:${dev ? " 'unsafe-eval'" : ""}`,
     "worker-src 'self' blob:",
     // React sets style attributes (animations, sizes); styles cannot run code.
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' blob: data:${api}`,
     `media-src 'self' blob:${api}`,
-    `connect-src 'self'${api}${dev ? " ws: wss:" : ""}`,
+    `connect-src 'self' blob:${api}${dev ? " ws: wss:" : ""}`,
     "font-src 'self' data:",
     "object-src 'none'",
     "base-uri 'self'",

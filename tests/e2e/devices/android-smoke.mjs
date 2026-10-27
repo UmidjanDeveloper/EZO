@@ -143,9 +143,30 @@ try {
   // the camera must open through the WebView and the worker must run inference on the emulator's
   // synthetic scene. The honest state is tracking or lost; an error is recorded, not hidden.
   await page.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
+  // A timeline of the engine start on the device (state changes + the worker's own console
+  // lines, seconds since the press) so a slow emulator is diagnosable from the job annotations.
+  const timeline = [];
+  const pressedAt = Date.now();
+  const since = () => `${((Date.now() - pressedAt) / 1000).toFixed(1)}s`;
+  const onConsole = (message) => {
+    const text = message.text();
+    if (/Graph successfully started|XNNPACK|Aborted|deadline|Vision|wasm/i.test(text)) timeline.push(`${since()} console: ${text.slice(0, 120)}`);
+  };
+  page.on("console", onConsole);
   await page.click("#cameraToggle");
-  await page.waitForFunction(() => ["tracking", "lost", "error", "denied"].includes(document.getElementById("cameraState")?.dataset.camera ?? ""), undefined, { timeout: 120_000 });
+  let last = "";
+  for (let i = 0; i < 120; i++) {
+    const state = await page.evaluate(() => document.getElementById("cameraState")?.dataset.camera ?? "");
+    if (state !== last) {
+      timeline.push(`${since()} state: ${state}`);
+      last = state;
+    }
+    if (["tracking", "lost", "error", "denied"].includes(state)) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
   await new Promise((r) => setTimeout(r, 5000));
+  page.off("console", onConsole);
+  step("camera engine timeline on the device (SIMULATION)", timeline.join(" | "));
   const camera = await page.evaluate(() => ({
     state: document.getElementById("cameraState")?.dataset.camera,
     text: document.getElementById("cameraState")?.textContent,

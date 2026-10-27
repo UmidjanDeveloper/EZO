@@ -8,7 +8,7 @@ describe("content security policy", () => {
     expect(csp).not.toContain("'unsafe-eval'"); // WASM may compile; JavaScript eval stays forbidden
     expect(csp).toContain("worker-src 'self' blob:"); // the perception worker from this origin
     expect(STATIC_SECURITY_HEADERS["Permissions-Policy"]).toContain("camera=(self)");
-    expect(csp).toContain("connect-src 'self' https://api.ezo.example");
+    expect(csp).toContain("connect-src 'self' blob: https://api.ezo.example");
     expect(csp).toContain("frame-ancestors 'none'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("upgrade-insecure-requests");

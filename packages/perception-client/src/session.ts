@@ -134,12 +134,14 @@ export class PerceptionSession {
   private frame(frame: PerceptionFrame): void {
     if (!this.active) return;
     const now = performance.now();
-    if (!this.attention.ingest(frame, now)) return;
-    this.microphone.detector.observeHands(frame.handsDistance, now);
+    // Diagnostics count every inference, including frames the controller rejects as stale
+    // (slower than its freshness budget): the owner must see "inference 900 ms" rather than nothing.
     this.inferenceMs = frame.inferenceMs;
     this.samples.push(frame.timestampMs);
     const floor = frame.timestampMs - 1000;
     while (this.samples.length && this.samples[0]! < floor) this.samples.shift();
+    const fresh = this.attention.ingest(frame, now);
+    if (fresh) this.microphone.detector.observeHands(frame.handsDistance, now);
     this.report();
   }
 

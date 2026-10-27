@@ -101,16 +101,24 @@ offline. Real renders of `packages/avatar/demo` in Chromium (SwiftShader), with 
   them from its own origin (`/vision/`), the worker re-verifies every byte before use, and
   nothing is fetched at runtime. Licence note: `scripts/vision/MODEL_LICENSE_REVIEW.txt`.
 
-**Sensing contract and attention** (`sensing.ts`)
-- The camera/gesture engine (owned separately: `packages/face-tracking` today, hand, gesture
-  and clap recognition as they land) and EZO's surfaces meet on structural types:
-  `TrackingFrame` (identical in shape to the face-tracking package's), `HeadPose`,
-  `HandTarget`, `MotionIntent`, `ClapEvent`, `VisionStatus`, `VoiceIntent`.
-- `AttentionDriver` turns frames into one gaze: a raised hand before the tracked face
-  before the pointer/touch fallback (labelled as such) before rest. Frames count only while
-  the camera reports `tracking` and the view is visible; a frame older than 400 ms,
-  below 0.5 confidence or non-finite releases the gaze; a 0.03 deadband stops jitter;
-  `stop()` lets go of everything. Hidden views never track.
+**Sensing contract, security and limits** (`sensing.ts`, `@ezo/perception-client`)
+- The engine and EZO's surfaces meet on structural types only: `MotionIntent`,
+  `AttentionState`, `VisionStatus`, `AttentionView`. The adapter lives with the figure in
+  every stage (with or without the engine), so the pointer/touch fallback is always labelled
+  "(not the camera)"; the engine session is added once the bundled assets verified.
+- CSP for the engine: `script-src … 'wasm-unsafe-eval' blob:` (the worker compiles the
+  bundled WASM and `importScripts` the verified loader from a blob it made itself),
+  `worker-src 'self' blob:` (the worker and the clap AudioWorklet), and `connect-src … blob:`
+  (the WASM runtime reads the verified binary blob; without it the worker dies with
+  "Failed to execute 'send' on 'XMLHttpRequest'"). Web: `apps/web/lib/security-headers.ts`;
+  Windows: `pill.html` meta + the `vision.worker.js` response header in `main/index.ts`.
+  No remote host appears in any directive.
+- Engine limits known from CI: `createVisionEstimator` gives the worker 15 s for its
+  initialisation and for each frame (fixed in the engine); the controller ignores frames
+  older than 500 ms, so on a machine where face+hand inference takes longer than that the
+  figure stays neutral while Diagnostics still shows the FPS and inference time. The bundled
+  WASM is the `nosimd` build (the only one pinned by the engine). Both are requests to Codex
+  in the Section C PR; the Android emulator in CI hit the 15 s deadline.
 - The real engine is bundled in every app since Section C; the camera control is enabled
   once `vision-assets.json` validates and disabled with the exact reason otherwise. CI runs
   the engine with Chromium's fake camera and a fake microphone file of clap-like bursts

@@ -309,8 +309,12 @@ async function toggleClap(): Promise<void> {
 
 /** Mounts the engine for the expanded stage; one session per figure, released with it. */
 function mountPerception(): void {
-  if (!face || !readiness?.ready || perception) return;
-  adapter = new MotionAdapter(face, { onChange: renderAttention });
+  if (!face) return;
+  // The adapter (engine first, labelled pointer fallback) lives with the figure even when the
+  // engine is not available (no app origin, assets missing); the session is added once verified.
+  adapter ??= new MotionAdapter(face, { onChange: renderAttention });
+  adapter.setVisible(visible);
+  if (!readiness?.ready || perception) return;
   perception = new PerceptionSession({
     base: VISION_BASE,
     assets: readiness.assets,
@@ -344,7 +348,6 @@ function mountPerception(): void {
       }
     },
   });
-  adapter.setVisible(visible);
 }
 
 function unmountPerception(): void {
