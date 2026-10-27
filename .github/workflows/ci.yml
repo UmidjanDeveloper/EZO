@@ -105,6 +105,7 @@ jobs:
         working-directory: apps/api
       - run: pnpm --filter @ezo/e2e exec playwright install --with-deps chromium
       - name: Humanoid sensing permissions, AudioWorklet and pinned worker (fake media, not physical hardware)
+        timeout-minutes: 5
         env:
           EZO_BROWSER_REPORT: reports/browser.json
         run: pnpm --filter @ezo/face-tracking test:browser

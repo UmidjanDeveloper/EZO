@@ -24,7 +24,7 @@ Claude Max. Existing API methods are used through a structural adapter.
 Environment: Linux cloud, Node24.19.0,5 logical CPUs, MemTotal34,906,016KiB
 (~33.3GiB), managed Chromium154. This is **not** the owner's <16GB PC, Android,
 Windows Electron or a4/8GB VM. A synthetic browser sample of10,000 attention updates
-measured12.2ms and100 seconds of zero PCM measured41.4ms CPU elapsed at one checkpoint;
+measured12.2ms and100 seconds of zero PCM measured41.4ms wall time for the synthetic loop at one checkpoint;
 these are single-run bookkeeping costs, **not camera FPS/CPU/GPU/RAM/latency figures**.
 Raw repeated measurements vary. No meaningful real-inference memory/GPU/battery or
 clap-to-voice latency measurement is available; none is inferred from those numbers.

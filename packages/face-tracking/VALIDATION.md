@@ -45,7 +45,9 @@ unchanged hosted CI jobs for this branch; they were not rerun locally for this
 isolated TypeScript change. Hosted status and exact head are recorded separately
 once available. Initial hosted browser runs exposed Not supported when opening fake
 camera/microphone in the default headless shell. The harness now explicitly selects
-the full Chromium new-headless channel; no capture/cleanup assertions were removed. A green hosted run cannot close the model/hardware gates above.
+the full Chromium new-headless channel and a real button click for AudioContext
+activation; no capture/cleanup assertions were removed. Each browser case has a30s
+deadline and context cleanup, and the CI step has a5min limit. A green hosted run cannot close the model/hardware gates above.
 The earlier2026-10-24 mocked-only package evidence remains in Git history.
 
 ## Remaining review gates
