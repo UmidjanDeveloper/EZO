@@ -1,7 +1,8 @@
 // The floating pill: idle → listening → recognizing → thinking/working → speaking, always
 // with a visible state and a real stop. Audio is recorded only while the red listening
 // state is shown. Every word comes from the main process in the owner's language.
-import { createLevelMeter, EzoAvatar, type AvatarState, type LevelMeter } from "@ezo/avatar";
+import { AttentionDriver, createLevelMeter, createVoiceFrame, EzoAvatar, type AvatarState, type LevelMeter, type MotionIntent, type VisionStatus, type VoiceFrame } from "@ezo/avatar";
+import { sensingProvider, type SensingSession } from "./sensing";
 
 interface TurnResponse {
   transcript?: string;
@@ -19,6 +20,8 @@ interface PillInit {
   shortcut: string;
   language: string;
   status: PillStatus;
+  media?: { microphone: boolean; camera: boolean };
+  lowPower?: boolean;
 }
 interface PillStatus {
   online: boolean;
@@ -48,6 +51,7 @@ interface EzoBridge {
   openSettings(): void;
   setFocusable(focusable: boolean): void;
   setHeight(height: number): void;
+  setExpanded(expanded: boolean): void;
   refreshStatus(): Promise<PillStatus>;
   recentHistory(): Promise<History>;
   conversations(): Promise<{ ok: boolean; conversations?: { id: string; title: string }[]; message?: string }>;
@@ -61,6 +65,8 @@ interface EzoBridge {
   onStatus(callback: (status: unknown) => void): void;
   onTasks(callback: (tasks: unknown) => void): void;
   onInit(callback: (init: unknown) => void): void;
+  onVisibility?(callback: (visible: unknown) => void): void;
+  onExpanded?(callback: (expanded: unknown) => void): void;
 }
 
 const ezo = (window as unknown as { ezo: EzoBridge }).ezo;
@@ -71,7 +77,9 @@ const pill = $("pill");
 const label = $("label");
 const hint = $("hint");
 const panel = $("panel");
+const stage = $("stage");
 const dot = $("dot");
+const mediaBox = $("media");
 const stopButton = $<HTMLButtonElement>("stop");
 const question = $<HTMLInputElement>("question");
 
@@ -90,12 +98,156 @@ let recordingTimer: number | undefined;
 let turnId = 0;
 let settleTimer: number | undefined;
 const SUCCESS_MS = 1600; // the figure's own gold burst lasts this long
+let media: { microphone: boolean; camera: boolean } = { microphone: true, camera: false };
+let lowPower = false;
+let expanded = false;
+let visible = true;
 
 // EZO's humanoid face follows the microphone while listening and its own voice while speaking.
-const face: EzoAvatar | null = EzoAvatar.supported()
-  ? new EzoAvatar($<HTMLCanvasElement>("face"), { framing: "head", quality: "low", terrain: false, describe: (s) => t[s] ?? s })
-  : null;
-if (face) document.body.classList.add("has-face");
+// One figure at a time: the small head in the pill, or the bust on the expanded stage.
+let face: EzoAvatar | null = null;
+let frame: VoiceFrame | null = null;
+const webgl = EzoAvatar.supported();
+if (webgl) document.body.classList.add("has-face");
+
+function mountFace(): void {
+  frame?.destroy();
+  frame = null;
+  face?.destroy();
+  face = null;
+  attention?.stop();
+  if (!webgl) return;
+  const canvas = expanded ? $<HTMLCanvasElement>("stageFace") : $<HTMLCanvasElement>("face");
+  face = new EzoAvatar(canvas, {
+    framing: expanded ? "bust" : "head",
+    quality: expanded ? "auto" : "low",
+    terrain: expanded,
+    power: lowPower ? "low" : "auto",
+    describe: (s) => t[s] ?? s,
+  });
+  face.setState(state);
+  face.setActive(visible);
+  if (expanded) {
+    frame = createVoiceFrame($("stageFrame"), { words: {} , showWord: false });
+    frame.follow(face);
+  }
+  attention = new AttentionDriver(face, { onIntent: renderAttention });
+  attention.setVision(vision);
+}
+
+// Where EZO looks: the camera engine when the owner enabled it, else the pointer (labelled so).
+let attention: AttentionDriver | null = null;
+let vision: VisionStatus = { camera: "off", faces: 0, hands: 0, since: 0 };
+let camera: SensingSession | null = null;
+let cameraGeneration = 0;
+
+function renderAttention(intent: MotionIntent): void {
+  const line = $("attention");
+  if (intent.kind !== "look") line.textContent = "";
+  else if (intent.source === "hand") line.textContent = fmt("attentionHand");
+  else if (intent.source === "head") line.textContent = fmt("attentionHead");
+  else line.textContent = fmt("attentionPointer");
+  if (vision.simulated && intent.kind === "look" && intent.source !== "pointer" && intent.source !== "touch") line.textContent += ` — ${fmt("attentionSimulated")}`;
+}
+
+function renderMedia(): void {
+  const chips: HTMLElement[] = [];
+  if (stream) {
+    const mic = document.createElement("span");
+    mic.textContent = "MIC";
+    mic.title = fmt("micActive");
+    mic.setAttribute("aria-label", fmt("micActive"));
+    chips.push(mic);
+  }
+  if (camera && (vision.camera === "tracking" || vision.camera === "lost" || vision.camera === "requesting")) {
+    const cam = document.createElement("span");
+    cam.className = "cam";
+    cam.textContent = "CAM";
+    cam.title = fmt("cameraActive");
+    cam.setAttribute("aria-label", fmt("cameraActive"));
+    chips.push(cam);
+  }
+  mediaBox.replaceChildren(...chips);
+}
+
+function renderCamera(): void {
+  const stateBox = $("cameraState");
+  const button = $<HTMLButtonElement>("cameraToggle");
+  stateBox.dataset.camera = vision.camera;
+  const words: Record<string, string> = {
+    off: fmt("cameraOff"),
+    requesting: fmt("cameraRequesting"),
+    denied: fmt("cameraDenied"),
+    unavailable: fmt("cameraUnavailable"),
+    tracking: fmt("cameraTracking"),
+    lost: fmt("cameraLost"),
+    error: vision.message ?? fmt("cameraDenied"),
+  };
+  stateBox.textContent = (words[vision.camera] ?? vision.camera) + (vision.simulated ? ` (${fmt("attentionSimulated")})` : "");
+  const provider = sensingProvider();
+  button.disabled = !provider || !media.camera;
+  button.textContent = camera ? fmt("cameraStop") : fmt("cameraOn");
+  button.title = !media.camera ? fmt("cameraSettings") : !provider ? fmt("cameraUnavailable") : "";
+  $("cameraPrivacy").textContent = !media.camera ? fmt("cameraSettings") : !provider ? fmt("cameraUnavailable") : fmt("cameraPrivacy");
+  renderMedia();
+}
+
+function setVision(next: VisionStatus): void {
+  vision = next;
+  attention?.setVision(next);
+  renderCamera();
+}
+
+/** Opens the camera through the sensing engine, only from the owner's click and only when allowed. */
+async function startCamera(): Promise<void> {
+  const provider = sensingProvider();
+  if (!provider || !media.camera || camera) return;
+  const video = document.createElement("video");
+  video.muted = true;
+  video.playsInline = true;
+  const generation = ++cameraGeneration;
+  setVision({ camera: "requesting", faces: 0, hands: 0, since: performance.now(), simulated: provider.simulated });
+  try {
+    const session = await provider.start({
+      video,
+      onStatus: (status) => {
+        // Only the session being started (or running) may report; a stopped one is ignored.
+        if (generation === cameraGeneration) setVision({ ...status, simulated: provider.simulated || status.simulated });
+      },
+      onHead: (frameIn) => attention?.headFrame(frameIn),
+      onHand: (hand) => attention?.handFrame(hand),
+      onClap: () => showPanel("", fmt("clap")),
+    });
+    camera = session;
+    if (!visible || !media.camera) stopCamera(); // revoked or hidden while asking
+  } catch (error) {
+    camera = null;
+    setVision({ camera: "error", faces: 0, hands: 0, since: performance.now(), message: String((error as Error).message ?? error), simulated: provider.simulated });
+  }
+  renderCamera();
+}
+
+function stopCamera(): void {
+  cameraGeneration += 1;
+  camera?.stop();
+  camera = null;
+  attention?.headFrame(null);
+  attention?.handFrame(null);
+  setVision({ camera: "off", faces: 0, hands: 0, since: performance.now() });
+}
+
+function setExpanded(next: boolean): void {
+  if (expanded === next) return;
+  expanded = next;
+  stage.hidden = !next;
+  $("expand").setAttribute("aria-pressed", String(next));
+  $("expand").textContent = next ? "⤡" : "⤢";
+  if (!next) stopCamera();
+  mountFace();
+  renderCamera();
+  resize();
+}
+
 let meter: LevelMeter | null = null;
 let meterFrame = 0;
 
@@ -116,7 +268,7 @@ function fmt(key: string, values: Record<string, string> = {}): string {
 }
 
 function resize(): void {
-  requestAnimationFrame(() => ezo.setHeight(panel.hidden ? 72 : document.body.scrollHeight + 4));
+  requestAnimationFrame(() => ezo.setHeight(panel.hidden && stage.hidden ? 72 : document.body.scrollHeight + 4));
 }
 
 function setState(next: State, detail?: string): void {
@@ -215,6 +367,11 @@ async function renderHistory(): Promise<void> {
 
 async function startListening(): Promise<void> {
   stopSpeaking();
+  if (!media.microphone) {
+    setState("error", fmt("micOff"));
+    showPanel("", fmt("micOff"));
+    return;
+  }
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
   } catch {
@@ -231,6 +388,7 @@ async function startListening(): Promise<void> {
   recorder.start();
   followLevel(stream);
   setState("listening");
+  renderMedia();
   recordingTimer = window.setTimeout(() => stopListening(), MAX_RECORDING_MS);
 }
 
@@ -241,6 +399,7 @@ function stopListening(cancel = false): void {
   if (recorder && recorder.state !== "inactive") recorder.stop();
   stream?.getTracks().forEach((track) => track.stop()); // the OS mic indicator turns off here
   stream = null;
+  renderMedia();
 }
 
 async function finishRecording(mimeType: string): Promise<void> {
@@ -307,6 +466,13 @@ function toggle(): void {
 }
 
 $("orb").addEventListener("click", toggle);
+$("expand").addEventListener("click", () => ezo.setExpanded(!expanded));
+$("cameraToggle").addEventListener("click", () => (camera ? stopCamera() : void startCamera()));
+$("stageFace").addEventListener("pointermove", (event) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  attention?.pointerGaze({ yaw: ((event.clientX - rect.left) / rect.width) * 2 - 1, pitch: 1 - ((event.clientY - rect.top) / rect.height) * 2 }, "pointer");
+});
+$("stageFace").addEventListener("pointerleave", () => attention?.pointerGaze(null));
 stopButton.addEventListener("click", () => stopEverything(fmt("stopped")));
 $("gear").addEventListener("click", () => ezo.openSettings());
 $("keyboard").addEventListener("click", () => {
@@ -366,6 +532,14 @@ function applyInit(init: PillInit): void {
   t = init.strings;
   shortcut = init.shortcut;
   document.documentElement.lang = init.language;
+  media = init.media ?? media;
+  lowPower = init.lowPower ?? false;
+  face?.setLowPower(lowPower);
+  if (!media.camera) stopCamera();
+  if (!media.microphone && state === "listening") stopListening(true);
+  $("expand").setAttribute("aria-label", expanded ? fmt("collapse") : fmt("expand"));
+  $("expand").title = expanded ? fmt("collapse") : fmt("expand");
+  renderCamera();
   $("orb").setAttribute("aria-label", fmt("talk"));
   $("orb").title = `${fmt("talk")} (${shortcut})`;
   $("keyboard").setAttribute("aria-label", fmt("type"));
@@ -398,6 +572,19 @@ ezo.onStage((stage) => {
 ezo.onStatus((next) => renderStatus(next as PillStatus));
 ezo.onTasks((tasks) => renderTasks(tasks as TaskSummary[]));
 ezo.onInit((init) => applyInit(init as PillInit));
+// Hidden (Ctrl+Alt+H, tray, quitting): release the microphone and the camera, stop drawing.
+ezo.onVisibility?.((next) => {
+  visible = next !== false;
+  if (!visible) {
+    if (state === "listening") stopListening(true);
+    stopCamera();
+    stopSpeaking();
+  }
+  face?.setActive(visible);
+  attention?.setVisible(visible);
+});
+ezo.onExpanded?.((next) => setExpanded(next === true));
+mountFace();
 void ezo.init().then((init) => {
   applyInit(init);
   void ezo.tasks().then(renderTasks);

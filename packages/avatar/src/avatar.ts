@@ -108,6 +108,7 @@ export class EzoAvatar {
   private blinkStart = -Infinity;
   private nextBlink = 1.2;
   private lowPower = false;
+  private active = true;
   private readonly describe: ((state: AvatarState) => string) | null;
   private time = 0;
   private last = 0;
@@ -188,6 +189,12 @@ export class EzoAvatar {
 
   isLowPower(): boolean {
     return this.lowPower;
+  }
+
+  /** A hidden host (an Electron window that is hidden, a collapsed stage) stops drawing entirely. */
+  setActive(active: boolean): void {
+    this.active = active;
+    this.syncRunning();
   }
 
   /** The facial amounts drawn now (blink, eye direction, jaw…): for tests and the voice frame. */
@@ -319,7 +326,7 @@ export class EzoAvatar {
 
   private syncRunning(): void {
     const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
-    if (!this.destroyed && !this.reduced && this.glState && visible) this.startLoop();
+    if (!this.destroyed && !this.reduced && this.glState && visible && this.active) this.startLoop();
     else {
       this.stopLoop();
       this.redrawIfStill();

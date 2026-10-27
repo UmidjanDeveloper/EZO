@@ -14,3 +14,5 @@ ul { padding-left: 18px; }
 li button { margin-left: 8px; padding: 2px 8px; }
 #testResult.ok { color: #1e8e3e; }
 #testResult.bad { color: #c0392b; }
+.welcome { border: 1px solid rgba(91,140,255,.5); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; background: rgba(91,140,255,.08); }
+.welcome p { margin: 6px 0; }

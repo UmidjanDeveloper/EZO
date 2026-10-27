@@ -11,6 +11,10 @@ interface DesktopSettings {
   allowScreen: boolean;
   allowVolume: boolean;
   speakReplies: boolean;
+  allowMicrophone: boolean;
+  allowCamera: boolean;
+  lowPower: boolean;
+  onboarded: boolean;
   shortcut: string;
   conversationId: string | null;
   jarvisFolder: string | null;
@@ -44,7 +48,7 @@ interface SettingsBridge {
 
 const bridge = (window as unknown as { ezoSettings: SettingsBridge }).ezoSettings;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies"] as const;
+const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "allowCamera", "lowPower"] as const;
 let t: SettingsStrings = {};
 let secure = true;
 let pairingPoll: number | undefined;
@@ -106,6 +110,14 @@ async function init(): Promise<void> {
   secure = secureStorage;
   document.documentElement.lang = settings.language;
   applyStrings();
+  // First run: a short welcome at the top, until the owner closes it.
+  const welcome = byId("welcome");
+  welcome.hidden = settings.onboarded;
+  byId("welcomeStep3").textContent = fmt("welcomeStep3", { shortcut: settings.shortcut.replace("Control", "Ctrl") });
+  byId("welcomeDone").addEventListener("click", async () => {
+    await bridge.save({ onboarded: true });
+    welcome.hidden = true;
+  });
   byId<HTMLInputElement>("apiUrl").value = settings.apiUrl;
   tokenState(hasToken);
   const language = byId<HTMLSelectElement>("language");
