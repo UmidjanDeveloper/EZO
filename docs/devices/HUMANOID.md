@@ -29,7 +29,8 @@ copied from the reference. What changed:
 - contour lines are brighter across the front, not only at the rim; mountains brighter, a
   few more warm sparks, fewer dust points to stay inside the point budgets;
 - a cheap bloom: a share of the points is drawn a second time as wide, faint sprites
-  (skipped in economy mode); stronger veins and face light; a denser crown spray; a cluster
+  (skipped in economy mode, and switched off for the session when the loop measures slower
+  than ~40 fps, e.g. software rendering; `data-glow` on the canvas says which); stronger veins and face light; a denser crown spray; a cluster
   of sparks on the sternum where the veins meet.
 
 | Desktop 1280×800 | Phone (iPhone 13 profile) |

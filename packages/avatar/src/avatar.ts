@@ -49,6 +49,8 @@ const UNIFORMS = [
   "uBlink", "uDroop", "uEyeX", "uEyeY", "uBrow", "uMouth", "uSmile",
 ] as const;
 const LOW_POWER_FRAME_MS = 1000 / 30;
+/** Slower than this (about 40 fps), the glow pass is switched off for the rest of the session. */
+const GLOW_MIN_FRAME_MS = 25;
 type UniformName = (typeof UNIFORMS)[number];
 
 interface GlState {
@@ -118,6 +120,9 @@ export class EzoAvatar {
   /** Measured loop cost: exponential averages of the display interval and of step+draw time (ms). */
   private frameMs = 0;
   private drawMs = 0;
+  /** The glow pass is dropped for good once this device proves too slow to afford it. */
+  private glow = true;
+  private measured = 0;
   private running = false;
   private destroyed = false;
   private readonly reduced: boolean;
@@ -158,6 +163,7 @@ export class EzoAvatar {
     canvas.dataset.points = String(this.figure.count);
     canvas.dataset.buildMs = buildMs.toFixed(1);
     canvas.dataset.power = this.lowPower ? "low" : "high";
+    canvas.dataset.glow = "on";
     canvas.dataset.motion = this.reduced ? "reduced" : "full";
     canvas.dataset.state = this.state;
     this.label();
@@ -377,6 +383,12 @@ export class EzoAvatar {
       // Measured, not estimated: what the loop actually costs on this device (for Diagnostics).
       this.frameMs = this.frameMs ? this.frameMs * 0.9 + interval * 0.1 : interval;
       this.drawMs = this.drawMs ? this.drawMs * 0.9 + cost * 0.1 : cost;
+      // Below ~40 fps (software rendering, a weak GPU) the glow is the first thing to go.
+      this.measured += 1;
+      if (this.glow && !this.lowPower && this.measured >= 8 && this.frameMs > GLOW_MIN_FRAME_MS) {
+        this.glow = false;
+        this.canvas.dataset.glow = "off";
+      }
     };
     this.frame = requestAnimationFrame(tick);
   }
@@ -536,7 +548,7 @@ export class EzoAvatar {
     bind(1, attributes.data, 4);
     bind(2, attributes.extra, 2);
     // Bloom-like glow under the sharp points (skipped in economy mode).
-    if (!this.lowPower) {
+    if (this.glow && !this.lowPower) {
       gl.uniform1f(u.uGlow, 1);
       gl.drawArrays(gl.POINTS, 0, this.figure.count);
     }
