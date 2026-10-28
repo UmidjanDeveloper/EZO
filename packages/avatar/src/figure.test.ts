@@ -70,3 +70,10 @@ describe("buildFigure", () => {
     }
   });
 });
+
+it("holographic profile keeps contour anatomy and voice light without illustrative facial features", () => {
+  const figure = buildFigure({ quality: "low", terrain: true, style: "holographic" });
+  for (const part of ["eye", "lid", "brow", "mouth"] as const) expect(figure.counts[part]).toBe(0);
+  for (const part of ["head", "body", "core", "terrain"] as const) expect(figure.counts[part]).toBeGreaterThan(0);
+  expect(figure.positions.every(Number.isFinite)).toBe(true);
+});

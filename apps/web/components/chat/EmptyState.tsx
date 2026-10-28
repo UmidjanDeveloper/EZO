@@ -11,8 +11,9 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
       <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6 }}>
         <EzoHumanoid
           state="idle"
-          framing="head"
-          className="relative aspect-square w-[min(230px,36vh,62vw)] rounded-full shadow-[0_0_60px_-10px_rgba(56,189,248,0.55)]"
+          framing="bust"
+          style="holographic"
+          className="relative h-[min(380px,42vh)] w-[min(600px,88vw)] [mask-image:linear-gradient(to_bottom,black_75%,transparent)]"
         />
       </motion.div>
       <motion.h1

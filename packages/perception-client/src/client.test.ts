@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadVisionAssets } from "./assets";
-import { cameraState } from "./session";
+import { MotionAdapter } from "@ezo/avatar";
+import { PerceptionSession, cameraState } from "./session";
 
 // Pure parts of the client glue. The sessions themselves run in Playwright against the real
 // engine with Chromium's fake media (tests/e2e/specs/perception.spec.ts).
@@ -41,4 +42,13 @@ describe("cameraState", () => {
     expect(cameraState("error", "NotAllowedError: denied")).toBe("denied");
     expect(cameraState("error", "Vision deadline exceeded")).toBe("error");
   });
+});
+
+it("microphone consent is independent from missing camera models; camera remains fail closed", async () => {
+  const getUserMedia=vi.fn(async()=>{throw new Error("NotAllowedError: denied");});
+  vi.stubGlobal("document", {hidden:false,addEventListener:vi.fn(),removeEventListener:vi.fn()});
+  vi.stubGlobal("isSecureContext",true);vi.stubGlobal("navigator",{mediaDevices:{getUserMedia}});
+  vi.stubGlobal("addEventListener",vi.fn());vi.stubGlobal("removeEventListener",vi.fn());
+  const session=new PerceptionSession({base:"/vision/",video:{pause:vi.fn()} as unknown as HTMLVideoElement,cameraIndicator:{} as HTMLElement,microphoneIndicator:{} as HTMLElement,adapter:new MotionAdapter({setGaze:vi.fn()})});
+  try { await session.startCamera();expect(getUserMedia).not.toHaveBeenCalled();expect(session.visionStatus().camera).toBe("unavailable");await session.startClap();expect(getUserMedia).toHaveBeenCalledExactlyOnceWith({video:false,audio:expect.any(Object)}); } finally {session.stop();vi.unstubAllGlobals();}
 });

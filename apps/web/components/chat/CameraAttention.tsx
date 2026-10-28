@@ -13,7 +13,7 @@ const OFF: VisionStatus = { camera: "off", since: 0 };
 export interface AcknowledgementHooks {
   /** The acknowledgement clip started / ended / could not be produced. */
   onPlayback: (phase: "start" | "end" | "unavailable" | "error") => void;
-  /** Spoken language for the acknowledgement (the UI language). */
+  /** Spoken language selected for this conversation (UI language only as fallback). */
   language: Language;
   /** Changes when the server's voice provider changes (drops the clip cache). */
   providerKey: string;
@@ -82,7 +82,7 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
   // One engine session per mounted figure; released with it (stage closed, mode changed).
   useEffect(() => {
     const adapter = adapterRef.current;
-    if (!avatar || !adapter || !readiness?.ready || !nodes.video || !nodes.camera || !nodes.microphone) return;
+    if (!avatar || !adapter || !nodes.video || !nodes.camera || !nodes.microphone) return;
     const speaker = createAcknowledgementSpeaker(() => hooksRef.current.providerKey, setTts);
     speakerRef.current = speaker;
     const reaction = new VoiceReaction(speaker, (event) => {
@@ -94,7 +94,7 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
     reactionRef.current = reaction;
     const session = new PerceptionSession({
       base: VISION_BASE,
-      assets: readiness.assets,
+      assets: readiness?.ready ? readiness.assets : undefined,
       video: nodes.video,
       cameraIndicator: nodes.camera,
       microphoneIndicator: nodes.microphone,
@@ -194,7 +194,7 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
       toggle: toggleCamera,
     },
     clap: {
-      available: Boolean(readiness?.ready),
+      available: Boolean(avatar && nodes.video && nodes.camera && nodes.microphone),
       consent: clapConsent === "on",
       running: micRunning,
       status: microphone.status,

@@ -82,3 +82,21 @@ test("voice: the composer microphone opens voice mode", async ({ page }) => {
   await page.getByTestId("composer-voice").click();
   await expect(page.getByTestId("voice-stage")).toBeVisible();
 });
+
+test("voice: holographic stage reserves space for the figure and keeps clap available without camera assets", async ({ page }) => {
+  await page.route("**/vision/vision-assets.json", route => route.fulfill({ status: 404, body: "missing" }));
+  await page.goto("/");
+  await page.getByTestId("mode-voice").click();
+  await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "holographic");
+  await expect(page.getByTestId("camera-toggle")).toBeDisabled();
+  await expect(page.getByTestId("clap-toggle")).toBeEnabled();
+  await expect(page.getByTestId("voice-frame")).toHaveCount(0);
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    const scene = await page.getByTestId("voice-scene").boundingBox();
+    const controls = await page.getByTestId("voice-controls").boundingBox();
+    expect(scene).not.toBeNull(); expect(controls).not.toBeNull();
+    expect(scene!.height).toBeGreaterThanOrEqual(320);
+    expect(controls!.y).toBeGreaterThanOrEqual(scene!.y + scene!.height - 1);
+  }
+});

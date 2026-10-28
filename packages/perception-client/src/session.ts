@@ -30,7 +30,7 @@ export interface Diagnostics {
 export interface SessionHost {
   /** Asset base on the app's own origin, e.g. "/vision/"; the bundled worker is `${base}vision.worker.js`. */
   base: string;
-  assets: VisionAssets;
+  assets?: VisionAssets;
   video: HTMLVideoElement;
   /** The engine writes its own status words into these (keep them visible). */
   cameraIndicator: HTMLElement;
@@ -104,13 +104,15 @@ export class PerceptionSession {
       video: host.video,
       indicator: host.cameraIndicator,
       lowPower: host.lowPower,
-      createEstimator: (signal) =>
-        createVisionEstimator(host.assets, (frame) => this.frame(frame), {
+      createEstimator: (signal) => {
+        if (!host.assets) throw new Error("Reviewed camera assets unavailable");
+        return createVisionEstimator(host.assets, (frame) => this.frame(frame), {
           signal,
           workerFactory: () => new Worker(`${host.base}vision.worker.js`),
           // Engine defaults: 60 s for initialization (fetch + SHA256 of 22 MB + WASM compile + two
           // model loads: ≈9 s on a laptop, 17–23 s on the CI Android emulator), 15 s per frame.
-        }),
+        });
+      },
       onFrame: () => undefined,
       onStatus: (status, error) => {
         if (error) this.lastError = error;
@@ -162,6 +164,13 @@ export class PerceptionSession {
   /** Permission action: bind to the camera button only. */
   async startCamera(): Promise<void> {
     if (this.stopped || document.hidden) return;
+    if (!this.host.assets) {
+      this.lastError = "Reviewed camera assets unavailable";
+      this.vision = { camera: "unavailable", message: this.lastError, since: performance.now() };
+      this.host.onVision?.(this.vision);
+      this.report();
+      return;
+    }
     this.lastError = null;
     this.active = true;
     document.addEventListener("visibilitychange", this.hide);
