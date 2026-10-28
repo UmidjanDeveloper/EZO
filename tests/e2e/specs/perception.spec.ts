@@ -56,7 +56,18 @@ test("perception (simulated camera): assets verify, the worker runs inference, t
     await expect(row.getByTestId("camera-indicator")).toContainText("Camera active");
     await expect.poll(async () => Number(await row.getAttribute("data-fps")), { timeout: 30_000 }).toBeGreaterThan(0);
     expect(Number(await row.getAttribute("data-inference-ms"))).toBeGreaterThan(0);
-    if (cycle === 0) await shot(page, "web-stage");
+    if (cycle === 0) {
+      await shot(page, "web-stage");
+      // The owner's Diagnostics: plain text, numbers and words only, never an image or landmarks.
+      await row.getByTestId("diagnostics").locator("summary").click();
+      await row.getByTestId("diagnostics-copy").click();
+      const text = (await row.getByTestId("diagnostics-text").textContent()) ?? "";
+      expect(text).toMatch(/^EZO web diagnostics/);
+      expect(text).toMatch(/camera: (tracking|lost)/);
+      expect(text).toMatch(/figure\.fps: \d/);
+      expect(text).toMatch(/vision: assets verified/);
+      expect(text).not.toMatch(/data:image|landmark|base64/);
+    }
     await row.getByTestId("camera-toggle").click();
     await expect(row.getByTestId("camera-state")).toHaveAttribute("data-camera", "off");
     await expect(row.getByTestId("camera-indicator")).toContainText("Camera off");

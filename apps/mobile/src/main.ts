@@ -1192,7 +1192,7 @@ function diagnosticsReport(): string {
     server: { url: prefs.apiUrl ? "set" : "missing", online: server.online, ai: server.ai, voice: server.voice },
     stage: $("voiceStage").hidden ? "closed" : "open",
     figure: avatar
-      ? { renderer: avatar.renderer, points: avatar.canvas.dataset.points, power: avatar.canvas.dataset.power, frames: avatar.getFrameCount(), level: Number(avatar.getLevel().toFixed(2)), liveLevel: avatar.hasLiveLevel() }
+      ? { renderer: avatar.renderer, points: avatar.canvas.dataset.points, power: avatar.canvas.dataset.power, frames: avatar.getFrameCount(), ...avatar.getPerformance(), level: Number(avatar.getLevel().toFixed(2)), liveLevel: avatar.hasLiveLevel() }
       : null,
     vision: readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking",
     camera: vision.camera,
