@@ -278,7 +278,7 @@ function reportDiagnostics(): void {
       microphone: microphone.status,
       stage: expanded ? "expanded" : "pill",
       figure: face
-        ? { renderer: face.renderer, points: face.canvas.dataset.points, power: face.canvas.dataset.power, frames: face.getFrameCount(), level: Number(face.getLevel().toFixed(2)), liveLevel: face.hasLiveLevel() }
+        ? { renderer: face.renderer, points: face.canvas.dataset.points, power: face.canvas.dataset.power, frames: face.getFrameCount(), ...face.getPerformance(), level: Number(face.getLevel().toFixed(2)), liveLevel: face.hasLiveLevel() }
         : null,
       vision: readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking",
       tts: lastTts,

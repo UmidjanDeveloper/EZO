@@ -579,6 +579,12 @@ const uz = {
       startsListening: "Qarsakdan keyin tinglashni boshlasin",
       simulated: "SIMULYATSIYA — haqiqiy mikrofon emas",
     },
+    diagnostics: {
+      title: "Diagnostika",
+      copy: "Hisobotni nusxalash",
+      copied: "Nusxalandi — egasiga yuboring",
+      note: "Faqat raqamlar va so‘zlar: rasm, ovoz yoki yuz nuqtalari yo‘q.",
+    },
     languages: { uz: "o‘zbekcha", en: "inglizcha", ru: "ruscha" },
   },
   personal: {
@@ -1341,6 +1347,12 @@ const en: Messages = {
       startsListening: "Start listening after a clap",
       simulated: "SIMULATED — not a real microphone",
     },
+    diagnostics: {
+      title: "Diagnostics",
+      copy: "Copy report",
+      copied: "Copied — send it to the owner",
+      note: "Numbers and words only: no images, audio or face points.",
+    },
     languages: { uz: "Uzbek", en: "English", ru: "Russian" },
   },
   personal: {
@@ -2100,6 +2112,12 @@ const ru: Messages = {
       unavailable: "Нет голосового провайдера — ответ не озвучен.",
       startsListening: "Начинать слушать после хлопка",
       simulated: "СИМУЛЯЦИЯ — не настоящий микрофон",
+    },
+    diagnostics: {
+      title: "Диагностика",
+      copy: "Скопировать отчёт",
+      copied: "Скопировано — отправьте владельцу",
+      note: "Только числа и слова: без изображений, звука и точек лица.",
     },
     languages: { uz: "узбекский", en: "английский", ru: "русский" },
   },

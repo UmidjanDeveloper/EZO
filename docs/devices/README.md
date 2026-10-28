@@ -70,6 +70,19 @@ listed above, and only from your own words.
 - On Windows: `pnpm --filter @ezo/desktop dist:win`. The output is
   `apps/desktop/release/EZO-Setup-*.exe`.
 
+### Updating the Windows app (safe strategy)
+
+There is no auto-updater and no update server: the app never contacts anything but the EZO
+server the owner configured. To update, download the newer `EZO-Setup-<version>.exe` from
+the Devices artifacts (or a release the owner published) and run it: the NSIS installer is
+not one-click, it upgrades the existing installation in place, and settings, the token and
+the conversation history stay in the per-user data folder (`%APPDATA%\EZO`). The installed
+version and build SHA are visible in Settings → Diagnostics, and the same SHA appears in the
+PR status comment that produced the artifact, so an update can always be traced to a tested
+commit. Unsigned builds are development builds: SmartScreen warns on first run until the
+owner provides a code-signing identity; never disable antivirus or SmartScreen to install.
+Uninstall uses the normal Windows "Apps" entry (verified silently in CI: nothing left behind).
+
 ## 3. Android app
 
 **Installing:**

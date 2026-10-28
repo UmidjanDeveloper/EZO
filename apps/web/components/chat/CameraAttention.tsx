@@ -212,6 +212,41 @@ export function useCameraAttention(avatar: EzoAvatar | null, hooks: Acknowledgem
     attention,
     diagnostics,
     tts,
+    /** Plain-text Diagnostics for the owner: numbers and words only (no images, audio or landmarks). */
+    report: (): string => {
+      const perf = avatar?.getPerformance() ?? null;
+      const lines: [string, unknown][] = [
+        ["EZO web diagnostics", ""],
+        ["version", process.env.NEXT_PUBLIC_EZO_VERSION ?? "dev"],
+        ["sha", process.env.NEXT_PUBLIC_EZO_BUILD_SHA ?? "dev"],
+        ["at", new Date().toISOString()],
+        ["language", hooksRef.current.language],
+        ["voice.provider", hooksRef.current.providerKey || "—"],
+        ["figure.renderer", avatar?.renderer ?? "—"],
+        ["figure.points", avatar?.canvas.dataset.points ?? "—"],
+        ["figure.power", avatar?.canvas.dataset.power ?? "—"],
+        ["figure.frames", avatar?.getFrameCount() ?? 0],
+        ["figure.frameMs", perf?.frameMs ?? 0],
+        ["figure.drawMs", perf?.drawMs ?? 0],
+        ["figure.fps", perf?.fps ?? 0],
+        ["figure.heapMb", perf?.heapMb ?? "—"],
+        ["figure.liveLevel", avatar?.hasLiveLevel() ?? false],
+        ["vision", readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking"],
+        ["camera", vision.camera],
+        ["camera.fps", diagnostics?.cameraFps ?? 0],
+        ["camera.inferenceMs", diagnostics?.inferenceMs ?? "—"],
+        ["camera.faceDetected", diagnostics?.faceDetected ?? false],
+        ["camera.handDetected", diagnostics?.handDetected ?? false],
+        ["attention", diagnostics?.attention ?? "neutral"],
+        ["microphone", microphone.status],
+        ["clap.count", diagnostics?.clapCount ?? 0],
+        ["tts.provider", tts?.provider ?? "—"],
+        ["tts.latencyMs", tts?.latencyMs ?? "—"],
+        ["tts.cached", tts?.cached ?? "—"],
+        ["lastError", diagnostics?.lastError ?? "—"],
+      ];
+      return lines.map(([k, v]) => (k === "EZO web diagnostics" ? k : `${k}: ${String(v)}`)).join("\n");
+    },
   };
 }
 
@@ -287,7 +322,46 @@ export function CameraAttentionRow({ camera }: { camera: ReturnType<typeof useCa
       </div>
       <p className="max-w-md text-center text-[11px] text-slate-400">{camera.camera.privacy}</p>
       <p className="max-w-md text-center text-[11px] text-slate-500">{camera.clap.privacy}</p>
+      <DiagnosticsPanel report={camera.report} />
     </div>
+  );
+}
+
+/** Hidden by default; the owner opens it, copies the plain-text report and pastes it back. */
+function DiagnosticsPanel({ report }: { report: () => string }) {
+  const { m } = useI18n();
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+  const refresh = () => {
+    setText(report());
+    setCopied(false);
+  };
+  const copy = async () => {
+    const value = report();
+    setText(value);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+    } catch {
+      setCopied(false); // the text stays visible for a manual copy
+    }
+  };
+  return (
+    <details className="w-full max-w-md text-[11px] text-slate-400" data-testid="diagnostics" onToggle={(e) => e.currentTarget.open && refresh()}>
+      <summary className="cursor-pointer text-center text-slate-500">{m.voice.diagnostics.title}</summary>
+      <p className="mt-1 text-center">{m.voice.diagnostics.note}</p>
+      <div className="mt-1 flex justify-center gap-2">
+        <button type="button" onClick={refresh} className="rounded-full border border-slate-600 px-2.5 py-0.5 text-slate-100" data-testid="diagnostics-refresh">
+          ↻
+        </button>
+        <button type="button" onClick={() => void copy()} className="rounded-full border border-slate-600 px-2.5 py-0.5 text-slate-100" data-testid="diagnostics-copy">
+          {copied ? m.voice.diagnostics.copied : m.voice.diagnostics.copy}
+        </button>
+      </div>
+      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-slate-900/60 p-2 text-left text-[10px] text-slate-300" data-testid="diagnostics-text">
+        {text}
+      </pre>
+    </details>
   );
 }
 

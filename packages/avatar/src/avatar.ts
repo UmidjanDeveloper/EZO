@@ -115,6 +115,9 @@ export class EzoAvatar {
   private last = 0;
   private frame = 0;
   private frames = 0;
+  /** Measured loop cost: exponential averages of the display interval and of step+draw time (ms). */
+  private frameMs = 0;
+  private drawMs = 0;
   private running = false;
   private destroyed = false;
   private readonly reduced: boolean;
@@ -204,6 +207,23 @@ export class EzoAvatar {
   /** Frames drawn so far (still redraws included): proves the loop survives a context loss. */
   getFrameCount(): number {
     return this.frames;
+  }
+
+  /**
+   * Measured performance for Diagnostics: average display interval and step+draw cost in
+   * milliseconds (0 until the loop has run), the resulting frames per second, and the JS heap in
+   * MB where the browser exposes it (Chromium's non-standard `performance.memory`; null elsewhere).
+   * Numbers only; nothing is uploaded.
+   */
+  getPerformance(): { frameMs: number; drawMs: number; fps: number; heapMb: number | null } {
+    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory;
+    const heap = memory?.usedJSHeapSize;
+    return {
+      frameMs: Number(this.frameMs.toFixed(2)),
+      drawMs: Number(this.drawMs.toFixed(2)),
+      fps: this.frameMs > 0 ? Number((1000 / this.frameMs).toFixed(1)) : 0,
+      heapMb: typeof heap === "number" && Number.isFinite(heap) ? Number((heap / 1048576).toFixed(1)) : null,
+    };
   }
 
   /** The facial amounts drawn now (blink, eye direction, jaw…): for tests and the voice frame. */
@@ -352,9 +372,15 @@ export class EzoAvatar {
       // Economy: skip every other display frame rather than draw a lighter figure.
       if (this.lowPower && now - this.last < LOW_POWER_FRAME_MS - 2) return;
       const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
+      const interval = now - this.last;
       this.last = now;
+      const started = performance.now();
       this.step(dt);
       this.draw();
+      const cost = performance.now() - started;
+      // Measured, not estimated: what the loop actually costs on this device (for Diagnostics).
+      this.frameMs = this.frameMs ? this.frameMs * 0.9 + interval * 0.1 : interval;
+      this.drawMs = this.drawMs ? this.drawMs * 0.9 + cost * 0.1 : cost;
     };
     this.frame = requestAnimationFrame(tick);
   }
