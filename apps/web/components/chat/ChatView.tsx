@@ -224,7 +224,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
               role="tab"
               aria-selected={mode === key}
               onClick={() => setMode(key)}
-              data-testid={`mode-${key}`}
+              data-testid={mode === "voice" ? undefined : `mode-${key}`}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors",
                 mode === key ? "bg-accent text-on-accent" : "text-ink-muted hover:text-ink",
@@ -272,7 +272,7 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
 
       {mode === "voice" ? (
         <div className="min-h-0 flex-1">
-          <VoiceStage session={session} />
+          <VoiceStage session={session} onExit={() => setMode("text")} offline={status?.offline_mode} />
         </div>
       ) : (
         <>

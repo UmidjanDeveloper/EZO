@@ -150,7 +150,9 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-state", "speaking");
   expect(speakRequests).toBe(1);
   // The volume slider is applied to the real playback element.
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   await page.getByTestId("voice-volume").fill("0.4");
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   expect(await page.evaluate(() => localStorage.getItem("ezo-voice-volume"))).toBe("0.4");
 
   // Barge-in: tap the robot while EZO speaks → it stops and listens.
@@ -206,6 +208,7 @@ test("auto language: EZO hears Russian and answers with a Russian voice", async 
 
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   await expect(page.getByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true"); // the default
   const chatRequest = page.waitForRequest((request) => request.url().includes("/api/chat/stream"));
   await page.getByTestId("voice-toggle").click();

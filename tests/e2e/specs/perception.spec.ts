@@ -45,6 +45,7 @@ test("perception (simulated camera): assets verify, the worker runs inference, t
   page.on("console", (message) => message.type() === "error" && errors.push(message.text()));
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("camera-attention");
   await expect(row.getByTestId("camera-toggle")).toBeEnabled({ timeout: 20_000 }); // vision-assets.json validated
   await expect(row).toContainText("MediaPipe");
@@ -79,6 +80,7 @@ test("perception (simulated camera): assets verify, the worker runs inference, t
 test("perception (simulated camera): a hidden tab stops the camera at once; leaving the stage releases everything", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("camera-attention");
   await expect(row.getByTestId("camera-toggle")).toBeEnabled({ timeout: 20_000 });
   await row.getByTestId("camera-toggle").click();
@@ -111,6 +113,7 @@ test("clap (simulated microphone file): separate consent, a clap is heard, EZO a
   });
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("camera-attention");
   await expect(row.getByTestId("clap-toggle")).toBeEnabled({ timeout: 20_000 });
   await expect(row.getByTestId("clap-state")).toHaveAttribute("data-microphone", "off"); // off until the owner presses
@@ -135,6 +138,7 @@ test("clap (simulated microphone file): without a voice provider the reply is no
   await page.route("**/api/voice/speak", (route) => route.fulfill({ status: 503, json: { error: { code: "voice_not_configured", message: "no provider" } } }));
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("camera-attention");
   await expect(row.getByTestId("clap-toggle")).toBeEnabled({ timeout: 20_000 });
   await row.getByTestId("clap-toggle").click();
