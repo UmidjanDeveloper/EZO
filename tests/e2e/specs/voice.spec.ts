@@ -83,19 +83,28 @@ test("voice: the composer microphone opens voice mode", async ({ page }) => {
   await expect(page.getByTestId("voice-stage")).toBeVisible();
 });
 
-test("voice: holographic stage reserves space for the figure, has no camera and keeps clap available", async ({ page }) => {
+test("voice: immersive holographic stage fills the viewport, has no camera and keeps clap available", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
   await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "holographic");
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   await expect(page.getByTestId("camera-toggle")).toHaveCount(0);
   await expect(page.getByTestId("clap-toggle")).toBeEnabled();
   await expect(page.getByTestId("voice-frame")).toHaveCount(0);
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.setViewportSize(viewport);
     const scene = await page.getByTestId("voice-scene").boundingBox();
     const controls = await page.getByTestId("voice-controls").boundingBox();
     expect(scene).not.toBeNull(); expect(controls).not.toBeNull();
-    expect(scene!.height).toBeGreaterThanOrEqual(320);
-    expect(controls!.y).toBeGreaterThanOrEqual(scene!.y + scene!.height - 1);
+    expect(scene!.x).toBe(0); expect(scene!.y).toBe(0);
+    expect(scene!.width).toBe(viewport.width);
+    expect(scene!.height).toBe(viewport.height);
+    expect(controls!.y).toBeGreaterThan(viewport.height * 0.6);
+    await expect(page.getByTestId("camera-toggle")).not.toBeVisible();
+    await expect(page.getByTestId("voice-sensor-status")).toBeVisible();
   }
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("voice-stage")).toHaveCount(0);
+  await expect(page.getByTestId("mode-voice")).toBeVisible();
 });

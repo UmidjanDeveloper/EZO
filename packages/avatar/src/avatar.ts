@@ -140,7 +140,8 @@ export class EzoAvatar {
     this.reduced = options.reducedMotion ?? media?.matches ?? false;
     this.describe = options.describe ?? null;
     const rect = canvas.getBoundingClientRect();
-    const small = Math.max(rect.width, rect.height) < 260;
+    // A canvas not laid out yet (e.g. inside a dialog that opens after this runs) measures 0x0: unknown, not small.
+    const small = rect.width > 0 && rect.height > 0 && Math.max(rect.width, rect.height) < 260;
     const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
     const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
     this.lowPower = options.power === "low" || (options.power !== "high" && EzoAvatar.prefersLowPower());

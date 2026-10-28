@@ -35,6 +35,7 @@ test("clap (simulated microphone file): off until pressed, a hidden tab stops it
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("clap-controls");
   await expect(row.getByTestId("clap-toggle")).toBeEnabled({ timeout: 20_000 });
   await expect(row.getByTestId("clap-state")).toHaveAttribute("data-microphone", "off");
@@ -76,6 +77,7 @@ test("clap (simulated microphone file): separate consent, a clap is heard, EZO a
   });
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("clap-controls");
   await expect(row.getByTestId("clap-toggle")).toBeEnabled({ timeout: 20_000 });
   await expect(row.getByTestId("clap-state")).toHaveAttribute("data-microphone", "off"); // off until the owner presses
@@ -100,6 +102,7 @@ test("clap (simulated microphone file): without a voice provider the reply is no
   await page.route("**/api/voice/speak", (route) => route.fulfill({ status: 503, json: { error: { code: "voice_not_configured", message: "no provider" } } }));
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
   const row = page.getByTestId("clap-controls");
   await expect(row.getByTestId("clap-toggle")).toBeEnabled({ timeout: 20_000 });
   await row.getByTestId("clap-toggle").click();
