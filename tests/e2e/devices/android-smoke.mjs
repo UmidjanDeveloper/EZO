@@ -38,11 +38,9 @@ try {
   if (!device) throw new Error("no Android device");
   step("device", `${device.model()} ${device.serial()}`);
   await device.shell("am force-stop uz.ezo.mobile");
-  // Microphone and camera are granted up front so the voice stage and the camera button can
-  // be exercised without system dialogs. The emulator's camera is a synthetic scene: this is
-  // a SIMULATION of the engine running on a device, not a face/hand recognition test.
+  // The microphone is granted up front so the voice stage opens without a system dialog.
+  // The app has no camera permission at all (EZO does not use camera tracking).
   await device.shell("pm grant uz.ezo.mobile android.permission.RECORD_AUDIO").catch(() => {});
-  await device.shell("pm grant uz.ezo.mobile android.permission.CAMERA").catch(() => {});
   await device.shell("am start -W -n uz.ezo.mobile/.MainActivity");
   const webview = await device.webView({ pkg: "uz.ezo.mobile" }, { timeout: 120_000 });
   const page = await webview.page();
@@ -129,9 +127,8 @@ try {
   step("language switched to English", (await page.getAttribute("#dot", "aria-label")) ?? "");
   await device.screenshot({ path: path.join(shotsDir, "4-english.png") });
 
-  // 8. The voice stage on the real device: the humanoid draws (WebGL in the WebView), the
-  // camera control is disabled and says why, the microphone state is whatever the device
-  // reports (no pretending).
+  // 8. The voice stage on the real device: the humanoid draws (WebGL in the WebView), there is
+  // no camera on the stage, the microphone state is whatever the device reports (no pretending).
   await page.click('nav button[data-go="chat"]');
   await page.click("#mic");
   await page.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
@@ -142,98 +139,16 @@ try {
     power: document.getElementById("avatar")?.dataset.power,
     state: document.getElementById("avatar")?.dataset.state,
     status: document.getElementById("stageStatus")?.textContent,
-    cameraDisabled: document.getElementById("cameraToggle")?.disabled,
-    cameraText: document.getElementById("cameraPrivacy")?.textContent?.slice(0, 80),
+    camera: Boolean(document.getElementById("cameraToggle")),
+    video: document.querySelectorAll("video").length,
   }));
   step("voice stage on the device", JSON.stringify(stage));
   if (stage.renderer !== "webgl" && stage.renderer !== "2d") throw new Error(`avatar renderer ${stage.renderer}`);
-  // 9. The real perception engine on the device: the bundled assets must verify (button enabled),
-  // the camera must open through the WebView and the worker must run inference on the emulator's
-  // synthetic scene. The honest state is tracking or lost; an error is recorded, not hidden.
-  await page.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
-  // A timeline of the engine start on the device (state changes + the worker's own console
-  // lines, seconds since the press) so a slow emulator is diagnosable from the job annotations.
-  const timeline = [];
-  const pressedAt = Date.now();
-  const since = () => `${((Date.now() - pressedAt) / 1000).toFixed(1)}s`;
-  const onConsole = (message) => {
-    const text = message.text();
-    if (/Graph successfully started|XNNPACK|Aborted|deadline|Vision|wasm/i.test(text)) timeline.push(`${since()} console: ${text.slice(0, 120)}`);
-  };
-  page.on("console", onConsole);
-  await page.click("#cameraToggle");
-  let last = "";
-  for (let i = 0; i < 120; i++) {
-    const state = await page.evaluate(() => document.getElementById("cameraState")?.dataset.camera ?? "");
-    if (state !== last) {
-      timeline.push(`${since()} state: ${state}`);
-      last = state;
-    }
-    if (["tracking", "lost", "error", "denied"].includes(state)) break;
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  await new Promise((r) => setTimeout(r, 5000));
-  page.off("console", onConsole);
-  step("camera engine timeline on the device (SIMULATION)", timeline.join(" | "));
-  const camera = await page.evaluate(() => ({
-    state: document.getElementById("cameraState")?.dataset.camera,
-    text: document.getElementById("cameraState")?.textContent,
-    indicator: document.getElementById("cameraIndicator")?.textContent,
-    fps: document.getElementById("voiceStage")?.dataset.fps,
-    inferenceMs: document.getElementById("voiceStage")?.dataset.inferenceMs,
-    attention: document.getElementById("voiceStage")?.dataset.attention,
-  }));
-  step("camera on the device (SIMULATION: emulator scene)", JSON.stringify(camera));
-  if (camera.state !== "tracking" && camera.state !== "lost") throw new Error(`camera state ${camera.state}: ${camera.text}`);
-  if (!(Number(camera.fps) > 0)) throw new Error(`no inference samples on the device (fps=${camera.fps})`);
+  if (stage.camera || stage.video) throw new Error("the voice stage must not contain a camera");
   await device.screenshot({ path: path.join(shotsDir, "5-voice-stage.png") });
-  await page.click("#cameraToggle");
-  await page.waitForFunction(() => document.getElementById("cameraState")?.dataset.camera === "off", undefined, { timeout: 10_000 });
   await page.click("#stageClose");
   await page.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
   step("voice stage closed; figure and any media released");
-
-  // 10. Negative scenario: the camera permission is taken away. Android kills the process on
-  // `pm revoke`, so the app is relaunched (its settings persist); the camera button then opens
-  // the system prompt, which is dismissed with BACK (= not allowed) — the honest state is
-  // "denied", nothing crashes, and the stage still closes cleanly. A SIMULATION of refusal.
-  await device.shell("pm revoke uz.ezo.mobile android.permission.CAMERA");
-  await device.shell("am force-stop uz.ezo.mobile").catch(() => {});
-  await device.shell("am start -W -n uz.ezo.mobile/.MainActivity");
-  const webview2 = await device.webView({ pkg: "uz.ezo.mobile" }, { timeout: 120_000 });
-  const page2 = await webview2.page();
-  await page2.locator('[data-tab="chat"]').waitFor({ state: "visible", timeout: 60_000 });
-  step("relaunched after the camera permission was revoked; settings persisted", (await page2.textContent("#status")) ?? "");
-  await page2.click('nav button[data-go="chat"]').catch(() => {});
-  await page2.click("#mic");
-  await page2.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
-  await page2.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
-  await page2.click("#cameraToggle");
-  await new Promise((r) => setTimeout(r, 2500)); // the system permission prompt
-  await device.screenshot({ path: path.join(shotsDir, "6-camera-permission-prompt.png") }).catch(() => {});
-  await device.shell("input keyevent KEYCODE_BACK"); // dismiss = not allowed
-  await page2.waitForFunction(() => ["denied", "error", "off"].includes(document.getElementById("cameraState")?.dataset.camera ?? ""), undefined, { timeout: 30_000 });
-  const denied = await page2.evaluate(() => ({
-    state: document.getElementById("cameraState")?.dataset.camera,
-    text: document.getElementById("cameraState")?.textContent,
-    stageOpen: !document.getElementById("voiceStage")?.hidden,
-  }));
-  step("camera refused on the device (SIMULATION: system prompt dismissed)", JSON.stringify(denied));
-  if (denied.state === "tracking" || denied.state === "lost") throw new Error("camera ran without the permission");
-  await page2.click("#stageClose");
-  await page2.locator("#voiceStage").waitFor({ state: "hidden", timeout: 10_000 });
-  // Granted again: the app recovers without a reinstall.
-  await device.shell("pm grant uz.ezo.mobile android.permission.CAMERA").catch(() => {});
-  await page2.click("#mic");
-  await page2.locator("#voiceStage").waitFor({ state: "visible", timeout: 30_000 });
-  await page2.waitForFunction(() => !document.getElementById("cameraToggle")?.disabled, undefined, { timeout: 30_000 });
-  await page2.click("#cameraToggle");
-  await page2.waitForFunction(() => ["tracking", "lost", "error", "denied"].includes(document.getElementById("cameraState")?.dataset.camera ?? ""), undefined, { timeout: 120_000 });
-  const regranted = await page2.evaluate(() => document.getElementById("cameraState")?.dataset.camera);
-  step("camera after the permission was granted again (SIMULATION)", String(regranted));
-  if (regranted !== "tracking" && regranted !== "lost") throw new Error(`camera did not recover after re-grant: ${regranted}`);
-  await page2.click("#cameraToggle");
-  await page2.click("#stageClose");
   report.ok = true;
 } catch (error) {
   report.error = String(error?.stack ?? error);

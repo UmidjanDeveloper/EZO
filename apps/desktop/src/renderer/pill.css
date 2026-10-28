@@ -53,11 +53,10 @@ button { -webkit-app-region: no-drag; cursor: pointer; }
 .messages li.me { align-self: flex-end; background: rgba(75,107,255,.25); }
 .messages li.ezo { align-self: flex-start; background: rgba(255,255,255,.07); }
 .messages li.muted { opacity: .7; align-self: center; }
-/* Media indicators: nothing is shown unless the microphone or the camera is really open. */
+/* Media indicators: nothing is shown unless the microphone is really open. */
 .media { display: none; gap: 4px; font-size: 10px; font-weight: 600; letter-spacing: .04em; }
 .media:not(:empty) { display: flex; }
 .media span { padding: 2px 6px; border-radius: 999px; background: rgba(255, 91, 110, .2); color: #ffb3bb; border: 1px solid rgba(255, 91, 110, .5); }
-.media span.cam { background: rgba(91, 140, 255, .2); color: #bcd0ff; border-color: rgba(91, 140, 255, .5); }
 .icon[aria-pressed="true"] { background: rgba(91, 140, 255, .35); }
 /* The expanded stage. */
 .stage { margin: 0 8px 8px; padding: 10px 12px 12px; border-radius: 20px; background: rgba(12, 14, 22, 0.95); color: #f3f4f8; animation: stage-in .22s ease-out; }
@@ -68,15 +67,10 @@ button { -webkit-app-region: no-drag; cursor: pointer; }
   background: radial-gradient(ellipse at 50% 35%, #0b1a3a 0%, #050c1f 60%, #01040c 100%); }
 .stage-face { position: absolute; inset: 0; width: 100%; height: 100%; }
 .stage-frame { position: absolute; inset: 0; pointer-events: none; }
-.attention { margin: 8px 0 0; font-size: 12px; opacity: .75; min-height: 1.2em; }
-.camera-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; }
-.camera-state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #6b7585; vertical-align: middle; }
-.camera-state[data-camera="tracking"]::before, .camera-state[data-camera="lost"]::before { background: #5b8cff; box-shadow: 0 0 8px rgba(91,140,255,.8); }
-.camera-state[data-camera="requesting"]::before { background: #fbbf24; }
-.camera-state[data-camera="denied"]::before, .camera-state[data-camera="error"]::before { background: #f87171; }
+.clap-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; }
+.clap-state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #6b7585; vertical-align: middle; }
 .privacy { margin: 6px 0 0; font-size: 11px; opacity: .6; line-height: 1.35; }
 .link:disabled { opacity: .5; cursor: default; text-decoration: none; }
-.hidden-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .indicator { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
 .clap-heard { font-size: 12px; color: #ffd36b; }
-.camera-row { flex-wrap: wrap; }
+.clap-row { flex-wrap: wrap; }

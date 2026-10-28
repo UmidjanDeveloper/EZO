@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "node ../../scripts/vision-assets.mjs public/vision && node -e \"require('fs').rmSync('.next/cache/webpack',{recursive:true,force:true})\" && next build --webpack",
+    "build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@ezo/avatar": "workspace:*",
-    "@ezo/face-tracking": "workspace:*",
     "@ezo/perception-client": "workspace:*",
     "@ezo/shared": "workspace:*",
     "@ezo/ui": "workspace:*",

@@ -30,16 +30,16 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|perception)\.spec\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|clap)\.spec\.ts/ },
     { name: "mobile", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ },
     {
-      // The real perception engine with Chromium's FAKE camera and a FAKE microphone file
-      // (short clap-like bursts): a SIMULATION that proves wiring and cleanup, never a device.
-      name: "perception",
-      testMatch: /perception\.spec\.ts/,
+      // The clap detector with Chromium's FAKE microphone file (short clap-like bursts):
+      // a SIMULATION that proves wiring and cleanup, never a device.
+      name: "clap",
+      testMatch: /clap\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
-        permissions: ["camera", "microphone"],
+        permissions: ["microphone"],
         launchOptions: {
           args: [
             "--use-angle=swiftshader",

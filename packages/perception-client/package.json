@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Glue between the perception engine (@ezo/face-tracking), EZO's figure (@ezo/avatar) and an app: asset readiness, camera/clap sessions, spoken acknowledgements with a cache, diagnostics. Framework-free; used by the web, Windows and Android apps.",
+  "description": "EZO's clap acknowledgement: a local clap detector on the microphone (AudioWorklet, nothing recorded or uploaded) and the spoken acknowledgement through the app's real TTS with a per-voice/per-language cache. Framework-free; used by the web, Windows and Android apps.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -13,13 +13,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ezo/avatar": "workspace:*",
-    "@ezo/face-tracking": "workspace:*"
+    "@ezo/avatar": "workspace:*"
   },
   "devDependencies": {
     "typescript": "6.0.3",
     "vitest": "5.0.5",
-    "esbuild": "0.28.2",
     "@types/node": "22.20.5"
   }
 }

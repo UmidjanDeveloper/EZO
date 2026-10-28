@@ -99,8 +99,7 @@ describe("avatar without a browser", () => {
     expect(canvas.dataset.state).toBe("offline");
     expect(calls.at(-1)).toEqual({ name: "aria-label", value: "EZO oflayn" });
     avatar.setGaze({ yaw: 5, pitch: Number.NaN }); // clamped, never throws
-    avatar.setHeadAim({ yawRadians: 0.1, pitchRadians: 0 });
-    avatar.setHeadAim(null);
+    avatar.setGaze(null);
     avatar.destroy();
   });
 });

@@ -18,7 +18,7 @@ on:
       - "apps/api/src/**"
       - "apps/api/tests/**"
       - "tests/e2e/**"
-      - "packages/face-tracking/**"
+      - "packages/perception-client/**"
       - "docs/master/**"
       - "apps/web/Dockerfile"
       - "apps/web/app/**"

@@ -36,8 +36,6 @@
 Thumbs.db
 __pycache__/
 apps/desktop/dist/
-apps/mobile/public/vision/
-apps/web/public/vision/
 coverage/
 next-env.d.ts
 node_modules/
