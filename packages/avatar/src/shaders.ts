@@ -221,13 +221,13 @@ void main() {
   vAlpha = clamp(alpha, 0.0, 1.0);
   // Glow pass: a share of the points drawn again as wide, faint sprites (a cheap bloom).
   if (uGlow > 0.5) {
-    bool skip = seed > 0.45 || (kind > 4.5 && kind < 5.5) || (kind > 5.5 && kind < 6.5 && warm < 0.5);
+    bool skip = seed > 0.2 || (kind > 4.5 && kind < 5.5) || (kind > 5.5 && kind < 6.5 && warm < 0.5);
     if (skip) {
       gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
       gl_PointSize = 1.0;
     } else {
-      gl_PointSize = min(64.0, gl_PointSize * 5.5);
-      vAlpha *= 0.075;
+      gl_PointSize = min(36.0, gl_PointSize * 4.5);
+      vAlpha *= 0.14;
     }
   }
 }
