@@ -17,17 +17,43 @@ These are real renders made by the code in this repository, using Chromium's Web
 
 **They are not photos of a physical phone or PC.**
 
+## Bust reshape (2026-10-28, owner request)
+
+The owner asked for a less childish, more lifelike bust, sending a phone screenshot of a
+reference holographic humanoid. EZO's figure is still our own procedural code; nothing was
+copied from the reference. What changed:
+- a strong neck that flows into sloping trapezius lines and broad shoulders (the old thin
+  neck on flat rings looked like a chess pawn);
+- neck, shoulder and chest contours follow the outline instead of concentric arcs;
+- face contours bend over brow, nose and lips; the warm light is wider and a little lower;
+- contour lines are brighter across the front, not only at the rim; mountains brighter, a
+  few more warm sparks, fewer dust points to stay inside the point budgets;
+- a cheap bloom: a share of the points is drawn a second time as wide, faint sprites
+  (never in economy mode; earned at runtime: it switches on only after 30 frames above
+  ~50 fps and off for the session if frames then fall below ~40 fps, so software rendering
+  such as CI's SwiftShader never pays for it; `data-glow` on the canvas says which. The
+  renders below were taken with the glow pass forced on, as a GPU shows it); stronger veins and face light; a denser crown spray; a cluster
+  of sparks on the sternum where the veins meet.
+
+| Desktop 1280×800 | Phone (iPhone 13 profile) |
+|---|---|
+| ![desktop](img/humanoid-bust-desktop.png) | ![phone](img/humanoid-bust-phone.png) |
+
+Renders from the Playwright e2e setup (Chromium SwiftShader, no voice provider, so the
+status reads "Oflayn rejim"). Not photos of a device.
+
 ## How the face works (`packages/avatar`)
 
 The package is framework-free TypeScript using WebGL 1, with no dependencies, so it runs
 in Next.js, Electron and the Android WebView.
 
 **Figure** (`figure.ts`)
-- Built once: 49,034 points at high quality and 18,630 at low quality on the voice stage
-  (measured, see Performance below), made of:
+- Built once: 45,488 points at high quality and 19,629 at low quality on the voice stage
+  (holographic style; the Performance table below is from the earlier 49,034 / 18,630 figure), made of:
   - head contour rings shaped by a head profile (crown, temples, cheekbones, jaw, chin) and
-    a light face relief;
-  - neck rings and arcs over the shoulders;
+    a light face relief that the lines bend over;
+  - one family of contour lines for the neck, trapezius, shoulders and chest that follows the
+    outline (level under the jaw, sloping over the shoulders, dipping towards the sternum);
   - a bright silhouette edge and a particle halo;
   - warm veins in the neck, soft glow sprites in the face;
   - ridge lines of mountains.

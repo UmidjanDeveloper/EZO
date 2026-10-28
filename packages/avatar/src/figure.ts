@@ -70,8 +70,8 @@ const HEAD_KNOTS: readonly [number, number][] = [
   [0.72, 0.5],
   [0.55, 0.49],
   [0.38, 0.45],
-  [0.22, 0.4],
-  [0.1, 0.31],
+  [0.22, 0.42],
+  [0.1, 0.34],
   [0.02, 0.19],
   [-0.025, 0.07],
   [-0.04, 0],
@@ -98,15 +98,17 @@ function headDepth(y: number): number {
 }
 
 // Neck and shoulders: half-width by height, smoothly interpolated between knots.
+// A strong neck that flows into sloping trapezius lines and broad shoulders (no "stand").
 const BODY_KNOTS: readonly [number, number][] = [
-  [0.15, 0.27],
-  [-0.25, 0.29],
-  [-0.38, 0.4],
-  [-0.5, 0.72],
-  [-0.62, 1.0],
-  [-0.78, 1.22],
-  [-1.0, 1.34],
-  [-1.8, 1.42],
+  [0.15, 0.33],
+  [-0.08, 0.34],
+  [-0.22, 0.4],
+  [-0.34, 0.56],
+  [-0.48, 0.84],
+  [-0.64, 1.1],
+  [-0.84, 1.3],
+  [-1.1, 1.4],
+  [-1.8, 1.47],
 ];
 
 /** Half-width of the neck/torso at height y (0 above the neck). */
@@ -140,7 +142,7 @@ export function faceRelief(x: number, y: number): number {
 
 /** How strongly a point of the face carries EZO's warm "voice" light (0..1). */
 export function faceWarmth(x: number, y: number, facing: number): number {
-  return Math.exp(-((x / 0.26) ** 2 + ((y - 0.5) / 0.27) ** 2)) * smoothstep(0, 0.5, facing);
+  return Math.exp(-((x / 0.3) ** 2 + ((y - 0.47) / 0.28) ** 2)) * smoothstep(0, 0.5, facing);
 }
 
 // --- value noise for the mountains -----------------------------------------------------------
@@ -220,38 +222,46 @@ function addHead(b: Builder, spacing: number, density: number): void {
       const len = Math.hypot(nx, nz) || 1;
       nx /= len;
       nz /= len;
-      b.push("head", x, y + (r() - 0.5) * 0.003, z, 0.7 + 0.3 * r(), faceWarmth(x, y, facing), nx, nz);
+      // Contours bend over the relief (brow, nose, lips) like lines projected onto a real face.
+      const bend = relief * 0.25;
+      b.push("head", x, y + bend + (r() - 0.5) * 0.003, z, 0.7 + 0.3 * r(), faceWarmth(x, y, facing), nx, nz);
     }
   }
 }
 
-function addNeck(b: Builder, spacing: number, density: number): void {
-  const r = b.random;
-  for (let y = CHIN_Y + 0.1; y > -0.5; y -= spacing) {
-    const w = bodyWidth(y);
-    const d = Math.min(0.85 * w, 0.5);
-    const n = Math.max(8, Math.round((FRONT_END - FRONT_START) * 0.5 * (w + d) * density));
-    for (let i = 0; i < n; i++) {
-      const theta = FRONT_START + ((i + r() * 0.6) / n) * (FRONT_END - FRONT_START);
-      const facing = Math.sin(theta);
-      b.push("body", w * Math.cos(theta), y, d * facing, 0.55 + 0.3 * r(), 0, Math.cos(theta), facing);
-    }
+/** Highest point of the neck/shoulder outline above x (the neck top under the head). */
+function shoulderTop(x: number): number {
+  const ax = Math.abs(x);
+  if (ax <= bodyWidth(0.15)) return 0.15;
+  let lo = BOTTOM_Y;
+  let hi = 0.15;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (bodyWidth(mid) >= ax) lo = mid;
+    else hi = mid;
   }
+  return lo;
 }
 
-function addChestArcs(b: Builder, spacing: number, density: number): void {
+/**
+ * Neck, shoulders and chest as one family of contour lines that follow the outline:
+ * level under the jaw, sloping with the trapezius over the shoulders, and dipping a
+ * little towards the sternum lower down.
+ */
+function addBodyContours(b: Builder, spacing: number, step: number): void {
   const r = b.random;
-  for (let radius = 0.1; radius < 2.2; radius += spacing) {
-    const n = Math.max(6, Math.round(Math.PI * radius * density));
-    for (let i = 0; i < n; i++) {
-      const phi = ((i + r() * 0.6) / n) * Math.PI;
-      const x = radius * Math.cos(phi);
-      const y = CHEST.y + radius * Math.sin(phi) * 0.92;
+  const width = bodyWidth(BOTTOM_Y);
+  for (let depth = spacing * 0.5; depth < 0.15 - BOTTOM_Y; depth += spacing) {
+    const dip = 0.2 * smoothstep(0.35, 1.6, depth);
+    for (let x0 = -width; x0 <= width; x0 += step) {
+      const x = x0 + (r() - 0.5) * step * 0.5;
+      const y = shoulderTop(x) - depth - dip * Math.exp(-((x / 0.6) ** 2)) + (r() - 0.5) * 0.003;
       const w = bodyWidth(y);
-      if (y > -0.48 || y < BOTTOM_Y || Math.abs(x) > w - 0.012) continue;
+      if (y < BOTTOM_Y || Math.abs(x) > w - 0.01) continue;
+      if (Math.abs(x) < headWidth(y) + 0.012) continue; // hidden behind the jaw
       const u = x / w;
-      const near = 1 - smoothstep(0.1, 0.7, radius); // arcs close to the chest light glow more
-      b.push("body", x, y, bodyFront(x, y), 0.45 + 0.35 * r() + 0.3 * near, 0, u, Math.sqrt(Math.max(0, 1 - u * u)));
+      const sternum = Math.exp(-(((x / 0.35) ** 2) + ((y - CHEST.y) / 0.5) ** 2));
+      b.push("body", x, y, bodyFront(x, y), 0.65 + 0.25 * r() + 0.25 * sternum, 0, u, Math.sqrt(Math.max(0, 1 - u * u)));
     }
   }
 }
@@ -342,14 +352,13 @@ function addCore(b: Builder, count: number): void {
 }
 
 function addEmblem(b: Builder): void {
+  // A small cluster of bright sparks where the veins meet, low on the sternum.
   const r = b.random;
   const z = bodyFront(CHEST.x, CHEST.y) + 0.02;
-  for (let i = 0; i < 70; i++) {
-    const a = (i / 70) * Math.PI * 2;
-    b.push("emblem", CHEST.x + Math.cos(a) * 0.055, CHEST.y + Math.sin(a) * 0.055, z, 0.8, 0, Math.cos(a), Math.sin(a));
-  }
-  for (let i = 0; i < 40; i++) {
-    b.push("emblem", CHEST.x + gaussian(r) * 0.015, CHEST.y + gaussian(r) * 0.015, z, 1, 0.3, 0, 0);
+  for (let i = 0; i < 160; i++) {
+    const a = r() * Math.PI * 2;
+    const d = Math.abs(gaussian(r)) * 0.045;
+    b.push("emblem", CHEST.x + Math.cos(a) * d, CHEST.y + 0.03 + Math.sin(a) * d * 1.3, z, 0.6 + 0.4 * r(), d < 0.02 ? 0.4 : 0, Math.cos(a), Math.sin(a));
   }
 }
 
@@ -468,7 +477,7 @@ function addTerrain(b: Builder, step: number, fill: number, seed: number): void 
       const sides = 0.2 + 0.8 * smoothstep(0.7, 2.6 + layer * 0.6, Math.abs(px)); // low behind the figure
       const ridge = ridges(px * 0.42 + layer * 3.1, layer * 7.3, seed);
       const crestY = base + amp * smoothstep(0.12, 0.62, ridge) * sides * 1.15;
-      const lava = r() < 0.05 * sides ? 1 : 0;
+      const lava = r() < 0.12 * sides ? 1 : 0;
       b.push("terrain", px, crestY, z, 0.55 + 0.45 * sides, lava);
       for (let k = 0; k < fill; k++) {
         const drop = Math.abs(gaussian(r)) * 0.35 * (0.4 + sides);
@@ -498,16 +507,15 @@ export function buildFigure(options: FigureOptions): Figure {
   const high = options.quality === "high";
   const seed = options.seed ?? 2026;
   const b = new Builder(createRandom(seed));
-  addHead(b, high ? 0.026 : 0.036, high ? 175 : 95);
-  addNeck(b, high ? 0.03 : 0.042, high ? 140 : 80);
-  addChestArcs(b, high ? 0.058 : 0.08, high ? 120 : 70);
+  addHead(b, high ? 0.026 : 0.034, high ? 175 : 112);
+  addBodyContours(b, high ? 0.034 : 0.05, high ? 0.011 : 0.02);
   addOutline(b, high ? 0.006 : 0.011);
-  addHalo(b, high ? 5200 : 2000);
+  addHalo(b, high ? 5600 : 1500);
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);
   if (options.style !== "holographic") addFeatures(b, high ? 1 : 0.6);
-  if (options.terrain) addTerrain(b, high ? 0.016 : 0.028, high ? 5 : 2, seed);
+  if (options.terrain) addTerrain(b, high ? 0.016 : 0.028, high ? 3 : 2, seed);
   return {
     count: Object.values(b.counts).reduce((sum, n) => sum + n, 0),
     positions: new Float32Array(b.positions),
