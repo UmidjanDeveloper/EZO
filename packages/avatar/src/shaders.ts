@@ -145,7 +145,7 @@ void main() {
     float twinkle = 0.65 + 0.35 * sin(t * (1.0 + seed * 2.0) + seed * 60.0);
     col = mix(mix(vec3(0.1, 0.35, 0.95), CYAN, bright * 0.6), mix(WARM, GOLD, seed), warm);
     alpha = (bright * 1.7 + warm * 1.1) * twinkle * (0.8 + 0.25 * uLevel);
-    size = 4.4 + warm * 2.0;
+    size = 3.9 + warm * 1.8;
   } else if (kind < 7.5) {
     // Chest light: beats faster and brighter while EZO works.
     p.y += breath;

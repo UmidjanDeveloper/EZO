@@ -510,7 +510,7 @@ export function buildFigure(options: FigureOptions): Figure {
   addHead(b, high ? 0.026 : 0.034, high ? 175 : 112);
   addBodyContours(b, high ? 0.034 : 0.05, high ? 0.011 : 0.02);
   addOutline(b, high ? 0.006 : 0.011);
-  addHalo(b, high ? 6800 : 1500);
+  addHalo(b, high ? 5600 : 1500);
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);

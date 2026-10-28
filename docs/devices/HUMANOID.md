@@ -29,8 +29,10 @@ copied from the reference. What changed:
 - contour lines are brighter across the front, not only at the rim; mountains brighter, a
   few more warm sparks, fewer dust points to stay inside the point budgets;
 - a cheap bloom: a share of the points is drawn a second time as wide, faint sprites
-  (skipped in economy mode, and switched off for the session when the loop measures slower
-  than ~40 fps, e.g. software rendering; `data-glow` on the canvas says which); stronger veins and face light; a denser crown spray; a cluster
+  (never in economy mode; earned at runtime: it switches on only after 30 frames above
+  ~50 fps and off for the session if frames then fall below ~40 fps, so software rendering
+  such as CI's SwiftShader never pays for it; `data-glow` on the canvas says which. The
+  renders below were taken with the glow pass forced on, as a GPU shows it); stronger veins and face light; a denser crown spray; a cluster
   of sparks on the sternum where the veins meet.
 
 | Desktop 1280×800 | Phone (iPhone 13 profile) |
@@ -46,7 +48,7 @@ The package is framework-free TypeScript using WebGL 1, with no dependencies, so
 in Next.js, Electron and the Android WebView.
 
 **Figure** (`figure.ts`)
-- Built once: 46,686 points at high quality and 19,629 at low quality on the voice stage
+- Built once: 45,488 points at high quality and 19,629 at low quality on the voice stage
   (holographic style; the Performance table below is from the earlier 49,034 / 18,630 figure), made of:
   - head contour rings shaped by a head profile (crown, temples, cheekbones, jaw, chin) and
     a light face relief that the lines bend over;
