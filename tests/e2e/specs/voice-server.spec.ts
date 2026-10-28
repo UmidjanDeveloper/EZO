@@ -130,14 +130,15 @@ test("server voice: record, transcribe, answer, speak; tap to interrupt", async 
   await expect(page.getByTestId("voice-status")).toHaveText("Tinglayapman…");
   await expect(page.getByTestId("voice-heard")).toContainText("Salom EZO, qalaysan?", { timeout: 15_000 });
   // Listening → recognizing (the recording ended; the server is turning it into words: an
-  // honest in-between state) → thinking, in that order, on the figure, its frame and the words.
+  // honest in-between state) → thinking, in that order, on the figure and the words.
   const seen = await sequence(page);
   const order = (entries: string[]) => entries.map((entry) => seen.indexOf(entry));
   expect(seen).toEqual(expect.arrayContaining(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"]));
   expect(order(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"])).toEqual(
     order(["ezo-humanoid=listening", "ezo-humanoid=recognizing", "ezo-humanoid=thinking"]).sort((a, b) => a - b),
   );
-  expect(seen).toEqual(expect.arrayContaining(["voice-frame:frame=listening", "voice-frame:frame=recognizing"]));
+  await expect(stage.getByTestId("voice-frame")).toHaveCount(0); // reference profile intentionally has no ring
+  await expect(stage.getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "holographic");
   expect(seen.indexOf("status=Tinglayapman…")).toBeLessThan(seen.indexOf("status=Eshitganimni matnga aylantiryapman…"));
   // The measured speaking time travels with the voice message (the fake microphone speaks 0.7 s).
   const sent = (await chatRequest).postDataJSON() as { channel: string; speech_seconds: number; language_hint?: string };

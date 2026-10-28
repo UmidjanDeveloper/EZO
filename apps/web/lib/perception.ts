@@ -35,3 +35,8 @@ export function createAcknowledgementSpeaker(providerKey: () => string, onTts: (
     onSynthesized: (info) => onTts({ ...info, at: Date.now() }),
   });
 }
+
+/** The chosen conversation language wins; camera data never chooses a language. */
+export function acknowledgementLanguage(choice: "auto" | "uz" | "en" | "ru", lastHeard: "uz" | "en" | "ru" | null, ui: "uz" | "en" | "ru") {
+  return choice === "auto" ? lastHeard ?? ui : choice;
+}

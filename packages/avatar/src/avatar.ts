@@ -19,6 +19,7 @@ import { easeLook, lookFor, TRANSIENT_STATES, type AvatarState, type Look } from
 
 export interface AvatarOptions {
   framing?: Framing;
+  style?: "expressive" | "holographic";
   /** "auto" picks "low" for small views and dense phone screens. */
   quality?: "high" | "low" | "auto";
   /** Mountains behind the figure. Defaults to true for "bust", false for "head". */
@@ -141,7 +142,7 @@ export class EzoAvatar {
     const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
     this.lowPower = options.power === "low" || (options.power !== "high" && EzoAvatar.prefersLowPower());
     const started = typeof performance !== "undefined" ? performance.now() : 0;
-    this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust" });
+    this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust", style: options.style });
     const buildMs = typeof performance !== "undefined" ? performance.now() - started : 0;
 
     this.glState = this.initGl();
@@ -149,6 +150,7 @@ export class EzoAvatar {
     canvas.dataset.ezoAvatar = this.renderer;
     // Static facts for performance checks (set once, never per frame).
     canvas.dataset.quality = quality;
+    canvas.dataset.style = options.style ?? "expressive";
     canvas.dataset.points = String(this.figure.count);
     canvas.dataset.buildMs = buildMs.toFixed(1);
     canvas.dataset.power = this.lowPower ? "low" : "high";

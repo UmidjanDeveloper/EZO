@@ -16,6 +16,7 @@ interface EzoHumanoidProps {
   state: EzoState;
   /** "bust": head and shoulders on the voice stage; "head": a compact face. */
   framing?: Framing;
+  style?: "expressive" | "holographic";
   /** Size and position (e.g. "absolute inset-0" or "relative h-56 w-56"). */
   className?: string;
   /** Accessible name, e.g. the current status. */
@@ -35,7 +36,7 @@ interface EzoHumanoidProps {
  * thinks and speaks, following the live voice level. Always drawn on its own
  * night backdrop; without WebGL the classic EzoPresence orb is shown instead.
  */
-export function EzoHumanoid({ state, framing = "bust", className, label, frame = false, followPointer = false, onPointerGaze, onAvatar }: EzoHumanoidProps) {
+export function EzoHumanoid({ state, framing = "bust", style = "expressive", className, label, frame = false, followPointer = false, onPointerGaze, onAvatar }: EzoHumanoidProps) {
   const { m } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -59,7 +60,7 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !supported) return;
-    const avatar = new EzoAvatar(canvas, { framing });
+    const avatar = new EzoAvatar(canvas, { framing, style });
     avatar.setState(toAvatarState(stateRef.current));
     avatarRef.current = avatar;
     onAvatarRef.current?.(avatar);
@@ -76,7 +77,7 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
       avatarRef.current = null;
       onAvatarRef.current?.(null);
     };
-  }, [framing, frame, supported]);
+  }, [framing, style, frame, supported]);
 
   const onPointer = followPointer
     ? (event: React.PointerEvent<HTMLDivElement>) => {
@@ -103,6 +104,7 @@ export function EzoHumanoid({ state, framing = "bust", className, label, frame =
       className={cn("ezo-night overflow-hidden", className)}
       data-testid="ezo-humanoid"
       data-state={state}
+      data-style={style}
       role="img"
       aria-label={`EZO — ${label ?? labels[toAvatarState(state)]}`}
       onPointerMove={onPointer}

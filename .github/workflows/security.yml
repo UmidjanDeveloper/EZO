@@ -7,7 +7,7 @@ on:
     - cron: "17 4 * * 1"
   workflow_dispatch:
   push:
-    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery", "feat/student-v1-complete", "feat/zero-budget-private-beta", "feat/free-beta-storage-profile", "feat/full-owner-beta-budget", "feat/master-build-candidate", "feat/final-backend-completion", "feat/jarvis-eight-upstream-integration", "feat/knowledge-refresh-governance", "feat/master-durable-refresh", "feat/final-backend-acceptance", "feat/humanoid-perception"]
+    branches: [main, "claude/**", "fix/p0-final-hardening-p1-readiness", "fix/p0-parser-process-final", "feat/p1-student-durable-jobs", "fix/p1-student-job-source-budgets", "fix/p1-student-audit-remediation", "feat/p0-p1-controlled-student-foundation", "feat/per-document-isolated-executor", "fix/executor-admission-recovery", "feat/student-v1-complete", "feat/zero-budget-private-beta", "feat/free-beta-storage-profile", "feat/full-owner-beta-budget", "feat/master-build-candidate", "feat/final-backend-completion", "feat/jarvis-eight-upstream-integration", "feat/knowledge-refresh-governance", "feat/master-durable-refresh", "feat/final-backend-acceptance", "feat/humanoid-perception", "fix/reference-voice-experience"]
     paths:
       - 'ROADMAP.md'
       - 'IMPLEMENTATION_STATUS.md'

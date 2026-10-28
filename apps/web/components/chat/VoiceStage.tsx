@@ -19,6 +19,7 @@ import {
   stopVoice,
   storedVoiceVolume,
 } from "@/lib/voice/engine";
+import { acknowledgementLanguage } from "@/lib/perception";
 import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
 import type { EzoAvatar } from "@ezo/avatar";
@@ -48,6 +49,7 @@ export function VoiceStage({ session }: { session: Session }) {
   // "auto": EZO hears uz, en or ru and answers in the language it heard.
   const choice: VoiceLanguage = storedLanguage || "auto";
   const lastHeardRef = useRef<LanguageCode | null>(null);
+  const [lastHeardLanguage, setLastHeardLanguage] = useState<LanguageCode | null>(null);
 
   const [phase, setPhase] = useState<VoicePhase>("idle");
   const [heard, setHeard] = useState("");
@@ -66,7 +68,7 @@ export function VoiceStage({ session }: { session: Session }) {
   const ackRef = useRef(false); // an acknowledgement clip is playing (not a conversation turn)
   const listenAfterAckRef = useRef<() => void>(() => undefined);
   const camera = useCameraAttention(avatar, {
-    language: uiLanguage,
+    language: acknowledgementLanguage(choice, lastHeardLanguage, uiLanguage),
     providerKey: (voiceStatus?.text_to_speech ?? []).join(","),
     interaction: phase === "listening" || phase === "recognizing" ? "listening" : phase === "speaking" ? "speaking" : null,
     onPlayback: (event) => {
@@ -155,6 +157,7 @@ export function VoiceStage({ session }: { session: Session }) {
       }
       const replyLanguage = reply.language ?? heardLanguage ?? uiLanguage;
       lastHeardRef.current = replyLanguage;
+      setLastHeardLanguage(replyLanguage);
       const serverSpeech = (voiceStatus?.text_to_speech.length ?? 0) > 0;
       if (!serverSpeech && !hasVoiceFor(replyLanguage)) {
         setNotice(f(m.voice.noVoice, { language: m.voice.languages[replyLanguage] }));
@@ -219,12 +222,12 @@ export function VoiceStage({ session }: { session: Session }) {
 
   return (
     <div
-      className="ezo-night relative flex h-full flex-col items-center px-4 pb-6 pt-2"
+      className="ezo-night relative isolate flex h-full min-h-0 w-full flex-col items-center overflow-y-auto px-4 pb-5 pt-4"
       data-testid="voice-stage"
       data-engine={engine ?? "none"}
     >
-      <EzoHumanoid state={visible} framing="bust" label={status} frame followPointer onPointerGaze={camera.pointer} onAvatar={setAvatar} className="absolute inset-0" />
-      <div className="relative z-10 flex w-full max-w-2xl items-center justify-between gap-2">
+
+      <div className="relative z-10 flex w-full max-w-2xl shrink-0 items-center justify-between gap-2">
         <input
           type="range"
           min={0}
@@ -256,15 +259,13 @@ export function VoiceStage({ session }: { session: Session }) {
       </div>
       </div>
 
-      {/* The whole stage is the talk button: tap EZO to talk, interrupt or stop. */}
-      <button
-        type="button"
-        onClick={toggle}
-        className="relative z-10 min-h-0 w-full flex-1 rounded-3xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-300"
-        aria-label={status}
-      />
-
-      <div className="relative z-10 flex w-full flex-col items-center gap-3">
+      <div className="relative mt-2 h-[clamp(320px,60dvh,720px)] w-full shrink-0" data-testid="voice-scene"
+        onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); camera.pointer({ yaw: (event.clientX-r.left)/r.width*2-1, pitch: (1-(event.clientY-r.top)/r.height*2)*0.6 }, event.pointerType === "touch" ? "touch" : "pointer"); }}
+        onPointerLeave={() => camera.pointer(null, "pointer")}>
+        <EzoHumanoid state={visible} framing="bust" style="holographic" label={status} onAvatar={setAvatar} className="absolute inset-0" />
+        <button type="button" onClick={toggle} className="absolute inset-0 z-10 focus-visible:outline-2 focus-visible:outline-sky-300" aria-label={status} />
+      </div>
+      <div className="relative z-10 flex w-full shrink-0 flex-col items-center gap-3 border-t border-sky-300/10 bg-[#030814]/95 px-3 py-4" data-testid="voice-controls">
         <p className="text-sm font-medium tracking-wide text-sky-100/80" aria-live="polite" data-testid="voice-status">
           {status}
         </p>
@@ -304,7 +305,7 @@ export function VoiceStage({ session }: { session: Session }) {
         data-testid="voice-toggle"
         aria-label={phase === "idle" ? m.voice.start : m.voice.stop}
         className={cn(
-          "relative z-10 flex h-16 w-16 items-center justify-center rounded-full transition-all disabled:opacity-40",
+          "relative z-10 mt-3 flex h-16 w-16 shrink-0 items-center justify-center rounded-full transition-all disabled:opacity-40",
           phase === "idle"
             ? "bg-accent text-on-accent shadow-[0_0_30px_-4px_var(--accent)] hover:scale-105"
             : "border border-slate-500 bg-slate-900/70 text-slate-100 hover:border-red-400 hover:text-red-300",

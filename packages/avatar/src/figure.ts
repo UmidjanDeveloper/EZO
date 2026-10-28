@@ -29,6 +29,8 @@ export interface FigureOptions {
   quality: "high" | "low";
   /** Mountains behind the figure (off for small views such as the desktop pill). */
   terrain: boolean;
+  /** Reference-style contour face, without illustrative eyes/lips. */
+  style?: "expressive" | "holographic";
   seed?: number;
 }
 
@@ -504,7 +506,7 @@ export function buildFigure(options: FigureOptions): Figure {
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);
-  addFeatures(b, high ? 1 : 0.6);
+  if (options.style !== "holographic") addFeatures(b, high ? 1 : 0.6);
   if (options.terrain) addTerrain(b, high ? 0.016 : 0.028, high ? 5 : 2, seed);
   return {
     count: Object.values(b.counts).reduce((sum, n) => sum + n, 0),
