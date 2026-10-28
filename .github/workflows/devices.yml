@@ -28,7 +28,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @ezo/desktop...
       - name: Unit tests
         run: pnpm --filter @ezo/desktop test
-      - name: Build the NSIS installer (unsigned; bundles the SHA256-pinned perception assets)
+      - name: Build the NSIS installer (unsigned)
         env:
           EZO_BUILD_SHA: ${{ github.sha }}
         run: pnpm --filter @ezo/desktop run dist:win

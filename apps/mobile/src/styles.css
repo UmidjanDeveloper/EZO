@@ -79,19 +79,14 @@ textarea { width: 100%; padding: 11px 12px; border-radius: 12px; border: 1px sol
 .retry { margin-top: 4px; }
 .bubble.failed { opacity: .75; border: 1px dashed var(--danger); }
 .bubble .retry { display: block; background: none; color: #fca5a5; padding: 4px 0 0; font-size: 13px; text-align: left; }
-.attention { margin: 0 0 4px; font-size: 12px; color: #cbd5e1; min-height: 1.2em; }
-.camera-row { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 12px; color: #cbd5e1; }
-.camera-state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #6b7585; vertical-align: middle; }
-.camera-state[data-camera="tracking"]::before, .camera-state[data-camera="lost"]::before { background: #5b8cff; box-shadow: 0 0 8px rgba(91,140,255,.8); }
-.camera-state[data-camera="requesting"]::before { background: #fbbf24; }
-.camera-state[data-camera="denied"]::before, .camera-state[data-camera="error"]::before { background: #f87171; }
+.clap-row { display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 12px; color: #cbd5e1; }
+.clap-state::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: #6b7585; vertical-align: middle; }
 .link { background: none; border: 1px solid #475569; color: #e2e8f0; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
 .link:disabled { opacity: .5; }
 .privacy { margin: 4px 0 8px; font-size: 11px; color: #94a3b8; line-height: 1.35; }
-.hidden-video { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .indicator { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: #64748b; }
 .clap-heard { font-size: 12px; color: #fde68a; }
 .check.small { justify-content: center; font-size: 12px; color: #cbd5e1; margin: 2px 0; }
-.camera-row { flex-wrap: wrap; }
+.clap-row { flex-wrap: wrap; }
 details { margin-top: 12px; } summary { cursor: pointer; font-weight: 600; }
 .diag { font-size: 12px; white-space: pre-wrap; background: var(--card); padding: 8px 10px; border-radius: 10px; user-select: text; max-height: 320px; overflow: auto; }

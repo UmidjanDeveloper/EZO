@@ -83,12 +83,11 @@ test("voice: the composer microphone opens voice mode", async ({ page }) => {
   await expect(page.getByTestId("voice-stage")).toBeVisible();
 });
 
-test("voice: holographic stage reserves space for the figure and keeps clap available without camera assets", async ({ page }) => {
-  await page.route("**/vision/vision-assets.json", route => route.fulfill({ status: 404, body: "missing" }));
+test("voice: holographic stage reserves space for the figure, has no camera and keeps clap available", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
   await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "holographic");
-  await expect(page.getByTestId("camera-toggle")).toBeDisabled();
+  await expect(page.getByTestId("camera-toggle")).toHaveCount(0);
   await expect(page.getByTestId("clap-toggle")).toBeEnabled();
   await expect(page.getByTestId("voice-frame")).toHaveCount(0);
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {

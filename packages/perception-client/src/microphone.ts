@@ -1,4 +1,3 @@
-import { watchRevocation } from './permissions';
 import { ClapDetector } from './clap';
 import type { ClapDetected } from './types';
 export type MicrophoneStatus = 'off' | 'requesting' | 'active' | 'error';
@@ -39,7 +38,7 @@ export class ClapMicrophone {
     }) { this.detector = options.detector ?? new ClapDetector(); }
     readonly detector: ClapDetector;
     private state(status: MicrophoneStatus, error?: string) { this.status = status; this.options.indicator.hidden = false; this.options.indicator.textContent = `Microphone ${this.stream ? 'active — ' : ''}${status}`; this.options.onStatus?.(status, error); }
-    /** Separate user action from camera permission. Does NOT enable STT/listening. */
+    /** Starts only from the owner's own press. Does NOT enable STT/listening. */
     async start(): Promise<void> {
         if (this.status === 'active' || this.status === 'requesting')
             return;
@@ -145,4 +144,19 @@ export class ClapMicrophone {
         this.detector.reset();
         this.state('off');
     }
+}
+
+/** Query does not request permission. Unsupported platforms fall back to track ended/mute. */
+export function watchRevocation(kind: 'microphone', signal: AbortSignal, onDenied: () => void): void {
+    if (!navigator.permissions?.query)
+        return;
+    void navigator.permissions.query({ name: kind as PermissionName }).then(status => {
+        if (signal.aborted)
+            return;
+        const changed = () => { if (status.state === 'denied' && !signal.aborted)
+            onDenied(); };
+        status.addEventListener('change', changed);
+        signal.addEventListener('abort', () => status.removeEventListener('change', changed), { once: true });
+        changed();
+    }).catch(() => { });
 }

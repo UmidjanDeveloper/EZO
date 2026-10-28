@@ -1,9 +1,8 @@
 // The floating pill: idle → listening → recognizing → thinking/working → speaking, always
 // with a visible state and a real stop. Audio is recorded only while the red listening
 // state is shown. Every word comes from the main process in the owner's language.
-import { createLevelMeter, createVoiceFrame, EzoAvatar, MotionAdapter, type AttentionView, type AvatarState, type LevelMeter, type VisionStatus, type VoiceFrame } from "@ezo/avatar";
-import type { MicrophoneStatus } from "@ezo/face-tracking";
-import { AcknowledgementSpeaker, acknowledgement, loadVisionAssets, PerceptionSession, VoiceReaction, type AssetsReadiness, type Diagnostics } from "@ezo/perception-client";
+import { createLevelMeter, createVoiceFrame, EzoAvatar, type AvatarState, type LevelMeter, type VoiceFrame } from "@ezo/avatar";
+import { AcknowledgementSpeaker, acknowledgement, ClapSession, VoiceReaction, type Diagnostics, type MicrophoneStatus } from "@ezo/perception-client";
 
 interface TurnResponse {
   transcript?: string;
@@ -21,7 +20,7 @@ interface PillInit {
   shortcut: string;
   language: string;
   status: PillStatus;
-  media?: { microphone: boolean; camera: boolean };
+  media?: { microphone: boolean };
   lowPower?: boolean;
   voiceVolume?: number;
   clap?: { listening: boolean; startsListening: boolean };
@@ -104,7 +103,7 @@ let recordingTimer: number | undefined;
 let turnId = 0;
 let settleTimer: number | undefined;
 const SUCCESS_MS = 1600; // the figure's own gold burst lasts this long
-let media: { microphone: boolean; camera: boolean } = { microphone: true, camera: false };
+let media: { microphone: boolean } = { microphone: true };
 let lowPower = false;
 let voiceVolume = 1;
 let clapSettings = { listening: false, startsListening: false };
@@ -119,7 +118,7 @@ const webgl = EzoAvatar.supported();
 if (webgl) document.body.classList.add("has-face");
 
 function mountFace(): void {
-  unmountPerception(); // camera, clap microphone and the worker never outlive the figure
+  unmountClap(); // the clap microphone never outlives the figure
   frame?.destroy();
   frame = null;
   face?.destroy();
@@ -138,19 +137,13 @@ function mountFace(): void {
   if (expanded) {
     frame = createVoiceFrame($("stageFrame"), { words: {}, showWord: false });
     frame.follow(face);
-    mountPerception();
+    mountClap();
   }
 }
 
-// Perception on the stage: the real engine (@ezo/face-tracking in a worker; assets bundled
-// under /vision on the app origin and SHA256-verified) feeds the figure through MotionAdapter.
-// The clap microphone is a separate consent (settings + the Listen button). Nothing is
-// recorded or uploaded; a clap never runs a command.
-const VISION_BASE = "/vision/";
-let adapter: MotionAdapter | null = null;
-let perception: PerceptionSession | null = null;
-let readiness: AssetsReadiness | null = null;
-let vision: VisionStatus = { camera: "off", since: 0 };
+// The clap on the stage: a separate microphone consent (settings + the Listen button),
+// detected on this computer. Nothing is recorded or uploaded; a clap never runs a command.
+let clapSession: ClapSession | null = null;
 let microphone: { status: MicrophoneStatus; error?: string } = { status: "off" };
 let diagnostics: Diagnostics | null = null;
 let lastTts: { provider: string | null; latencyMs: number; cached: boolean; at: number } | null = null;
@@ -173,23 +166,18 @@ const reaction = new VoiceReaction(speaker, (event) => {
   if (event.type === "start") {
     acknowledging = true;
     stopSpeaking();
-    perception?.setInteraction("speaking");
+    clapSession?.setInteraction("speaking");
     setState("speaking");
   } else if (event.type === "unavailable" || event.type === "error") {
     // Not spoken: no provider, or it failed. Never a pretended playback.
     setState("idle", fmt("clapUnavailable"));
   } else if (event.type === "end" && acknowledging) {
     acknowledging = false;
-    perception?.setInteraction(null);
+    clapSession?.setInteraction(null);
     if (clapSettings.startsListening && media.microphone && state === "speaking") void startListening();
     else if (state === "speaking") setState("idle");
   }
 });
-
-function renderAttention(view: AttentionView): void {
-  $("attention").textContent =
-    view.source === "hand" ? fmt("attentionHand") : view.source === "face" ? fmt("attentionHead") : view.source === "pointer" || view.source === "touch" ? fmt("attentionPointer") : "";
-}
 
 function renderMedia(): void {
   const chips: HTMLElement[] = [];
@@ -200,49 +188,10 @@ function renderMedia(): void {
     mic.setAttribute("aria-label", mic.title);
     chips.push(mic);
   }
-  if (vision.camera === "tracking" || vision.camera === "lost" || vision.camera === "requesting") {
-    const cam = document.createElement("span");
-    cam.className = "cam";
-    cam.textContent = "CAM";
-    cam.title = fmt("cameraActive");
-    cam.setAttribute("aria-label", fmt("cameraActive"));
-    chips.push(cam);
-  }
   mediaBox.replaceChildren(...chips);
 }
 
-function renderCamera(): void {
-  const stateBox = $("cameraState");
-  const button = $<HTMLButtonElement>("cameraToggle");
-  stateBox.dataset.camera = vision.camera;
-  const words: Record<string, string> = {
-    off: fmt("cameraOff"),
-    requesting: fmt("cameraRequesting"),
-    denied: fmt("cameraDenied"),
-    unavailable: fmt("cameraUnavailable"),
-    tracking: fmt("cameraTracking"),
-    lost: fmt("cameraLost"),
-    error: fmt("cameraError", { detail: vision.message ?? "" }),
-  };
-  stateBox.textContent = (words[vision.camera] ?? vision.camera) + (vision.simulated ? ` (${fmt("attentionSimulated")})` : "");
-  const ready = Boolean(readiness?.ready);
-  const running = vision.camera !== "off";
-  button.disabled = !ready || !media.camera;
-  button.textContent = running ? fmt("cameraStop") : fmt("cameraOn");
-  const reason = !media.camera
-    ? fmt("cameraSettings")
-    : !readiness
-      ? ""
-      : readiness.ready
-        ? ""
-        : readiness.reason === "missing"
-          ? fmt("cameraAssetsMissing")
-          : readiness.reason === "invalid"
-            ? fmt("cameraAssetsInvalid", { detail: readiness.detail })
-            : fmt("cameraError", { detail: readiness.detail });
-  button.title = reason;
-  $("cameraPrivacy").textContent = reason || `${fmt("cameraPrivacy")} ${fmt("cameraEngine")}`;
-  // Clap row.
+function renderClap(): void {
   const clapBox = $("clapState");
   const clapButton = $<HTMLButtonElement>("clapToggle");
   clapBox.dataset.microphone = microphone.status;
@@ -254,14 +203,11 @@ function renderCamera(): void {
   };
   clapBox.textContent = micWords[microphone.status];
   const micRunning = microphone.status === "active" || microphone.status === "requesting";
-  clapButton.disabled = !ready || !clapSettings.listening || !media.microphone;
+  clapButton.disabled = !clapSettings.listening || !media.microphone;
   clapButton.textContent = micRunning ? fmt("clapStop") : fmt("clapListen");
   clapButton.title = !clapSettings.listening ? fmt("clapSettings") : !media.microphone ? fmt("micOff") : "";
   $("clapHeard").textContent = diagnostics?.clapCount ? `${fmt("clap")} ×${diagnostics.clapCount}` : "";
   $("clapPrivacy").textContent = !clapSettings.listening ? fmt("clapSettings") : fmt("clapPrivacy");
-  stage.dataset.fps = String(diagnostics?.cameraFps ?? 0);
-  stage.dataset.inferenceMs = String(diagnostics?.inferenceMs ?? "");
-  stage.dataset.attention = diagnostics?.attention ?? "neutral";
   stage.dataset.clapCount = String(diagnostics?.clapCount ?? 0);
   renderMedia();
 }
@@ -274,69 +220,39 @@ function reportDiagnostics(): void {
     diagnosticsTimer = undefined;
     ezo.reportDiagnostics?.({
       ...(diagnostics ?? {}),
-      camera: vision.camera,
       microphone: microphone.status,
       stage: expanded ? "expanded" : "pill",
       figure: face
         ? { renderer: face.renderer, points: face.canvas.dataset.points, power: face.canvas.dataset.power, frames: face.getFrameCount(), ...face.getPerformance(), level: Number(face.getLevel().toFixed(2)), liveLevel: face.hasLiveLevel() }
         : null,
-      vision: readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking",
       tts: lastTts,
     });
   }, 1000);
 }
 
-async function startCamera(): Promise<void> {
-  if (!media.camera) return;
-  await perception?.startCamera();
-  renderCamera();
-}
-
-function stopCamera(): void {
-  perception?.stopCamera();
-  renderCamera();
-}
-
 async function toggleClap(): Promise<void> {
   if (microphone.status === "active" || microphone.status === "requesting") {
-    perception?.stopClap();
+    clapSession?.stopClap();
     return;
   }
   if (!clapSettings.listening || !media.microphone) return;
-  await perception?.startClap();
-  renderCamera();
+  await clapSession?.startClap();
+  renderClap();
 }
 
-/** Mounts the engine for the expanded stage; one session per figure, released with it. */
-function mountPerception(): void {
-  if (!face) return;
-  // The adapter (engine first, labelled pointer fallback) lives with the figure even when the
-  // engine is not available (no app origin, assets missing); the session is added once verified.
-  adapter ??= new MotionAdapter(face, { onChange: renderAttention });
-  adapter.setVisible(visible);
-  if (!readiness?.ready || perception) return;
-  perception = new PerceptionSession({
-    base: VISION_BASE,
-    assets: readiness.assets,
-    video: $<HTMLVideoElement>("perceptionVideo"),
-    cameraIndicator: $("cameraIndicator"),
+/** Mounts the clap session for the expanded stage; one per figure, released with it. */
+function mountClap(): void {
+  if (!face || clapSession) return;
+  clapSession = new ClapSession({
     microphoneIndicator: $("microphoneIndicator"),
-    adapter,
-    lowPower,
-    reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
-    onVision: (next) => {
-      vision = next;
-      renderCamera();
-      reportDiagnostics();
-    },
     onMicrophone: (next, error) => {
       microphone = { status: next, error };
-      renderCamera();
+      renderClap();
       reportDiagnostics();
     },
     onDiagnostics: (next) => {
       diagnostics = next;
-      renderCamera();
+      renderClap();
       reportDiagnostics();
     },
     onClap: (event) => {
@@ -350,14 +266,11 @@ function mountPerception(): void {
   });
 }
 
-function unmountPerception(): void {
+function unmountClap(): void {
   reaction.stop();
   speaker.stop();
-  perception?.stop();
-  perception = null;
-  adapter?.stop();
-  adapter = null;
-  vision = { camera: "off", since: performance.now() };
+  clapSession?.stop();
+  clapSession = null;
   microphone = { status: "off" };
   diagnostics = null;
   acknowledging = false;
@@ -369,8 +282,8 @@ function setExpanded(next: boolean): void {
   stage.hidden = !next;
   $("expand").setAttribute("aria-pressed", String(next));
   $("expand").textContent = next ? "⤡" : "⤢";
-  mountFace(); // unmounts the previous figure, its camera, microphone and worker
-  renderCamera();
+  mountFace(); // unmounts the previous figure and its clap microphone
+  renderClap();
   resize();
 }
 
@@ -594,15 +507,13 @@ function toggle(): void {
 
 $("orb").addEventListener("click", toggle);
 $("expand").addEventListener("click", () => ezo.setExpanded(!expanded));
-$("cameraToggle").addEventListener("click", () => (vision.camera !== "off" ? stopCamera() : void startCamera()));
 $("clapToggle").addEventListener("click", () => void toggleClap());
 $("stageFace").addEventListener("pointermove", (event) => {
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
   const gaze = { yaw: ((event.clientX - rect.left) / rect.width) * 2 - 1, pitch: 1 - ((event.clientY - rect.top) / rect.height) * 2 };
-  if (adapter) adapter.pointerGaze(gaze, "pointer");
-  else face?.setGaze(gaze);
+  face?.setGaze(gaze);
 });
-$("stageFace").addEventListener("pointerleave", () => (adapter ? adapter.pointerGaze(null) : face?.setGaze(null)));
+$("stageFace").addEventListener("pointerleave", () => face?.setGaze(null));
 stopButton.addEventListener("click", () => stopEverything(fmt("stopped")));
 $("gear").addEventListener("click", () => ezo.openSettings());
 $("keyboard").addEventListener("click", () => {
@@ -668,12 +579,11 @@ function applyInit(init: PillInit): void {
   if (player) player.volume = voiceVolume;
   face?.setLowPower(lowPower);
   clapSettings = init.clap ?? clapSettings;
-  if (!media.camera) stopCamera();
-  if (!clapSettings.listening || !media.microphone) perception?.stopClap();
+  if (!clapSettings.listening || !media.microphone) clapSession?.stopClap();
   if (!media.microphone && state === "listening") stopListening(true);
   $("expand").setAttribute("aria-label", expanded ? fmt("collapse") : fmt("expand"));
   $("expand").title = expanded ? fmt("collapse") : fmt("expand");
-  renderCamera();
+  renderClap();
   $("orb").setAttribute("aria-label", fmt("talk"));
   $("orb").title = `${fmt("talk")} (${shortcut})`;
   $("keyboard").setAttribute("aria-label", fmt("type"));
@@ -706,7 +616,7 @@ ezo.onStage((stage) => {
 ezo.onStatus((next) => renderStatus(next as PillStatus));
 ezo.onTasks((tasks) => renderTasks(tasks as TaskSummary[]));
 ezo.onInit((init) => applyInit(init as PillInit));
-// Hidden (Ctrl+Alt+H, tray, quitting): release the microphone and the camera, stop drawing.
+// Hidden (Ctrl+Alt+H, tray, quitting): release the microphone, stop drawing.
 ezo.onVisibility?.((next) => {
   visible = next !== false;
   if (!visible) {
@@ -714,18 +624,12 @@ ezo.onVisibility?.((next) => {
     stopSpeaking();
     reaction.stop();
   }
-  perception?.setVisible(visible); // hidden: camera and clap microphone off, nothing restarts by itself
+  clapSession?.setVisible(visible); // hidden: clap microphone off, nothing restarts by itself
   face?.setActive(visible);
-  renderCamera();
+  renderClap();
 });
 ezo.onExpanded?.((next) => setExpanded(next === true));
 mountFace();
-void loadVisionAssets(VISION_BASE).then((result) => {
-  readiness = result;
-  if (expanded) mountPerception();
-  renderCamera();
-  reportDiagnostics();
-});
 void ezo.init().then((init) => {
   applyInit(init);
   void ezo.tasks().then(renderTasks);

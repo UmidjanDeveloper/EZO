@@ -22,14 +22,14 @@ const STRINGS = {
     taskRunning: "JARVIS vazifasi: {step}", taskWaiting: "JARVIS: sizning tasdig‘ingizni kutyapti", cancelTask: "Vazifani bekor qilish",
     talk: "Gapirishni boshlash yoki to‘xtatish", type: "Yozib so‘rash", stop: "To‘xtatish", settings: "Sozlamalar", typePlaceholder: "Masalan: Kalkulyatorni och",
     acted: "Bajarildi", showHideHint: "Ko‘rsatish/yashirish: Ctrl+Alt+H",
-    expand: "Kattalashtirish", collapse: "Kichraytirish", micActive: "Mikrofon faol", micOff: "Mikrofon sozlamalarda o‘chirilgan", cameraActive: "Kamera faol",
-    cameraOff: "Kamera o‘chiq", cameraOn: "Kamerani yoqish", cameraStop: "Kamerani to‘xtatish", cameraSettings: "Kamera sozlamalarda o‘chirilgan — avval u yerda yoqing.",
-    cameraUnavailable: "Kamera kuzatuvi bu versiyada yo‘q: sensing dvigateli (yuz/qo‘l) hali ulanmagan.", cameraDenied: "Kameraga ruxsat berilmadi.", cameraRequesting: "Kamera so‘ralmoqda…",
-    cameraTracking: "Kamera: yuz ko‘rinmoqda", cameraLost: "Kamera: yuz topilmadi", cameraPrivacy: "Tasvir kompyuteringizdan chiqmaydi, yozib olinmaydi, yuz tanilmaydi.",
-    attentionPointer: "EZO sichqonchaga qaraydi (kamera emas)", attentionHand: "EZO qo‘lingizga qaraydi", attentionHead: "EZO sizga qaraydi", attentionSimulated: "SIMULYATSIYA — haqiqiy kamera emas",
+    expand: "Kattalashtirish", collapse: "Kichraytirish", micActive: "Mikrofon faol", micOff: "Mikrofon sozlamalarda o‘chirilgan",
+   
+   
+   
+   
     lowPower: "Tejamkor rejim: 30 kadr/s", clap: "Qarsak eshitildi",
-    cameraAssetsMissing: "Kamera modeli bu buildga qo‘shilmagan (vision assets yo‘q).", cameraAssetsInvalid: "Kamera modeli tekshiruvdan o‘tmadi: {detail}",
-    cameraEngine: "Yuz/qo‘l kuzatuvi: MediaPipe, shu kompyuterda; kadrlar hech qayerga yuborilmaydi.", cameraError: "Kamera xatosi: {detail}",
+   
+   
     clapListen: "Qarsakni tinglash", clapStop: "Tinglashni to‘xtatish", clapOff: "Qarsak mikrofoni o‘chiq", clapRequesting: "Mikrofon so‘ralmoqda…", clapActive: "Mikrofon (qarsak) faol",
     clapDenied: "Mikrofonga ruxsat berilmadi — «Qarsakni tinglash»ni qayta bosing.", clapError: "Mikrofon xatosi: {detail}", clapPrivacy: "Faqat qarsak kabi qisqa tovushlar aniqlanadi.",
     clapSettings: "Qarsakni tinglash sozlamalarda o‘chiq — avval u yerda yoqing.", clapUnavailable: "Ovoz provayderi yo‘q — javob aytilmadi.",
@@ -42,7 +42,7 @@ interface PillOptions {
   online?: boolean;
   ai?: boolean;
   replyDelayMs?: number;
-  media?: { microphone: boolean; camera: boolean };
+  media?: { microphone: boolean };
 }
 
 async function openPill(page: Page, options: PillOptions = {}) {
@@ -104,7 +104,7 @@ async function openPill(page: Page, options: PillOptions = {}) {
       online: options.online ?? true,
       ai: options.ai ?? true,
       replyDelayMs: options.replyDelayMs ?? 50,
-      media: options.media ?? { microphone: true, camera: false },
+      media: options.media ?? { microphone: true },
     },
   );
   await page.goto(`file://${PILL}`);
@@ -226,25 +226,21 @@ test("desktop stage: expands to the full humanoid and collapses back, ten times,
   await expect(page.locator("#stageFrame svg")).toHaveCount(1);
   const after = await heap();
   expect(after - before).toBeLessThan(40 * 1024 * 1024);
-  // The pointer is a labelled fallback for the camera.
-  await page.locator("#stageFace").hover({ position: { x: 20, y: 20 } });
-  await expect(page.locator("#attention")).toHaveText("EZO sichqonchaga qaraydi (kamera emas)");
+  // No camera on the stage: no video element, no camera control.
+  expect(await page.locator("video").count()).toBe(0);
+  await expect(page.locator("#cameraToggle")).toHaveCount(0);
 });
 
-test("desktop stage: served from file:// (no app origin) the camera and clap controls stay disabled and say why", async ({ page }) => {
-  // The real app serves itself from https://ezo.desktop; here vision-assets.json cannot be
-  // fetched, so the honest state is "disabled with a reason", never a pretended camera.
-  await openPill(page, { media: { microphone: true, camera: true } });
+test("desktop stage: clap listening is off until switched on in settings; nothing is open, so no indicator", async ({ page }) => {
+  await openPill(page, { media: { microphone: true } });
   await page.locator("#expand").click();
-  await expect(page.locator("#cameraToggle")).toBeDisabled();
-  await expect(page.locator("#cameraPrivacy")).toContainText("Kamera xatosi");
-  await expect(page.locator("#cameraState")).toHaveAttribute("data-camera", "off");
   await expect(page.locator("#clapToggle")).toBeDisabled();
-  await expect(page.locator("#media")).toBeEmpty(); // no camera, no microphone: no indicator
+  await expect(page.locator("#clapState")).toHaveAttribute("data-microphone", "off");
+  await expect(page.locator("#media")).toBeEmpty(); // no microphone open: no indicator
 });
 
 test("desktop pill: with the microphone switched off in settings, talking is refused honestly", async ({ page }) => {
-  await openPill(page, { media: { microphone: false, camera: false } });
+  await openPill(page, { media: { microphone: false } });
   await page.locator("#orb").click();
   await expect(page.locator("#pill")).toHaveClass(/error/);
   await expect(page.locator("#hint")).toHaveText("Mikrofon sozlamalarda o‘chirilgan");

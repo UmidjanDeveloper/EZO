@@ -35,7 +35,7 @@ export interface AvatarOptions {
   power?: "auto" | "low" | "high";
 }
 
-/** Where EZO looks, from camera tracking or a pointer. Normalised: -1 (left/down) .. 1. */
+/** Where EZO looks, from the pointer or a touch. Normalised: -1 (left/down) .. 1. */
 export interface Gaze {
   yaw: number;
   pitch: number;
@@ -264,7 +264,7 @@ export class EzoAvatar {
     this.levelAt = this.time;
   }
 
-  /** Turn the head towards a point (camera tracking, or the pointer). Null, or silence for
+  /** Turn the head towards a point (the pointer or a touch). Null, or silence for
    * 1.5 s, lets the head return to its own gentle sway. Never used as proof of a face. */
   setGaze(gaze: Gaze | null): void {
     if (!gaze) {
@@ -275,11 +275,6 @@ export class EzoAvatar {
     this.gazeTarget = { yaw: clamp(gaze.yaw), pitch: clamp(gaze.pitch) };
     this.gazeAt = this.time;
     if (this.reduced || !this.running) this.redrawIfStill();
-  }
-
-  /** `packages/face-tracking` MotionPort: head angles in radians, or null when no face. */
-  setHeadAim(aim: { yawRadians: number; pitchRadians: number } | null): void {
-    this.setGaze(aim ? { yaw: aim.yawRadians / 0.25, pitch: aim.pitchRadians / 0.15 } : null);
   }
 
   private label(): void {

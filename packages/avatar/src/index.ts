@@ -4,4 +4,3 @@ export { AVATAR_STATES, TRANSIENT_STATES, lookFor, toAvatarState, type AvatarSta
 export { createLevelMeter, levelFromSamples, type LevelMeter } from "./level";
 export type { Framing } from "./math";
 export { createVoiceFrame, type VoiceFrame, type VoiceFrameOptions } from "./frame";
-export { MotionAdapter, type AttentionState, type AttentionView, type CameraState, type GazeTarget, type MotionAdapterOptions, type MotionIntent, type VisionStatus } from "./sensing";

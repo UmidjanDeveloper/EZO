@@ -15,9 +15,8 @@ export interface DesktopSettings {
   allowScreen: boolean;
   allowVolume: boolean;
   speakReplies: boolean;
-  /** The microphone can be switched off entirely; the camera is off until the owner turns it on. */
+  /** The microphone can be switched off entirely. */
   allowMicrophone: boolean;
-  allowCamera: boolean;
   /** Economy drawing (30 fps) for laptops on battery or little RAM. */
   lowPower: boolean;
   /** The first-run welcome was read. */
@@ -46,7 +45,6 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   allowVolume: false,
   speakReplies: true,
   allowMicrophone: true,
-  allowCamera: false,
   lowPower: false,
   onboarded: false,
   voiceVolume: 1,
@@ -97,7 +95,6 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     allowVolume: bool("allowVolume", false),
     speakReplies: bool("speakReplies", true),
     allowMicrophone: bool("allowMicrophone", true),
-    allowCamera: bool("allowCamera", false),
     lowPower: bool("lowPower", false),
     onboarded: bool("onboarded", false),
     clapListening: bool("clapListening", false),

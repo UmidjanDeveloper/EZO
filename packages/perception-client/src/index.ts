@@ -1,4 +1,6 @@
-export { loadVisionAssets, type AssetsReadiness } from "./assets";
-export { PerceptionSession, cameraState, type Diagnostics, type SessionHost } from "./session";
+export { ClapSession, type Diagnostics, type SessionHost } from "./session";
 export { AcknowledgementSpeaker, type SpeakerOptions } from "./speaker";
-export { acknowledgement, VoiceReaction, ACKNOWLEDGEMENTS, type AcknowledgementIntent, type ClapDetected, type Language, type PlaybackEvent, type VisionAssets } from "@ezo/face-tracking";
+export { ClapDetector, type ClapOptions } from "./clap";
+export { ClapMicrophone, type MicrophoneStatus } from "./microphone";
+export { acknowledgement, VoiceReaction, ACKNOWLEDGEMENTS, type AcknowledgementIntent, type AcknowledgementPlayer } from "./voice";
+export type { ClapDetected, Language, PlaybackEvent } from "./types";

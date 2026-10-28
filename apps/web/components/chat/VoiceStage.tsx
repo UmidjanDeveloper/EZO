@@ -24,7 +24,7 @@ import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
 import type { EzoAvatar } from "@ezo/avatar";
 import { EzoHumanoid } from "../robot/EzoHumanoid";
-import { CameraAttentionRow, useCameraAttention } from "./CameraAttention";
+import { ClapRow, useClap } from "./ClapControls";
 import type { useChatSession } from "./useChatSession";
 
 type Session = ReturnType<typeof useChatSession>;
@@ -67,7 +67,7 @@ export function VoiceStage({ session }: { session: Session }) {
   const [avatar, setAvatar] = useState<EzoAvatar | null>(null);
   const ackRef = useRef(false); // an acknowledgement clip is playing (not a conversation turn)
   const listenAfterAckRef = useRef<() => void>(() => undefined);
-  const camera = useCameraAttention(avatar, {
+  const clap = useClap(avatar, {
     language: acknowledgementLanguage(choice, lastHeardLanguage, uiLanguage),
     providerKey: (voiceStatus?.text_to_speech ?? []).join(","),
     interaction: phase === "listening" || phase === "recognizing" ? "listening" : phase === "speaking" ? "speaking" : null,
@@ -192,9 +192,9 @@ export function VoiceStage({ session }: { session: Session }) {
   useEffect(() => {
     // Only when the owner switched it on: after the spoken acknowledgement EZO starts listening.
     listenAfterAckRef.current = () => {
-      if (camera.clap.startsListening && supported) listen();
+      if (clap.startsListening && supported) listen();
     };
-  }, [camera.clap.startsListening, listen, supported]);
+  }, [clap.startsListening, listen, supported]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -260,8 +260,8 @@ export function VoiceStage({ session }: { session: Session }) {
       </div>
 
       <div className="relative mt-2 h-[clamp(320px,60dvh,720px)] w-full shrink-0" data-testid="voice-scene"
-        onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); camera.pointer({ yaw: (event.clientX-r.left)/r.width*2-1, pitch: (1-(event.clientY-r.top)/r.height*2)*0.6 }, event.pointerType === "touch" ? "touch" : "pointer"); }}
-        onPointerLeave={() => camera.pointer(null, "pointer")}>
+        onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); avatar?.setGaze({ yaw: (event.clientX-r.left)/r.width*2-1, pitch: (1-(event.clientY-r.top)/r.height*2)*0.6 }); }}
+        onPointerLeave={() => avatar?.setGaze(null)}>
         <EzoHumanoid state={visible} framing="bust" style="holographic" label={status} onAvatar={setAvatar} className="absolute inset-0" />
         <button type="button" onClick={toggle} className="absolute inset-0 z-10 focus-visible:outline-2 focus-visible:outline-sky-300" aria-label={status} />
       </div>
@@ -295,7 +295,7 @@ export function VoiceStage({ session }: { session: Session }) {
         ) : null}
 
         {notice ? <p className="max-w-md text-center text-sm text-amber-300" role="status">{notice}</p> : null}
-        <CameraAttentionRow camera={camera} />
+        <ClapRow clap={clap} />
       </div>
 
       <button
