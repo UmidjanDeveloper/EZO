@@ -1,9 +1,0 @@
-<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>EZO permissioned perception acceptance</title>
-<style>body{font:16px system-ui;max-width:900px;margin:24px auto;padding:0 16px;background:#10151b;color:#eee}button,select{padding:12px;margin:6px}canvas{width:100%;height:360px}video{width:320px;max-width:100%;transform:scaleX(-1)}pre{white-space:pre-wrap}p[role=status]{border:1px solid #999;padding:8px}</style>
-<h1>EZO humanoid — local perception acceptance</h1>
-<p>Optional camera: approximate head/face and hand motion only. Not eye measurement or identity recognition. Optional microphone: local acoustic transient detection with possible false positives. Nothing is recorded or uploaded.</p>
-<button id="camera">Start camera</button><button id="stopCamera">Stop camera</button><button id="microphone">Start clap microphone</button><button id="stopMicrophone">Stop microphone</button><button id="stop">Stop all sensors</button>
-<label>Language <select id="language"><option value="uz">O‘zbek</option><option value="en">English</option><option value="ru">Русский</option></select></label><button id="manual">Manual acknowledgement intent</button>
-<p id="cameraStatus" role="status">Camera off</p><p id="microphoneStatus" role="status">Microphone off</p><p id="error" role="alert"></p>
-<video id="video" muted playsinline></video><canvas id="avatar" aria-label="EZO humanoid"></canvas><p id="voice" role="status">Voice provider not connected — no audio playback.</p><pre id="output">No perception data</pre>
-<script type="module" src="./main.ts"></script></html>

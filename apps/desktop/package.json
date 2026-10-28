@@ -16,7 +16,6 @@
   },
   "devDependencies": {
     "@ezo/avatar": "workspace:*",
-    "@ezo/face-tracking": "workspace:*",
     "@ezo/perception-client": "workspace:*",
     "@types/node": "22.20.5",
     "electron": "44.9.3",

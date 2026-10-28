@@ -1,5 +1,6 @@
 import { createLevelMeter, type LevelMeter } from "@ezo/avatar";
-import type { AcknowledgementIntent, AcknowledgementPlayer, Language, PlaybackEvent } from "@ezo/face-tracking";
+import type { AcknowledgementIntent, AcknowledgementPlayer } from "./voice";
+import type { Language, PlaybackEvent } from "./types";
 
 export interface SpeakerOptions {
   /** The app's authenticated /api/voice/speak call; rejects when no provider is configured. */

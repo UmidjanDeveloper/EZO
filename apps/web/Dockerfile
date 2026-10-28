@@ -9,7 +9,6 @@ COPY apps/web/package.json apps/web/
 COPY packages/ui/package.json packages/ui/
 COPY packages/shared/package.json packages/shared/
 COPY packages/avatar/package.json packages/avatar/
-COPY packages/face-tracking/package.json packages/face-tracking/
 COPY packages/perception-client/package.json packages/perception-client/
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
@@ -18,13 +17,8 @@ RUN --mount=type=secret,id=proxy_ca \
 FROM deps AS build
 COPY packages ./packages
 COPY apps/web ./apps/web
-COPY scripts ./scripts
 ENV NEXT_TELEMETRY_DISABLED=1
-# The web build prepares public/vision (pinned MediaPipe assets, SHA256-verified; the models
-# are downloaded here at build time, never at runtime).
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    pnpm --filter @ezo/web build
+RUN pnpm --filter @ezo/web build
 
 FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS run
 WORKDIR /app
@@ -45,7 +39,6 @@ RUN --mount=type=secret,id=system_ca \
         /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 COPY --from=build --chown=ezo:ezo /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=ezo:ezo /repo/apps/web/.next/static ./apps/web/.next/static
-COPY --from=build --chown=ezo:ezo /repo/apps/web/public ./apps/web/public
 USER ezo
 EXPOSE 3000
 # EZO_API_URL (runtime) tells the browser where the API is.

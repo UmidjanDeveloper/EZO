@@ -1,6 +1,6 @@
 # EZO — egasi uchun 10 daqiqalik sinov (Windows + Android + veb)
 
-Bu ro‘yxat **haqiqiy** kamera, mikrofon, dinamik va telefon bilan bajariladi. CI’dagi
+Bu ro‘yxat **haqiqiy** mikrofon, dinamik va telefon bilan bajariladi. Kamera ishlatilmaydi (yuz/qo‘l kuzatuvi koddan olib tashlangan). CI’dagi
 hamma narsa simulyatsiya; faqat siz quyidagilarni tasdiqlay olasiz. Har bir qadamda
 «kutilgan natija» va «agar ishlamasa» bor. Oxirida Diagnostika hisobotini nusxalab
 Claude’ga tashlang — shu bilan «yana bir prompt» sikli tugaydi.
@@ -20,13 +20,12 @@ Tayyorgarlik (5 daqiqa, bir marta):
 |---|---|---|---|
 | A1 | `EZO-Setup-0.1.0.exe` ni ishga tushiring (SmartScreen: «Batafsil → Baribir ishga tushirish»). | O‘rnatildi, yuqorida doiracha (pill) chiqdi, Sozlamalar oynasi xush kelibsiz bilan ochildi. | Antivirus bloklasa — imzosiz build; sertifikat kelguncha ruxsat bering. |
 | A2 | Sozlamalar → server manzili + token → «Ulanishni tekshirish». | Yashil nuqta, «Server ulangan, AI tayyor». | Qizil: manzil/tokenni tekshiring; `/api/health` brauzerda ochiladimi? |
-| A3 | Sozlamalar → «Mikrofon va kamera» → **Kamera** ni yoqing; «Qarsakni tinglash» ni yoqing. | Ikkala katak belgilandi. | — |
-| A4 | Pill’dagi `⤢` ni bosing → sahna ochiladi → «Kamerani yoqish». Windows ruxsat so‘rasa — «Ruxsat». | «Kamera: yuz ko‘rinmoqda», CAM belgisi, EZO sizga qaraydi; yuzni chapga/o‘ngga bursangiz — bosh ergashadi. | «Kamera xatosi» matnini Diagnostikaga yozing. «Kamera modeli yo‘q» chiqsa — build’da vision assets yo‘q (CI logi). |
-| A5 | Qo‘lingizni ko‘tarib chapga-o‘ngga harakatlantiring. | «EZO qo‘lingizga qaraydi»; ko‘zlar oldin, bosh keyin buriladi. | Qo‘l ko‘rinmasa — yorug‘lik, qo‘l kameradan 0.5–1 m. |
+| A3 | Sozlamalar → «Mikrofon» → «Qarsakni tinglash» ni yoqing. | Katak belgilandi. | — |
+| A4 | Pill’dagi `⤢` ni bosing → sahna ochiladi. Sichqonchani humanoid ustida yurgizing. | Katta humanoid; bosh sichqonchaga qarab buriladi. | — |
 | A6 | «Qarsakni tinglash» → bir marta qarsak chaling. | «Qarsak eshitildi ×1», EZO «Eshitaman seni.» deb aytadi (jag‘ ovoz bilan qimirlaydi), keyin tinch turadi. | «Ovoz provayderi yo‘q» — serverda kalit yo‘q. Qarsak eshitilmasa — mikrofon darajasi, 1–2 m masofa. |
 | A7 | Sozlamalar → Ilova tili: English → qarsak; Русский → qarsak. | «I'm listening.» / «Я тебя слушаю.» aytiladi (ikkinchi marta darhol — kesh). | — |
-| A8 | Ctrl+Alt+H (yashirish) → qayta ko‘rsatish. | Kamera va mikrofon o‘chadi (CAM/MIC belgilari yo‘qoladi), o‘zi qayta yoqilmaydi. | — |
-| A9 | Sozlamalar → pastdagi **Diagnostika** → «Hisobotni nusxalash». | Buferda matn: fps, inference ms, clap soni, TTS provayder, versiya, sha. | «Yangilash»ni bosing; sahna ochiq bo‘lsin. |
+| A8 | Ctrl+Alt+H (yashirish) → qayta ko‘rsatish. | Mikrofon o‘chadi (MIC belgisi yo‘qoladi), o‘zi qayta yoqilmaydi. | — |
+| A9 | Sozlamalar → pastdagi **Diagnostika** → «Hisobotni nusxalash». | Buferda matn: fps, clap soni, TTS provayder, versiya, sha. | «Yangilash»ni bosing; sahna ochiq bo‘lsin. |
 
 ## B. Android (4 daqiqa)
 
@@ -34,20 +33,20 @@ Tayyorgarlik (5 daqiqa, bir marta):
 |---|---|---|---|
 | B1 | `EZO-0.1.0-debug.apk` ni o‘rnating («Noma’lum manbalar»ga ruxsat). | Xush kelibsiz sahifasi, humanoid bosh. | — |
 | B2 | Server manzili (LAN: `http://192.168.x.x:8000`) + token → «Saqlash va ulanish». | Yashil nuqta. | Telefon va server bir Wi‑Fi’da bo‘lsin; serverda `EZO_CORS_ORIGINS` da `https://localhost` bo‘lsin. |
-| B3 | Chat → 🎤 → sahna → «Kamerani yoqish» → Android ruxsat → «Ruxsat». | «Kamera: yuz ko‘rinmoqda», EZO sizga qaraydi, bosh/qo‘l harakatiga ergashadi. | «Kamera xatosi: …» matnini yozing. Ruxsat rad etilsa — Android sozlamalari → EZO → Ruxsatlar. |
+| B3 | Chat → 🎤 → sahna ochiladi. Barmog‘ingizni humanoid ustida yurgizing. | Humanoid; bosh barmoqqa qarab buriladi. | — |
 | B4 | «Qarsakni tinglash» → qarsak. | «Qarsak eshitildi», «Eshitaman seni.» aytiladi. | B6 dagi hisobot. |
-| B5 | Ilovani fonga oling (Home) → qaytib keling. | Kamera va mikrofon o‘chgan, o‘zi yoqilmaydi. | — |
+| B5 | Ilovani fonga oling (Home) → qaytib keling. | Qarsak mikrofoni o‘chgan, o‘zi yoqilmaydi. | — |
 | B6 | Ko‘proq → **Diagnostika** → «Hisobotni nusxalash». | Buferda matn (fps, kadr vaqti, xotira ham). | — |
-| B7 | Telefon sozlamalarida EZO uchun **Kamera** ruxsatini o‘chiring → ilovani oching → sahna → «Kamerani yoqish». | Tizim so‘rovi; «Ruxsat berilmadi» holati, ilova yopilib qolmaydi. Ruxsatni qaytarsangiz, kamera yana ishlaydi. | Ilova yopilib qolsa — B6 hisobotini yuboring. |
+| B7 | Telefon sozlamalarida EZO uchun **Mikrofon** ruxsatini o‘chiring → sahna → «Qarsakni tinglash». | «Ruxsat berilmadi» holati, ilova yopilib qolmaydi. | Ilova yopilib qolsa — B6 hisobotini yuboring. |
 
 ## C. Veb (2 daqiqa)
 
 | # | Qadam | Kutilgan natija |
 |---|---|---|
-| C1 | Brauzerda EZO → «Gaplashish» → «Kamerani yoqish» → ruxsat. | «Kamera: yuz ko‘rinmoqda», EZO sizga qaraydi. |
+| C1 | Brauzerda EZO → «Gaplashish». Sichqonchani humanoid ustida yurgizing. | Humanoid sichqonchaga qaraydi; sahnada kamera yo‘q. |
 | C2 | «Qarsakni tinglash» → qarsak. | «Qarsak eshitildi», javob aytiladi. |
-| C3 | Tabni almashtiring → qaytib keling. | Kamera o‘chgan, o‘zi yoqilmaydi. |
-| C4 | Sahnada pastdagi **Diagnostika** → «Hisobotni nusxalash». | Buferda matn: versiya, sha, fps, kamera, TTS provayder. |
+| C3 | Tabni almashtiring → qaytib keling. | Qarsak mikrofoni o‘chgan, o‘zi yoqilmaydi. |
+| C4 | Sahnada pastdagi **Diagnostika** → «Hisobotni nusxalash». | Buferda matn: versiya, sha, fps, mikrofon, TTS provayder. |
 
 ### Ixtiyoriy: ovoz aniqligi (server kalitlari bilan)
 
@@ -68,9 +67,4 @@ Eshitgan ovozim: uz ✓/✗ (tabiiymi? 1–5), en ✓/✗, ru ✓/✗
 Ishlamagan qadamlar: A?, B? — nima ko‘rindi
 ```
 
-Hisobotda rasm, ovoz yozuvi yoki yuz nuqtalari yo‘q — faqat raqamlar va so‘zlar.
-
-Sahna qanday ko‘rinishi kerak (CI dagi SIMULYATSIYA — soxta kamera, yuz yo‘q, shuning uchun
-«yuz topilmadi»): `docs/devices/img/section-c-simulation-web-stage.jpg`,
-`…-windows-pill-stage.jpg` (qarsakdan keyin gapirmoqda), `…-android-stage.jpg`. Sizda haqiqiy
-kamera oldida «Kamera: yuz ko‘rinmoqda» bo‘lishi kerak.
+Hisobotda rasm yoki ovoz yozuvi yo‘q — faqat raqamlar va so‘zlar.

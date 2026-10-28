@@ -2,9 +2,8 @@ import "./styles.css";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { FilePicker } from "@capawesome/capacitor-file-picker";
-import { createLevelMeter, createVoiceFrame, EzoAvatar, MotionAdapter, type AttentionView, type AvatarState, type LevelMeter, type VisionStatus, type VoiceFrame } from "@ezo/avatar";
-import type { MicrophoneStatus } from "@ezo/face-tracking";
-import { AcknowledgementSpeaker, acknowledgement, loadVisionAssets, PerceptionSession, VoiceReaction, type AssetsReadiness, type Diagnostics } from "@ezo/perception-client";
+import { createLevelMeter, createVoiceFrame, EzoAvatar, type AvatarState, type LevelMeter, type VoiceFrame } from "@ezo/avatar";
+import { AcknowledgementSpeaker, acknowledgement, ClapSession, VoiceReaction, type Diagnostics, type MicrophoneStatus } from "@ezo/perception-client";
 import { ApiError, createApi, type Api, type IeltsAdvance, type JarvisTask, type Lang, type Message, type ServerStatus } from "./api";
 import { base64Bytes, documentPrompt, isStudentDocument, jobMessage, MAX_STUDENT_BYTES } from "./documents";
 import { Recorder } from "./recorder";
@@ -257,14 +256,9 @@ function renderLanguage(): void {
   }
 }
 
-// Perception on the stage: the real engine (@ezo/face-tracking in a worker, assets bundled
-// under /vision and SHA256-verified) feeds the figure through MotionAdapter; the clap
-// microphone is a separate consent with its own Stop. Nothing is recorded or uploaded.
-const VISION_BASE = "/vision/";
-let adapter: MotionAdapter | null = null;
-let perception: PerceptionSession | null = null;
-let readiness: AssetsReadiness | null = null;
-let vision: VisionStatus = { camera: "off", since: 0 };
+// The clap on the stage: a separate microphone consent with its own Stop, detected on the
+// phone. Nothing is recorded or uploaded; a clap never runs a command.
+let clapSession: ClapSession | null = null;
 let microphone: { status: MicrophoneStatus; error?: string } = { status: "off" };
 let diagnostics: Diagnostics | null = null;
 let lastTts: { provider: string | null; latencyMs: number; cached: boolean; at: number } | null = null;
@@ -286,53 +280,20 @@ const reaction = new VoiceReaction(speaker, (event) => {
   if (event.type === "start") {
     acknowledging = true;
     player?.pause();
-    perception?.setInteraction("speaking");
+    clapSession?.setInteraction("speaking");
     stageState("speaking", t.voice.speaking);
   } else if (event.type === "unavailable" || event.type === "error") {
     // Not spoken: no provider, or it failed. Never a pretended playback.
     stageState("idle", t.voice.clapUnavailable);
   } else if (event.type === "end" && acknowledging) {
     acknowledging = false;
-    perception?.setInteraction(null);
+    clapSession?.setInteraction(null);
     if (prefs.clapStartsListening === "on" && server.online && !recorder.active) void startListening();
     else if (!$("voiceStage").hidden) stageState("idle", t.voice.again);
   }
 });
 
-function renderAttention(view: AttentionView): void {
-  const line = $("attention");
-  line.textContent =
-    view.source === "hand" ? t.voice.attentionHand : view.source === "face" ? t.voice.attentionHead : view.source === "touch" || view.source === "pointer" ? t.voice.attentionTouch : "";
-}
-
-function renderCamera(): void {
-  const stateBox = $("cameraState");
-  const button = $<HTMLButtonElement>("cameraToggle");
-  stateBox.dataset.camera = vision.camera;
-  const words: Record<VisionStatus["camera"], string> = {
-    off: t.voice.cameraOff,
-    requesting: t.voice.cameraRequesting,
-    denied: t.voice.cameraDenied,
-    unavailable: t.voice.cameraUnavailable,
-    tracking: t.voice.cameraTracking,
-    lost: t.voice.cameraLost,
-    error: format(t.voice.cameraError, { detail: vision.message ?? "" }),
-  };
-  stateBox.textContent = words[vision.camera] + (vision.simulated ? ` (${t.voice.attentionSimulated})` : "");
-  const ready = Boolean(readiness?.ready);
-  button.disabled = !ready;
-  const running = vision.camera !== "off";
-  button.textContent = running ? t.voice.cameraStop : t.voice.cameraOn;
-  $("cameraPrivacy").textContent = !readiness
-    ? ""
-    : readiness.ready
-      ? `${t.voice.cameraPrivacy} ${t.voice.cameraEngine}`
-      : readiness.reason === "missing"
-        ? t.voice.cameraAssetsMissing
-        : readiness.reason === "invalid"
-          ? format(t.voice.cameraAssetsInvalid, { detail: readiness.detail })
-          : format(t.voice.cameraError, { detail: readiness.detail });
-  // Clap row.
+function renderClap(): void {
   const clapBox = $("clapState");
   const clapButton = $<HTMLButtonElement>("clapToggle");
   clapBox.dataset.microphone = microphone.status;
@@ -344,67 +305,38 @@ function renderCamera(): void {
   };
   clapBox.textContent = micWords[microphone.status];
   const micRunning = microphone.status === "active" || microphone.status === "requesting";
-  clapButton.disabled = !ready;
   clapButton.textContent = micRunning ? t.voice.clapStop : t.voice.clapListen;
   $("clapHeard").textContent = diagnostics?.clapCount ? `${t.voice.clapHeard} ×${diagnostics.clapCount}` : "";
   $("clapStartsListeningLabel").textContent = t.voice.clapStartsListening;
   $<HTMLInputElement>("clapStartsListening").checked = prefs.clapStartsListening === "on";
   $("clapPrivacy").textContent = t.voice.clapPrivacy;
   const stage = $("voiceStage");
-  stage.dataset.fps = String(diagnostics?.cameraFps ?? 0);
-  stage.dataset.inferenceMs = String(diagnostics?.inferenceMs ?? "");
-  stage.dataset.attention = diagnostics?.attention ?? "neutral";
   stage.dataset.clapCount = String(diagnostics?.clapCount ?? 0);
-}
-
-async function startCamera(): Promise<void> {
-  await perception?.startCamera();
-  renderCamera();
-}
-
-function stopCamera(): void {
-  perception?.stopCamera();
-  renderCamera();
 }
 
 async function toggleClap(): Promise<void> {
   if (microphone.status === "active" || microphone.status === "requesting") {
-    perception?.stopClap();
+    clapSession?.stopClap();
     return;
   }
   prefs = { ...prefs, clapListening: "on" };
   savePrefs(prefs);
-  await perception?.startClap();
-  renderCamera();
+  await clapSession?.startClap();
+  renderClap();
 }
 
-/** Mounts the engine for the open stage; one session per figure, released with it. */
-function mountPerception(): void {
-  if (!avatar) return;
-  // The adapter (engine first, labelled touch/pointer fallback) lives with the figure even when
-  // the engine is not available in this build; the session is added once the assets verified.
-  adapter ??= new MotionAdapter(avatar, { onChange: renderAttention });
-  if (!readiness?.ready || perception) return;
-  perception = new PerceptionSession({
-    base: VISION_BASE,
-    assets: readiness.assets,
-    video: $<HTMLVideoElement>("perceptionVideo"),
-    cameraIndicator: $("cameraIndicator"),
+/** Mounts the clap session for the open stage; one per figure, released with it. */
+function mountClap(): void {
+  if (!avatar || clapSession) return;
+  clapSession = new ClapSession({
     microphoneIndicator: $("microphoneIndicator"),
-    adapter,
-    lowPower: avatar.isLowPower(),
-    reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
-    onVision: (status) => {
-      vision = status;
-      renderCamera();
-    },
     onMicrophone: (status, error) => {
       microphone = { status, error };
-      renderCamera();
+      renderClap();
     },
     onDiagnostics: (next) => {
       diagnostics = next;
-      renderCamera();
+      renderClap();
     },
     onClap: (event) => {
       // Acknowledgement only ("Eshitaman seni." in the app language): never a send, a tool or listening by itself.
@@ -417,14 +349,11 @@ function mountPerception(): void {
   });
 }
 
-function unmountPerception(): void {
+function unmountClap(): void {
   reaction.stop();
   speaker.stop();
-  perception?.stop();
-  perception = null;
-  adapter?.stop();
-  adapter = null;
-  vision = { camera: "off", since: performance.now() };
+  clapSession?.stop();
+  clapSession = null;
   microphone = { status: "off" };
   acknowledging = false;
 }
@@ -435,10 +364,10 @@ function openStage(): void {
     avatar = new EzoAvatar($<HTMLCanvasElement>("avatar"), { framing: "bust", power: prefs.lowPower === "on" ? "low" : "auto", describe: (s) => t.voice.words[s] });
     frame = createVoiceFrame($("avatarBox"), { words: t.voice.words, showWord: false }); // the status line below says the state
     frame.follow(avatar);
-    mountPerception();
+    mountClap();
   }
   renderLanguage();
-  renderCamera();
+  renderClap();
   if (!server.online) stageState("offline", t.voice.offline);
   else stageState("idle", t.voice.tapToTalk);
 }
@@ -448,13 +377,12 @@ function closeStage(): void {
   turn?.abort(); // an in-flight transcription, answer or voice stops with the stage
   player?.pause();
   followLevel(null);
-  unmountPerception(); // camera, clap microphone and worker never outlive the stage
+  unmountClap(); // the clap microphone never outlives the stage
   frame?.destroy();
   frame = null;
   avatar?.destroy(); // frees the GPU while the stage is closed
   avatar = null;
   voiceBusy = false;
-  $("attention").textContent = "";
   $("voiceStage").hidden = true;
 }
 
@@ -1037,11 +965,9 @@ function wire(): void {
   $("avatarBox").addEventListener("pointermove", (event) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const gaze = { yaw: ((event.clientX - rect.left) / rect.width) * 2 - 1, pitch: (1 - ((event.clientY - rect.top) / rect.height) * 2) * 0.6 };
-    if (adapter) adapter.pointerGaze(gaze, event.pointerType === "mouse" ? "pointer" : "touch");
-    else avatar?.setGaze(gaze);
+    avatar?.setGaze(gaze);
   });
-  $("avatarBox").addEventListener("pointerleave", () => (adapter ? adapter.pointerGaze(null) : avatar?.setGaze(null)));
-  $("cameraToggle").addEventListener("click", () => (vision.camera !== "off" ? stopCamera() : void startCamera()));
+  $("avatarBox").addEventListener("pointerleave", () => avatar?.setGaze(null));
   $("clapToggle").addEventListener("click", () => void toggleClap());
   $<HTMLInputElement>("clapStartsListening").addEventListener("change", (event) => {
     prefs = { ...prefs, clapStartsListening: (event.target as HTMLInputElement).checked ? "on" : "off" };
@@ -1147,9 +1073,9 @@ function wire(): void {
     }
   });
   document.addEventListener("visibilitychange", () => {
-    // In the background nothing senses: camera and clap microphone stop; nothing restarts by itself.
-    perception?.setVisible(!document.hidden);
-    if (document.hidden) renderCamera();
+    // In the background nothing listens: the clap microphone stops; nothing restarts by itself.
+    clapSession?.setVisible(!document.hidden);
+    if (document.hidden) renderClap();
     // Coming back to the app shows what was said on the desktop in the meantime.
     if (!document.hidden && !$("chatTab").hidden) void refreshConversations();
   });
@@ -1158,13 +1084,6 @@ function wire(): void {
 async function start(): Promise<void> {
   wire();
   applyStrings();
-  void loadVisionAssets(VISION_BASE).then((result) => {
-    readiness = result;
-    if (!$("voiceStage").hidden) {
-      mountPerception();
-      renderCamera();
-    }
-  });
   $<HTMLInputElement>("apiUrl").value = prefs.apiUrl;
   $<HTMLInputElement>("speakReplies").checked = prefs.speakReplies;
   $<HTMLInputElement>("lowPower").checked = prefs.lowPower === "on";
@@ -1194,8 +1113,6 @@ function diagnosticsReport(): string {
     figure: avatar
       ? { renderer: avatar.renderer, points: avatar.canvas.dataset.points, power: avatar.canvas.dataset.power, frames: avatar.getFrameCount(), ...avatar.getPerformance(), level: Number(avatar.getLevel().toFixed(2)), liveLevel: avatar.hasLiveLevel() }
       : null,
-    vision: readiness ? (readiness.ready ? "assets verified" : `${readiness.reason}: ${readiness.detail}`) : "checking",
-    camera: vision.camera,
     microphone: microphone.status,
     ...(diagnostics ?? {}),
     tts: lastTts,

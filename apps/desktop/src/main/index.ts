@@ -45,8 +45,7 @@ const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 
 /**
  * The renderers load from https://ezo.desktop/, served from dist/ by a protocol handler.
- * A real https origin (not file://) is what the perception worker needs to fetch the
- * bundled, SHA256-pinned vision assets from "the same origin" with a strict CSP; nothing
+ * A real https origin (not file://) gives the renderers a proper secure context; nothing
  * ever goes to the network for that host, and every other https request from a renderer
  * is passed through untouched (renderers have connect-src 'self' anyway).
  */
@@ -56,8 +55,6 @@ const CONTENT_TYPES: Record<string, string> = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".json": "application/json",
-  ".wasm": "application/wasm",
-  ".task": "application/octet-stream",
   ".txt": "text/plain; charset=utf-8",
   ".png": "image/png",
 };
@@ -71,8 +68,6 @@ function serveAppOrigin(): void {
     if (!file.startsWith(__dirname + path.sep) || !existsSync(file)) return new Response("not found", { status: 404 });
     const extension = path.extname(file).toLowerCase();
     const headers: Record<string, string> = { "Content-Type": CONTENT_TYPES[extension] ?? "application/octet-stream", "Cache-Control": "no-store" };
-    // The perception worker may compile the bundled WASM and importScripts its verified loader (a blob it made itself); nothing remote.
-    if (relative.endsWith("vision.worker.js")) headers["Content-Security-Policy"] = "default-src 'none'; script-src 'self' blob: 'wasm-unsafe-eval'; connect-src 'self' blob:";
     return new Response(readFileSync(file), { headers });
   });
 }
@@ -180,7 +175,7 @@ interface PillInit {
   language: Lang;
   status: PillStatus;
   /** What the owner allowed in settings; the renderer never asks the OS for more. */
-  media: { microphone: boolean; camera: boolean };
+  media: { microphone: boolean };
   lowPower: boolean;
   voiceVolume: number;
   clap: { listening: boolean; startsListening: boolean };
@@ -194,7 +189,7 @@ function pillInit(): PillInit {
     shortcut: settings.shortcut.replace("Control", "Ctrl"),
     language: settings.language,
     status: lastStatus,
-    media: { microphone: settings.allowMicrophone, camera: settings.allowCamera },
+    media: { microphone: settings.allowMicrophone },
     lowPower: settings.lowPower,
     voiceVolume: settings.voiceVolume,
     clap: { listening: settings.clapListening, startsListening: settings.clapStartsListening },
@@ -461,7 +456,7 @@ function createPill(): void {
   secureWindow(pill);
   void pill.loadURL(`${APP_ORIGIN}/pill.html`);
   pill.once("ready-to-show", () => pill?.showInactive());
-  // Hidden means hidden: the renderer stops the microphone, the camera and the drawing loop.
+  // Hidden means hidden: the renderer stops the microphone and the drawing loop.
   pill.on("hide", () => tell("visibility", false));
   pill.on("show", () => tell("visibility", true));
 }
@@ -560,7 +555,7 @@ function registerIpc(): void {
     platform: `${process.platform} ${process.arch}`,
     server: lastStatus,
     language: settings.language,
-    media: { microphone: settings.allowMicrophone, camera: settings.allowCamera, clap: settings.clapListening },
+    media: { microphone: settings.allowMicrophone, clap: settings.clapListening },
   }));
   ipcMain.on("pill:focusable", (_event, focusable: unknown) => {
     if (!pill || typeof focusable !== "boolean") return;
@@ -730,17 +725,17 @@ function registerIpc(): void {
   });
 }
 
-/** Only the pill may use media, and only what the owner allowed in settings: the microphone
- * (on by default, can be switched off) and the camera (off until switched on). */
+/** Only the pill may use media, and only the microphone the owner allowed in settings
+ * (on by default, can be switched off). The camera is never granted. */
 function allowOnlyAllowedMedia(): void {
-  const allowedType = (type: string) => (type === "audio" ? settings.allowMicrophone : type === "video" ? settings.allowCamera : false);
+  const allowedType = (type: string) => type === "audio" && settings.allowMicrophone;
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const fromPill = pill !== null && contents.id === pill.webContents.id;
     const types = (details as { mediaTypes?: string[] }).mediaTypes ?? [];
     callback(Boolean(fromPill && permission === "media" && types.length > 0 && types.every(allowedType)));
   });
   session.defaultSession.setPermissionCheckHandler((contents, permission) =>
-    Boolean(pill && contents?.id === pill.webContents.id && permission === "media" && (settings.allowMicrophone || settings.allowCamera)),
+    Boolean(pill && contents?.id === pill.webContents.id && permission === "media" && settings.allowMicrophone),
   );
 }
 
@@ -790,7 +785,7 @@ if (!selfTestArg && !app.requestSingleInstanceLock()) {
     // A new install, or a remote server without a token: the owner must see where to connect.
     if (firstRun || !settings.onboarded || (!readToken() && settings.apiUrl.startsWith("https:"))) openSettings();
   });
-  app.on("before-quit", () => tell("visibility", false)); // release the microphone/camera first
+  app.on("before-quit", () => tell("visibility", false)); // release the microphone first
   app.on("will-quit", () => globalShortcut.unregisterAll());
   app.on("window-all-closed", () => {
     // Stay in the tray; quitting is explicit.

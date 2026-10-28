@@ -1,7 +1,6 @@
 /**
- * The web app's perception wiring: where the bundled, SHA256-pinned vision assets live
- * (public/vision, prepared at build time by scripts/vision-assets.mjs), the clap consent
- * settings (off by default) and the acknowledgement voice through the real /api/voice/speak.
+ * The web app's clap wiring: the clap consent settings (off by default) and the
+ * acknowledgement voice through the real /api/voice/speak.
  * Nothing starts without the owner's own press; a clap never sends, runs or listens unless
  * "start listening after a clap" is on.
  */
@@ -10,8 +9,6 @@ import { api } from "./api";
 import { createStoredValue } from "./stored-value";
 import { publishVoiceLevel } from "./voice/level";
 import { voiceVolume } from "./voice/engine";
-
-export const VISION_BASE = "/vision/";
 
 /** Clap listening consent: "on" only after the owner switched it on (and pressed Listen). */
 export const storedClapListening = createStoredValue<"off" | "on">("ezo-clap-listening", "off", (v): v is "off" | "on" => v === "off" || v === "on");
@@ -36,7 +33,7 @@ export function createAcknowledgementSpeaker(providerKey: () => string, onTts: (
   });
 }
 
-/** The chosen conversation language wins; camera data never chooses a language. */
+/** The chosen conversation language wins. */
 export function acknowledgementLanguage(choice: "auto" | "uz" | "en" | "ru", lastHeard: "uz" | "en" | "ru" | null, ui: "uz" | "en" | "ru") {
   return choice === "auto" ? lastHeard ?? ui : choice;
 }

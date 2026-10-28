@@ -12,7 +12,6 @@ interface DesktopSettings {
   allowVolume: boolean;
   speakReplies: boolean;
   allowMicrophone: boolean;
-  allowCamera: boolean;
   lowPower: boolean;
   onboarded: boolean;
   voiceVolume: number;
@@ -52,7 +51,7 @@ interface SettingsBridge {
 
 const bridge = (window as unknown as { ezoSettings: SettingsBridge }).ezoSettings;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "allowCamera", "lowPower", "clapListening", "clapStartsListening"] as const;
+const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "lowPower", "clapListening", "clapStartsListening"] as const;
 let t: SettingsStrings = {};
 let secure = true;
 let pairingPoll: number | undefined;

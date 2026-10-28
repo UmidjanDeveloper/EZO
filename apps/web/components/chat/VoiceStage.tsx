@@ -24,7 +24,7 @@ import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
 import type { EzoAvatar } from "@ezo/avatar";
 import { EzoHumanoid } from "../robot/EzoHumanoid";
-import { CameraAttentionRow, useCameraAttention } from "./CameraAttention";
+import { ClapRow, useClap } from "./ClapControls";
 import type { useChatSession } from "./useChatSession";
 
 type Session = ReturnType<typeof useChatSession>;
@@ -73,7 +73,7 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
   const [avatar, setAvatar] = useState<EzoAvatar | null>(null);
   const ackRef = useRef(false); // an acknowledgement clip is playing (not a conversation turn)
   const listenAfterAckRef = useRef<() => void>(() => undefined);
-  const camera = useCameraAttention(avatar, {
+  const clap = useClap(avatar, {
     language: acknowledgementLanguage(choice, lastHeardLanguage, uiLanguage),
     providerKey: (voiceStatus?.text_to_speech ?? []).join(","),
     interaction: phase === "listening" || phase === "recognizing" ? "listening" : phase === "speaking" ? "speaking" : null,
@@ -198,9 +198,9 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
   useEffect(() => {
     // Only when the owner switched it on: after the spoken acknowledgement EZO starts listening.
     listenAfterAckRef.current = () => {
-      if (camera.clap.startsListening && supported) listen();
+      if (clap.startsListening && supported) listen();
     };
-  }, [camera.clap.startsListening, listen, supported]);
+  }, [clap.startsListening, listen, supported]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -238,7 +238,7 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
         <div className="text-[11px] tracking-wide text-sky-100/70" aria-live="polite">
           <span className="text-sm font-semibold tracking-[0.35em] text-sky-100">EZO</span>
           {offline ? <p className="mt-2 text-amber-300" data-testid="voice-offline">{m.chat.offlineTitle}</p> : null}
-          <p className="mt-2" data-testid="voice-sensor-status">{camera.camera.text} · {camera.clap.text}</p>
+          <p className="mt-2" data-testid="voice-sensor-status">{clap.text}</p>
         </div>
         <button type="button" data-testid="mode-text" onClick={onExit} aria-label={m.voice.modeText} className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-sky-100/20 bg-slate-950/60 hover:bg-slate-800"><X size={20} /></button>
       </div>
@@ -276,11 +276,11 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
       </div>
       </div>
 
-      <CameraAttentionRow camera={camera} />
+      <ClapRow clap={clap} />
       </details>
       <div className="absolute inset-0" data-testid="voice-scene"
-        onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); camera.pointer({ yaw: (event.clientX-r.left)/r.width*2-1, pitch: (1-(event.clientY-r.top)/r.height*2)*0.6 }, event.pointerType === "touch" ? "touch" : "pointer"); }}
-        onPointerLeave={() => camera.pointer(null, "pointer")}>
+        onPointerMove={(event) => { const r = event.currentTarget.getBoundingClientRect(); avatar?.setGaze({ yaw: (event.clientX-r.left)/r.width*2-1, pitch: (1-(event.clientY-r.top)/r.height*2)*0.6 }); }}
+        onPointerLeave={() => avatar?.setGaze(null)}>
         <EzoHumanoid state={visible} framing="bust" style="holographic" label={status} onAvatar={setAvatar} className="absolute inset-0" />
         <button type="button" onClick={toggle} className="absolute inset-0 z-10 focus-visible:outline-2 focus-visible:outline-sky-300" aria-label={status} />
       </div>
