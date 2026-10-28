@@ -95,7 +95,7 @@ void main() {
     float key = max(0.0, dot(normalize(vec3(aExtra.x, 0.25, aExtra.y)), normalize(KEY_DIR)));
     float w = clamp(face * uWarmth * (0.9 + 0.8 * uLevel), 0.0, 1.0);
     col = mix(mix(BLUE, CYAN, rim * 0.5 + scan + key * 0.25), mix(WARM, GOLD, face * face * (0.3 + 0.7 * uLevel)), w);
-    alpha = bright * (0.26 + 0.7 * rim * rim + 0.22 * key) * smoothstep(-0.55, 0.05, n.z) + w * 0.55 + scan * 0.6;
+    alpha = bright * (0.42 + 0.6 * rim * rim + 0.2 * key) * smoothstep(-0.55, 0.05, n.z) + w * 0.55 + scan * 0.6;
     size = 2.1 + w;
   } else if (kind < 1.5) {
     // Neck rings and chest arcs.
@@ -104,7 +104,7 @@ void main() {
     float rim = 1.0 - abs(n.z);
     float key = max(0.0, dot(normalize(vec3(aExtra.x, 0.2, aExtra.y)), normalize(KEY_DIR)));
     col = mix(BLUE, CYAN, 0.25 * bright + scan + 0.2 * key);
-    alpha = bright * (0.34 + 0.6 * rim * rim + 0.18 * key) + scan * 0.5;
+    alpha = bright * (0.5 + 0.5 * rim * rim + 0.16 * key) + scan * 0.5;
     size = 1.9;
   } else if (kind < 2.5) {
     // Silhouette edge.
@@ -143,7 +143,7 @@ void main() {
     // Mountains: twinkling crests, a few warm sparks.
     float twinkle = 0.65 + 0.35 * sin(t * (1.0 + seed * 2.0) + seed * 60.0);
     col = mix(mix(vec3(0.1, 0.35, 0.95), CYAN, bright * 0.6), mix(WARM, GOLD, seed), warm);
-    alpha = (bright * 1.1 + warm * 0.8) * twinkle * (0.8 + 0.25 * uLevel);
+    alpha = (bright * 1.3 + warm * 0.9) * twinkle * (0.8 + 0.25 * uLevel);
     size = 3.6 + warm * 1.6;
   } else if (kind < 7.5) {
     // Chest light: beats faster and brighter while EZO works.
