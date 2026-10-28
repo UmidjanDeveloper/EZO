@@ -44,6 +44,7 @@ uniform float uOffline;
 uniform float uPx;
 uniform float uGlowPx;
 uniform float uRef;
+uniform float uGlow;
 uniform float uBlink;
 uniform float uDroop;
 uniform float uEyeX;
@@ -93,9 +94,9 @@ void main() {
     vec3 n = turnDir(vec3(aExtra.x, 0.0, aExtra.y));
     float rim = 1.0 - abs(n.z);
     float key = max(0.0, dot(normalize(vec3(aExtra.x, 0.25, aExtra.y)), normalize(KEY_DIR)));
-    float w = clamp(face * uWarmth * (0.9 + 0.8 * uLevel), 0.0, 1.0);
+    float w = clamp(face * uWarmth * (1.25 + 0.8 * uLevel), 0.0, 1.0);
     col = mix(mix(BLUE, CYAN, rim * 0.5 + scan + key * 0.25), mix(WARM, GOLD, face * face * (0.3 + 0.7 * uLevel)), w);
-    alpha = bright * (0.42 + 0.6 * rim * rim + 0.2 * key) * smoothstep(-0.55, 0.05, n.z) + w * 0.55 + scan * 0.6;
+    alpha = bright * (0.42 + 0.6 * rim * rim + 0.2 * key) * smoothstep(-0.55, 0.05, n.z) * smoothstep(-0.04, 0.16, aPos.y) + w * 0.55 + scan * 0.6;
     size = 2.1 + w;
   } else if (kind < 1.5) {
     // Neck rings and chest arcs.
@@ -130,21 +131,21 @@ void main() {
     p.y += breath;
     float pulse = smoothstep(0.82, 1.0, fract(aExtra.x * 1.4 - t * (0.35 + 0.5 * uEnergy + 1.2 * uWork) + seed * 0.05));
     col = mix(WARM, GOLD, pulse);
-    alpha = bright * (0.25 + 0.75 * pulse) * (0.45 + 0.55 * uWarmth) + uLevel * uSpeak * 0.25;
+    alpha = bright * (0.55 + 0.6 * pulse) * (0.5 + 0.6 * uWarmth) + uLevel * uSpeak * 0.25;
     size = 2.2 + pulse * 1.4;
   } else if (kind < 5.5) {
     // Soft glow of the voice light.
     p.x += sin(t * 1.3 + seed * 40.0) * 0.012;
     p.y += cos(t * 1.1 + seed * 30.0) * 0.012 + breath * 0.5;
     col = mix(WARM, GOLD, warm * (0.4 + 0.6 * uLevel));
-    alpha = bright * (0.05 + 0.05 * warm) * uWarmth * (0.75 + 0.8 * uLevel);
+    alpha = bright * (0.08 + 0.08 * warm) * uWarmth * (0.75 + 0.8 * uLevel);
     size = 10.0 + 13.0 * bright * (0.7 + 0.6 * uLevel);
   } else if (kind < 6.5) {
     // Mountains: twinkling crests, a few warm sparks.
     float twinkle = 0.65 + 0.35 * sin(t * (1.0 + seed * 2.0) + seed * 60.0);
     col = mix(mix(vec3(0.1, 0.35, 0.95), CYAN, bright * 0.6), mix(WARM, GOLD, seed), warm);
-    alpha = (bright * 1.3 + warm * 0.9) * twinkle * (0.8 + 0.25 * uLevel);
-    size = 3.6 + warm * 1.6;
+    alpha = (bright * 1.7 + warm * 1.1) * twinkle * (0.8 + 0.25 * uLevel);
+    size = 4.4 + warm * 2.0;
   } else if (kind < 7.5) {
     // Chest light: beats faster and brighter while EZO works.
     p.y += breath;
@@ -218,6 +219,17 @@ void main() {
   gl_PointSize = max(1.0, size * px * (uRef / clip.w));
   vColor = col;
   vAlpha = clamp(alpha, 0.0, 1.0);
+  // Glow pass: a share of the points drawn again as wide, faint sprites (a cheap bloom).
+  if (uGlow > 0.5) {
+    bool skip = seed > 0.45 || (kind > 4.5 && kind < 5.5) || (kind > 5.5 && kind < 6.5 && warm < 0.5);
+    if (skip) {
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      gl_PointSize = 1.0;
+    } else {
+      gl_PointSize = min(64.0, gl_PointSize * 5.5);
+      vAlpha *= 0.075;
+    }
+  }
 }
 `;
 

@@ -352,14 +352,13 @@ function addCore(b: Builder, count: number): void {
 }
 
 function addEmblem(b: Builder): void {
+  // A small cluster of bright sparks where the veins meet, low on the sternum.
   const r = b.random;
   const z = bodyFront(CHEST.x, CHEST.y) + 0.02;
-  for (let i = 0; i < 70; i++) {
-    const a = (i / 70) * Math.PI * 2;
-    b.push("emblem", CHEST.x + Math.cos(a) * 0.055, CHEST.y + Math.sin(a) * 0.055, z, 0.8, 0, Math.cos(a), Math.sin(a));
-  }
-  for (let i = 0; i < 40; i++) {
-    b.push("emblem", CHEST.x + gaussian(r) * 0.015, CHEST.y + gaussian(r) * 0.015, z, 1, 0.3, 0, 0);
+  for (let i = 0; i < 160; i++) {
+    const a = r() * Math.PI * 2;
+    const d = Math.abs(gaussian(r)) * 0.045;
+    b.push("emblem", CHEST.x + Math.cos(a) * d, CHEST.y + 0.03 + Math.sin(a) * d * 1.3, z, 0.6 + 0.4 * r(), d < 0.02 ? 0.4 : 0, Math.cos(a), Math.sin(a));
   }
 }
 
@@ -478,7 +477,7 @@ function addTerrain(b: Builder, step: number, fill: number, seed: number): void 
       const sides = 0.2 + 0.8 * smoothstep(0.7, 2.6 + layer * 0.6, Math.abs(px)); // low behind the figure
       const ridge = ridges(px * 0.42 + layer * 3.1, layer * 7.3, seed);
       const crestY = base + amp * smoothstep(0.12, 0.62, ridge) * sides * 1.15;
-      const lava = r() < 0.08 * sides ? 1 : 0;
+      const lava = r() < 0.12 * sides ? 1 : 0;
       b.push("terrain", px, crestY, z, 0.55 + 0.45 * sides, lava);
       for (let k = 0; k < fill; k++) {
         const drop = Math.abs(gaussian(r)) * 0.35 * (0.4 + sides);
@@ -511,7 +510,7 @@ export function buildFigure(options: FigureOptions): Figure {
   addHead(b, high ? 0.026 : 0.034, high ? 175 : 112);
   addBodyContours(b, high ? 0.034 : 0.05, high ? 0.011 : 0.02);
   addOutline(b, high ? 0.006 : 0.011);
-  addHalo(b, high ? 5200 : 1500);
+  addHalo(b, high ? 6800 : 1500);
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);

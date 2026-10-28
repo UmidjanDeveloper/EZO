@@ -120,7 +120,7 @@ test("avatar performance: hardware-independent budgets hold and frame times are 
   for (const r of results) expect(r.frames).toBeGreaterThan(10);
   // The owner's PC has under 16 GB: the whole page, avatar included, must stay small.
   for (const r of results) if (r.heapMB !== null) expect(r.heapMB).toBeLessThan(200);
-  // Point budgets (docs/devices/HUMANOID.md, 2026-10-28 bust: 45,038 high / 19,579 low
+  // Point budgets (docs/devices/HUMANOID.md, 2026-10-28 bust: 46,686 high / 19,629 low
   // on the voice stage). They guard against regressions; raising them is a deliberate change.
   expect(desktop.quality).toBe("high");
   expect(desktop.points).toBeLessThanOrEqual(50_000);

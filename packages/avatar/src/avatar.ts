@@ -45,7 +45,7 @@ export interface Gaze {
 const GAZE_HOLD_SECONDS = 1.5;
 
 const UNIFORMS = [
-  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef",
+  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef", "uGlow",
   "uBlink", "uDroop", "uEyeX", "uEyeY", "uBrow", "uMouth", "uSmile",
 ] as const;
 const LOW_POWER_FRAME_MS = 1000 / 30;
@@ -535,6 +535,12 @@ export class EzoAvatar {
     bind(0, attributes.pos, 3);
     bind(1, attributes.data, 4);
     bind(2, attributes.extra, 2);
+    // Bloom-like glow under the sharp points (skipped in economy mode).
+    if (!this.lowPower) {
+      gl.uniform1f(u.uGlow, 1);
+      gl.drawArrays(gl.POINTS, 0, this.figure.count);
+    }
+    gl.uniform1f(u.uGlow, 0);
     gl.drawArrays(gl.POINTS, 0, this.figure.count);
     gl.disableVertexAttribArray(attributes.pos);
     gl.disableVertexAttribArray(attributes.data);
