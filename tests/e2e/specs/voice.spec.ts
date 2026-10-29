@@ -77,6 +77,53 @@ test("voice: talk to EZO like to a person", async ({ page }) => {
   await expect(page).toHaveURL(/\/chat\/[0-9a-f-]{36}$/);
 });
 
+test("voice: «EZO, menga tarjimon bo'lib ber» interprets between two people, each in their own language", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __ezoUtterances: string[] }).__ezoUtterances = [
+      "EZO, menga tarjimon bo‘lib ber",
+      "Bugun havo juda yaxshi",
+      "Yes, it is really sunny",
+    ];
+  });
+  // The e2e API has no AI provider; the translation route is answered here (direction checked).
+  const asked: { text: string; source: string; target: string }[] = [];
+  await page.route("**/api/translation/translate", async (route) => {
+    const body = route.request().postDataJSON() as { text: string; source: string; target: string };
+    asked.push({ text: body.text, source: body.source, target: body.target });
+    const text = body.target === "en" ? "The weather is very nice today" : "Ha, haqiqatan quyoshli";
+    await route.fulfill({
+      json: { text, source_language: body.source, target_language: body.target, method: "model", quality: { ok: true }, warnings: [], terms: [], provider: "test", model: "test" },
+    });
+  });
+  await page.goto("/");
+  await page.getByTestId("mode-voice").click();
+  await page.getByTestId("voice-toggle").click();
+
+  const spokenNow = () => page.evaluate(() => (window as unknown as { __ezoSpoken: string[] }).__ezoSpoken);
+  await expect.poll(spokenNow).toHaveLength(3);
+  // Silence after the last turn leaves the mode on and the last exchange on screen.
+  await expect(page.getByTestId("voice-status")).toHaveText("Gaplashish uchun robotga bosing");
+  await expect(page.getByTestId("voice-interpreter")).toContainText("UZ ⇄ EN");
+  await expect(page.getByTestId("voice-interpretation")).toContainText("Yes, it is really sunny");
+  await expect(page.getByTestId("voice-interpretation")).toContainText("Ha, haqiqatan quyoshli");
+  expect(asked).toEqual([
+    { text: "Bugun havo juda yaxshi", source: "uz", target: "en" },
+    { text: "Yes, it is really sunny", source: "en", target: "uz" },
+  ]);
+  expect(await spokenNow()).toEqual([
+    expect.stringContaining("Tarjimon rejimi yoqildi"),
+    "The weather is very nice today",
+    "Ha, haqiqatan quyoshli",
+  ]);
+  // The browser recogniser listened for the side whose turn it was.
+  const langs = await page.evaluate(() => (window as unknown as { __ezoLangs: string[] }).__ezoLangs);
+  expect(langs.slice(0, 4)).toEqual(["uz-UZ", "uz-UZ", "en-US", "uz-UZ"]);
+  // Stop ends the mode (the spoken stop phrase is covered by the unit tests).
+  await page.getByTestId("voice-interpreter-stop").click();
+  await expect(page.getByTestId("voice-interpreter")).toHaveCount(0);
+  await expect.poll(spokenNow).toContain("Tarjimon rejimi o‘chirildi.");
+});
+
 test("voice: the composer microphone opens voice mode", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("composer-voice").click();

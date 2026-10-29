@@ -9,7 +9,6 @@ import {
   FileStack,
   FolderKanban,
   GraduationCap,
-  Languages,
   Layers,
   PanelLeftClose,
   Plus,
@@ -45,7 +44,6 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/office", label: m.nav.office, icon: FileSpreadsheet },
     { href: "/ielts", label: m.nav.ielts, icon: Award },
     { href: "/language", label: m.nav.language, icon: GraduationCap },
-    { href: "/translate", label: m.nav.translation, icon: Languages },
     { href: "/knowledge", label: m.nav.knowledge, icon: FileStack },
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
@@ -54,7 +52,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
   ].filter(
     (item) =>
       status?.deployment_profile !== "free-beta" ||
-      !["/student", "/presentations", "/language", "/translate", "/knowledge", "/jarvis", "/admin"].includes(item.href)
+      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin"].includes(item.href)
   );
 
   return (

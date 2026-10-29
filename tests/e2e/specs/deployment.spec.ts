@@ -32,7 +32,7 @@ test("every page runs under a nonce content security policy without violations",
   // The inline theme script and /ezo-config only run because they carry the nonce.
   expect(await page.evaluate(() => (window as Window & { __EZO_API_URL__?: string }).__EZO_API_URL__))
     .toBe("http://localhost:8100");
-  for (const path of ["/knowledge", "/settings", "/memory", "/projects", "/artifacts", "/translate", "/language"]) {
+  for (const path of ["/knowledge", "/settings", "/memory", "/projects", "/artifacts", "/language"]) {
     await page.goto(path);
     await expect(page.locator("main").first()).toBeVisible();
   }
