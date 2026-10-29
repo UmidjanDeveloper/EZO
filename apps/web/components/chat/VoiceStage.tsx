@@ -3,7 +3,7 @@
 import type { LanguageCode } from "@ezo/shared";
 import { cn } from "@ezo/ui";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mic, Square, X, Settings2 } from "lucide-react";
+import { Languages, Mic, Square, X, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
@@ -20,6 +20,7 @@ import {
   storedVoiceVolume,
 } from "@/lib/voice/engine";
 import { acknowledgementLanguage } from "@/lib/perception";
+import { otherSide, parseInterpreterCommand, speakerSide, type LanguagePair } from "@/lib/voice/interpreter";
 import { voicePresence, type VoicePhase } from "@/lib/ezo-state";
 import { createStoredValue } from "@/lib/stored-value";
 import type { EzoAvatar } from "@ezo/avatar";
@@ -60,6 +61,10 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
   const [phase, setPhase] = useState<VoicePhase>("idle");
   const [heard, setHeard] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  // Interpreter mode: two people take turns; each turn is translated and spoken in the other language.
+  const [interp, setInterp] = useState<{ pair: LanguagePair; next: LanguageCode } | null>(null);
+  const interpRef = useRef(interp);
+  const [interpLine, setInterpLine] = useState<{ original: string; translated: string } | null>(null);
   // Server voice (VoiceStudio, OpenAI…) when the API has a provider; the browser otherwise.
   const fetchVoiceStatus = useCallback(() => api.voiceStatus(), []);
   const { data: voiceStatus } = useApiData(fetchVoiceStatus);
@@ -112,6 +117,27 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
     [m.voice],
   );
 
+  /** Start (pair) or stop (null) interpreter mode, say so aloud, then keep listening. */
+  const switchInterpreter = useCallback(
+    async (pair: LanguagePair | null, currentTurn: number) => {
+      const next = pair ? { pair, next: pair[0] } : null;
+      interpRef.current = next;
+      setInterp(next);
+      setInterpLine(null);
+      setNotice(null);
+      const line = pair
+        ? f(m.voice.interpreter.started, { a: m.voice.languages[pair[0]], b: m.voice.languages[pair[1]] })
+        : m.voice.interpreter.stopped;
+      setHeard("");
+      setPhase("speaking");
+      await speakReply(line, uiLanguage, voiceStatus);
+      if (!mountedRef.current || currentTurn !== turnRef.current) return;
+      if (pair) listenRef.current();
+      else setPhase("idle");
+    },
+    [f, m.voice, uiLanguage, voiceStatus],
+  );
+
   const listen = useCallback(() => {
     const turn = ++turnRef.current;
     stopVoice();
@@ -124,7 +150,17 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
     else setNotice(null);
     const listenFn = useServer ? listenWithServer : listenWithBrowser;
     // The server recogniser can take any of the three languages; the browser's needs one.
-    const listenLanguage = choice !== "auto" ? choice : useServer ? null : (lastHeardRef.current ?? uiLanguage);
+    // Interpreting, the browser listens for the side whose turn it is.
+    const interpreting = interpRef.current;
+    const listenLanguage = interpreting
+      ? useServer
+        ? null
+        : interpreting.next
+      : choice !== "auto"
+        ? choice
+        : useServer
+          ? null
+          : (lastHeardRef.current ?? uiLanguage);
     stopListeningRef.current = listenFn(listenLanguage, {
       onInterim: (text) => turn === turnRef.current && setHeard(text),
       onRecognizing: () => turn === turnRef.current && setPhase("recognizing"),
@@ -132,7 +168,7 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
         if (turn !== turnRef.current) return;
         gotText = true;
         setHeard(text);
-        const heardLanguage = info?.language ?? (choice !== "auto" ? choice : listenLanguage);
+        const heardLanguage = info?.language ?? (interpreting || choice === "auto" ? listenLanguage : choice);
         void respond(text, turn, info?.speechSeconds ?? null, heardLanguage ?? null);
       },
       onEnd: (error) => {
@@ -154,6 +190,16 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
     });
 
     async function respond(text: string, currentTurn: number, speechSeconds: number | null, heardLanguage: LanguageCode | null) {
+      const command = parseInterpreterCommand(text, heardLanguage);
+      const active = interpRef.current;
+      if (command?.kind === "start" || (command?.kind === "stop" && active)) {
+        await switchInterpreter(command.kind === "start" ? command.pair : null, currentTurn);
+        return;
+      }
+      if (active) {
+        await interpretTurn(text, heardLanguage, active, currentTurn);
+        return;
+      }
       setPhase("thinking");
       const reply = await send(text, "voice", { speechSeconds, languageHint: heardLanguage });
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
@@ -173,7 +219,29 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
       if (!mountedRef.current || currentTurn !== turnRef.current) return;
       listenRef.current(); // keep the conversation going
     }
-  }, [choice, errorNotice, f, m.voice, send, uiLanguage, voiceStatus]);
+
+    /** One interpreted turn: what was said is translated and spoken in the other language. */
+    async function interpretTurn(text: string, heardLanguage: LanguageCode | null, active: { pair: LanguagePair; next: LanguageCode }, currentTurn: number) {
+      const from = speakerSide(active.pair, heardLanguage, active.next);
+      const into = otherSide(active.pair, from);
+      setPhase("thinking");
+      try {
+        const result = await api.translate({ text, source: from, target: into });
+        if (!mountedRef.current || currentTurn !== turnRef.current) return;
+        setInterpLine({ original: text, translated: result.text });
+        const next = { pair: active.pair, next: into }; // the other person answers next
+        interpRef.current = next;
+        setInterp(next);
+        setPhase("speaking");
+        await speakReply(result.text, into, voiceStatus);
+      } catch (error) {
+        if (!mountedRef.current || currentTurn !== turnRef.current) return;
+        setNotice(f(m.voice.interpreter.failed, { detail: error instanceof Error ? error.message : String(error) }));
+      }
+      if (!mountedRef.current || currentTurn !== turnRef.current) return;
+      listenRef.current();
+    }
+  }, [choice, errorNotice, f, m.voice, send, switchInterpreter, uiLanguage, voiceStatus]);
 
   useEffect(() => {
     listenRef.current = listen;
@@ -239,6 +307,38 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
           <span className="text-sm font-semibold tracking-[0.35em] text-sky-100">EZO</span>
           {offline ? <p className="mt-2 text-amber-300" data-testid="voice-offline">{m.chat.offlineTitle}</p> : null}
           <p className="mt-2" data-testid="voice-sensor-status">{clap.text}</p>
+          {interp ? (
+            <div className="pointer-events-auto mt-3 flex flex-wrap items-center gap-2" data-testid="voice-interpreter">
+              <span className="flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                <Languages size={14} />
+                {f(m.voice.interpreter.badge, { a: interp.pair[0].toUpperCase(), b: interp.pair[1].toUpperCase() })}
+              </span>
+              <span className="text-[11px] text-sky-100/70">{m.voice.interpreter.next}:</span>
+              {interp.pair.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  aria-pressed={interp.next === code}
+                  onClick={() => {
+                    const next = { pair: interp.pair, next: code };
+                    interpRef.current = next;
+                    setInterp(next);
+                  }}
+                  className={cn("rounded-full px-2.5 py-1 text-xs font-medium uppercase", interp.next === code ? "bg-sky-400/25 text-sky-100" : "text-slate-400 hover:text-slate-100")}
+                >
+                  {code}
+                </button>
+              ))}
+              <button
+                type="button"
+                data-testid="voice-interpreter-stop"
+                onClick={() => void switchInterpreter(null, ++turnRef.current)}
+                className="rounded-full border border-slate-500 px-2.5 py-1 text-xs text-slate-200 hover:border-red-400 hover:text-red-300"
+              >
+                {m.voice.interpreter.stop}
+              </button>
+            </div>
+          ) : null}
         </div>
         <button type="button" data-testid="mode-text" onClick={onExit} aria-label={m.voice.modeText} className="pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-sky-100/20 bg-slate-950/60 hover:bg-slate-800"><X size={20} /></button>
       </div>
@@ -276,6 +376,22 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
       </div>
       </div>
 
+      <button
+        type="button"
+        data-testid="voice-interpreter-start"
+        disabled={!supported}
+        onClick={() => {
+          (document.activeElement as HTMLElement | null)?.closest("details")?.removeAttribute("open");
+          void switchInterpreter(["uz", "en"], ++turnRef.current);
+        }}
+        className="mb-2 flex w-full items-center gap-2 rounded-xl border border-sky-100/10 px-3 py-2 text-left text-xs text-sky-100 hover:bg-sky-400/10 disabled:opacity-40"
+      >
+        <Languages size={16} />
+        <span>
+          <span className="block font-semibold">{m.voice.interpreter.start}</span>
+          <span className="block text-sky-100/60">{m.voice.interpreter.hint}</span>
+        </span>
+      </button>
       <ClapRow clap={clap} />
       </details>
       <div className="absolute inset-0" data-testid="voice-scene"
@@ -304,7 +420,12 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
           ) : null}
         </AnimatePresence>
 
-        {caption && phase !== "listening" ? (
+        {interp && interpLine ? (
+          <div className="pointer-events-auto w-full max-w-2xl text-center" data-testid="voice-interpretation">
+            <p className="text-sm text-slate-400">{interpLine.original}</p>
+            <p className="text-lg leading-relaxed text-amber-100 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{interpLine.translated}</p>
+          </div>
+        ) : !interp && caption && phase !== "listening" ? (
           <div
             className="pointer-events-auto max-h-[12dvh] w-full max-w-2xl overflow-y-auto text-center text-lg leading-relaxed text-slate-50 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]"
             data-testid="voice-caption"

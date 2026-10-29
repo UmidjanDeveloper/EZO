@@ -68,3 +68,19 @@ Ishlamagan qadamlar: A?, B? — nima ko‘rindi
 ```
 
 Hisobotda rasm yoki ovoz yozuvi yo‘q — faqat raqamlar va so‘zlar.
+
+## Tarjimon rejimi (2026-10-29)
+
+Chap paneldagi alohida tarjima sahifasi olib tashlandi (egasi qarori). Tarjima endi ovozli
+rejimning o‘zida, ikki odam o‘rtasida ishlaydi:
+
+1. «Gaplashish» → robotga bosing → **«EZO, menga tarjimon bo‘lib ber»** deng.
+   Kutilgan natija: EZO «Tarjimon rejimi yoqildi…» deydi, tepada «Tarjimon: UZ ⇄ EN» chiqadi.
+   Boshqa juftlik: «rus tili bilan o‘zbek tili o‘rtasida tarjimon bo‘l».
+2. Navbat bilan gapiring: o‘zbekcha gap inglizchaga, inglizcha gap o‘zbekchaga tarjima
+   qilinib, ovoz chiqarib o‘qiladi. Kim gapirishini tepadagi UZ/EN tugmasi bilan ham tanlash mumkin.
+3. To‘xtatish: **«tarjimon rejimini to‘xtat»** deng yoki «Tarjimonni to‘xtatish» tugmasini bosing.
+
+Agar ishlamasa: tarjima AI provayder kalitiga muhtoj (`GEMINI_API_KEY`, AI Studio’dan
+`AIza…` bilan boshlanadigan kalit). Kalitsiz «Tarjima bo‘lmadi» xabari chiqadi.
+Bu navbatma-navbat (turn-based) tarjima; bir vaqtda (sinxron) tarjima emas.
