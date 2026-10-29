@@ -42,12 +42,14 @@ test.beforeEach(async ({ page }) => {
     synth.cancel = () => undefined;
     synth.speak = (utterance: SpeechSynthesisUtterance) => {
       (w.__ezoSpoken as string[]).push(utterance.text);
+      setTimeout(() => utterance.onstart?.(new Event("start") as SpeechSynthesisEvent), 20);
       setTimeout(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent), 100);
     };
   });
 });
 
 test("voice: talk to EZO like to a person", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ json: { offline_mode: false } }));
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
   await expect(page.getByTestId("voice-stage")).toBeVisible();
@@ -64,9 +66,10 @@ test("voice: talk to EZO like to a person", async ({ page }) => {
   const spoken = await page.evaluate(() => (window as unknown as { __ezoSpoken: string[] }).__ezoSpoken[0]);
   expect(spoken).toContain("oflayn rejimda");
   expect(spoken).not.toContain("**"); // Markdown is not read aloud
+  await expect(page.getByTestId("audio-measurement")).toHaveAttribute("data-measured", "false");
 
   // It listened again afterwards (hands-free), then stopped on silence.
-  await expect(page.getByTestId("voice-status")).toHaveText("Gaplashish uchun robotga bosing");
+  await expect(page.getByTestId("voice-status")).toHaveText("Gaplashish uchun EZOga bosing");
   const langs = await page.evaluate(() => (window as unknown as { __ezoLangs: string[] }).__ezoLangs);
   expect(langs).toEqual(["uz-UZ", "uz-UZ"]);
 
@@ -83,12 +86,14 @@ test("voice: the composer microphone opens voice mode", async ({ page }) => {
   await expect(page.getByTestId("voice-stage")).toBeVisible();
 });
 
-test("voice: immersive holographic stage fills the viewport, has no camera and keeps clap available", async ({ page }) => {
+test("voice: immersive energy stage fills the viewport, keeps camera opt-in and clap available", async ({ page }) => {
   await page.goto("/");
   await page.getByTestId("mode-voice").click();
-  await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "holographic");
+  await expect(page.getByTestId("voice-stage").getByTestId("ezo-humanoid")).toHaveAttribute("data-style", "energy");
+  await expect(page.getByTestId("camera-toggle")).not.toBeVisible(); // collapsed settings do not request permission
   await page.getByTestId("voice-settings").locator(":scope > summary").click();
-  await expect(page.getByTestId("camera-toggle")).toHaveCount(0);
+  await expect(page.getByTestId("camera-toggle")).toBeVisible();
+  await expect(page.getByTestId("camera-toggle")).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("clap-toggle")).toBeEnabled();
   await expect(page.getByTestId("voice-frame")).toHaveCount(0);
   await page.getByTestId("voice-settings").locator(":scope > summary").click();

@@ -8,9 +8,9 @@ import path from "node:path";
  */
 const ROOT = path.resolve(__dirname, "../..");
 const PYTHON = process.env.EZO_PYTHON ?? (process.platform === "win32" ? "python" : "python3");
-const WEB_PORT = 3100;
-const API_PORT = 8100;
-const DOCS_PORT = 8200;
+const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 3100);
+const API_PORT = Number(process.env.E2E_API_PORT ?? 8100);
+const DOCS_PORT = Number(process.env.E2E_DOCS_PORT ?? 8200);
 
 export default defineConfig({
   testDir: "./specs",

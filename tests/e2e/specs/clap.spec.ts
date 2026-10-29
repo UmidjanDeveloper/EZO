@@ -65,6 +65,7 @@ test("clap (simulated microphone file): off until pressed, a hidden tab stops it
 });
 
 test("clap (simulated microphone file): separate consent, a clap is heard, EZO answers with the real TTS route and speaks; no provider = honest notice", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ json: { offline_mode: false } }));
   let synthesized = 0;
   await page.route("**/api/voice/status", (route) =>
     route.fulfill({ json: { speech_to_text: [], text_to_speech: ["fixture-tts"], realtime: false, max_audio_mb: 10, stores_audio: false, browser_fallback: true } }),

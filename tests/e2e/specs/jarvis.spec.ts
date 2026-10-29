@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const API_PORT = Number(process.env.E2E_API_PORT ?? 8100);
+
 // Real browser against the real e2e API (offline mode, no provider credentials, no paired
 // device, no Telegram configuration): nothing may appear connected, paired or delivered.
 
@@ -131,7 +133,7 @@ test("jarvis: a device is paired only after the owner types the code shown on th
   const nonce = randomBytes(16).toString("hex");
   const message = "ezo-jarvis-device-pairing-v1\u0000" + JSON.stringify({ name, nonce, platform: "windows" });
   const signature = sign(null, Buffer.from(message), privateKey).toString("hex");
-  const pairing = await request.post("http://localhost:8100/api/jarvis/devices/pairing", {
+  const pairing = await request.post(`http://localhost:${API_PORT}/api/jarvis/devices/pairing`, {
     data: { name, platform: "windows", public_key: publicHex, nonce, signature, capabilities: ["files.latest_documents"] },
   });
   expect(pairing.status()).toBe(201);

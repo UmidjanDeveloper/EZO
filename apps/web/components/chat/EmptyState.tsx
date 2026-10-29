@@ -12,7 +12,7 @@ export function EmptyState({ onPick }: { onPick: (text: string) => void }) {
         <EzoHumanoid
           state="idle"
           framing="bust"
-          style="holographic"
+          style="energy"
           className="relative h-[min(380px,42vh)] w-[min(600px,88vw)] [mask-image:linear-gradient(to_bottom,black_75%,transparent)]"
         />
       </motion.div>

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const DOCS_PORT = Number(process.env.E2E_DOCS_PORT ?? 8200);
+
 // Knowledge OS: EZO learns a local fixture documentation site (served by Playwright on
 // 127.0.0.1:8200) without an AI key: reading and keyword indexing need no model.
 test("knowledge OS: learn a documentation site, see its status, pages and flags, then delete it", async ({
@@ -15,7 +17,7 @@ test("knowledge OS: learn a documentation site, see its status, pages and flags,
   await section.getByTestId("learn-submit").click();
   await expect(section.getByRole("alert")).toBeVisible();
 
-  await section.getByTestId("learn-target").fill("http://127.0.0.1:8200/guide/");
+  await section.getByTestId("learn-target").fill(`http://127.0.0.1:${DOCS_PORT}/guide/`);
   await section.getByTestId("learn-library").fill("E2E hujjatlar");
   await section.getByTestId("learn-submit").click();
   const source = section.getByTestId("learned-source");

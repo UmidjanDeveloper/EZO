@@ -1,3 +1,5 @@
+> **Superseded visual direction (2026-10-29):** the current energy-humanoid implementation and verification notes live in [HUMANOID.md](HUMANOID.md). This file is retained as historical context for the earlier contour-bust iteration.
+
 # Reference voice experience correction — 2026-10-28
 
 Owner's explicit visual correction supersedes the earlier no-UI-edit restriction for this focused change. This branch is based on a4b4b009009bff77fbe0eef2844bb8b6d57fd3dd, preserving the merged perception/voice work. No deployment or merge is authorized.

@@ -5,12 +5,14 @@
  */
 
 import { accounts } from "./sections/accounts";
+import { energy } from "./sections/energy";
 import { admin } from "./sections/admin";
 import { jarvisConsole } from "./sections/jarvisConsole";
 import { student } from "./sections/student";
 import { studentExtras } from "./sections/studentExtras";
 
 const uz = {
+  energy: energy.uz,
   admin: admin.uz,
   accounts: accounts.uz,
   jarvisConsole: jarvisConsole.uz,
@@ -522,7 +524,7 @@ const uz = {
   voice: {
     modeText: "Yozish",
     modeVoice: "Gaplashish",
-    idle: "Gaplashish uchun robotga bosing",
+    idle: "Gaplashish uchun EZOga bosing",
     listening: "Tinglayapman…",
     recognizing: "Eshitganimni matnga aylantiryapman…",
     thinking: "O‘ylayapman…",
@@ -533,7 +535,7 @@ const uz = {
     volume: "EZO ovozi balandligi",
     language: "Nutq tili",
     listen: "Ovozda tinglash",
-    noSpeech: "Ovoz eshitilmadi. Robotga bosib, qayta gapiring.",
+    noSpeech: "Ovoz eshitilmadi. EZOga bosib, qayta gapiring.",
     micDenied: "Mikrofonga ruxsat berilmagan. Brauzerda mikrofonga ruxsat bering.",
     network: "Nutqni tanish xizmatiga ulanib bo‘lmadi. Internetni tekshiring.",
     failed: "Ovozni tanib bo‘lmadi. Qayta urinib ko‘ring.",
@@ -762,6 +764,7 @@ const uz = {
 export type Messages = typeof uz;
 
 const en: Messages = {
+  energy: energy.en,
   admin: admin.en,
   accounts: accounts.en,
   jarvisConsole: jarvisConsole.en,
@@ -1269,7 +1272,7 @@ const en: Messages = {
   voice: {
     modeText: "Type",
     modeVoice: "Talk",
-    idle: "Tap the robot to talk",
+    idle: "Tap EZO to talk",
     listening: "Listening…",
     recognizing: "Turning what I heard into words…",
     thinking: "Thinking…",
@@ -1280,7 +1283,7 @@ const en: Messages = {
     volume: "EZO voice volume",
     language: "Speech language",
     listen: "Read aloud",
-    noSpeech: "I didn't hear anything. Tap the robot and speak again.",
+    noSpeech: "I didn't hear anything. Tap EZO and speak again.",
     micDenied: "Microphone access was denied. Allow the microphone in your browser.",
     network: "Could not reach the speech recognition service. Check your internet.",
     failed: "Speech could not be recognised. Please try again.",
@@ -1507,6 +1510,7 @@ const en: Messages = {
 };
 
 const ru: Messages = {
+  energy: energy.ru,
   admin: admin.ru,
   accounts: accounts.ru,
   jarvisConsole: jarvisConsole.ru,

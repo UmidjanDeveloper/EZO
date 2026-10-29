@@ -17,7 +17,7 @@ import { ApiError } from "@ezo/shared";
 import { api } from "../api";
 import { listenOnce, speak as browserSpeak, speechRecognitionSupported, stopSpeaking, type ListenHandlers } from "../speech";
 import { createLevelMeter, levelFromSamples } from "@ezo/avatar";
-import { publishVoiceLevel } from "./level";
+import { publishVoiceLevel, publishVoiceUnavailable, resetVoiceSignal } from "./level";
 import { DEFAULT_VAD, rmsOf, speakingSeconds, vadStart, vadStep } from "./vad";
 
 export type EngineKind = "server" | "browser";
@@ -111,7 +111,7 @@ export const listenWithServer = (
 
     const timer = window.setInterval(() => {
       analyser.getFloatTimeDomainData(samples);
-      publishVoiceLevel(levelFromSamples(samples));
+      publishVoiceLevel(levelFromSamples(samples), "microphone");
       const [next, action] = vadStep(vad, rmsOf(samples), performance.now(), vadConfig);
       vad = next;
       if (vad.speechAt !== null && !heardSpeech) {
@@ -123,7 +123,7 @@ export const listenWithServer = (
 
     cleanup = () => {
       window.clearInterval(timer);
-      publishVoiceLevel(0);
+      resetVoiceSignal("microphone");
       if (recorder.state === "recording") recorder.stop();
       stream.getTracks().forEach((track) => track.stop());
       void context.close().catch(() => undefined);
@@ -166,7 +166,10 @@ export const listenWithServer = (
 };
 
 /** The browser recogniser needs one fixed language; callers resolve "auto" before this. */
-export const listenWithBrowser: Listen = (language, handlers) => listenOnce(language ?? "uz", handlers);
+export const listenWithBrowser: Listen = (language, handlers) => {
+  publishVoiceUnavailable("microphone");
+  return listenOnce(language ?? "uz", { ...handlers, onEnd: (error) => { resetVoiceSignal("microphone"); handlers.onEnd(error); } });
+};
 
 let currentAudio: HTMLAudioElement | null = null;
 /** EZO's voice volume 0..1 (the stage slider); applied to every server-voice playback. */
@@ -176,9 +179,19 @@ export function voiceVolume(): number {
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
 }
 let currentRequest: AbortController | null = null;
+let playbackGeneration = 0;
+export const storedVoiceRate = createStoredValue<string>("ezo-voice-rate", "1", (v): v is string => /^(0\.[7-9]\d*|1(\.[0-2]\d*)?)$/.test(v) && Number(v) >= 0.7 && Number(v) <= 1.3);
+export function voiceRate(): number { return Number(storedVoiceRate.get()) || 1; }
+export interface PlaybackHooks { onStart?: (engine: EngineKind) => void }
+export function setVoiceVolume(value: number): void {
+  storedVoiceVolume.set(String(Math.max(0, Math.min(1, value))));
+  if (currentAudio) currentAudio.volume = voiceVolume();
+}
 
 /** Stop whatever EZO is saying (server or browser voice). */
 export function stopVoice(): void {
+  playbackGeneration++;
+  resetVoiceSignal("output");
   currentRequest?.abort();
   currentRequest = null;
   if (currentAudio) {
@@ -189,31 +202,30 @@ export function stopVoice(): void {
   stopSpeaking();
 }
 
-/**
- * Read a reply aloud: the server voice when available, otherwise (or if it
- * fails) the browser voice. Resolves with the engine that spoke.
- */
-export async function speakReply(text: string, language: LanguageCode, status: VoiceStatus | null): Promise<EngineKind> {
+/** Read generated audio. Speaking starts on the actual playback event, not on synthesis request. */
+export async function speakReply(text: string, language: LanguageCode, status: VoiceStatus | null, hooks: PlaybackHooks = {}): Promise<EngineKind> {
+  stopVoice();
+  const generation = playbackGeneration;
   if (status && status.text_to_speech.length > 0) {
     const controller = new AbortController();
     currentRequest = controller;
     try {
       const audioBlob = await api.speak(text, language, controller.signal);
-      if (controller.signal.aborted) return "server";
-      await playBlob(audioBlob);
+      if (controller.signal.aborted || generation !== playbackGeneration) return "server";
+      await playBlob(audioBlob, generation, () => hooks.onStart?.("server"));
       return "server";
     } catch {
-      if (controller.signal.aborted) return "server";
-      // Fall through to the browser voice.
-    } finally {
-      if (currentRequest === controller) currentRequest = null;
-    }
+      if (controller.signal.aborted || generation !== playbackGeneration) return "server";
+    } finally { if (currentRequest === controller) currentRequest = null; }
   }
-  await browserSpeak(text, language);
+  if (generation !== playbackGeneration) return "browser";
+  publishVoiceUnavailable("output");
+  await browserSpeak(text, language, { volume: voiceVolume(), rate: voiceRate(), onStart: () => hooks.onStart?.("browser") });
+  if (generation === playbackGeneration) resetVoiceSignal("output");
   return "browser";
 }
 
-function playBlob(blob: Blob): Promise<void> {
+function playBlob(blob: Blob, generation: number, onStart: () => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -221,28 +233,32 @@ function playBlob(blob: Blob): Promise<void> {
     currentAudio = audio;
     let frame = 0;
     let meter: ReturnType<typeof createLevelMeter> = null;
+    let finished = false;
+    const tick = () => {
+      if (finished || generation !== playbackGeneration) return;
+      if (meter?.ready()) publishVoiceLevel(meter.read(), "output");
+      else publishVoiceUnavailable("output");
+      frame = requestAnimationFrame(tick);
+    };
     audio.onplaying = () => {
-      // EZO's humanoid follows its own voice (where the browser can measure it).
+      if (finished || generation !== playbackGeneration) { audio.pause(); return; }
       meter ??= createLevelMeter(audio);
-      const tick = () => {
-        if (!meter) return;
-        publishVoiceLevel(meter.read());
-        frame = requestAnimationFrame(tick);
-      };
-      if (meter && !frame) frame = requestAnimationFrame(tick);
+      if (meter) frame = requestAnimationFrame(tick);
+      else publishVoiceUnavailable("output");
+      onStart();
     };
     const done = (error?: unknown) => {
-      cancelAnimationFrame(frame);
-      meter?.close();
-      meter = null;
-      publishVoiceLevel(0);
+      if (finished) return;
+      finished = true;
+      cancelAnimationFrame(frame); meter?.close(); meter = null;
+      audio.onplaying = audio.onended = audio.onpause = audio.onerror = null;
+      audio.pause();
       URL.revokeObjectURL(url);
-      if (currentAudio === audio) currentAudio = null;
-      if (error) reject(error);
-      else resolve();
+      if (currentAudio === audio) { currentAudio = null; resetVoiceSignal("output"); }
+      if (error) reject(error); else resolve();
     };
     audio.onended = () => done();
-    audio.onpause = () => done(); // stopVoice() pauses: the reply was interrupted
+    audio.onpause = () => done();
     audio.onerror = () => done(new Error("audio playback failed"));
     audio.play().catch(done);
   });

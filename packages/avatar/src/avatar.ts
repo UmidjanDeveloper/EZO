@@ -1,614 +1,356 @@
 /**
- * EzoAvatar: mounts the humanoid on a <canvas> and animates it.
- *
- *   const avatar = new EzoAvatar(canvas, { framing: "bust" });
- *   avatar.setState("listening");
- *   avatar.setLevel(0.4); // optional: live microphone / voice level
- *   avatar.destroy();
- *
- * WebGL 1 with additive points; falls back to a still 2D drawing when WebGL is
- * unavailable. Respects prefers-reduced-motion (renders still frames only) and
- * pauses while the page is hidden.
+ * EZO's energy presence. Raw WebGL is the portable equivalent of a Three.js
+ * point/shader scene: no character mesh, model file, skin or facial features.
+ * The public API is shared by web, Electron and Capacitor.
  */
-import { blinkCurve, BLINK_LENGTH, browFor, CLOSED_FACE, droopFor, eyeTarget, mouthFor, nextBlinkDelay, smileFor, type FaceAmounts } from "./face";
-import { buildFigure, EYE, type Figure } from "./figure";
-import { followLevel, syntheticSpeech } from "./level";
+import { buildEnergyFigure, type EnergyFigure } from "./energy-figure";
+import { ENERGY_FRAGMENT, ENERGY_VERTEX } from "./energy-shaders";
+import { followLevel } from "./level";
 import { frameCamera, project, type Framing } from "./math";
-import { MASK_FRAGMENT, MASK_VERTEX, POINT_FRAGMENT, POINT_VERTEX } from "./shaders";
 import { easeLook, lookFor, TRANSIENT_STATES, type AvatarState, type Look } from "./states";
 
+export type QualityProfile = "auto" | "high" | "balanced" | "low";
+export type AudioChannel = "microphone" | "output";
+export interface Gaze { yaw: number; pitch: number }
 export interface AvatarOptions {
   framing?: Framing;
-  style?: "expressive" | "holographic";
-  /** "auto" picks "low" for small views and dense phone screens. */
-  quality?: "high" | "low" | "auto";
-  /** Mountains behind the figure. Defaults to true for "bust", false for "head". */
+  /** @deprecated Legacy styles now resolve to the same non-character energy figure. */
+  style?: "energy" | "expressive" | "holographic";
+  quality?: QualityProfile;
   terrain?: boolean;
-  /** Overrides the prefers-reduced-motion media query. */
   reducedMotion?: boolean;
-  /** Accessible name per state, in the app's language; applied to the canvas as aria-label. */
+  intensity?: number;
   describe?: (state: AvatarState) => string;
-  /**
-   * Low-power mode halves the frame rate (30 fps cap) and stills the halo drift; "auto"
-   * turns it on for devices that report little memory or a data-saver preference.
-   */
   power?: "auto" | "low" | "high";
 }
-
-/** Where EZO looks, from the pointer or a touch. Normalised: -1 (left/down) .. 1. */
-export interface Gaze {
-  yaw: number;
-  pitch: number;
-}
-
-/** How long a gaze stays before the head drifts back to its idle sway. */
-const GAZE_HOLD_SECONDS = 1.5;
-
-const UNIFORMS = [
-  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef", "uGlow",
-  "uBlink", "uDroop", "uEyeX", "uEyeY", "uBrow", "uMouth", "uSmile",
-] as const;
-const LOW_POWER_FRAME_MS = 1000 / 30;
-/** The glow pass switches on below this frame time (about 50 fps)… */
-const GLOW_ON_FRAME_MS = 20;
-/** …and off for the rest of the session above this one (about 40 fps). */
-const GLOW_OFF_FRAME_MS = 25;
-type UniformName = (typeof UNIFORMS)[number];
-
 interface GlState {
   gl: WebGLRenderingContext;
   points: WebGLProgram;
   mask: WebGLProgram;
-  uniforms: Record<UniformName, WebGLUniformLocation | null>;
-  maskVP: WebGLUniformLocation | null;
-  maskYaw: WebGLUniformLocation | null;
-  maskPitch: WebGLUniformLocation | null;
   buffers: WebGLBuffer[];
-  attributes: { pos: number; data: number; extra: number; xy: number };
-  silhouetteVertices: number;
+  uniforms: Record<string, WebGLUniformLocation | null>;
+  maskUniforms: Record<string, WebGLUniformLocation | null>;
+  attributes: number[];
+  xy: number;
 }
+const PARAMETERS = ["uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef", "uGlow", "uIntensity"] as const;
+const MASK_VERTEX = `attribute vec2 aXY; uniform mat4 uVP; uniform float uYaw,uPitch;
+void main(){vec3 p=vec3(aXY,0.0);p.y-=0.12;float c=cos(uYaw),s=sin(uYaw);p=vec3(c*p.x+s*p.z,p.y,-s*p.x+c*p.z);c=cos(uPitch);s=sin(uPitch);p=vec3(p.x,c*p.y-s*p.z,s*p.y+c*p.z);p.y+=0.12;gl_Position=uVP*vec4(p,1.0);}`;
+const MASK_FRAGMENT = `precision mediump float; void main(){gl_FragColor=vec4(0.0);}`;
+const clamp1 = (v: number) => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
 
-const STILL_TIME = 6.5; // the moment shown when motion is reduced
-
-function compile(gl: WebGLRenderingContext, vertex: string, fragment: string): WebGLProgram {
+function compile(gl: WebGLRenderingContext, vertex: string, fragment: string) {
   const program = gl.createProgram();
-  for (const [type, source] of [
-    [gl.VERTEX_SHADER, vertex],
-    [gl.FRAGMENT_SHADER, fragment],
-  ] as const) {
-    const shader = gl.createShader(type);
-    if (!shader) throw new Error("shader allocation failed");
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-      throw new Error(`shader: ${gl.getShaderInfoLog(shader) ?? "compile failed"}`);
+  if (!program) throw new Error("Shader allocation failed");
+  const shaders: WebGLShader[] = [];
+  try {
+    for (const [type, source] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]] as const) {
+      const shader = gl.createShader(type);
+      if (!shader) throw new Error("Shader allocation failed");
+      shaders.push(shader);
+      gl.shaderSource(shader, source); gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader) ?? "Shader compilation failed");
+      gl.attachShader(program, shader);
     }
-    gl.attachShader(program, shader);
-  }
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error(`program: ${gl.getProgramInfoLog(program) ?? "link failed"}`);
-  }
-  return program;
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program) ?? "Shader link failed");
+    return program;
+  } catch (error) { gl.deleteProgram(program); throw error; }
+  finally { shaders.forEach((shader) => gl.deleteShader(shader)); }
 }
 
 export class EzoAvatar {
   readonly canvas: HTMLCanvasElement;
   readonly framing: Framing;
-  /** "webgl", "2d" (still fallback) or "none". */
   readonly renderer: "webgl" | "2d" | "none";
-
-  private figure: Figure;
+  private figure: EnergyFigure;
   private glState: GlState | null = null;
   private state: AvatarState = "idle";
-  private look: Look = lookFor("idle");
+  private look: Look = { ...lookFor("idle") };
+  private quality: QualityProfile;
+  private resolvedQuality: "high" | "low";
+  private density = 1;
+  private readonly terrain: boolean;
+  private lowPower: boolean;
+  private reduced: boolean;
+  private motionOverride: boolean | undefined;
+  private intensity = 1;
+  private active = true;
+  private running = false;
+  private destroyed = false;
+  private frame = 0;
+  private frames = 0;
+  private last = 0;
+  private time = 0;
+  private stateAt = 0;
+  private frameMs = 0;
+  private drawMs = 0;
+  private measured = 0;
+  private glow = false;
+  private glowLost = false;
   private level = 0;
   private levelTarget = 0;
   private levelAt = -Infinity;
-  private gazeTarget: Gaze = { yaw: 0, pitch: 0 };
+  private channel: AudioChannel = "output";
   private gaze: Gaze = { yaw: 0, pitch: 0 };
+  private gazeTarget: Gaze = { yaw: 0, pitch: 0 };
   private gazeAt = -Infinity;
-  private stateAt = 0;
-  private face: FaceAmounts = { ...CLOSED_FACE, eye: { yaw: 0, pitch: 0 } };
-  private blinkStart = -Infinity;
-  private nextBlink = 1.2;
-  private lowPower = false;
-  private active = true;
-  private readonly describe: ((state: AvatarState) => string) | null;
-  private time = 0;
-  private last = 0;
-  private frame = 0;
-  private frames = 0;
-  /** Measured loop cost: exponential averages of the display interval and of step+draw time (ms). */
-  private frameMs = 0;
-  private drawMs = 0;
-  /** The glow pass is earned: on only after the loop proves fast, off for good if it then slows. */
-  private glow = false;
-  private glowLost = false;
-  private measured = 0;
-  private running = false;
-  private destroyed = false;
-  private readonly reduced: boolean;
+  private describe: AvatarOptions["describe"];
   private readonly observer: ResizeObserver | null;
+  private readonly media = typeof window !== "undefined" ? window.matchMedia?.("(prefers-reduced-motion: reduce)") : null;
+  private readonly onMotion = () => { if (this.motionOverride === undefined) this.setReducedMotion(this.media?.matches ?? false); };
   private readonly onVisibility = () => this.syncRunning();
   private readonly onLost = (event: Event) => {
-    event.preventDefault();
-    this.glState = null;
-    this.stopLoop();
+    event.preventDefault(); this.glState = null; this.stopLoop();
+    this.canvas.dataset.ezoAvatar = "context-lost";
   };
   private readonly onRestored = () => {
     this.glState = this.initGl();
+    this.canvas.dataset.ezoAvatar = this.glState ? "webgl" : "context-lost";
     this.syncRunning();
   };
 
   constructor(canvas: HTMLCanvasElement, options: AvatarOptions = {}) {
     this.canvas = canvas;
     this.framing = options.framing ?? "bust";
-    const media = typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
-    this.reduced = options.reducedMotion ?? media?.matches ?? false;
-    this.describe = options.describe ?? null;
+    this.terrain = options.terrain ?? this.framing === "bust";
+    this.quality = options.quality ?? "auto";
+    this.motionOverride = options.reducedMotion;
+    this.reduced = options.reducedMotion ?? this.media?.matches ?? false;
+    this.intensity = options.intensity ?? 1;
+    this.describe = options.describe;
     const rect = canvas.getBoundingClientRect();
-    // A canvas not laid out yet (e.g. inside a dialog that opens after this runs) measures 0x0: unknown, not small.
     const small = rect.width > 0 && rect.height > 0 && Math.max(rect.width, rect.height) < 260;
-    const dense = typeof window !== "undefined" && (window.devicePixelRatio ?? 1) > 2.5;
-    const quality = options.quality && options.quality !== "auto" ? options.quality : small || dense ? "low" : "high";
-    this.lowPower = options.power === "low" || (options.power !== "high" && EzoAvatar.prefersLowPower());
+    const dense = typeof window !== "undefined" && window.devicePixelRatio > 2.5;
+    this.resolvedQuality = this.quality === "high" || (this.quality === "auto" && !small && !dense && !EzoAvatar.prefersLowPower()) ? "high" : "low";
+    this.lowPower = options.power === "low" || (options.power !== "high" && EzoAvatar.prefersLowPower()) || this.quality === "low";
     const started = typeof performance !== "undefined" ? performance.now() : 0;
-    this.figure = buildFigure({ quality, terrain: options.terrain ?? this.framing === "bust", style: options.style });
+    this.figure = buildEnergyFigure(this.resolvedQuality, this.terrain);
     const buildMs = typeof performance !== "undefined" ? performance.now() - started : 0;
-
     this.glState = this.initGl();
     this.renderer = this.glState ? "webgl" : canvas.getContext("2d") ? "2d" : "none";
-    canvas.dataset.ezoAvatar = this.renderer;
-    // Static facts for performance checks (set once, never per frame).
-    canvas.dataset.quality = quality;
-    canvas.dataset.style = options.style ?? "expressive";
-    canvas.dataset.points = String(this.figure.count);
-    canvas.dataset.buildMs = buildMs.toFixed(1);
-    canvas.dataset.power = this.lowPower ? "low" : "high";
-    canvas.dataset.glow = "off";
-    canvas.dataset.motion = this.reduced ? "reduced" : "full";
-    canvas.dataset.state = this.state;
+    Object.assign(canvas.dataset, { ezoAvatar: this.renderer, style: "energy", quality: this.resolvedQuality, profile: this.quality, points: String(this.figure.count), buildMs: buildMs.toFixed(1), power: this.lowPower ? "low" : "high", glow: "off", motion: this.reduced ? "reduced" : "full", state: this.state });
+    this.setIntensity(this.intensity);
     this.label();
     canvas.addEventListener("webglcontextlost", this.onLost);
     canvas.addEventListener("webglcontextrestored", this.onRestored);
     if (typeof document !== "undefined") document.addEventListener("visibilitychange", this.onVisibility);
+    this.media?.addEventListener?.("change", this.onMotion);
     this.observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => this.redrawIfStill()) : null;
     this.observer?.observe(canvas);
     this.syncRunning();
   }
 
-  /** WebGL is usable on this device. */
   static supported(): boolean {
     if (typeof document === "undefined") return false;
     try {
       const canvas = document.createElement("canvas");
-      return Boolean(canvas.getContext("webgl") ?? canvas.getContext("experimental-webgl"));
-    } catch {
-      return false;
-    }
+      const gl = canvas.getContext("webgl");
+      const supported = Boolean(gl);
+      gl?.getExtension("WEBGL_lose_context")?.loseContext();
+      return supported;
+    } catch { return false; }
   }
-
-  /** The device asks for economy: little memory, a data-saver preference or a coarse, dense phone screen. */
   static prefersLowPower(): boolean {
     if (typeof navigator === "undefined") return false;
-    const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean }; hardwareConcurrency?: number };
-    if (typeof nav.deviceMemory === "number" && nav.deviceMemory <= 4) return true;
-    if (nav.connection?.saveData) return true;
-    return typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 2;
+    const nav = navigator as Navigator & { deviceMemory?: number; connection?: { saveData?: boolean } };
+    return (nav.deviceMemory !== undefined && nav.deviceMemory <= 4) || Boolean(nav.connection?.saveData) || (nav.hardwareConcurrency > 0 && nav.hardwareConcurrency <= 2);
   }
-
-  /** Switch the 30 fps economy mode on or off at runtime (e.g. on battery). */
-  setLowPower(on: boolean): void {
-    this.lowPower = on;
-    this.canvas.dataset.power = on ? "low" : "high";
+  setLowPower(on: boolean) { this.lowPower = on; this.canvas.dataset.power = on ? "low" : "high"; if (on) { this.glow = false; this.canvas.dataset.glow = "off"; } }
+  isLowPower() { return this.lowPower; }
+  setActive(active: boolean) { this.active = active; this.syncRunning(); }
+  getFrameCount() { return this.frames; }
+  getPerformance() {
+    const heap = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory?.usedJSHeapSize;
+    return { frameMs: +this.frameMs.toFixed(2), drawMs: +this.drawMs.toFixed(2), fps: this.frameMs ? +(1000 / this.frameMs).toFixed(1) : 0, heapMb: typeof heap === "number" ? +(heap / 1048576).toFixed(1) : null };
   }
-
-  isLowPower(): boolean {
-    return this.lowPower;
+  getQuality() { return { profile: this.quality, resolved: this.resolvedQuality, points: this.drawCount(), density: this.density }; }
+  setQuality(profile: QualityProfile) {
+    if (profile === this.quality) return;
+    this.quality = profile;
+    const next = profile === "high" || (profile === "auto" && !EzoAvatar.prefersLowPower() && this.framing === "bust") ? "high" : "low";
+    this.density = 1; this.measured = 0; this.glowLost = false;
+    if (next !== this.resolvedQuality) {
+      this.resolvedQuality = next;
+      this.figure = buildEnergyFigure(next, this.terrain);
+      if (this.glState) {
+        this.glState.buffers.forEach((buffer) => this.glState!.gl.deleteBuffer(buffer));
+        this.glState.buffers = this.uploadBuffers(this.glState.gl);
+      }
+    }
+    this.setLowPower(profile === "low" || EzoAvatar.prefersLowPower());
+    Object.assign(this.canvas.dataset, { profile, quality: next, points: String(this.figure.count) });
+    this.redrawIfStill();
   }
-
-  /** A hidden host (an Electron window that is hidden, a collapsed stage) stops drawing entirely. */
-  setActive(active: boolean): void {
-    this.active = active;
+  setReducedMotion(reduced: boolean) {
+    this.reduced = reduced;
+    this.canvas.dataset.motion = reduced ? "reduced" : "full";
     this.syncRunning();
   }
-
-  /** Frames drawn so far (still redraws included): proves the loop survives a context loss. */
-  getFrameCount(): number {
-    return this.frames;
+  setMotionPreference(preference: "system" | "reduced") {
+    this.motionOverride = preference === "reduced" ? true : undefined;
+    this.setReducedMotion(this.motionOverride ?? this.media?.matches ?? false);
   }
-
-  /**
-   * Measured performance for Diagnostics: average display interval and step+draw cost in
-   * milliseconds (0 until the loop has run), the resulting frames per second, and the JS heap in
-   * MB where the browser exposes it (Chromium's non-standard `performance.memory`; null elsewhere).
-   * Numbers only; nothing is uploaded.
-   */
-  getPerformance(): { frameMs: number; drawMs: number; fps: number; heapMb: number | null } {
-    const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory;
-    const heap = memory?.usedJSHeapSize;
-    return {
-      frameMs: Number(this.frameMs.toFixed(2)),
-      drawMs: Number(this.drawMs.toFixed(2)),
-      fps: this.frameMs > 0 ? Number((1000 / this.frameMs).toFixed(1)) : 0,
-      heapMb: typeof heap === "number" && Number.isFinite(heap) ? Number((heap / 1048576).toFixed(1)) : null,
-    };
-  }
-
-  /** The facial amounts drawn now (blink, eye direction, jaw…): for tests and the voice frame. */
-  getFace(): FaceAmounts {
-    return { ...this.face, eye: { ...this.face.eye } };
-  }
-
-  setState(state: AvatarState): void {
+  setIntensity(value: number) { this.intensity = 0.35 + clamp1(value) * 0.65; this.canvas.dataset.intensity = this.intensity.toFixed(2); this.redrawIfStill(); }
+  setState(state: AvatarState) {
     if (state === this.state) return;
-    this.state = state;
-    this.stateAt = this.time;
+    this.state = state; this.stateAt = this.time;
     this.canvas.dataset.state = state;
+    this.level = 0; this.levelTarget = 0; this.levelAt = -Infinity;
     this.label();
-    if (this.reduced || !this.running) {
-      this.look = lookFor(state);
-      this.redrawIfStill();
-    }
+    if (this.reduced || !this.running) { this.look = { ...lookFor(state) }; this.redrawIfStill(); }
   }
-
-  /** The state as last set (transient states return to "idle" by themselves). */
-  getState(): AvatarState {
-    return this.state;
+  getState() { return this.state; }
+  getLevel() { return this.level; }
+  hasLiveLevel() { return this.time - this.levelAt < 0.3 && this.channel === (this.state === "listening" ? "microphone" : "output") && (this.state === "listening" || this.state === "speaking"); }
+  /** Only real PCM measurements enter here. Stale/unavailable audio settles to zero; no synthetic speech. */
+  setLevel(level: number, channel: AudioChannel = "output") {
+    const expected = this.state === "listening" ? "microphone" : "output";
+    if (channel !== expected || (this.state !== "listening" && this.state !== "speaking")) return;
+    this.levelTarget = clamp1(level); this.levelAt = this.time; this.channel = channel;
+    if (this.reduced) { this.level = this.levelTarget; this.redrawIfStill(); }
   }
-
-  /** The level actually being drawn now: the live voice, or the speech rhythm animated in its place. */
-  getLevel(): number {
-    return this.level;
+  setGaze(gaze: Gaze | null) {
+    if (!gaze) { this.gazeAt = -Infinity; return; }
+    const clamp = (v: number) => Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0));
+    this.gazeTarget = { yaw: clamp(gaze.yaw), pitch: clamp(gaze.pitch) }; this.gazeAt = this.time;
+    if (this.reduced) this.redrawIfStill();
   }
-
-  /** True while the drawn level comes from a real measurement (not the synthetic rhythm). */
-  hasLiveLevel(): boolean {
-    return this.time - this.levelAt < 0.4;
-  }
-
-  /** Live voice level 0..1 (microphone while listening, EZO's voice while speaking). */
-  setLevel(level: number): void {
-    this.levelTarget = Math.min(1, Math.max(0, Number.isFinite(level) ? level : 0));
-    this.levelAt = this.time;
-  }
-
-  /** Turn the head towards a point (the pointer or a touch). Null, or silence for
-   * 1.5 s, lets the head return to its own gentle sway. Never used as proof of a face. */
-  setGaze(gaze: Gaze | null): void {
-    if (!gaze) {
-      this.gazeAt = -Infinity;
-      return;
-    }
-    const clamp = (v: number) => Math.min(1, Math.max(-1, Number.isFinite(v) ? v : 0));
-    this.gazeTarget = { yaw: clamp(gaze.yaw), pitch: clamp(gaze.pitch) };
-    this.gazeAt = this.time;
-    if (this.reduced || !this.running) this.redrawIfStill();
-  }
-
-  private label(): void {
-    if (!this.describe) return;
-    this.canvas.setAttribute("role", "img");
-    this.canvas.setAttribute("aria-label", this.describe(this.state));
-  }
-
-  destroy(): void {
-    this.destroyed = true;
-    this.stopLoop();
-    this.observer?.disconnect();
+  destroy() {
+    this.destroyed = true; this.stopLoop(); this.observer?.disconnect();
     this.canvas.removeEventListener("webglcontextlost", this.onLost);
     this.canvas.removeEventListener("webglcontextrestored", this.onRestored);
     if (typeof document !== "undefined") document.removeEventListener("visibilitychange", this.onVisibility);
-    const glState = this.glState;
-    if (glState) {
-      const { gl } = glState;
-      glState.buffers.forEach((buffer) => gl.deleteBuffer(buffer));
-      gl.deleteProgram(glState.points);
-      gl.deleteProgram(glState.mask);
-    }
-    this.glState = null;
+    this.media?.removeEventListener?.("change", this.onMotion);
+    this.releaseBuffers(); this.glState = null;
   }
-
-  // --- setup -------------------------------------------------------------------------------
-
+  private label() { if (this.describe) { this.canvas.setAttribute("role", "img"); this.canvas.setAttribute("aria-label", this.describe(this.state)); } }
+  private drawCount() { return Math.max(1, Math.floor(this.figure.count * this.density)); }
+  private uploadBuffers(gl: WebGLRenderingContext) {
+    const buffers: WebGLBuffer[] = [];
+    try {
+      for (const data of [this.figure.positions, this.figure.data, this.figure.extra, this.figure.silhouette]) {
+        const buffer = gl.createBuffer(); if (!buffer) throw new Error("Buffer allocation failed");
+        buffers.push(buffer); gl.bindBuffer(gl.ARRAY_BUFFER, buffer); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+      }
+      return buffers;
+    } catch (error) { buffers.forEach((buffer) => gl.deleteBuffer(buffer)); throw error; }
+  }
+  private releaseBuffers() {
+    const state = this.glState; if (!state) return;
+    state.buffers.forEach((buffer) => state.gl.deleteBuffer(buffer));
+    state.gl.deleteProgram(state.points); state.gl.deleteProgram(state.mask); state.buffers = [];
+  }
   private initGl(): GlState | null {
     let gl: WebGLRenderingContext | null = null;
-    try {
-      gl = (this.canvas.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: true, depth: true }) ??
-        this.canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-    } catch {
-      gl = null;
-    }
+    try { gl = this.canvas.getContext("webgl", { alpha: true, antialias: false, premultipliedAlpha: true, depth: true, powerPreference: "low-power" }); } catch { return null; }
     if (!gl) return null;
     try {
-      const points = compile(gl, POINT_VERTEX, POINT_FRAGMENT);
+      const points = compile(gl, ENERGY_VERTEX, ENERGY_FRAGMENT);
       const mask = compile(gl, MASK_VERTEX, MASK_FRAGMENT);
-      const upload = (data: Float32Array) => {
-        const buffer = gl.createBuffer();
-        if (!buffer) throw new Error("buffer allocation failed");
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
-        return buffer;
-      };
-      const buffers = [upload(this.figure.positions), upload(this.figure.data), upload(this.figure.extra), upload(this.figure.silhouette)];
-      const uniforms = Object.fromEntries(UNIFORMS.map((name) => [name, gl.getUniformLocation(points, name)])) as GlState["uniforms"];
-      return {
-        gl,
-        points,
-        mask,
-        uniforms,
-        maskVP: gl.getUniformLocation(mask, "uVP"),
-        maskYaw: gl.getUniformLocation(mask, "uYaw"),
-        maskPitch: gl.getUniformLocation(mask, "uPitch"),
-        buffers,
-        attributes: {
-          pos: gl.getAttribLocation(points, "aPos"),
-          data: gl.getAttribLocation(points, "aData"),
-          extra: gl.getAttribLocation(points, "aExtra"),
-          xy: gl.getAttribLocation(mask, "aXY"),
-        },
-        silhouetteVertices: this.figure.silhouette.length / 2,
-      };
-    } catch (error) {
-      console.warn("EZO avatar: WebGL setup failed, using the still fallback.", error);
-      return null;
-    }
+      return { gl, points, mask, buffers: this.uploadBuffers(gl), uniforms: Object.fromEntries(["uVP", ...PARAMETERS].map((name) => [name, gl.getUniformLocation(points, name)])), maskUniforms: Object.fromEntries(["uVP", "uYaw", "uPitch"].map((name) => [name, gl.getUniformLocation(mask, name)])), attributes: ["aPos", "aData", "aExtra"].map((name) => gl.getAttribLocation(points, name)), xy: gl.getAttribLocation(mask, "aXY") };
+    } catch (error) { console.warn("EZO energy: GPU initialization failed.", error); return null; }
   }
-
-  // --- loop ----------------------------------------------------------------------------------
-
-  private syncRunning(): void {
+  private syncRunning() {
     const visible = typeof document === "undefined" || document.visibilityState !== "hidden";
     if (!this.destroyed && !this.reduced && this.glState && visible && this.active) this.startLoop();
-    else {
-      this.stopLoop();
-      this.redrawIfStill();
-    }
+    else { this.stopLoop(); this.redrawIfStill(); }
   }
-
-  private startLoop(): void {
+  private startLoop() {
     if (this.running) return;
-    this.running = true;
-    this.last = performance.now();
+    this.running = true; this.last = performance.now();
     const tick = (now: number) => {
       if (!this.running) return;
       this.frame = requestAnimationFrame(tick);
-      // Economy: skip every other display frame rather than draw a lighter figure.
-      if (this.lowPower && now - this.last < LOW_POWER_FRAME_MS - 2) return;
-      const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000));
+      const cap = this.lowPower || this.quality === "low" ? 1000 / 30 : this.quality === "balanced" ? 1000 / 45 : 0;
+      if (cap && now - this.last < cap - 1) return;
       const interval = now - this.last;
-      this.last = now;
-      const started = performance.now();
-      this.step(dt);
-      this.draw();
+      const dt = Math.min(0.1, Math.max(0, interval / 1000)); this.last = now;
+      const started = performance.now(); this.step(dt); this.draw();
       const cost = performance.now() - started;
-      // Measured, not estimated: what the loop actually costs on this device (for Diagnostics).
-      this.frameMs = this.frameMs ? this.frameMs * 0.9 + interval * 0.1 : interval;
-      this.drawMs = this.drawMs ? this.drawMs * 0.9 + cost * 0.1 : cost;
-      // The glow costs a second pass: switch it on only where the loop runs above ~50 fps, and
-      // drop it for good if frames then fall below ~40 fps (software rendering, a weak GPU).
-      this.measured += 1;
-      if (!this.glow && !this.glowLost && !this.lowPower && this.measured >= 30 && this.frameMs < GLOW_ON_FRAME_MS) {
-        this.glow = true;
-        this.measured = 0;
-        this.canvas.dataset.glow = "on";
-      } else if (this.glow && this.measured >= 30 && this.frameMs > GLOW_OFF_FRAME_MS) {
-        this.glow = false;
-        this.glowLost = true;
-        this.canvas.dataset.glow = "off";
+      this.frameMs = this.frameMs ? this.frameMs * 0.94 + interval * 0.06 : interval;
+      this.drawMs = this.drawMs ? this.drawMs * 0.94 + cost * 0.06 : cost;
+      this.measured++;
+      if (this.measured >= 60 && this.quality === "auto") {
+        if (this.frameMs > 29 && this.density > 0.4) { this.density = Math.max(0.4, this.density - 0.2); this.glow = false; this.glowLost = true; this.measured = 0; }
+        else if (this.frameMs < 19 && this.density < 1) { this.density = Math.min(1, this.density + 0.1); this.measured = 0; }
       }
+      if (!this.glow && !this.glowLost && !this.lowPower && this.measured >= 60 && this.frameMs < 20) { this.glow = true; this.canvas.dataset.glow = "on"; }
+      else if (this.glow && this.frameMs > 27) { this.glow = false; this.glowLost = true; this.canvas.dataset.glow = "off"; }
+      this.canvas.dataset.drawnPoints = String(this.drawCount());
     };
     this.frame = requestAnimationFrame(tick);
   }
-
-  private stopLoop(): void {
-    this.running = false;
-    if (this.frame) cancelAnimationFrame(this.frame);
-    this.frame = 0;
-  }
-
-  private step(dt: number): void {
+  private stopLoop() { this.running = false; if (this.frame) cancelAnimationFrame(this.frame); this.frame = 0; }
+  private step(dt: number) {
     this.time += dt;
-    const hold = TRANSIENT_STATES[this.state];
-    if (hold !== undefined && this.time - this.stateAt > hold) this.setState("idle");
+    const hold = TRANSIENT_STATES[this.state]; if (hold !== undefined && this.time - this.stateAt > hold) this.setState("idle");
     this.look = easeLook(this.look, lookFor(this.state), dt);
-    const held = this.time - this.gazeAt < GAZE_HOLD_SECONDS;
-    const aim = held ? this.gazeTarget : { yaw: 0, pitch: 0 };
-    const k = 1 - Math.exp(-dt * (held ? 6 : 1.5));
-    this.gaze = { yaw: this.gaze.yaw + (aim.yaw - this.gaze.yaw) * k, pitch: this.gaze.pitch + (aim.pitch - this.gaze.pitch) * k };
-    // Without a live level (e.g. the browser's own voice), speech gets a speech-like rhythm.
-    const fresh = this.time - this.levelAt < 0.4;
-    const target = fresh ? this.levelTarget : this.state === "speaking" ? syntheticSpeech(this.time) : this.state === "listening" ? 0.08 : 0;
-    this.level = followLevel(this.level, target, dt);
-    this.stepFace(dt, held ? this.gazeTarget : null);
+    const held = this.time - this.gazeAt < 0.45;
+    const target = held ? this.gazeTarget : { yaw: 0, pitch: 0 };
+    const k = 1 - Math.exp(-dt * (held ? 7 : 2));
+    this.gaze.yaw += (target.yaw - this.gaze.yaw) * k; this.gaze.pitch += (target.pitch - this.gaze.pitch) * k;
+    this.level = followLevel(this.level, this.hasLiveLevel() ? this.levelTarget : 0, dt);
   }
-
-  /** Blinks, eye direction, brows and the jaw for this frame. */
-  private stepFace(dt: number, gaze: Gaze | null): void {
-    const look = this.look;
-    if (this.time >= this.nextBlink && this.state !== "offline") {
-      this.blinkStart = this.time;
-      this.nextBlink = this.time + BLINK_LENGTH + nextBlinkDelay(Math.random(), look.listen);
-    }
-    const eye = eyeTarget(look, gaze, this.time);
-    const k = 1 - Math.exp(-dt * 14); // the eyes move faster than the head
-    const current = this.face.eye;
-    this.face = {
-      blink: blinkCurve(this.time - this.blinkStart),
-      droop: droopFor(look),
-      eye: { yaw: current.yaw + (eye.yaw - current.yaw) * k, pitch: current.pitch + (eye.pitch - current.pitch) * k },
-      brow: browFor(look),
-      mouth: mouthFor(this.level, look),
-      smile: smileFor(look),
-    };
-  }
-
-  private redrawIfStill(): void {
+  private redrawIfStill() {
     if (this.running || this.destroyed) return;
-    if (this.reduced || !this.glState) {
-      this.time = STILL_TIME;
-      this.level = this.state === "speaking" ? 0.5 : 0;
-      const look = lookFor(this.state);
-      const held = this.time - this.gazeAt < GAZE_HOLD_SECONDS;
-      this.face = { blink: 0, droop: droopFor(look), eye: eyeTarget(look, held ? this.gazeTarget : null, 0), brow: browFor(look), mouth: mouthFor(this.level, look), smile: smileFor(look) };
-    }
+    if (this.reduced) { this.time = 6.5; this.look = { ...lookFor(this.state) }; if (!this.hasLiveLevel()) this.level = 0; }
     this.draw();
   }
-
-  // --- drawing -------------------------------------------------------------------------------
-
-  private resize(): { width: number; height: number; cssHeight: number; dpr: number } {
+  private resize() {
     const rect = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, 2);
+    const cap = this.quality === "low" ? 1 : this.quality === "balanced" ? 1.5 : 2;
+    const dpr = Math.min(typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1, cap);
     const width = Math.max(1, Math.round((rect.width || this.canvas.width) * dpr));
     const height = Math.max(1, Math.round((rect.height || this.canvas.height) * dpr));
-    if (this.canvas.width !== width || this.canvas.height !== height) {
-      this.canvas.width = width;
-      this.canvas.height = height;
-    }
+    if (this.canvas.width !== width || this.canvas.height !== height) { this.canvas.width = width; this.canvas.height = height; }
     return { width, height, cssHeight: height / dpr, dpr };
   }
-
-  private motion(): { yaw: number; pitch: number } {
-    const t = this.time;
-    const still = this.reduced || !this.running;
-    const gaze = still && this.time - this.gazeAt < GAZE_HOLD_SECONDS ? this.gazeTarget : this.gaze;
-    // Idle sway, plus up to ±0.35 rad of real gaze (listening leans in a little).
-    const attention = 1 - 0.3 * this.look.listen;
-    return {
-      yaw: attention * (0.1 * Math.sin(t * 0.23) + 0.04 * Math.sin(t * 0.61)) + 0.35 * gaze.yaw,
-      pitch: 0.03 * Math.sin(t * 0.17) + 0.2 * gaze.pitch,
-    };
+  private motion() {
+    const t = this.reduced ? 0 : this.time;
+    return { yaw: 0.055 * Math.sin(t * 0.23) + 0.025 * Math.sin(t * 0.47) + this.gaze.yaw * 0.24, pitch: 0.018 * Math.sin(t * 0.19) + this.gaze.pitch * 0.14 };
   }
-
-  private draw(): void {
+  private draw() {
     if (this.destroyed) return;
-    this.frames += 1;
+    this.frames++;
     const { width, height, cssHeight, dpr } = this.resize();
     const camera = frameCamera(this.framing, width / height);
-    if (!this.glState) {
-      this.drawStill(camera.viewProjection, width, height);
-      return;
-    }
-    const { gl, points, mask, uniforms: u, buffers, attributes, silhouetteVertices } = this.glState;
+    if (!this.glState) { this.drawStill(camera.viewProjection, width, height); return; }
+    const { gl, points, mask, buffers, uniforms, maskUniforms, attributes, xy } = this.glState;
     const { yaw, pitch } = this.motion();
-    gl.viewport(0, 0, width, height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clearDepth(1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    gl.enable(gl.DEPTH_TEST);
-    gl.depthFunc(gl.LESS);
-
-    // 1. The silhouette writes depth only.
-    gl.useProgram(mask);
-    gl.colorMask(false, false, false, false);
-    gl.depthMask(true);
-    gl.disable(gl.BLEND);
-    gl.uniformMatrix4fv(this.glState.maskVP, false, camera.viewProjection);
-    gl.uniform1f(this.glState.maskYaw, yaw);
-    gl.uniform1f(this.glState.maskPitch, pitch);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffers[3]!);
-    gl.enableVertexAttribArray(attributes.xy);
-    gl.vertexAttribPointer(attributes.xy, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, silhouetteVertices);
-    gl.disableVertexAttribArray(attributes.xy);
-
-    // 2. Glowing points, added together.
-    gl.useProgram(points);
-    gl.colorMask(true, true, true, true);
-    gl.depthMask(false);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE);
-    const look = this.look;
-    gl.uniformMatrix4fv(u.uVP, false, camera.viewProjection);
-    gl.uniform1f(u.uTime, this.time);
-    gl.uniform1f(u.uLevel, this.level);
-    gl.uniform1f(u.uEnergy, look.energy);
-    gl.uniform1f(u.uWarmth, look.warmth);
-    gl.uniform1f(u.uListen, look.listen);
-    gl.uniform1f(u.uThink, look.think);
-    gl.uniform1f(u.uSpeak, look.speak);
-    gl.uniform1f(u.uError, look.error);
-    gl.uniform1f(u.uWork, look.work);
-    gl.uniform1f(u.uSuccess, look.success);
-    gl.uniform1f(u.uOffline, look.offline);
-    gl.uniform1f(u.uYaw, yaw);
-    gl.uniform1f(u.uPitch, pitch);
-    const face = this.face;
-    gl.uniform1f(u.uBlink, face.blink);
-    gl.uniform1f(u.uDroop, face.droop);
-    gl.uniform1f(u.uEyeX, face.eye.yaw);
-    gl.uniform1f(u.uEyeY, face.eye.pitch);
-    gl.uniform1f(u.uBrow, face.brow);
-    gl.uniform1f(u.uMouth, face.mouth);
-    gl.uniform1f(u.uSmile, face.smile);
-    // Point size follows the view size; small faces (pill, home screen) keep visible lines.
+    gl.viewport(0, 0, width, height); gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.useProgram(mask); gl.colorMask(false, false, false, false); gl.depthMask(true); gl.disable(gl.BLEND);
+    gl.uniformMatrix4fv(maskUniforms.uVP!, false, camera.viewProjection); gl.uniform1f(maskUniforms.uYaw!, yaw); gl.uniform1f(maskUniforms.uPitch!, pitch);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffers[3]!); gl.enableVertexAttribArray(xy); gl.vertexAttribPointer(xy, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, this.figure.silhouette.length / 2); gl.disableVertexAttribArray(xy);
+    gl.useProgram(points); gl.colorMask(true, true, true, true); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.uniformMatrix4fv(uniforms.uVP!, false, camera.viewProjection);
+    const values: Record<string, number> = { uTime: this.time, uLevel: this.level, uEnergy: this.look.energy, uWarmth: this.look.warmth, uListen: this.look.listen, uThink: this.look.think, uSpeak: this.look.speak, uError: this.look.error, uWork: this.look.work, uSuccess: this.look.success, uOffline: this.look.offline, uYaw: yaw, uPitch: pitch, uIntensity: this.intensity };
+    for (const name of PARAMETERS) gl.uniform1f(uniforms[name]!, values[name] ?? 0);
     const reference = this.framing === "head" ? 380 : 720;
-    gl.uniform1f(u.uPx, dpr * Math.min(1.5, Math.max(0.6, cssHeight / reference)));
-    gl.uniform1f(u.uGlowPx, dpr * Math.min(1.5, Math.max(0.1, cssHeight / reference)));
-    gl.uniform1f(u.uRef, camera.distance);
-    const bind = (index: number, location: number, size: number) => {
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffers[index]!);
-      gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
-    };
-    bind(0, attributes.pos, 3);
-    bind(1, attributes.data, 4);
-    bind(2, attributes.extra, 2);
-    // Bloom-like glow under the sharp points (skipped in economy mode).
-    if (this.glow && !this.lowPower) {
-      gl.uniform1f(u.uGlow, 1);
-      gl.drawArrays(gl.POINTS, 0, this.figure.count);
-    }
-    gl.uniform1f(u.uGlow, 0);
-    gl.drawArrays(gl.POINTS, 0, this.figure.count);
-    gl.disableVertexAttribArray(attributes.pos);
-    gl.disableVertexAttribArray(attributes.data);
-    gl.disableVertexAttribArray(attributes.extra);
+    gl.uniform1f(uniforms.uPx!, dpr * Math.min(1.5, Math.max(0.6, cssHeight / reference)));
+    gl.uniform1f(uniforms.uGlowPx!, dpr * Math.min(1.5, Math.max(0.1, cssHeight / reference)));
+    gl.uniform1f(uniforms.uRef!, camera.distance);
+    [3, 4, 2].forEach((size, index) => { const location = attributes[index]!; gl.bindBuffer(gl.ARRAY_BUFFER, buffers[index]!); gl.enableVertexAttribArray(location); gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0); });
+    if (this.glow && !this.lowPower) { gl.uniform1f(uniforms.uGlow!, 1); gl.drawArrays(gl.POINTS, 0, this.drawCount()); }
+    gl.uniform1f(uniforms.uGlow!, 0); gl.drawArrays(gl.POINTS, 0, this.drawCount());
+    attributes.forEach((location) => gl.disableVertexAttribArray(location));
   }
-
-  /** No WebGL: a still drawing of the figure (no mountains), tinted by state. */
-  private drawStill(viewProjection: Float32Array, width: number, height: number): void {
-    const ctx = this.canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, width, height);
-    ctx.globalCompositeOperation = "lighter";
-    const tint =
-      this.state === "error" ? "255,70,80" : this.state === "offline" ? "90,100,120" : this.state === "success" ? "255,200,90" : "70,170,255";
-    const warm = this.state === "speaking" || this.state === "success" ? "255,170,60" : this.state === "offline" ? "110,100,90" : "255,110,30";
-    const { positions, data, extra, count } = this.figure;
-    const dot = Math.max(1, height / 500);
-    const face = this.face;
-    for (let i = 0; i < count; i++) {
-      const kind = data[i * 4]!;
-      if (kind === 6 || kind === 3 || kind === 5) continue;
-      let px = positions[i * 3]!;
-      let py = positions[i * 3 + 1]!;
-      const w = data[i * 4 + 3]!;
-      let colour = w > 0.35 ? warm : tint;
-      let alpha = 0.25 + 0.5 * data[i * 4 + 2]!;
-      if (kind === 8) {
-        // Eyes: the iris follows the gaze; the outline is the brightest line of the face.
-        if (w > 0.25) {
-          px += face.eye.yaw * 0.42 * EYE.rx;
-          py += face.eye.pitch * 0.32 * EYE.ry;
-        }
-        colour = w > 0.75 ? "10,20,40" : w > 0.25 ? "80,190,255" : "190,235,255";
-        alpha = w > 0.75 ? 0.9 : 0.85;
-      } else if (kind === 9) {
-        colour = "120,200,255";
-      } else if (kind === 10) {
-        colour = "90,160,255";
-        py += face.brow * 0.02;
-      } else if (kind === 11) {
-        colour = "255,170,90";
-        if (extra[i * 2 + 1]! > 0.5) py -= face.mouth * 0.06;
-        alpha = 0.8;
-      }
-      const [x, y] = project(viewProjection, px, py, positions[i * 3 + 2]!);
-      ctx.fillStyle = `rgba(${colour},${alpha})`;
-      ctx.fillRect(((x + 1) / 2) * width, ((1 - y) / 2) * height, dot, dot);
+  /** Graceful fallback is the SAME contour anatomy, not a robot, orb or stock avatar. */
+  private drawStill(vp: Float32Array, width: number, height: number) {
+    const ctx = this.canvas.getContext("2d"); if (!ctx) return;
+    ctx.clearRect(0, 0, width, height); ctx.globalCompositeOperation = "lighter";
+    const { yaw, pitch } = this.motion(); const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const stride = Math.max(1, Math.ceil(this.figure.count / 14000));
+    for (let i = 0; i < this.figure.count; i += stride) {
+      const kind = this.figure.data[i * 4]!, warm = this.figure.data[i * 4 + 3]!;
+      if (kind === 3 || kind === 5 || kind === 6) continue;
+      const x = this.figure.positions[i * 3]!, y0 = this.figure.positions[i * 3 + 1]! - 0.12, z = this.figure.positions[i * 3 + 2]!;
+      const rx = cy * x + sy * z, rz = -sy * x + cy * z;
+      const [nx, ny] = project(vp, rx, cp * y0 - sp * rz + 0.12, sp * y0 + cp * rz);
+      const color = this.state === "offline" ? "100,140,150" : warm > 0.35 && kind < 1 ? "255,155,55" : "65,210,255";
+      ctx.fillStyle = `rgba(${color},${(0.3 + this.figure.data[i * 4 + 2]! * 0.4) * this.intensity})`;
+      const dot = Math.max(1, height / 600); ctx.fillRect((nx + 1) * width / 2, (1 - ny) * height / 2, dot, dot);
     }
     ctx.globalCompositeOperation = "source-over";
   }

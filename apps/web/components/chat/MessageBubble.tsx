@@ -10,7 +10,7 @@ import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { speak, speechSynthesisSupported, toSpeakableText } from "@/lib/speech";
 import { ArtifactCard } from "../artifacts/ArtifactCard";
-import { EzoRobot } from "../robot/EzoRobot";
+import { EnergyMark } from "../robot/EnergyMark";
 import { Markdown } from "./Markdown";
 import { Sources } from "./Sources";
 import type { UiMessage } from "./types";
@@ -57,7 +57,6 @@ export function MessageBubble({ message, onShowTrace }: Props) {
     );
   }
 
-  const robotState = message.streaming ? (message.content ? "speaking" : "thinking") : "idle";
   const artifacts = [...(message.metadata?.artifacts ?? []), ...saved].filter(
     (artifact, index, all) => all.findIndex((other) => other.id === artifact.id) === index,
   );
@@ -90,7 +89,7 @@ export function MessageBubble({ message, onShowTrace }: Props) {
 
   return (
     <motion.div className="flex gap-3" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} data-testid="message-assistant">
-      <EzoRobot size={34} state={robotState} showHalo={false} className="mt-0.5 shrink-0" />
+      <EnergyMark size={34} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {message.error ? (
           <div className="rounded-xl border border-danger/40 bg-danger/5 px-4 py-3 text-sm" role="alert">

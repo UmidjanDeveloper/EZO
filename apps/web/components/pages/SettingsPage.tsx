@@ -8,6 +8,7 @@ import { useApp } from "@/lib/app-state";
 import { UI_LANGUAGES, useI18n } from "@/lib/i18n/context";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
 import { useApiData } from "@/lib/use-api-data";
+import { PresenceControls } from "../robot/PresenceControls";
 import { CareerCard } from "../settings/CareerCard";
 import { OrganizationCard } from "../settings/OrganizationCard";
 import { PageFrame } from "./PageFrame";
@@ -137,6 +138,14 @@ export function SettingsPage() {
               hint={m.settings.apiTokenHint}
             />
           </div>
+        </Card>
+
+        <Card data-testid="energy-settings">
+          <h2 className="font-medium">{m.energy.title}</h2>
+          <p className="mb-4 mt-1 text-sm text-ink-muted">{m.energy.subtitle}</p>
+          <PresenceControls />
+          <p className="mt-3 text-xs text-ink-muted">{m.energy.motionHint}</p>
+          <p className="mt-2 text-xs text-ink-muted">{m.energy.reference}</p>
         </Card>
 
         <OrganizationCard />

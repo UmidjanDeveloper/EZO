@@ -244,7 +244,7 @@ function followLevel(source: MediaStream | HTMLMediaElement | null): void {
   meter = source ? createLevelMeter(source) : null;
   const tick = () => {
     if (!meter) return;
-    avatar?.setLevel(meter.read());
+    if (meter.ready()) avatar?.setLevel(meter.read(), source instanceof MediaStream ? "microphone" : "output");
     meterFrame = requestAnimationFrame(tick);
   };
   if (meter) meterFrame = requestAnimationFrame(tick);
@@ -271,7 +271,7 @@ const speaker = new AcknowledgementSpeaker({
   },
   cacheKey: () => `${prefs.apiUrl}|${server.voice ? "voice" : "novoice"}`,
   volume: () => prefs.voiceVolume,
-  onLevel: (level) => avatar?.setLevel(level),
+  onLevel: (level, measured) => { if (measured) avatar?.setLevel(level, "output"); },
   onSynthesized: (info) => {
     lastTts = { ...info, at: Date.now() };
   },

@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
+import { apiProxyTarget } from "./lib/runtime-config";
+
+const proxyTarget = apiProxyTarget(process.env);
 
 const nextConfig: NextConfig = {
+  // Explicit preview deployment option: browser requests stay same-origin while Next
+  // forwards them to the local API. Production without this variable is unchanged.
+  async rewrites() {
+    return proxyTarget ? [{ source: "/api/:path*", destination: `${proxyTarget}/api/:path*` }] : [];
+  },
   // Build identity for the Diagnostics report (numbers and words only); CI passes GITHUB_SHA.
   env: {
     NEXT_PUBLIC_EZO_VERSION: process.env.npm_package_version ?? "0.1.0",

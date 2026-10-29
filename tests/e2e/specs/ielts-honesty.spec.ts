@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+const API_PORT = Number(process.env.E2E_API_PORT ?? 8100);
+
 test("IELTS text feedback never invents a band or pronunciation score", async ({ page }) => {
   await page.goto("/ielts");
   const created = page.waitForResponse(response =>
@@ -21,7 +23,7 @@ test("IELTS text feedback never invents a band or pronunciation score", async ({
     await expect(page.getByText("Band —", { exact: true })).toBeVisible();
   } finally {
     // Only this test's session: later journeys share the fixture owner's database.
-    const deleted = await page.request.delete(`http://localhost:8100/api/language/sessions/${id}?confirm=true`);
+    const deleted = await page.request.delete(`http://localhost:${API_PORT}/api/language/sessions/${id}?confirm=true`);
     expect(deleted.status()).toBe(204);
   }
 });

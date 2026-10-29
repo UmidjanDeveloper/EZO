@@ -8,8 +8,8 @@ export interface SpeakerOptions {
   /** Changes when the server's voice/provider setting changes; the cache is dropped then. */
   cacheKey: () => string;
   volume?: () => number;
-  /** The real playback level 0..1 while the clip plays (drives the figure's jaw). */
-  onLevel?: (level: number) => void;
+  /** The real playback level 0..1 while the clip plays (drives the facial light). */
+  onLevel?: (level: number, measured: boolean) => void;
   /** Provider and latency of the last synthesis, for Diagnostics. */
   onSynthesized?: (info: { provider: string | null; latencyMs: number; cached: boolean; language: Language }) => void;
 }
@@ -67,13 +67,14 @@ export class AcknowledgementSpeaker implements AcknowledgementPlayer {
         onPlayback({ type: "start", timestampMs: performance.now() });
         ref.meter ??= createLevelMeter(audio);
         const tick = () => {
-          if (!ref.meter || this.current !== audio) return;
-          const level = ref.meter.read();
-          this.options.onLevel?.(level);
+          if (this.current !== audio) return;
+          const measured = ref.meter?.ready() ?? false;
+          const level = measured ? ref.meter!.read() : 0;
+          this.options.onLevel?.(level, measured);
           onPlayback({ type: "level", level, timestampMs: performance.now() });
           ref.frame = requestAnimationFrame(tick);
         };
-        if (ref.meter) ref.frame = requestAnimationFrame(tick);
+        ref.frame = requestAnimationFrame(tick);
       };
       audio.onended = () => resolve();
       audio.onerror = () => reject(new Error("playback failed"));
@@ -85,7 +86,7 @@ export class AcknowledgementSpeaker implements AcknowledgementPlayer {
     } finally {
       cancelAnimationFrame(ref.frame);
       ref.meter?.close();
-      this.options.onLevel?.(0);
+      this.options.onLevel?.(0, true);
       if (this.current === audio) {
         audio.pause();
         this.current = null;

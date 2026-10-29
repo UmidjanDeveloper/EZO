@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { followLevel, levelFromSamples, syntheticSpeech } from "./level";
+import { followLevel, levelFromSamples } from "./level";
 import { frameCamera, project } from "./math";
 import { AVATAR_STATES, easeLook, lookFor, toAvatarState, TRANSIENT_STATES } from "./states";
 
@@ -53,12 +53,9 @@ describe("level", () => {
     expect(up).toBeGreaterThan(down);
   });
 
-  it("synthetic speech stays in range", () => {
-    for (let t = 0; t < 10; t += 0.07) {
-      const v = syntheticSpeech(t);
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(1);
-    }
+  it("never substitutes synthetic speech for unavailable PCM", async () => {
+    const level = await import("./level");
+    expect("syntheticSpeech" in level).toBe(false);
   });
 });
 

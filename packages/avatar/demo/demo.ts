@@ -17,7 +17,7 @@ const WORDS: Record<AvatarState, string> = {
 };
 const avatar = new EzoAvatar(canvas, {
   framing: params.get("framing") === "head" ? "head" : "bust",
-  quality: params.get("quality") === "low" ? "low" : "auto",
+  quality: (["high", "balanced", "low"].includes(params.get("quality") ?? "") ? params.get("quality") : "auto") as "high" | "balanced" | "low" | "auto",
   power: params.get("power") === "low" ? "low" : params.get("power") === "high" ? "high" : "auto",
   ...(params.has("reduced") ? { reducedMotion: params.get("reduced") === "1" } : {}),
   describe: (s) => `EZO: ${WORDS[s]}`,
@@ -25,7 +25,7 @@ const avatar = new EzoAvatar(canvas, {
 const state = (params.get("state") ?? "idle") as AvatarState;
 avatar.setState(AVATAR_STATES.includes(state) ? state : "idle");
 const level = Number(params.get("level") ?? "NaN");
-if (Number.isFinite(level)) setInterval(() => avatar.setLevel(level * (0.7 + 0.3 * Math.random())), 50);
+if (Number.isFinite(level)) setInterval(() => avatar.setLevel(level), 50);
 const gaze = params.get("gaze")?.split(",").map(Number);
 if (gaze && gaze.length === 2) setInterval(() => avatar.setGaze({ yaw: gaze[0]!, pitch: gaze[1]! }), 200);
 if (params.get("frame") === "1") {

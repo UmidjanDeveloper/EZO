@@ -158,27 +158,42 @@ export function hasVoiceFor(language: LanguageCode): boolean {
   return pickVoice(SPEECH_LOCALES[language]) !== null;
 }
 
-/** Speak text aloud. Resolves when finished or cancelled. */
-export function speak(text: string, language: LanguageCode): Promise<void> {
+export interface BrowserSpeechOptions {
+  volume?: number;
+  rate?: number;
+  onStart?: () => void;
+}
+let finishCurrent: (() => void) | null = null;
+
+/** Browser TTS exposes lifecycle events, but no PCM tap. Callers must not pretend otherwise. */
+export function speak(text: string, language: LanguageCode, options: BrowserSpeechOptions = {}): Promise<void> {
+  stopSpeaking();
   return new Promise((resolve) => {
-    if (!speechSynthesisSupported() || !text.trim()) {
-      resolve();
-      return;
-    }
+    if (!speechSynthesisSupported() || !text.trim()) { resolve(); return; }
     const synthesis = window.speechSynthesis;
-    synthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     const locale = SPEECH_LOCALES[language];
     utterance.lang = locale;
     const voice = pickVoice(locale);
     if (voice) utterance.voice = voice;
-    utterance.rate = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
-    synthesis.speak(utterance);
+    utterance.rate = Math.max(0.7, Math.min(1.3, options.rate ?? 1));
+    utterance.volume = Math.max(0, Math.min(1, options.volume ?? 1));
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (finishCurrent === finish) finishCurrent = null;
+      resolve();
+    };
+    finishCurrent = finish;
+    utterance.onstart = () => { if (!finished) options.onStart?.(); };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    try { synthesis.speak(utterance); } catch { finish(); }
   });
 }
 
 export function stopSpeaking(): void {
   if (speechSynthesisSupported()) window.speechSynthesis.cancel();
+  finishCurrent?.();
 }

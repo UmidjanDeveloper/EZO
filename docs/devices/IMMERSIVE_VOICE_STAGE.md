@@ -1,3 +1,5 @@
+> **Superseded visual direction (2026-10-29):** the current energy-humanoid implementation and verification notes live in [HUMANOID.md](HUMANOID.md). This file is retained as historical context for the earlier contour-bust iteration.
+
 # Immersive voice stage
 
 Owner-requested follow-up to the previously merged reference correction (PR #64).

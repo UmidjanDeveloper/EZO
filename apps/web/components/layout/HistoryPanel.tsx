@@ -22,7 +22,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
-import { EzoRobot } from "../robot/EzoRobot";
+import { EnergyMark } from "../robot/EnergyMark";
 
 /** Conversation history: the primary navigation for EZO OS. */
 export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
@@ -61,7 +61,7 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     <nav className="flex h-full flex-col gap-3 p-3" aria-label={m.nav.history}>
       <div className="flex items-center justify-between px-1">
         <Link href="/" onClick={onNavigate} className="flex items-center gap-2">
-          <EzoRobot size={30} showHalo={false} />
+          <EnergyMark size={30} />
           <span className="text-base font-semibold tracking-[0.25em]">EZO</span>
         </Link>
         {onClose ? (

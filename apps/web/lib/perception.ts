@@ -7,7 +7,7 @@
 import { AcknowledgementSpeaker } from "@ezo/perception-client";
 import { api } from "./api";
 import { createStoredValue } from "./stored-value";
-import { publishVoiceLevel } from "./voice/level";
+import { publishVoiceLevel, publishVoiceUnavailable, resetVoiceSignal } from "./voice/level";
 import { voiceVolume } from "./voice/engine";
 
 /** Clap listening consent: "on" only after the owner switched it on (and pressed Listen). */
@@ -28,7 +28,7 @@ export function createAcknowledgementSpeaker(providerKey: () => string, onTts: (
     synthesize: (text, language, signal) => api.speakWithProvider(text, language, signal),
     cacheKey: providerKey,
     volume: voiceVolume,
-    onLevel: publishVoiceLevel,
+    onLevel: (level, measured) => { if (measured) publishVoiceLevel(level, "output"); else if (level === 0) resetVoiceSignal("output"); else publishVoiceUnavailable("output"); },
     onSynthesized: (info) => onTts({ ...info, at: Date.now() }),
   });
 }

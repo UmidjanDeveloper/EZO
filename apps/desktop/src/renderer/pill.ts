@@ -156,7 +156,7 @@ const speaker = new AcknowledgementSpeaker({
   },
   cacheKey: () => `${status.voice ? "voice" : "novoice"}|${status.text}`,
   volume: () => voiceVolume,
-  onLevel: (level) => face?.setLevel(level),
+  onLevel: (level, measured) => { if (measured) face?.setLevel(level, "output"); },
   onSynthesized: (info) => {
     lastTts = { ...info, at: Date.now() };
     reportDiagnostics();
@@ -296,7 +296,7 @@ function followLevel(source: MediaStream | HTMLMediaElement | null): void {
   meter = face && source ? createLevelMeter(source) : null;
   const tick = () => {
     if (!meter) return;
-    face?.setLevel(meter.read());
+    if (meter.ready()) face?.setLevel(meter.read(), source instanceof MediaStream ? "microphone" : "output");
     meterFrame = requestAnimationFrame(tick);
   };
   if (meter) meterFrame = requestAnimationFrame(tick);

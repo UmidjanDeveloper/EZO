@@ -2,25 +2,26 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { EZO_STATES } from "@/lib/ezo-state";
 import { EzoPresence, EzoStatus } from "./EzoPresence";
+import { I18nProvider } from "@/lib/i18n/context";
 
 describe("EzoPresence", () => {
+  const render = (node: React.ReactElement) => renderToStaticMarkup(<I18nProvider>{node}</I18nProvider>);
   it.each(EZO_STATES)("renders the %s state with its own motion layer", (state) => {
-    const html = renderToStaticMarkup(<EzoPresence state={state} label={`label-${state}`} />);
+    const html = render(<EzoPresence state={state} label={`label-${state}`} />);
     expect(html).toContain(`data-state="${state}"`);
     expect(html).toContain(`label-${state}`);
-    expect(html).toContain('data-testid="ezo-robot"');
-    if (state === "idle") expect(html).not.toContain("data-layer=");
-    else expect(html).toContain(`data-layer="${state}"`);
+    expect(html).toContain('data-testid="ezo-humanoid"');
+    expect(html).toContain('data-style="energy"');
   });
 
   it("marks busy states for assistive technology", () => {
-    expect(renderToStaticMarkup(<EzoPresence state="searching" />)).toContain('aria-busy="true"');
-    expect(renderToStaticMarkup(<EzoPresence state="idle" />)).toContain('aria-busy="false"');
+    expect(render(<EzoPresence state="searching" />)).toContain('aria-busy="true"');
+    expect(render(<EzoPresence state="idle" />)).toContain('aria-busy="false"');
   });
 
-  it("tints errors and completion", () => {
-    expect(renderToStaticMarkup(<EzoPresence state="error" />)).toContain("var(--danger)");
-    expect(renderToStaticMarkup(<EzoPresence state="completed" />)).toContain("var(--success)");
+  it("keeps error and completion states accessible", () => {
+    expect(render(<EzoPresence state="error" />)).toContain('data-state="error"');
+    expect(render(<EzoPresence state="completed" />)).toContain('data-state="completed"');
   });
 });
 
