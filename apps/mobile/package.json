@@ -16,19 +16,19 @@
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "8.0.1",
     "@capacitor/android": "8.5.3",
-    "@capacitor/camera": "8.2.5",
+    "@capacitor/camera": "8.2.6",
     "@capacitor/core": "8.5.3",
     "@capacitor/filesystem": "8.1.5",
     "@capacitor/local-notifications": "8.3.1",
     "@capacitor/share": "8.0.3",
-    "@capawesome/capacitor-file-picker": "8.1.0",
+    "@capawesome/capacitor-file-picker": "8.1.1",
     "@ezo/avatar": "workspace:*",
     "@ezo/perception-client": "workspace:*"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",
     "typescript": "6.0.3",
-    "vite": "8.3.4",
+    "vite": "8.3.5",
     "vitest": "5.0.5"
   }
 }
