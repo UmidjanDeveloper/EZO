@@ -14,14 +14,12 @@ def _assert_secure_trust(context: ssl.SSLContext) -> None:
         if key == "commonName"
     }
     # PYSEC-2026-4320 / GHSA-6q48-6c7w-9gw2: compromised intermediates
-    # chaining to G3 must not remain trusted. Unaffected emSign roots stay usable.
+    # chaining to G3 must not remain trusted. Which other emSign roots stay is
+    # the upstream (Mozilla/certifi) trust decision: certifi 2026.10.23 dropped
+    # "emSign Root CA - C1" and "emSign ECC Root CA - C3", so only a widely used
+    # healthy root is required here.
     assert "emSign ECC Root CA - G3" not in common_names
-    assert {
-        "ISRG Root X1",
-        "emSign Root CA - G1",
-        "emSign Root CA - C1",
-        "emSign ECC Root CA - C3",
-    } <= common_names
+    assert "ISRG Root X1" in common_names
     assert context.verify_mode == ssl.CERT_REQUIRED
     assert context.check_hostname
 
