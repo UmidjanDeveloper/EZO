@@ -28,11 +28,11 @@ from ezo_api.learning.targets import parse_target
 # Imperative "learn this source" forms only: "o'rganmoqchiman" (I want to learn), "learn
 # Python from …" or "I study at …" describe the user, not a request to read a source.
 _LEARN = re.compile(
-    r"(?<!\w)(o'rgan(ib (chiq|ol|ber)\w*|gin|ing|ingiz)?(?!\w)|o'qib chiq\w*|o'zlashtir\w*|"
+    r"(?<!\w)(o'?rgan(ib (chiq|ol|ber)\w*|gin|ing|ingiz)?(?!\w)|o'qib chiq\w*|o'zlashtir\w*|"
     r"bilim(lar)? bazasiga qo'sh|kutubxona\w* qo'sh|indeksla\w*|"
     r"(learn|study|index|ingest) (this|that|these|it|the (site|website|docs|documentation|"
     r"repo|repository|package|library))(?!\w)|learn from (this|that|the)\b|"
-    r"read and remember|"
+    r"read and remember|(?:^|[,.!:;]\s*|please\s+)(?:learn|study)(?!\w)|"
     r"ўрган(иб (чиқ|ол|бер)\w*|гин|инг|ингиз)?(?!\w)|ўқиб чиқ\w*|"
     r"изучи(те)?(?!\w)|прочитай и запомни|индексируй)"
 )
