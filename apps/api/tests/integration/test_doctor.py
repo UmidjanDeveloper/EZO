@@ -18,6 +18,7 @@ async def test_a_rejected_wrongly_shaped_gemini_key_is_named(database_url: str) 
     assert "KALIT RAD ETILDI" in report
     assert "o‘zbekcha server ovozi: o‘chiq" in report
     assert "--force-recreate api" in report
+    assert "hujjat ishchisi): o‘chiq (yoqish: .env ga COMPOSE_PROFILES=documents" in report
     assert secret not in report and secret[:8] not in report
 
 
@@ -30,7 +31,12 @@ async def test_no_key_at_all_points_at_the_env_file(database_url: str) -> None:
 
 
 async def test_a_working_key_is_reported_working(database_url: str) -> None:
-    settings = make_settings(database_url, GEMINI_API_KEY="AIza" + "x" * 35)
+    settings = make_settings(
+        database_url, GEMINI_API_KEY="AIza" + "x" * 35, EZO_DOCUMENT_WORKER="documents"
+    )
     lines, healthy = await run(settings, "en", providers={"gemini": FakeProvider(name="gemini")})
     assert healthy is True
     assert "  Google Gemini: works" in lines
+    assert any(
+        line.startswith("  Reading PDF/DOCX/EPUB/scans (document worker): on") for line in lines
+    )

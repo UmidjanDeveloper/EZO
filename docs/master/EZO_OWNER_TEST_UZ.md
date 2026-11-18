@@ -102,3 +102,28 @@ U o‘zbekcha aytadi:
 Xuddi shu tekshiruv brauzerda ham bor: **Sozlamalar → Kalitlarni tekshirish**. Kalit rad etilsa,
 chat tepasida qizil ogohlantirish ham chiqadi. `.env` o‘zgarsa:
 `docker compose up -d --force-recreate api`.
+## PDF, DOCX, EPUB va skan qilingan hujjatlarni o‘qish (2026-11-18)
+
+Egasi ruxsati bilan (2026-11-18) hujjatlar faqat **sizning kompyuteringizda** shunday yoqiladi:
+
+1. `.env` faylining oxiriga bitta qator qo‘shing:
+   ```
+   COMPOSE_PROFILES=documents
+   ```
+2. Loyiha papkasida:
+   ```powershell
+   docker compose up -d --build
+   ```
+   Birinchi marta OCR (Tesseract) va LibreOffice o‘rnatiladigan hujjat obrazi yig‘iladi —
+   bir necha daqiqa ketadi.
+3. Chatga PDF/DOCX/EPUB/rasm tashlang (5 MB gacha). Fayl yonida avval «navbatda», keyin
+   «indekslandi» chiqadi; shundan keyin EZO hujjat bo‘yicha javob beradi.
+
+Qanday ishlaydi: `document-worker` har bir faylni alohida, qulflangan konteynerda ochadi
+(internetsiz, faqat o‘qish, 768 MB xotira, 64 jarayon, 25 soniya, hech qanday huquqsiz).
+Buning uchun ishchi Docker’ni boshqara oladi (`/var/run/docker.sock`) — shuning uchun bu
+profil faqat shaxsiy kompyuter uchun; umumiy serverda hujjat ishchisi alohida hostda turadi
+(`docs/deployment/EXECUTOR_REQUIREMENTS.md`). API’ning o‘zi Docker’ga hech qachon ulanmaydi.
+
+Agar ishlamasa: `docker compose logs document-worker` — xato shu yerda ko‘rinadi.
+Profil yoqilmagan bo‘lsa, chatda «PDF/DOCX/skan o‘qish yoqilmagan…» degan aniq xabar chiqadi.

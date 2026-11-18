@@ -62,12 +62,18 @@ export function useAttachments(projectId?: string | null) {
               controllers.current.delete(controller);
             }
           } catch (error) {
-            update(key, { status: "failed", note: error instanceof ApiError ? error.message : String(error) });
+            const note =
+              error instanceof ApiError && error.code === "isolation_unavailable"
+                ? m.chat.documentsDisabled
+                : error instanceof ApiError
+                  ? error.message
+                  : String(error);
+            update(key, { status: "failed", note });
           }
         })();
       }
     },
-    [m.knowledge.duplicate, projectId, update],
+    [m.chat.documentsDisabled, m.knowledge.duplicate, projectId, update],
   );
 
   const dismiss = useCallback((key: string) => setItems((current) => current.filter((item) => item.key !== key)), []);

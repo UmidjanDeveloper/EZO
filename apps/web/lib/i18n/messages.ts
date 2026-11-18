@@ -68,6 +68,8 @@ const uz = {
       "Eslab qol: men qisqa va aniq javoblarni yoqtiraman",
     ],
     thinking: "EZO o‘ylamoqda…",
+    documentsDisabled:
+      "PDF/DOCX/skan o‘qish yoqilmagan: .env ga COMPOSE_PROFILES=documents qo‘shing, keyin docker compose up -d --build",
     keyRejectedTitle: "AI kaliti rad etildi",
     keyFormatTitle: "AI kaliti noto‘g‘ri ko‘rinishda",
     keyProblemBody:
@@ -845,6 +847,8 @@ const en: Messages = {
       "Remember that I prefer short, precise answers",
     ],
     thinking: "EZO is thinking…",
+    documentsDisabled:
+      "Reading PDF/DOCX/scans is off: add COMPOSE_PROFILES=documents to .env, then run docker compose up -d --build",
     keyRejectedTitle: "The AI key was rejected",
     keyFormatTitle: "The AI key does not look right",
     keyProblemBody:
@@ -1618,6 +1622,8 @@ const ru: Messages = {
       "Запомни: я предпочитаю короткие и точные ответы",
     ],
     thinking: "EZO думает…",
+    documentsDisabled:
+      "Чтение PDF/DOCX/сканов выключено: добавьте COMPOSE_PROFILES=documents в .env и выполните docker compose up -d --build",
     keyRejectedTitle: "Ключ AI отклонён",
     keyFormatTitle: "Ключ AI выглядит неправильно",
     keyProblemBody:

@@ -71,6 +71,20 @@ _TEXT: dict[str, dict[str, str]] = {
     "docs": {"uz": "Hujjatlar", "en": "Documents"},
     "ocr": {"uz": "skan/rasm matnini o‘qish (OCR)", "en": "reading scans/images (OCR)"},
     "office": {"uz": "Office → PDF", "en": "Office → PDF"},
+    "worker": {
+        "uz": "PDF/DOCX/EPUB/skan o‘qish (hujjat ishchisi): {state}",
+        "en": "Reading PDF/DOCX/EPUB/scans (document worker): {state}",
+    },
+    "worker_on": {
+        "uz": "yoqilgan (ishlamasa: docker compose logs document-worker)",
+        "en": "on (if it fails: docker compose logs document-worker)",
+    },
+    "worker_off": {
+        "uz": "o‘chiq (yoqish: .env ga COMPOSE_PROFILES=documents, "
+        "keyin docker compose up -d --build)",
+        "en": "off (turn on: COMPOSE_PROFILES=documents in .env, "
+        "then docker compose up -d --build)",
+    },
     "on": {"uz": "bor", "en": "available"},
     "off": {"uz": "yo‘q", "en": "not available"},
     "restart": {
@@ -153,6 +167,8 @@ async def run(
     lines += ["", t("docs")]
     ocr = services.ocr.status()
     office = services.office.status() if services.office else {"available": False}
+    worker = t("worker_on") if settings.document_worker else t("worker_off")
+    lines.append("  " + t("worker", state=worker))
     lines.append(f"  {t('ocr')}: {t('on') if ocr.get('available') else t('off')}")
     lines.append(f"  {t('office')}: {t('on') if office.get('available') else t('off')}")
 
