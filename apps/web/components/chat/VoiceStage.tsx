@@ -38,6 +38,9 @@ const storedVoiceLanguage = createStoredValue<VoiceLanguage | "">(
   "",
   (value): value is VoiceLanguage | "" => value === "" || value === "auto" || value === "uz" || value === "en" || value === "ru",
 );
+/** EZO greets aloud when the voice stage opens (once per page load); the owner can turn it off. */
+const storedGreeting = createStoredValue<"on" | "off">("ezo-voice-greeting", "on", (value): value is "on" | "off" => value === "on" || value === "off");
+let greetedThisPage = false;
 
 /**
  * Hands-free conversation with EZO: tap the robot, speak, hear the answer.
@@ -67,7 +70,7 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
   const [interpLine, setInterpLine] = useState<{ original: string; translated: string } | null>(null);
   // Server voice (VoiceStudio, OpenAI…) when the API has a provider; the browser otherwise.
   const fetchVoiceStatus = useCallback(() => api.voiceStatus(), []);
-  const { data: voiceStatus } = useApiData(fetchVoiceStatus);
+  const { data: voiceStatus, error: voiceStatusError } = useApiData(fetchVoiceStatus);
   const [serverFailed, setServerFailed] = useState(false);
   const serverFailedRef = useRef(false);
   const [canRecord] = useState(() => serverRecordingSupported() || speechRecognitionSupported());
@@ -280,6 +283,27 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
     };
   }, []);
 
+  // A short spoken greeting when the stage opens (the click that opened it allows audio).
+  const greeting = storedGreeting.useValue();
+  const [greetingLine, setGreetingLine] = useState<string | null>(null);
+  useEffect(() => {
+    // Wait for the voice status so the greeting uses the server voice when there is one.
+    if (greeting === "off" || greetedThisPage || (!voiceStatus && !voiceStatusError)) return;
+    greetedThisPage = true;
+    const turn = ++turnRef.current;
+    const line = m.voice.greeting.line;
+    void Promise.resolve()
+      .then(() => {
+        if (!mountedRef.current || turn !== turnRef.current) return;
+        setGreetingLine(line);
+        setPhase("speaking");
+        return speakReply(line, uiLanguage, voiceStatus ?? null);
+      })
+      .finally(() => {
+        if (mountedRef.current && turn === turnRef.current) setPhase("idle");
+      });
+  }, [greeting, m.voice.greeting.line, uiLanguage, voiceStatus, voiceStatusError]);
+
   const status = !supported
     ? m.voice.unsupported
     : phase === "listening"
@@ -392,6 +416,16 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
           <span className="block text-sky-100/60">{m.voice.interpreter.hint}</span>
         </span>
       </button>
+      <label className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-sky-100/10 px-3 py-2 text-xs text-sky-100">
+        <span>{m.voice.greeting.toggle}</span>
+        <input
+          type="checkbox"
+          data-testid="voice-greeting-toggle"
+          checked={greeting !== "off"}
+          onChange={(event) => storedGreeting.set(event.target.checked ? "on" : "off")}
+          className="h-4 w-4 accent-sky-300"
+        />
+      </label>
       <ClapRow clap={clap} />
       </details>
       <div className="absolute inset-0" data-testid="voice-scene"
@@ -424,6 +458,10 @@ export function VoiceStage({ session, onExit, offline = false }: { session: Sess
           <div className="pointer-events-auto w-full max-w-2xl text-center" data-testid="voice-interpretation">
             <p className="text-sm text-slate-400">{interpLine.original}</p>
             <p className="text-lg leading-relaxed text-amber-100 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]">{interpLine.translated}</p>
+          </div>
+        ) : !interp && !caption && greetingLine && phase !== "listening" ? (
+          <div className="w-full max-w-2xl text-center text-lg leading-relaxed text-slate-50 [text-shadow:0_1px_8px_rgba(0,0,0,0.8)]" data-testid="voice-greeting">
+            {greetingLine}
           </div>
         ) : !interp && caption && phase !== "listening" ? (
           <div

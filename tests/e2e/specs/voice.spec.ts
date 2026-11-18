@@ -6,6 +6,8 @@ import { expect, test } from "@playwright/test";
  */
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
+    // The greeting is tested on its own below; the other tests count EZO's replies.
+    if (!sessionStorage.getItem("ezo-test-greeting")) localStorage.setItem("ezo-voice-greeting", "off");
     const w = window as unknown as Record<string, unknown>;
     w.__ezoUtterances = ["Salom EZO, qalaysan?"];
     w.__ezoSpoken = [];
@@ -122,6 +124,37 @@ test("voice: «EZO, menga tarjimon bo'lib ber» interprets between two people, e
   await page.getByTestId("voice-interpreter-stop").click();
   await expect(page.getByTestId("voice-interpreter")).toHaveCount(0);
   await expect.poll(spokenNow).toContain("Tarjimon rejimi o‘chirildi.");
+});
+
+test("voice: EZO greets aloud once when the stage opens, and the greeting can be turned off", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("ezo-test-greeting", "1");
+    if (!localStorage.getItem("ezo-greeting-test-started")) {
+      localStorage.setItem("ezo-greeting-test-started", "1");
+      localStorage.setItem("ezo-voice-greeting", "on");
+    }
+  });
+  await page.goto("/");
+  await page.getByTestId("mode-voice").click();
+  const spokenNow = () => page.evaluate(() => (window as unknown as { __ezoSpoken: string[] }).__ezoSpoken);
+  await expect.poll(spokenNow).toEqual(["Salom! Men EZO. Gaplashish uchun menga bosing — yoki chapak chaling."]);
+  await expect(page.getByTestId("voice-greeting")).toContainText("Salom! Men EZO.");
+  // It does not start listening by itself.
+  await expect(page.getByTestId("voice-status")).toHaveText("Gaplashish uchun robotga bosing");
+
+  // Once per page: leaving and reopening the stage stays quiet.
+  await page.getByTestId("mode-text").click();
+  await page.getByTestId("mode-voice").click();
+  await page.waitForTimeout(500);
+  expect(await spokenNow()).toHaveLength(1);
+
+  // Turned off in the stage settings, a new visit is silent.
+  await page.getByTestId("voice-settings").locator(":scope > summary").click();
+  await page.getByTestId("voice-greeting-toggle").uncheck();
+  await page.reload();
+  await page.getByTestId("mode-voice").click();
+  await page.waitForTimeout(800);
+  expect(await spokenNow()).toEqual([]);
 });
 
 test("voice: the composer microphone opens voice mode", async ({ page }) => {

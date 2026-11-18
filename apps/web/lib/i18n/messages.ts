@@ -584,6 +584,10 @@ const uz = {
       copied: "Nusxalandi — egasiga yuboring",
       note: "Faqat raqamlar va so‘zlar: rasm, ovoz yoki yuz nuqtalari yo‘q.",
     },
+    greeting: {
+      line: "Salom! Men EZO. Gaplashish uchun menga bosing — yoki chapak chaling.",
+      toggle: "Ochilganda salomlashsin",
+    },
     interpreter: {
       start: "Tarjimon rejimi",
       badge: "Tarjimon: {a} ⇄ {b}",
@@ -1361,6 +1365,10 @@ const en: Messages = {
       copied: "Copied — send it to the owner",
       note: "Numbers and words only: no images, audio or face points.",
     },
+    greeting: {
+      line: "Hi! I'm EZO. Tap me to talk — or clap.",
+      toggle: "Greet me when the stage opens",
+    },
     interpreter: {
       start: "Interpreter mode",
       badge: "Interpreter: {a} ⇄ {b}",
@@ -2135,6 +2143,10 @@ const ru: Messages = {
       copy: "Скопировать отчёт",
       copied: "Скопировано — отправьте владельцу",
       note: "Только числа и слова: без изображений, звука и точек лица.",
+    },
+    greeting: {
+      line: "Привет! Я EZO. Нажмите на меня, чтобы поговорить, — или хлопните.",
+      toggle: "Приветствовать при открытии",
     },
     interpreter: {
       start: "Режим переводчика",
