@@ -32,6 +32,7 @@ LANGUAGE_MODES = (
     "job_interview",
     "travel",
     "business",
+    "exam",
 )
 SESSION_STATUSES = ("active", "completed", "abandoned")
 CEFR_LEVELS = ("A1", "A2", "B1", "B2", "C1", "C2")

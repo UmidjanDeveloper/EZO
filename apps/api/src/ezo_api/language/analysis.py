@@ -10,7 +10,10 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
-_WORD = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?")
+# Letters of any script (Cyrillic, Arabic, Korean, accented Latin…); Chinese and Japanese
+# characters count one each, since those languages do not separate words with spaces.
+_CJK = "\u3040-\u30ff\u3400-\u9fff"
+_WORD = re.compile(rf"[{_CJK}]|[^\W\d_{_CJK}]+(?:'[^\W\d_{_CJK}]+)?")
 _SENTENCE = re.compile(r"[.!?]+")
 # Hesitation and filler expressions (multi-word ones are counted as one filler).
 FILLERS = (

@@ -415,7 +415,7 @@ EZO’s presentation/story projects. It is AGPL-3.0 and will run as a separate s
 
 ### OpenCode — coding execution backend (evaluated, not installed)
 
-Evaluated as an optional, sandboxed backend for the future Developer Agent (Phase 9). It is not
+Evaluated as an optional, sandboxed backend for the Developer Agent (Phase 9; the agent itself now builds projects as files without running them). It is not
 installed, and it would never replace EzoCore or get unrestricted shell, file, network, Git or
 secret access. See [docs/OPENCODE_INTEGRATION_PLAN.md](docs/OPENCODE_INTEGRATION_PLAN.md).
 

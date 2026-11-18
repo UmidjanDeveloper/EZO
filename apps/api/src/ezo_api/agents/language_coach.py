@@ -17,6 +17,7 @@ discussed after the section or session, not after every sentence. Bands are alwa
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 
 from sqlalchemy import select
@@ -25,13 +26,20 @@ from ezo_api.agents.base import Agent, AgentPlan, AgentTurn, GatherContext, Gath
 from ezo_api.agents.catalog import AGENTS
 from ezo_api.agents.llm import complete, extract_json, sources_block
 from ezo_api.core.intent import Intent
+from ezo_api.core.text import normalize
 from ezo_api.db.base import utcnow
 from ezo_api.db.models import LanguageSession, LanguageTurn, Message
 from ezo_api.knowledge.retrieval.keyword import has_searchable_documents
 from ezo_api.knowledge.retrieval.sources import number_sources
+from ezo_api.language import exam
 from ezo_api.language import service as lang
 from ezo_api.language.analysis import describe
-from ezo_api.language.assessment import ASSESSMENT_SYSTEM, Assessment, validate
+from ezo_api.language.assessment import (
+    ASSESSMENT_SYSTEM,
+    CEFR_ASSESSMENT_SYSTEM,
+    Assessment,
+    validate,
+)
 from ezo_api.language.ielts import IeltsState, advance
 from ezo_api.language.modes import (
     CEFR_GUIDE,
@@ -42,6 +50,7 @@ from ezo_api.language.modes import (
     detect_mode,
 )
 from ezo_api.language.report import build_report, report_title
+from ezo_api.language.targets import LANGUAGE_ACTIVITY, detect_practice_language, language_name
 from ezo_api.providers.router import AllProvidersFailedError, StreamInterruptedError
 from ezo_api.providers.types import ChatMessage
 
@@ -50,9 +59,11 @@ logger = logging.getLogger(__name__)
 TRANSCRIPT_CHARS = 30_000
 LANGUAGE_NAMES = {"uz": "Uzbek (Latin script)", "en": "English", "ru": "Russian"}
 
-COACH_INSTRUCTIONS = """Role: EZO's language coach for English practice.
-- Practice turns are in ENGLISH (the language being learned), even when the learner writes in Uzbek or Russian; this overrides the general reply-language rule for practice. Explanations, feedback and progress answers are in the learner's own language.
-- Never call yourself an official IELTS examiner and never give an "official" score. In IELTS mode you are an "IELTS-style examiner simulator" and any band is an "estimated band".
+_ACTIVITY = re.compile(LANGUAGE_ACTIVITY)
+
+COACH_INSTRUCTIONS = """Role: EZO's language coach and speaking examiner simulator (English by default; EZO's notes name the practised language).
+- Practice and exam turns are in THE PRACTISED LANGUAGE named in EZO's notes, even when the learner writes in Uzbek or Russian; this overrides the general reply-language rule for practice. Explanations, feedback and progress answers are in the learner's own language.
+- Never call yourself an official examiner and never give an "official" score or certificate. In IELTS mode you are an "IELTS-style examiner simulator" and any band is an "estimated band"; in exam mode you are EZO's exam simulator and the level is an estimate.
 - Do NOT correct every mistake during practice: respond naturally and keep the conversation going. Correct briefly only if a mistake makes the meaning unclear. Detailed feedback comes after the section or session.
 - One question at a time. Keep your turns short so the learner speaks more than you.
 - Follow EZO's notes below exactly (mode, level, the next question, recurring weak points, assessment results)."""
@@ -61,6 +72,12 @@ OFFLINE_NOTE = (
     "No AI provider is connected: EZO cannot run a practice conversation or estimate bands. "
     "Tell the user briefly; measured numbers from past sessions are still available."
 )
+
+
+def uses_cefr(session: LanguageSession) -> bool:
+    """The exam simulator and every language but English are assessed by CEFR level (EZO's
+    0–9 criteria scale), never with IELTS bands."""
+    return session.mode == "exam" or (session.language or "en") != "en"
 
 
 class LanguageCoachAgent(Agent):
@@ -112,9 +129,23 @@ class LanguageCoachAgent(Agent):
             return gathered
 
         mode = detect_mode(turn.text)
-        starting = active is None or (mode is not None and mode != active.mode)
+        wanted = detect_practice_language(turn.text)
+        norm = normalize(turn.text)
+        switching_language = (
+            active is not None
+            and wanted is not None
+            and wanted != active.language
+            # A short command ("endi nemis tilida gaplashamiz"), not a learner's answer that
+            # happens to mention a language.
+            and len(norm.split()) <= 12
+            and (mode is not None or bool(_ACTIVITY.search(norm)))
+        )
+        starting = (
+            active is None or (mode is not None and mode != active.mode) or switching_language
+        )
         if starting:
-            active = await self._start(ctx, gathered, mode)
+            practice = "en" if mode == "ielts" else (wanted or "en")
+            active = await self._start(ctx, gathered, mode, practice)
         else:
             assert active is not None
             await self._record_coach_reply(ctx, active)
@@ -133,7 +164,20 @@ class LanguageCoachAgent(Agent):
             }
         )
 
-        if active.mode == "ielts":
+        name = language_name(active.language)
+        gathered.notes.append(
+            f"Practised language: {name}. Ask and answer the practice or exam turns in {name}."
+        )
+        if active.mode == "exam":
+            meta = dict(active.meta or {})
+            exam_step = exam.advance(meta, learner_answered=not starting)
+            active.meta = meta
+            if exam_step.finished:
+                gathered.notes.append(exam_step.instruction)
+                await self._finish(ctx, gathered, active)
+                return gathered
+            gathered.notes.append(f"{exam.EXAMINER_GUIDE}\n{exam_step.instruction}")
+        elif active.mode == "ielts":
             state = IeltsState.from_dict((active.meta or {}).get("ielts"))
             step = advance(state, learner_answered=not starting)
             active.meta = {**(active.meta or {}), "ielts": state.to_dict()}
@@ -144,16 +188,17 @@ class LanguageCoachAgent(Agent):
                 return gathered
             gathered.notes.append(f"IELTS-style test, Part {step.part}. {step.instruction}")
         else:
-            gathered.notes.append(MODE_GUIDE.get(active.mode, MODE_GUIDE["free_conversation"]))
+            guide = MODE_GUIDE.get(active.mode) or MODE_GUIDE["free_conversation"]
+            gathered.notes.append(guide.replace("English", name))
         if active.cefr_target:
-            gathered.notes.append(CEFR_GUIDE[active.cefr_target])
+            gathered.notes.append(CEFR_GUIDE[active.cefr_target].replace("English", name))
         await db.flush()
         return gathered
 
     # --- practice ---------------------------------------------------------------------------
 
     async def _start(
-        self, ctx: GatherContext, gathered: Gathered, mode: str | None
+        self, ctx: GatherContext, gathered: Gathered, mode: str | None, practice: str = "en"
     ) -> LanguageSession:
         tools = ctx.tools
         db = tools.session
@@ -169,16 +214,20 @@ class LanguageCoachAgent(Agent):
             mode=mode or "free_conversation",
             cefr=cefr,
             ui_language=ctx.turn.language,
+            language=practice,
         )
-        recurring = await lang.recurring_mistakes(db, tools.user_id, limit=3)
+        recurring = (
+            await lang.recurring_mistakes(db, tools.user_id, limit=3) if practice == "en" else []
+        )
         gathered.notes.append(
             f"A new {session.mode.replace('_', ' ')} practice session started"
             + (f" (target level {cefr})" if cefr else "")
-            + ". Greet the learner in one short sentence in their language, then continue in English."
+            + f" in {language_name(practice)}"
+            + f". Greet the learner in one short sentence in their language, then continue in {language_name(practice)}."
             + (
                 ""
                 if mode
-                else " No specific mode was asked for: start a friendly free conversation and mention in one line that IELTS-style speaking, job interview, travel or grammar practice are also possible."
+                else " No specific mode was asked for: start a friendly free conversation and mention in one line that an exam simulator (CEFR level), IELTS-style speaking, job interview, travel or grammar practice are also possible, in English, Russian, German, French, Turkish, Korean and other languages."
             )
         )
         if recurring:
@@ -240,9 +289,9 @@ class LanguageCoachAgent(Agent):
                 completion = await complete(
                     tools.services.router,
                     "reasoning",
-                    system=ASSESSMENT_SYSTEM.replace(
-                        "{feedback_language}", LANGUAGE_NAMES.get(ui_language, "English")
-                    ),
+                    system=(CEFR_ASSESSMENT_SYSTEM if uses_cefr(session) else ASSESSMENT_SYSTEM)
+                    .replace("{feedback_language}", LANGUAGE_NAMES.get(ui_language, "English"))
+                    .replace("{practice_language}", language_name(session.language)),
                     messages=[ChatMessage("user", prompt)],
                     max_output_tokens=6_000,
                     language=ui_language,
@@ -260,6 +309,10 @@ class LanguageCoachAgent(Agent):
             learner_words=metrics.words,
             spoken_share=lang.spoken_share(turns),
         )
+        if uses_cefr(session):
+            # An exam or a language other than English: the criteria are on EZO's 0–9 scale and the result is the
+            # CEFR estimate; no "band" is shown.
+            assessment.band_low = assessment.band_high = None
         if data is None:
             assessment.notes.append(
                 "No AI assessment was available (no provider or the provider failed), so only measured numbers are given."
@@ -328,7 +381,12 @@ class LanguageCoachAgent(Agent):
     @staticmethod
     def _results_note(session: LanguageSession, assessment: Assessment, metrics_text: str) -> str:
         s = assessment.scores
-        if assessment.band_low is not None and assessment.band_high is not None:
+        if uses_cefr(session):
+            band_line = (
+                f"{language_name(session.language)} — CEFR level estimate (simulator, not an "
+                "official exam); the criteria below are on EZO's 0–9 scale, not IELTS bands."
+            )
+        elif assessment.band_low is not None and assessment.band_high is not None:
             band = (
                 f"{assessment.band_low:g}"
                 if assessment.band_low == assessment.band_high

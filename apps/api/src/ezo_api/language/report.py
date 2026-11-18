@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (label text is kept on one line each)
 """The session report saved as an artifact (Markdown → DOCX + PDF), in the learner's language."""
 
 from __future__ import annotations
@@ -5,11 +6,15 @@ from __future__ import annotations
 from ezo_api.db.models import LanguageSession
 from ezo_api.language.analysis import TextMetrics, describe
 from ezo_api.language.assessment import Assessment
+from ezo_api.language.targets import PRACTICE_LANGUAGES
 
 LABELS: dict[str, dict[str, str]] = {
     "en": {
         "ielts_title": "IELTS-style Speaking Practice",
         "title": "English Practice Session",
+        "lang_title": "{lang} practice session",
+        "exam_title": "{lang} speaking exam (simulator)",
+        "cefr_disclaimer": "Simulator result: the CEFR level and the 0–9 criteria scores are EZO's estimates, not an official exam or certificate.",
         "disclaimer": "Simulator result: all bands are estimates, not an official IELTS score.",
         "range": "Estimated band range",
         "no_band": "No band estimate",
@@ -34,6 +39,9 @@ LABELS: dict[str, dict[str, str]] = {
     "uz": {
         "ielts_title": "IELTS uslubidagi speaking mashg'uloti",
         "title": "Ingliz tili mashg'uloti",
+        "lang_title": "{lang} — til mashg'uloti",
+        "exam_title": "{lang} — og'zaki imtihon (simulyator)",
+        "cefr_disclaimer": "Simulyator natijasi: CEFR darajasi va 0–9 mezon ballari EZO'ning taxmini, rasmiy imtihon yoki sertifikat emas.",
         "disclaimer": "Simulyator natijasi: barcha ballar taxminiy, rasmiy IELTS balli emas.",
         "range": "Taxminiy band oralig'i",
         "no_band": "Band baholanmadi",
@@ -58,6 +66,9 @@ LABELS: dict[str, dict[str, str]] = {
     "ru": {
         "ielts_title": "Практика IELTS Speaking (симулятор)",
         "title": "Занятие по английскому языку",
+        "lang_title": "{lang}: языковая практика",
+        "exam_title": "{lang}: устный экзамен (симулятор)",
+        "cefr_disclaimer": "Результат симулятора: уровень CEFR и баллы 0–9 — оценка EZO, не официальный экзамен и не сертификат.",
         "disclaimer": "Результат симулятора: все баллы ориентировочные, не официальный балл IELTS.",
         "range": "Ориентировочный диапазон",
         "no_band": "Балл не оценивался",
@@ -88,7 +99,17 @@ def _band(value: float | None) -> str:
 
 def report_title(language_session: LanguageSession, ui_language: str) -> str:
     labels = LABELS.get(ui_language, LABELS["en"])
-    title = labels["ielts_title"] if language_session.mode == "ielts" else labels["title"]
+    code = language_session.language or "en"
+    lang = PRACTICE_LANGUAGES.get(code, PRACTICE_LANGUAGES["en"])[1]
+    lang = lang[:1].upper() + lang[1:]
+    if language_session.mode == "ielts":
+        title = labels["ielts_title"]
+    elif language_session.mode == "exam":
+        title = labels["exam_title"].format(lang=lang)
+    elif code != "en":
+        title = labels["lang_title"].format(lang=lang)
+    else:
+        title = labels["title"]
     date = language_session.started_at.strftime("%Y-%m-%d")
     return f"{title} — {date}"
 
@@ -101,7 +122,9 @@ def build_report(
 ) -> str:
     t = LABELS.get(ui_language, LABELS["en"])
     s = assessment.scores
-    lines = [f"# {report_title(language_session, ui_language)}", "", f"*{t['disclaimer']}*", ""]
+    cefr = language_session.mode == "exam" or (language_session.language or "en") != "en"
+    disclaimer = t["cefr_disclaimer"] if cefr else t["disclaimer"]
+    lines = [f"# {report_title(language_session, ui_language)}", "", f"*{disclaimer}*", ""]
     if assessment.band_low is not None and assessment.band_high is not None:
         band = (
             f"{assessment.band_low:g}"
@@ -109,7 +132,7 @@ def build_report(
             else f"{assessment.band_low:g}–{assessment.band_high:g}"
         )
         lines.append(f"**{t['range']}: {band}**")
-    else:
+    elif not cefr:
         lines.append(f"**{t['no_band']}**")
     if assessment.cefr_estimate:
         lines.append(f"{t['level']}: {assessment.cefr_estimate}")
@@ -125,7 +148,7 @@ def build_report(
     lines += [
         f"## {t['criteria']}",
         "",
-        "| | Band |",
+        "| | 0–9 |" if cefr else "| | Band |",
         "|---|---|",
         f"| {t['fc']} | {_band(s.get('fluency_coherence'))} |",
         f"| {t['lr']} | {_band(s.get('lexical_resource'))} |",
