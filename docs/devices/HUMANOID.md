@@ -35,6 +35,11 @@ copied from the reference. What changed:
   renders below were taken with the glow pass forced on, as a GPU shows it); stronger veins and face light; a denser crown spray; a cluster
   of sparks on the sternum where the veins meet.
 
+- filaments (2026-11-18): neighbouring points of each contour, vein and near mountain ridge
+  are also joined by 1 px line segments (one extra indexed draw, no extra points), so the
+  head and body read as continuous scan lines like the owner's reference instead of dotted
+  rows; a brighter near range sits beside the shoulders; distant ranges stay as dust.
+
 | Desktop 1280×800 | Phone (iPhone 13 profile) |
 |---|---|
 | ![desktop](img/humanoid-bust-desktop.png) | ![phone](img/humanoid-bust-phone.png) |
@@ -48,7 +53,7 @@ The package is framework-free TypeScript using WebGL 1, with no dependencies, so
 in Next.js, Electron and the Android WebView.
 
 **Figure** (`figure.ts`)
-- Built once: 45,488 points at high quality and 19,629 at low quality on the voice stage
+- Built once: 46,058 points at high quality and 19,654 at low quality on the voice stage
   (holographic style; the Performance table below is from the earlier 49,034 / 18,630 figure), made of:
   - head contour rings shaped by a head profile (crown, temples, cheekbones, jaw, chin) and
     a light face relief that the lines bend over;

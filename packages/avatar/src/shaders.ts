@@ -45,6 +45,7 @@ uniform float uPx;
 uniform float uGlowPx;
 uniform float uRef;
 uniform float uGlow;
+uniform float uLine;
 uniform float uBlink;
 uniform float uDroop;
 uniform float uEyeX;
@@ -54,6 +55,7 @@ uniform float uMouth;
 uniform float uSmile;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vLine;
 ${TURN}
 const vec3 KEY_DIR = vec3(-0.42, 0.55, 0.72); // soft key light from the upper left, in front
 const vec3 BLUE = vec3(0.12, 0.48, 1.0);
@@ -219,6 +221,9 @@ void main() {
   gl_PointSize = max(1.0, size * px * (uRef / clip.w));
   vColor = col;
   vAlpha = clamp(alpha, 0.0, 1.0);
+  // Line pass: the same points joined into 1 px filaments along their contour.
+  vLine = uLine;
+  if (uLine > 0.5) vAlpha = clamp(alpha * (kind > 5.5 && kind < 6.5 ? 0.26 : 0.62), 0.0, 1.0);
   // Glow pass: a share of the points drawn again as wide, faint sprites (a cheap bloom).
   if (uGlow > 0.5) {
     bool skip = seed > 0.2 || (kind > 4.5 && kind < 5.5) || (kind > 5.5 && kind < 6.5 && warm < 0.5);
@@ -237,7 +242,12 @@ export const POINT_FRAGMENT = /* glsl */ `
 precision mediump float;
 varying vec3 vColor;
 varying float vAlpha;
+varying float vLine;
 void main() {
+  if (vLine > 0.5) {
+    gl_FragColor = vec4(vColor * vAlpha, vAlpha);
+    return;
+  }
   vec2 c = gl_PointCoord * 2.0 - 1.0;
   float r2 = dot(c, c);
   if (r2 > 1.0) discard;
