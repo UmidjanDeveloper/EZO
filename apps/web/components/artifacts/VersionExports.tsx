@@ -45,13 +45,15 @@ export function VersionExports({
     .sort((a, b) => Number(PREVIEW.exec(a.name)?.[1]) - Number(PREVIEW.exec(b.name)?.[1]));
   const qa = version.generation_metadata["qa"] as { passed?: boolean; errors?: number } | undefined;
   const names = m.artifacts.exportNames as Record<string, string>;
+  const site = version.exports.find((e) => e.name === "site");
+  const projectFiles = projectFileList(version.generation_metadata);
 
   async function download(name: string) {
     const { blob, filename } = await api.downloadExport(artifactId, version.version_number, name);
     saveBlob(blob, filename);
   }
 
-  if (!files.length && !previews.length) return null;
+  if (!files.length && !previews.length && !projectFiles.length) return null;
   return (
     <div className="mt-3 flex flex-col gap-2" data-testid="artifact-exports">
       {files.length ? (
@@ -75,6 +77,20 @@ export function VersionExports({
           {qa.passed ? m.artifacts.qaPassed : f(m.artifacts.qaIssues, { n: qa.errors ?? 0 })}
         </p>
       ) : null}
+      {projectFiles.length ? (
+        <details className="text-xs" data-testid="project-files">
+          <summary className="cursor-pointer text-ink-faint">
+            {f(m.artifacts.projectFiles, { n: projectFiles.length })}
+          </summary>
+          <ul className="mt-1 grid gap-0.5 font-mono text-ink-soft sm:grid-cols-2">
+            {projectFiles.map((path) => (
+              <li key={path}>{path}</li>
+            ))}
+          </ul>
+          <p className="mt-1 text-ink-faint">{m.artifacts.notRun}</p>
+        </details>
+      ) : null}
+      {site ? <SitePreview artifactId={artifactId} version={version.version_number} /> : null}
       {info && (info.placeholder || info.madeBy) ? (
         <p className={`text-xs ${info.placeholder ? "text-danger" : "text-ink-faint"}`} data-testid="image-origin">
           {info.placeholder ? m.artifacts.placeholder : f(m.artifacts.madeBy, { who: info.madeBy ?? "" })}
@@ -88,6 +104,57 @@ export function VersionExports({
           single={isImage}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** Paths of a project built by the Developer Agent ([] for any other artifact). */
+export function projectFileList(meta: Record<string, unknown>): string[] {
+  const files = meta["files"];
+  if (!Array.isArray(files)) return [];
+  return files
+    .map((file) => (file && typeof file === "object" ? (file as { path?: unknown }).path : null))
+    .filter((path): path is string => typeof path === "string")
+    .slice(0, 60);
+}
+
+/**
+ * A built website, shown in a frame that may not run scripts, submit forms or reach this
+ * page (an empty sandbox gives it an opaque origin): generated code never runs with the
+ * owner's session. The downloadable one-file version runs fully in the user's own browser.
+ */
+function SitePreview({ artifactId, version }: { artifactId: string; version: number }) {
+  const { m } = useI18n();
+  const [html, setHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { blob } = await api.downloadExport(artifactId, version, "site");
+        const text = await blob.text();
+        if (!cancelled) setHtml(text);
+      } catch {
+        // The file stays downloadable; a missing preview needs no error message.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [artifactId, version]);
+
+  if (html === null) return null;
+  return (
+    <div>
+      <p className="mb-1 text-xs text-ink-faint">{m.artifacts.sitePreview}</p>
+      <iframe
+        title={m.artifacts.preview}
+        sandbox=""
+        srcDoc={html}
+        referrerPolicy="no-referrer"
+        className="h-96 w-full rounded-lg border border-line bg-white"
+        data-testid="site-preview"
+      />
     </div>
   );
 }

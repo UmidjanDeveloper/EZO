@@ -70,8 +70,10 @@ AGENTS: dict[Intent, AgentSpec] = {
             "developer",
             Intent.DEVELOPER,
             {"uz": "Dasturchi agent", "en": "Developer Agent", "ru": "Агент-разработчик"},
-            "Repository understanding, debugging, tests, diffs and pull requests.",
-            maturity="planned",
+            "Builds websites, programs and bots as downloadable projects (ZIP, one-file "
+            "website with preview) and changes them on request; explains and debugs code. "
+            "Generated code is not run by EZO.",
+            maturity="alpha",
             phase="Phase 9",
             context_mode="technical",
             route="coding",

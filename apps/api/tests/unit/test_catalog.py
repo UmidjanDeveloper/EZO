@@ -22,6 +22,7 @@ def test_available_agents_are_exactly_the_implemented_ones() -> None:
         "legal_research",
         "knowledge_os",
         "district",
+        "developer",
     }
     registry = AgentRegistry()
     for spec in AGENTS.values():

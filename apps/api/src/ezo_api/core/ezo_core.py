@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.academic.requests import citation_request, wants_research_plan
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
+from ezo_api.agents.developer import wants_project_edit
 from ezo_api.agents.district import wants_district
 from ezo_api.agents.learning import wants_learning
 from ezo_api.agents.references import latest_artifact
@@ -226,6 +227,17 @@ async def _names_district_project(session: AsyncSession, user_id: uuid.UUID, tex
     return bool(names) and wants_district(text, names)
 
 
+async def _latest_artifact_is_project(
+    session: AsyncSession, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> bool:
+    latest = await latest_artifact(session, user_id, conversation_id, ARTIFACT_TYPES)
+    return (
+        latest is not None
+        and latest.artifact_type == "code"
+        and (latest.meta or {}).get("action") == "code_project"
+    )
+
+
 async def _latest_artifact_is_image(
     session: AsyncSession, user_id: uuid.UUID, conversation_id: uuid.UUID
 ) -> bool:
@@ -247,6 +259,7 @@ ARTIFACT_TOOLS = frozenset(
         "pdf_tool",
         "sheet_ops",
         "extract_tables",
+        "build_project",
     }
 )
 
@@ -327,6 +340,14 @@ class EzoCore:
             ):
                 # "Fonini ko'k qil" right after an image: a change to that image.
                 intent = IntentResult(Intent.VISUAL, 1.0, ("image_follow_up",), intent.scores)
+            elif (
+                intent.intent == Intent.GENERAL
+                and turn.forced_agent is None
+                and wants_project_edit(turn.text)
+                and await _latest_artifact_is_project(session, user.id, conversation.id)
+            ):
+                # "Tugmani ko'k qil", "kontakt sahifasini qo'sh" right after a built website.
+                intent = IntentResult(Intent.DEVELOPER, 1.0, ("project_follow_up",), intent.scores)
             elif (
                 intent.intent
                 in (

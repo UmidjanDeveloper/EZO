@@ -21,3 +21,14 @@ describe("imageInfo", () => {
     expect(imageInfo({})).toEqual({ placeholder: false, madeBy: null });
   });
 });
+
+describe("projectFileList", () => {
+  it("lists the paths of a built project and nothing for other artifacts", async () => {
+    const { projectFileList } = await import("./VersionExports");
+    expect(projectFileList({ files: [{ path: "index.html", size: 10 }, { path: "style.css" }, { size: 3 }] })).toEqual([
+      "index.html",
+      "style.css",
+    ]);
+    expect(projectFileList({ qa: { passed: true } })).toEqual([]);
+  });
+});

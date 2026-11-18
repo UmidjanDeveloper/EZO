@@ -174,3 +174,32 @@ Muhim: Eskiz SMS matnlarini moderatsiya qiladi — ogohlantirish shablonini Eski
 oldindan tasdiqlating, aks holda Eskiz rad etadi va kartada shu xato ko‘rinadi.
 Telefon raqamlar AI modelga yuborilmaydi; ular faqat SMS uchun saqlanadi.
 `.env` o‘zgargach: `docker compose up -d --force-recreate api`.
+## Dasturchi agent, ko‘p tilli imtihonchi va kutubxona o‘rganish (2026-11-18)
+
+**Sayt yoki dastur tuzish.** Chatga oddiy so‘z bilan yozing:
+
+- «Menga kafe uchun website tuzib ber»
+- «Python’da kalkulyator dasturi yozib ber»
+- «Telegram bot yozib ber, ob-havoni aytsin»
+
+EZO loyihaning barcha fayllarini yozadi (README’da ishga tushirish qadamlari bilan) va
+ularni ZIP qilib saqlaydi — javob ostida karta chiqadi. Sayt bo‘lsa, kartada yana
+**«Sayt (bitta HTML fayl)»** bor: yuklab oling va brauzerda oching — to‘liq ishlaydi.
+«Yaratilganlar» sahifasida saytning ko‘rinishi va fayllar ro‘yxati chiqadi (bu oynada
+sayt skriptlari xavfsizlik uchun ishlamaydi).
+
+O‘zgartirish uchun shu suhbatda yozing: «tugmani ko‘k rangga o‘zgartir», «kontakt sahifasini
+qo‘sh» — EZO shu loyihaning yangi versiyasini saqlaydi (eski versiya qoladi). EZO kodni
+o‘zi ishga tushirmaydi: xato chiqsa, xato matnini yuboring.
+
+**Til imtihonchisi.** «Rus tilidan imtihon ol», «nemis tili bo‘yicha meni sinab ko‘r»,
+«ingliz tilidan examiner bo‘l», «test my French». Imtihon 3 qismdan iborat (suhbat,
+tasvirlash, muhokama; ~6 savol), oxirida CEFR darajasi (A1–C2), xatolar va tavsiyalar
+bilan hisobot fayli chiqadi. «tugat» desangiz, erta yakunlanadi. Tillar: ingliz, rus,
+nemis, fransuz, ispan, italyan, turk, arab, koreys, xitoy, yapon, qozoq, portugal,
+o‘zbek. Bu simulyator: rasmiy imtihon yoki sertifikat emas.
+
+**Kutubxonani o‘rganish.** Endi havola shart emas: «fastapi kutubxonasini o‘rgan»,
+«npm axios paketini o‘rgan», «pallets/flask repozitoriyasini o‘rgan». EZO hujjatlarni
+o‘qib, bilim kutubxonasiga qo‘shadi va keyingi savollarda shundan foydalanadi
+(«Bilim» sahifasida holati ko‘rinadi). Hech narsa o‘rnatilmaydi va ishga tushirilmaydi.

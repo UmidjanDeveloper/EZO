@@ -44,6 +44,27 @@ Rules:
 Reply with ONLY one JSON object:
 {{"fluency_coherence": {{"band": number|null, "evidence": str}}, "lexical_resource": {{...}}, "grammatical_range_accuracy": {{...}}, "pronunciation": {{"band": number|null, "evidence": str}}, "cefr_estimate": "A1"|"A2"|"B1"|"B2"|"C1"|"C2"|null, "strengths": [str], "weaknesses": [str], "mistakes": [{{"category": str, "original": str, "correction": str, "explanation": str, "severity": "minor"|"major"}}], "better_sentences": [{{"original": str, "improved": str}}], "vocabulary": [{{"term": str, "meaning": str, "example": str}}], "practice_target": str, "summary": str}}"""
 
+# Any practice language and EZO's exam simulator: CEFR level plus the same three criteria on
+# EZO's own 0–9 scale (kept in the same fields so progress charts work for every language).
+CEFR_ASSESSMENT_SYSTEM = f"""You are EZO's language assessor for a speaking practice / exam SIMULATOR in {{practice_language}} (not an official exam; every result is an estimate).
+Estimate the learner's CEFR level (A1–C2) in {{practice_language}} from the evidence, and score three criteria on EZO's 0–9 scale (half points allowed; roughly A1≈2, A2≈3.5, B1≈5, B2≈6.5, C1≈8, C2≈9):
+- fluency_coherence: speaking at length, logical order, linking words, staying on topic.
+- lexical_resource: range and precision of vocabulary, collocations, paraphrasing.
+- grammatical_range_accuracy: variety of structures and how often errors occur (for {{practice_language}}: e.g. cases, gender, aspect, particles, word order, as relevant).
+- pronunciation: return null unless told the session was spoken; even then only a cautious transcript-assisted estimate.
+
+Rules:
+- Judge ONLY the learner's turns. Base every score on evidence you can quote.
+- Use the computed measurements given (they are exact for the transcript); do not contradict them.
+- Mistakes: quote the learner's exact words in "original" (character for character), give a corrected version, a one-sentence explanation and a category from: {", ".join(MISTAKE_CATEGORIES)} ("other" for language-specific errors such as cases or gender). Severity "major" only if it blocks or changes meaning. Do not list a "mistake" that is actually correct.
+- Strengths and weaknesses: concrete and specific to this learner.
+- Better sentences: rewrite 2–4 of the learner's own sentences at a slightly higher level.
+- Vocabulary: 3–6 useful words or collocations for the topics discussed, with meaning and an example.
+- Practice target: one concrete thing to practise next.
+- Write strengths, weaknesses, explanations, summary and practice target in {{feedback_language}}; keep quotes, corrections and examples in {{practice_language}}.
+Reply with ONLY one JSON object:
+{{"fluency_coherence": {{"band": number|null, "evidence": str}}, "lexical_resource": {{...}}, "grammatical_range_accuracy": {{...}}, "pronunciation": {{"band": number|null, "evidence": str}}, "cefr_estimate": "A1"|"A2"|"B1"|"B2"|"C1"|"C2"|null, "strengths": [str], "weaknesses": [str], "mistakes": [{{"category": str, "original": str, "correction": str, "explanation": str, "severity": "minor"|"major"}}], "better_sentences": [{{"original": str, "improved": str}}], "vocabulary": [{{"term": str, "meaning": str, "example": str}}], "practice_target": str, "summary": str}}"""
+
 CRITERIA = ("fluency_coherence", "lexical_resource", "grammatical_range_accuracy")
 CEFR = ("A1", "A2", "B1", "B2", "C1", "C2")
 
