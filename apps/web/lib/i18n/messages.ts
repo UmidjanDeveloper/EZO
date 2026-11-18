@@ -68,6 +68,10 @@ const uz = {
       "Eslab qol: men qisqa va aniq javoblarni yoqtiraman",
     ],
     thinking: "EZO o‘ylamoqda…",
+    keyRejectedTitle: "AI kaliti rad etildi",
+    keyFormatTitle: "AI kaliti noto‘g‘ri ko‘rinishda",
+    keyProblemBody:
+      "Shu sababli EZO javob bera olmayapti. .env faylida Gemini kaliti (aistudio.google.com/apikey, «AIza…» bilan boshlanadi) yoki OpenAI kaliti («sk-…») bo‘lsin, keyin: docker compose up -d --force-recreate api",
     offlineTitle: "Oflayn rejim",
     offlineBody:
       "AI provayder ulanmagan. Loyiha ildizidagi .env fayliga API kalitini yozing va EZO’ni qayta ishga tushiring.",
@@ -827,6 +831,10 @@ const en: Messages = {
       "Remember that I prefer short, precise answers",
     ],
     thinking: "EZO is thinking…",
+    keyRejectedTitle: "The AI key was rejected",
+    keyFormatTitle: "The AI key does not look right",
+    keyProblemBody:
+      "EZO cannot answer until this is fixed. Put a Gemini key (aistudio.google.com/apikey, starts with “AIza…”) or an OpenAI key (“sk-…”) in .env, then run: docker compose up -d --force-recreate api",
     offlineTitle: "Offline mode",
     offlineBody: "No AI provider is connected. Add an API key to the .env file in the project root and restart EZO.",
     errorTitle: "No reply",
@@ -1582,6 +1590,10 @@ const ru: Messages = {
       "Запомни: я предпочитаю короткие и точные ответы",
     ],
     thinking: "EZO думает…",
+    keyRejectedTitle: "Ключ AI отклонён",
+    keyFormatTitle: "Ключ AI выглядит неправильно",
+    keyProblemBody:
+      "Пока это не исправлено, EZO не может отвечать. Укажите в .env ключ Gemini (aistudio.google.com/apikey, начинается с «AIza…») или ключ OpenAI («sk-…»), затем: docker compose up -d --force-recreate api",
     offlineTitle: "Офлайн-режим",
     offlineBody: "AI-провайдер не подключён. Добавьте API-ключ в файл .env в корне проекта и перезапустите EZO.",
     errorTitle: "Ответ не получен",

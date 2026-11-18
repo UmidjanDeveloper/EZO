@@ -14,7 +14,7 @@ from ezo_api.api.serializers import user_out
 from ezo_api.db.models import AgentRun, User
 from ezo_api.maturity import FEATURES
 from ezo_api.memory.consent import apply_consent_change
-from ezo_api.providers.registry import KNOWN_PROVIDERS
+from ezo_api.providers.registry import KNOWN_PROVIDERS, key_warnings
 from ezo_api.schemas.api import (
     AgentInfo,
     AgentRunOut,
@@ -53,6 +53,7 @@ async def health(response: Response, services: ServicesDep, session: SessionDep)
 @router.get("/status", dependencies=limited)
 async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> SystemStatus:
     router_ = services.router
+    warnings = key_warnings(services.settings)
     providers = [
         ProviderStatus(
             name=name,
@@ -61,6 +62,8 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
             capabilities=sorted(router_.providers[name].capabilities)
             if name in router_.providers
             else [],
+            key_warning=warnings.get(name) if name in router_.providers else None,
+            last_result=router_.health.get(name),
         )
         for name, display in KNOWN_PROVIDERS.items()
     ]
