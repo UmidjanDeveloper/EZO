@@ -2,7 +2,7 @@
 
 import type { KnowledgeLibrary } from "@ezo/shared";
 import { Badge, cn, Spinner } from "@ezo/ui";
-import { AudioLines, BookOpen, ChevronDown, FolderKanban, MessageSquare, WifiOff, X } from "lucide-react";
+import { AudioLines, BookOpen, ChevronDown, FolderKanban, KeyRound, MessageSquare, WifiOff, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
@@ -27,6 +27,14 @@ type Mode = "text" | "voice";
 export function ChatView({ conversationId, projectId }: ChatViewProps) {
   const { m, f } = useI18n();
   const { status } = useApp();
+  // A configured key the provider rejected, or one that does not look like a key it issues.
+  const keyProblem = (() => {
+    const configured = status?.providers.filter((p) => p.configured) ?? [];
+    const rejected = configured.filter((p) => p.last_result === "auth");
+    const odd = configured.filter((p) => p.key_warning && p.last_result !== "ok");
+    const shown = rejected.length ? rejected : odd;
+    return shown.length ? { rejected: rejected.length > 0, names: shown.map((p) => p.display_name).join(", ") } : null;
+  })();
   const session = useChatSession({ conversationId, projectId });
   const {
     title,
@@ -266,6 +274,24 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
           <p>
             <span className="font-medium">{m.chat.offlineTitle}.</span>{" "}
             <span className="text-ink-muted">{m.chat.offlineBody}</span>
+          </p>
+        </div>
+      ) : null}
+
+      {keyProblem ? (
+        <div
+          className="mx-3 flex items-start gap-2 rounded-xl border border-danger/40 bg-danger/5 px-4 py-2.5 text-sm sm:mx-auto sm:w-full sm:max-w-3xl"
+          data-testid="key-problem-banner"
+          role="alert"
+        >
+          <KeyRound size={16} className="mt-0.5 shrink-0 text-danger" />
+          <p>
+            <span className="font-medium">
+              {keyProblem.rejected ? m.chat.keyRejectedTitle : m.chat.keyFormatTitle}
+              {" — "}
+              {keyProblem.names}.
+            </span>{" "}
+            <span className="text-ink-muted">{m.chat.keyProblemBody}</span>
           </p>
         </div>
       ) : null}

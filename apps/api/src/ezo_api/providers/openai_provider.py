@@ -9,7 +9,7 @@ from typing import Any, Literal
 import openai
 
 from ezo_api.providers.base import ModelProvider
-from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_status
+from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_error
 from ezo_api.providers.types import (
     Capability,
     ChatMessage,
@@ -90,7 +90,10 @@ class OpenAIProvider(ModelProvider):
             raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
         except openai.APIStatusError as exc:
             raise ProviderError(
-                self.name, kind_from_status(exc.status_code), exc.message, exc.status_code
+                self.name,
+                kind_from_error(exc.status_code, exc.message),
+                exc.message,
+                exc.status_code,
             ) from exc
 
         yield StreamEnd(model=model, usage=usage, finish_reason=finish_reason)
@@ -109,7 +112,10 @@ class OpenAIProvider(ModelProvider):
             raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
         except openai.APIStatusError as exc:
             raise ProviderError(
-                self.name, kind_from_status(exc.status_code), exc.message, exc.status_code
+                self.name,
+                kind_from_error(exc.status_code, exc.message),
+                exc.message,
+                exc.status_code,
             ) from exc
         rows = sorted(response.data, key=lambda item: item.index)
         return [list(row.embedding) for row in rows]
