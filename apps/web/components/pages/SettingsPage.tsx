@@ -24,6 +24,21 @@ export function SettingsPage() {
   const error = actionError ?? loadError?.message ?? null;
   const token = storedToken.useValue();
   const [saved, setSaved] = useState(false);
+  const [testingKeys, setTestingKeys] = useState(false);
+  const [keyTestError, setKeyTestError] = useState<string | null>(null);
+  // One tiny real request per configured provider; the status then shows each outcome.
+  const testKeys = useCallback(async () => {
+    setTestingKeys(true);
+    setKeyTestError(null);
+    try {
+      await api.testProviders();
+    } catch (error) {
+      setKeyTestError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTestingKeys(false);
+      void refreshStatus();
+    }
+  }, [refreshStatus]);
 
   async function update(changes: Partial<User["preferences"]>) {
     try {
@@ -163,15 +178,38 @@ export function SettingsPage() {
                 {status.offline_mode ? <Badge tone="warning">{m.settings.offline}</Badge> : null}
               </div>
 
-              <section>
-                <h3 className="mb-2 font-medium">{m.settings.providers}</h3>
+              <section data-testid="provider-settings">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-medium">{m.settings.providers}</h3>
+                  {status.providers.some((p) => p.configured) ? (
+                    <button
+                      type="button"
+                      data-testid="test-provider-keys"
+                      disabled={testingKeys}
+                      onClick={() => void testKeys()}
+                      className="rounded-lg border border-line px-3 py-1 text-xs font-medium hover:border-accent hover:text-accent disabled:opacity-50"
+                    >
+                      {testingKeys ? m.settings.keyTesting : m.settings.keyTest}
+                    </button>
+                  ) : null}
+                </div>
+                {keyTestError ? <p className="mb-2 text-xs text-danger">{keyTestError}</p> : null}
                 <ul className="flex flex-col gap-1.5">
                   {status.providers.map((provider) => (
-                    <li key={provider.name} className="flex flex-wrap items-center gap-2">
+                    <li key={provider.name} className="flex flex-wrap items-center gap-2" data-testid={`provider-${provider.name}`}>
                       <span className="w-36">{provider.display_name}</span>
                       <Badge tone={provider.configured ? "success" : "neutral"}>
                         {provider.configured ? m.settings.configured : m.settings.notConfigured}
                       </Badge>
+                      {provider.configured && provider.last_result ? (
+                        <Badge tone={provider.last_result === "ok" ? "success" : "danger"}>
+                          {provider.last_result === "ok"
+                            ? m.settings.keyWorks
+                            : (m.settings.keyResults as Record<string, string>)[provider.last_result] ?? provider.last_result}
+                        </Badge>
+                      ) : provider.configured && provider.key_warning ? (
+                        <Badge tone="warning">{m.settings.keyLooksWrong}</Badge>
+                      ) : null}
                       {provider.capabilities.length ? (
                         <span className="text-xs text-ink-faint">{provider.capabilities.join(", ")}</span>
                       ) : null}

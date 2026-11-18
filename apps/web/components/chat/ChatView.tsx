@@ -2,6 +2,7 @@
 
 import type { KnowledgeLibrary } from "@ezo/shared";
 import { Badge, cn, Spinner } from "@ezo/ui";
+import Link from "next/link";
 import { AudioLines, BookOpen, ChevronDown, FolderKanban, KeyRound, MessageSquare, WifiOff, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -291,7 +292,10 @@ export function ChatView({ conversationId, projectId }: ChatViewProps) {
               {" — "}
               {keyProblem.names}.
             </span>{" "}
-            <span className="text-ink-muted">{m.chat.keyProblemBody}</span>
+            <span className="text-ink-muted">{m.chat.keyProblemBody}</span>{" "}
+            <Link href="/settings" className="font-medium text-accent underline" data-testid="key-problem-settings">
+              {m.settings.keyTest} →
+            </Link>
           </p>
         </div>
       ) : null}
