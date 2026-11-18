@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// The spoken greeting on opening the stage has its own test (voice.spec.ts); here it would
+// add an extra utterance to every count.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("ezo-voice-greeting", "off"));
+});
+
+
 /**
  * Server voice (e.g. VoiceStudio or OpenAI behind EZO's /api/voice): the microphone is a
  * synthetic tone that "speaks" briefly and then goes quiet; the voice API is mocked.
@@ -182,8 +189,11 @@ test("server voice failure falls back to the browser for listening and speaking"
 
   await expect(page.getByRole("status").filter({ hasText: "Server ovozi hozir ishlamayapti" })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId("voice-stage")).toHaveAttribute("data-engine", "browser");
-  await expect(page.getByTestId("voice-heard")).toContainText("Salom, brauzer orqali gapiryapman");
-  await expect(page.getByTestId("voice-caption")).toContainText("oflayn rejimda");
+  // After answering, EZO listens again (hands-free) and clears the heard line, so check the
+  // lasting record: the browser-heard sentence became the conversation, and the reply caption
+  // returns once that second listen ends in silence.
+  await expect(page.getByRole("link", { name: "Salom, brauzer orqali gapiryapman" })).toBeVisible();
+  await expect(page.getByTestId("voice-caption")).toContainText("oflayn rejimda", { timeout: 10_000 });
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __ezoSpoken: string[] }).__ezoSpoken.length))
     .toBeGreaterThan(0); // the reply was read by the browser voice after the server voice failed

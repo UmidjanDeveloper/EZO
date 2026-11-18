@@ -2,6 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+// The spoken greeting on opening the stage has its own test (voice.spec.ts); here it would
+// add an extra utterance to every count.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("ezo-voice-greeting", "off"));
+});
+
+
 // The clap detector on the voice stage, driven by Chromium's FAKE microphone file with
 // clap-like bursts (playwright.config.ts, project "clap"). This is a SIMULATION: it proves
 // the consent, the wiring, the honesty of the states and the cleanup. It does not prove that
