@@ -135,6 +135,12 @@ export function createApiClient(options: ApiClientOptions) {
     /** Public probe; `version` is omitted in production. */
     health: () => request<{ status: string; database: string; version?: string }>("/api/health"),
     status: () => request<SystemStatus>("/api/status"),
+    /** Owner only: one tiny real request per configured AI provider ("ok", "auth", ...). */
+    testProviders: () =>
+      request<{ offline: boolean; providers: { name: string; display_name: string; result: string; key_warning: string | null }[] }>(
+        "/api/status/providers/test",
+        { method: "POST" },
+      ),
     me: () => request<User>("/api/me"),
     updatePreferences: (prefs: Partial<Preferences>) =>
       request<User>("/api/me/preferences", { method: "PATCH", ...json(prefs) }),

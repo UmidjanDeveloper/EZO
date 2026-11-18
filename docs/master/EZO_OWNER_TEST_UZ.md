@@ -85,6 +85,23 @@ Agar ishlamasa: tarjima AI provayder kalitiga muhtoj (`GEMINI_API_KEY`, AI Studi
 `AIza…` bilan boshlanadigan kalit). Kalitsiz «Tarjima bo‘lmadi» xabari chiqadi.
 Bu navbatma-navbat (turn-based) tarjima; bir vaqtda (sinxron) tarjima emas.
 
+## Hamma narsa joyidami? — bitta buyruq (2026-11-18)
+
+EZO ishlamayotgandek tuyulsa, avval shuni ishga tushiring (loyiha papkasida, EZO ishlab turganda):
+
+```powershell
+docker compose exec api python -m ezo_api.doctor
+```
+
+U o‘zbekcha aytadi:
+- `.env` dagi AI kalitlari API ga yetib bordimi (faqat uzunligi, kalitning o‘zi chiqmaydi);
+- kalit to‘g‘ri ko‘rinishdami (Gemini `AIza…`, OpenAI `sk-…`);
+- har bir provayder kalitni qabul qildimi (bitta juda kichik haqiqiy so‘rov; o‘tkazib yuborish: `--no-probe`);
+- o‘zbekcha server ovozi yoqilganmi, OCR va Office→PDF bormi.
+
+Xuddi shu tekshiruv brauzerda ham bor: **Sozlamalar → Kalitlarni tekshirish**. Kalit rad etilsa,
+chat tepasida qizil ogohlantirish ham chiqadi. `.env` o‘zgarsa:
+`docker compose up -d --force-recreate api`.
 ## PDF, DOCX, EPUB va skan qilingan hujjatlarni o‘qish (2026-11-18)
 
 Egasi ruxsati bilan (2026-11-18) hujjatlar faqat **sizning kompyuteringizda** shunday yoqiladi:
