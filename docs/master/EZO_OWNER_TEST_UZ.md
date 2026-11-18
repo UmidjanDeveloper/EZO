@@ -128,6 +128,52 @@ profil faqat shaxsiy kompyuter uchun; umumiy serverda hujjat ishchisi alohida ho
 Agar ishlamasa: `docker compose logs document-worker` — xato shu yerda ko‘rinadi.
 Profil yoqilmagan bo‘lsa, chatda «PDF/DOCX/skan o‘qish yoqilmagan…» degan aniq xabar chiqadi.
 
+## Tuman markazi: loyihalar, xatlov, ogohlantirishlar (2026-11-18)
+
+Chap menyuda **«Tuman markazi»** sahifasi bor. Bu yerda tumandagi har bir loyiha (masalan,
+«Xatlov 2026») uchun kim qancha bajargani, kim orqada qolgani va ogohlantirishlar turadi.
+
+**1. Loyiha qo‘shish.** «Yangi loyiha» → nomi, o‘lchov birligi (xonadon), mas’ul tashkilot,
+boshlanish va muddat. Muddat bo‘lsa, EZO bugungacha qancha bajarilishi kerakligini hisoblaydi
+va 80% dan kam bajarganlarni «Orqada» deb belgilaydi.
+
+**2. Ma’lumot manbai** (uchtasidan biri):
+- **Rasmiy API** — loyiha ichida «Ma’lumot manbai → Rasmiy API»: API manzili (https://…),
+  ro‘yxat joyi (masalan `data.items`) va maydonlar (ism, reja, bajarildi, telefon, mahalla, ID).
+  Token qiymatini faqat `.env` ga yozing:
+  ```
+  EZO_DISTRICT_API_TOKEN=...
+  ```
+  (bir nechta API bo‘lsa: `EZO_DISTRICT_API_TOKEN_BANDLIK=...` va sahifada shu nomni yozasiz).
+  EZO API’ni chatda so‘ralganda (10 daqiqada bir martadan ko‘p emas) yoki «API’dan yangilash»
+  tugmasi bosilganda o‘qiydi. API hujjatini bersangiz, maydonlarni aniq moslab beraman.
+- **Excel/CSV** — ustunlar: F.I.Sh, Telefon, Mahalla, Reja, Bajarildi (lotin, kirill, rus
+  sarlavhalari ham tushuniladi).
+- **Qo‘lda** — har bir odam uchun reja va bajarilgan sonini kiritish.
+
+**3. Chatda so‘rash.**
+- «Xatlov qalay ketyapti?» → umumiy foiz, muddatga nisbatan sur’at, kim orqada qolgani.
+- «Nega Aliyev xatlov qilmayapti, uni ogohlantir» → Aliyev uchun ogohlantirish **qoralamasi**.
+- «Xatlov bo‘yicha orqada qolganlarni ogohlantir» → har biriga qoralama (20 tagacha).
+
+**4. Yuborish — faqat sizning tasdig‘ingiz bilan.** Qoralama javob ostida karta bo‘lib chiqadi:
+matnni tahrirlashingiz mumkin, «Yuborish» bosilib tasdiqlangandagina ketadi. Har bir
+kanalning haqiqiy natijasi (SMS id, Telegram xabar raqami yoki xato) kartada va jurnalda
+saqlanadi. Bir xabar ikki marta yuborilmaydi. Faqat egasi akkaunti yubora oladi.
+
+**Kanallar** (`.env` da, o‘zingiz yozasiz):
+```
+# SMS — Eskiz.uz hisobingiz (notify.eskiz.uz)
+EZO_ESKIZ_EMAIL=
+EZO_ESKIZ_PASSWORD=
+EZO_ESKIZ_SENDER=4546
+# Telegram — bot tokeni (mas’ullar botga /start bosib, JARVIS sahifasida ulanadi)
+EZO_TELEGRAM_BOT_TOKEN=
+```
+Muhim: Eskiz SMS matnlarini moderatsiya qiladi — ogohlantirish shablonini Eskiz kabinetida
+oldindan tasdiqlating, aks holda Eskiz rad etadi va kartada shu xato ko‘rinadi.
+Telefon raqamlar AI modelga yuborilmaydi; ular faqat SMS uchun saqlanadi.
+`.env` o‘zgargach: `docker compose up -d --force-recreate api`.
 ## Dasturchi agent, ko‘p tilli imtihonchi va kutubxona o‘rganish (2026-11-18)
 
 **Sayt yoki dastur tuzish.** Chatga oddiy so‘z bilan yozing:

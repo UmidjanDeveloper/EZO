@@ -76,6 +76,8 @@ class Gathered:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[dict[str, Any]] = field(default_factory=list)
     """Artifacts created during this turn ({id, title, type, version}); shown under the answer."""
+    notices: list[dict[str, Any]] = field(default_factory=list)
+    """District warning drafts made this turn; shown as cards to review and send."""
 
 
 async def call_tool(

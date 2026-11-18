@@ -10,6 +10,7 @@ import { useApp } from "@/lib/app-state";
 import { useI18n } from "@/lib/i18n/context";
 import { speak, speechSynthesisSupported, toSpeakableText } from "@/lib/speech";
 import { ArtifactCard } from "../artifacts/ArtifactCard";
+import { NoticeCard } from "../district/NoticeCard";
 import { EzoRobot } from "../robot/EzoRobot";
 import { Markdown } from "./Markdown";
 import { Sources } from "./Sources";
@@ -114,6 +115,10 @@ export function MessageBubble({ message, onShowTrace }: Props) {
         {artifacts.map((artifact) => (
           <ArtifactCard key={artifact.id} artifact={artifact} />
         ))}
+
+        {!message.streaming
+          ? (message.metadata?.district_notices ?? []).map((notice) => <NoticeCard key={notice.id} notice={notice} />)
+          : null}
 
         {!message.streaming && message.metadata?.citations?.length ? (
           <Sources citations={message.metadata.citations} />

@@ -63,6 +63,8 @@ export interface MessageMetadata {
   sources_considered?: number;
   /** Files EZO created (or the user saved) in this turn. */
   artifacts?: ArtifactRef[];
+  /** District warning drafts made in this turn (sent only after the owner approves). */
+  district_notices?: DistrictNotice[];
   /** Uploaded documents attached to a user message (ids, and their names). */
   attachments?: string[];
   attachment_names?: string[];
@@ -882,4 +884,95 @@ export interface LibraryCapabilityReport {
   evidence_limitations: string[];
   status: "proposal";
   generated_at: string;
+}
+
+// --- District center (Tuman markazi) ---------------------------------------------------
+
+export interface DistrictSource {
+  url?: string;
+  token_env?: string;
+  auth_header?: string;
+  auth_prefix?: string;
+  items_path?: string;
+  fields?: Partial<Record<"name" | "target" | "done" | "phone" | "area" | "position" | "external_id", string>>;
+}
+
+export interface DistrictSummary {
+  target: number;
+  done: number;
+  percent: number | null;
+  expected_share: number | null;
+  days_left: number | null;
+  behind: number;
+}
+
+export interface DistrictPerson {
+  member_id: string;
+  name: string;
+  area: string;
+  target: number;
+  done: number;
+  percent: number | null;
+  expected: number | null;
+  behind: boolean;
+}
+
+export interface DistrictProject {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  unit: string;
+  responsible_org: string;
+  start_date: string | null;
+  deadline: string | null;
+  status: "active" | "paused" | "finished";
+  source_kind: "manual" | "import" | "api";
+  source: DistrictSource;
+  last_sync_at: string | null;
+  last_sync_error: string | null;
+  summary?: DistrictSummary;
+}
+
+export interface DistrictProjectInput {
+  name: string;
+  aliases?: string[];
+  description?: string;
+  unit?: string;
+  responsible_org?: string;
+  start_date?: string | null;
+  deadline?: string | null;
+  source_kind?: "manual" | "import" | "api";
+  source?: DistrictSource;
+}
+
+export interface DistrictMember {
+  id: string;
+  full_name: string;
+  position: string;
+  area: string;
+  phone: string | null;
+  external_id: string | null;
+  telegram_recipient_id: string | null;
+}
+
+export interface DistrictNotice {
+  id: string;
+  project_id: string | null;
+  member_id: string | null;
+  recipient_name: string;
+  text: string;
+  channels: ("telegram" | "sms")[];
+  status: "draft" | "sent" | "partly_sent" | "failed" | "cancelled";
+  sender: string;
+  approved_at: string | null;
+  results: Record<string, { ok: boolean; id?: string | number; error?: string; unknown?: boolean }>;
+  created_at: string | null;
+}
+
+export interface DistrictChannels {
+  telegram: boolean;
+  sms: boolean;
+  sms_sender: string | null;
+  can_send: boolean;
 }

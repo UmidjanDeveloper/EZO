@@ -26,6 +26,9 @@ class Intent(StrEnum):
     DOCUMENT = "document"
     BUSINESS = "business"
     VISUAL = "visual"
+    DISTRICT = "district"
+    """District center: the account's district projects (chosen by EzoCore's override when a
+    project of the account is named; "xatlov" is a signal of its own)."""
     LEARNING = "learning"
     """Knowledge OS: learn a website, repository or package (chosen by EzoCore's override
     when a source and a "learn" verb are present; no keyword signals of its own)."""
@@ -201,6 +204,12 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\b(fayl|file|файл)\s*(qilib|sifatida|ko'?rinishida|as\b)", 2.5),
         (r"\bsolishtir", 1),
         (r"\bcompare (the|these|two)\b", 2),
+    ],
+    Intent.DISTRICT: [
+        (r"\bxatlov", 3),
+        (r"\bхатлов", 3),
+        (r"\b(tuman|hokimlik|hokimiyat|mahalla)\w* loyiha", 3),
+        (r"\bloyihalar\w* (holat|qalay|qanday)", 3),
     ],
     Intent.BUSINESS: [
         (r"\bbiznes", 3),

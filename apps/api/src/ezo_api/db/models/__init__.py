@@ -11,6 +11,13 @@ from ezo_api.db.models.artifacts import (
 )
 from ezo_api.db.models.career import CareerProfile
 from ezo_api.db.models.conversation import Conversation, Message
+from ezo_api.db.models.district import (
+    DistrictAssignment,
+    DistrictMember,
+    DistrictNotice,
+    DistrictProgress,
+    DistrictProject,
+)
 from ezo_api.db.models.document_jobs import DocumentJob, DocumentJobPublication
 from ezo_api.db.models.jarvis import (
     JarvisAuthorization,
@@ -61,6 +68,11 @@ __all__ = [
     "AuditLog",
     "CareerProfile",
     "Conversation",
+    "DistrictAssignment",
+    "DistrictMember",
+    "DistrictNotice",
+    "DistrictProgress",
+    "DistrictProject",
     "DocumentJob",
     "DocumentJobPublication",
     "DocumentRevision",
