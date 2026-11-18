@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from ezo_api.academic.scholar import OpenAlexClient, ScholarSearch
 from ezo_api.agents.registry import AgentRegistry
@@ -90,6 +90,10 @@ class Services:
     office: OfficeConverter | None
     scholar: ScholarSearch | None = None
     learning: LearningRunner | None = None
+    # Delivery clients for district warnings; None = built from settings when sending.
+    # Tests inject fakes here.
+    district_telegram: Any = None
+    district_sms: Any = None
 
 
 def build_services(

@@ -50,6 +50,7 @@ const pages: [string, string][] = [
   ["settings", "/settings"],
   ["jarvis console", "/jarvis"],
   ["memory", "/memory"],
+  ["district center", "/district"],
 ];
 
 for (const [name, url] of pages) {

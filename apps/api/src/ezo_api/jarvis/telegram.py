@@ -177,3 +177,25 @@ class TelegramClient:
             document_sha256=hashlib.sha256(data).hexdigest(),
             file_name=file_name,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class TextReceipt:
+    chat_id: str
+    message_id: int
+
+
+async def send_text(client: TelegramClient, chat_id: str, text: str) -> TextReceipt:
+    """A plain text message, recorded only when Telegram confirms it for exactly that chat."""
+    result = await client._call(
+        "sendMessage", data={"chat_id": chat_id, "text": text[:4000]}, sends=True
+    )
+    if (
+        not isinstance(result, dict)
+        or not isinstance(result.get("message_id"), int)
+        or str((result.get("chat") or {}).get("id")) != str(chat_id)
+    ):
+        raise TelegramError(
+            "unverified", "Telegram's answer does not confirm this delivery.", outcome_unknown=True
+        )
+    return TextReceipt(chat_id=str(chat_id), message_id=int(result["message_id"]))

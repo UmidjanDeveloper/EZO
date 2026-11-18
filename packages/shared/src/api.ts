@@ -48,6 +48,13 @@ import type {
   TranslateRequest,
   TranslateResult,
   TransliterateResult,
+  DistrictChannels,
+  DistrictMember,
+  DistrictNotice,
+  DistrictPerson,
+  DistrictProject,
+  DistrictProjectInput,
+  DistrictSummary,
 } from "./types";
 
 export class ApiError extends Error {
@@ -142,6 +149,50 @@ export function createApiClient(options: ApiClientOptions) {
         { method: "POST" },
       ),
     me: () => request<User>("/api/me"),
+
+    // District center (Tuman markazi)
+    districtChannels: () => request<DistrictChannels>("/api/district/channels"),
+    districtProjects: () => request<DistrictProject[]>("/api/district/projects"),
+    districtProject: (id: string) =>
+      request<{ project: DistrictProject; summary: DistrictSummary; people: DistrictPerson[] }>(
+        `/api/district/projects/${id}`,
+      ),
+    createDistrictProject: (body: DistrictProjectInput) =>
+      request<DistrictProject>("/api/district/projects", { method: "POST", ...json(body) }),
+    updateDistrictProject: (id: string, body: Partial<DistrictProjectInput>) =>
+      request<DistrictProject>(`/api/district/projects/${id}`, { method: "PATCH", ...json(body) }),
+    deleteDistrictProject: (id: string) => request<void>(`/api/district/projects/${id}`, { method: "DELETE" }),
+    importDistrictTable: (id: string, file: Blob, filename: string) => {
+      const form = new FormData();
+      form.append("file", file, filename);
+      return request<{ rows: number; created_people: number; updated: number; unchanged: number }>(
+        `/api/district/projects/${id}/import`,
+        { method: "POST", body: form },
+      );
+    },
+    syncDistrictProject: (id: string) =>
+      request<{ ok: boolean; error: string | null; updated: number; created_people: number }>(
+        `/api/district/projects/${id}/sync`,
+        { method: "POST" },
+      ),
+    setDistrictProgress: (projectId: string, memberId: string, body: { target?: number; done?: number }) =>
+      request<{ updated: number }>(`/api/district/projects/${projectId}/progress/${memberId}`, {
+        method: "PUT",
+        ...json(body),
+      }),
+    districtMembers: () => request<DistrictMember[]>("/api/district/members"),
+    updateDistrictMember: (id: string, body: Omit<DistrictMember, "id">) =>
+      request<DistrictMember>(`/api/district/members/${id}`, { method: "PATCH", ...json(body) }),
+    districtNotices: () => request<DistrictNotice[]>("/api/district/notices"),
+    draftDistrictNotice: (projectId: string, memberId: string, extra = "") =>
+      request<DistrictNotice>("/api/district/notices", {
+        method: "POST",
+        ...json({ project_id: projectId, member_id: memberId, extra }),
+      }),
+    sendDistrictNotice: (id: string, text?: string) =>
+      request<DistrictNotice>(`/api/district/notices/${id}/send`, { method: "POST", ...json({ text: text ?? null }) }),
+    cancelDistrictNotice: (id: string) =>
+      request<DistrictNotice>(`/api/district/notices/${id}/cancel`, { method: "POST" }),
     updatePreferences: (prefs: Partial<Preferences>) =>
       request<User>("/api/me/preferences", { method: "PATCH", ...json(prefs) }),
 

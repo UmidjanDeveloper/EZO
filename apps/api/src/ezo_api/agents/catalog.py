@@ -143,6 +143,18 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "district",
+            Intent.DISTRICT,
+            {"uz": "Tuman markazi", "en": "District Center", "ru": "Районный центр"},
+            "District projects (xatlov, bandlik…): progress from the official API, Excel or "
+            "manual entries, who is behind, and warnings sent by Telegram/SMS only after the "
+            "owner approves each one.",
+            maturity="alpha",
+            phase="District",
+            context_mode="professional",
+            route="chat",
+        ),
+        AgentSpec(
             "knowledge_os",
             Intent.LEARNING,
             {"uz": "Bilim tizimi", "en": "Knowledge OS", "ru": "Система знаний"},

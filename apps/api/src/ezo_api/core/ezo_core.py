@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ezo_api.academic.requests import citation_request, wants_research_plan
 from ezo_api.agents.base import AgentPlan, AgentTurn, GatherContext, Gathered
+from ezo_api.agents.district import wants_district
 from ezo_api.agents.learning import wants_learning
 from ezo_api.agents.references import latest_artifact
 from ezo_api.agents.registry import AgentRegistry, AgentSelection
@@ -45,6 +46,7 @@ from ezo_api.db.base import utcnow
 from ezo_api.db.models import (
     AgentRun,
     Conversation,
+    DistrictProject,
     KnowledgeDocument,
     KnowledgeLibrary,
     Message,
@@ -215,6 +217,15 @@ async def _owned_attachments(
     return ids, [names[i] for i in ids]
 
 
+async def _names_district_project(session: AsyncSession, user_id: uuid.UUID, text: str) -> bool:
+    names = list(
+        await session.scalars(
+            select(DistrictProject.name).where(DistrictProject.user_id == user_id).limit(200)
+        )
+    )
+    return bool(names) and wants_district(text, names)
+
+
 async def _latest_artifact_is_image(
     session: AsyncSession, user_id: uuid.UUID, conversation_id: uuid.UUID
 ) -> bool:
@@ -299,6 +310,15 @@ class EzoCore:
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and intent.intent
+                in (Intent.GENERAL, Intent.RESEARCH, Intent.DOCUMENT, Intent.BUSINESS)
+                and await _names_district_project(session, user.id, turn.text)
+            ):
+                # "Xatlov qalay ketyapti?", "Aliyevni ogohlantir" about the account's own
+                # district projects: the District Center answers from stored numbers.
+                intent = IntentResult(Intent.DISTRICT, 1.0, ("district_project",), intent.scores)
             elif (
                 intent.intent == Intent.GENERAL
                 and turn.forced_agent is None
@@ -880,6 +900,7 @@ class EzoCore:
                 "citations": quality.get("citation_sources", []),
                 "sources_considered": len(gathered.sources),
                 "artifacts": gathered.artifacts,
+                **({"district_notices": gathered.notices} if gathered.notices else {}),
             },
         )
         session.add(message)

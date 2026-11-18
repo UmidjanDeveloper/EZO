@@ -26,6 +26,7 @@ from ezo_api.api.routes import (
     career,
     chat,
     conversations,
+    district,
     document_jobs,
     governance,
     ielts,
@@ -290,6 +291,7 @@ def create_app(
         career,
         learning,
         accounts,
+        district,
     ):
         app.include_router(module.router)
 

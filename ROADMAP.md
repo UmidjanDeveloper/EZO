@@ -143,6 +143,16 @@ images) plus the extended local checks listed for that phase.
 - Next: E2 secretary (minutes and task registers from notes, documents and — only with a
   real transcription provider — audio), E3 citizen appeals, E4 reports
 
+### District — alpha (2026-11-18)
+- District center ("Tuman markazi"): projects (xatlov, bandlik…) with a plan per responsible
+  person, progress from an official JSON API (token only in `.env`), an Excel/CSV table or
+  manual entry, pace against the deadline and who is behind (migration 0025)
+- Chat: "Xatlov qalay ketyapti?" answers from stored numbers; "…ni ogohlantir" makes
+  warning drafts; Telegram and SMS (Eskiz.uz) delivery only after the owner presses Send,
+  each channel's real result stored and audited
+- Next: the real field mapping of the official API once its documentation is available;
+  employees reporting their own progress through their accounts or the Telegram bot
+
 ### Knowledge OS — K1, K2 & K3 done (2026-10-19, Knowledge OS & SkillForge prompt)
 - K1 (done): named knowledge libraries; learned sources — documentation websites
   (one site and folder, robots.txt, polite pacing, page/depth/size/time budgets), GitHub
