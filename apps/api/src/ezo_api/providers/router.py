@@ -144,6 +144,8 @@ class RoutedStream:
     candidates: list[Candidate]
     attempts: list[Attempt] = field(default_factory=list)
     selected: Candidate | None = None
+    # Shared with the router: the last outcome per provider ("ok" or an error kind).
+    health: dict[str, str] = field(default_factory=dict)
 
     async def stream(self, request: ChatRequest) -> AsyncIterator[StreamEvent]:
         for candidate in self.candidates:
@@ -158,6 +160,7 @@ class RoutedStream:
                 self.attempts.append(
                     Attempt(candidate.provider.name, candidate.model, "ok", _ms(started))
                 )
+                self.health[candidate.provider.name] = "ok"
                 self.selected = candidate
                 return
             except Exception as exc:
@@ -173,6 +176,7 @@ class RoutedStream:
                         error.detail[:500],
                     )
                 )
+                self.health[candidate.provider.name] = error.kind.value
                 if produced_text:
                     raise StreamInterruptedError(error) from exc
         raise AllProvidersFailedError(self.attempts)
@@ -201,6 +205,8 @@ class ModelRouter:
         self.providers = dict(providers)
         self.offline = offline
         self.preferred_provider = preferred_provider
+        # Last outcome per provider in this process, for the status screen (no secrets).
+        self.health: dict[str, str] = {}
 
     @property
     def is_offline(self) -> bool:
@@ -229,7 +235,7 @@ class ModelRouter:
         )
 
     def open(self, route: str) -> RoutedStream:
-        return RoutedStream(route=route, candidates=self.candidates(route))
+        return RoutedStream(route=route, candidates=self.candidates(route), health=self.health)
 
     def describe(self) -> dict[str, Any]:
         """Safe summary for the settings screen (no secrets)."""

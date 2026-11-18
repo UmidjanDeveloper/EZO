@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 
 
@@ -43,6 +44,21 @@ class ProviderError(Exception):
     @property
     def hint(self) -> str:
         return _HINTS[self.kind]
+
+
+# Providers answer a bad key with 400 as often as 401/403 (Gemini: "API key not valid").
+_KEY_REJECTED = re.compile(
+    r"api[ _-]?key[ _-]?(not[ _-]valid|invalid)|invalid[ _-]api[ _-]?key|incorrect api key"
+    r"|unauthenticated|permission[ _]denied|invalid x-api-key|authentication[ _]error",
+    re.IGNORECASE,
+)
+
+
+def kind_from_error(status: int | None, detail: str) -> ProviderErrorKind:
+    """The kind of a provider failure from its HTTP status and message."""
+    if _KEY_REJECTED.search(detail or ""):
+        return ProviderErrorKind.AUTH
+    return kind_from_status(status)
 
 
 def kind_from_status(status: int | None) -> ProviderErrorKind:

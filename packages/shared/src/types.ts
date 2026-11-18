@@ -219,6 +219,10 @@ export interface ProviderStatus {
   display_name: string;
   configured: boolean;
   capabilities: string[];
+  /** "unexpected_key_format" when the configured key does not look like one the provider issues. */
+  key_warning?: string | null;
+  /** Last outcome in the running API: "ok" or an error kind such as "auth". */
+  last_result?: string | null;
 }
 
 export interface AgentInfo {

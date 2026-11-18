@@ -219,6 +219,10 @@ class ProviderStatus(BaseModel):
     display_name: str
     configured: bool
     capabilities: list[str]
+    # "unexpected_key_format" when the configured key does not look like one the provider issues.
+    key_warning: str | None = None
+    # Last outcome in this API process: "ok" or an error kind ("auth", "rate_limit", ...).
+    last_result: str | None = None
 
 
 class AgentInfo(BaseModel):

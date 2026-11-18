@@ -909,7 +909,7 @@ class EzoCore:
         if isinstance(exc, AllProvidersFailedError):
             code, message = "all_providers_failed", messages.text("all_providers_failed", language)
             hints = sorted({a.error_kind or "unknown" for a in exc.attempts})
-            hint = _provider_hint(hints)
+            hint = _provider_hint(hints, language)
         elif isinstance(exc, StreamInterruptedError):
             code, message = "stream_interrupted", messages.text("stream_interrupted", language)
             hint = exc.error.hint
@@ -956,13 +956,13 @@ class EzoCore:
             logger.error("Turn %s crashed", prepared.run.id, exc_info=exc)
 
 
-def _provider_hint(kinds: list[str]) -> str:
+def _provider_hint(kinds: list[str], language: str = "en") -> str:
     if "auth" in kinds:
-        return "An API key was rejected. Check the keys in your .env file."
+        return messages.text("hint_auth", language)
     if "model_not_found" in kinds:
-        return "A model name is not available. Check apps/api/config/models.toml."
+        return messages.text("hint_model", language)
     if "rate_limit" in kinds:
-        return "The provider is rate limiting or the account has no credit. Try again later."
+        return messages.text("hint_rate", language)
     if "unavailable" in kinds or "timeout" in kinds:
-        return "Could not reach the provider. Check your internet connection."
-    return "See the API logs for details (Settings → Debug shows the attempts)."
+        return messages.text("hint_network", language)
+    return messages.text("hint_other", language)

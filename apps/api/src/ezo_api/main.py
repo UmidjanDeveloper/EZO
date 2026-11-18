@@ -152,6 +152,15 @@ def create_app(
                 mode,
                 "sqlite" if settings.is_sqlite else "postgresql",
             )
+            from ezo_api.providers.registry import key_warnings
+
+            for name in key_warnings(settings):
+                logger.warning(
+                    "The %s API key does not look like a key %s issues; requests will likely be "
+                    "rejected. Check it in .env (see docs/master/EZO_OWNER_TEST_UZ.md).",
+                    name,
+                    name,
+                )
             if settings.deployment_profile != "free-beta":
                 async with services.db.sessionmaker() as session:
                     interrupted = await services.official.recover_interrupted(session)

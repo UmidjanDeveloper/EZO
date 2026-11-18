@@ -10,7 +10,7 @@ from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 
 from ezo_api.providers.base import ModelProvider
-from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_status
+from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_error
 from ezo_api.providers.types import (
     Capability,
     ChatRequest,
@@ -102,7 +102,9 @@ class GeminiProvider(ModelProvider):
                             yield TextDelta(part.text)
         except genai_errors.APIError as exc:
             status = exc.code if isinstance(exc.code, int) else None
-            raise ProviderError(self.name, kind_from_status(status), str(exc), status) from exc
+            raise ProviderError(
+                self.name, kind_from_error(status, str(exc)), str(exc), status
+            ) from exc
         except TimeoutError as exc:
             raise ProviderError(self.name, ProviderErrorKind.TIMEOUT, str(exc)) from exc
         except OSError as exc:
@@ -125,7 +127,9 @@ class GeminiProvider(ModelProvider):
             )
         except genai_errors.APIError as exc:
             status = exc.code if isinstance(exc.code, int) else None
-            raise ProviderError(self.name, kind_from_status(status), str(exc), status) from exc
+            raise ProviderError(
+                self.name, kind_from_error(status, str(exc)), str(exc), status
+            ) from exc
         except TimeoutError as exc:
             raise ProviderError(self.name, ProviderErrorKind.TIMEOUT, str(exc)) from exc
         except OSError as exc:
