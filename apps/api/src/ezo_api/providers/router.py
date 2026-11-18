@@ -7,6 +7,7 @@ streams from the first one that works.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import tomllib
@@ -18,7 +19,7 @@ from typing import Any, cast
 from ezo_api.providers.base import ModelProvider
 from ezo_api.providers.errors import ProviderError, ProviderErrorKind
 from ezo_api.providers.offline import OFFLINE_MODEL
-from ezo_api.providers.types import ChatRequest, Effort, StreamEvent, TextDelta
+from ezo_api.providers.types import ChatMessage, ChatRequest, Effort, StreamEvent, TextDelta
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +234,44 @@ class ModelRouter:
             "No configured provider appears in models.toml. Add a candidate for one of: "
             + ", ".join(sorted(self.providers))
         )
+
+    async def probe(self, name: str, limit_seconds: float = 25.0) -> str:
+        """One tiny real request to a configured provider: "ok" or an error kind.
+
+        Used by the owner's "test keys" button; it costs a few tokens and records the
+        outcome like a normal turn would. Nothing about the key is returned.
+        """
+        provider = self.providers.get(name)
+        if provider is None:
+            return "not_configured"
+        model = next(
+            (
+                c.model
+                for route in (DEFAULT_ROUTE, *self.config.routes)
+                if (config := self.config.routes.get(route)) is not None
+                for c in config.candidates
+                if c.provider == name
+            ),
+            None,
+        )
+        if model is None:
+            return "no_model"
+        request = ChatRequest(
+            model=model,
+            messages=[ChatMessage("user", "Reply with OK.")],
+            max_output_tokens=16,
+        )
+        try:
+            async with asyncio.timeout(limit_seconds):
+                async for _ in provider.stream_chat(request):
+                    pass
+            result = "ok"
+        except TimeoutError:
+            result = ProviderErrorKind.TIMEOUT.value
+        except Exception as exc:
+            result = _as_provider_error(name, exc).kind.value
+        self.health[name] = result
+        return result
 
     def open(self, route: str) -> RoutedStream:
         return RoutedStream(route=route, candidates=self.candidates(route), health=self.health)

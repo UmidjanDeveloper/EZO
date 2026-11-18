@@ -84,3 +84,46 @@ rejimning o‘zida, ikki odam o‘rtasida ishlaydi:
 Agar ishlamasa: tarjima AI provayder kalitiga muhtoj (`GEMINI_API_KEY`, AI Studio’dan
 `AIza…` bilan boshlanadigan kalit). Kalitsiz «Tarjima bo‘lmadi» xabari chiqadi.
 Bu navbatma-navbat (turn-based) tarjima; bir vaqtda (sinxron) tarjima emas.
+
+## Hamma narsa joyidami? — bitta buyruq (2026-11-18)
+
+EZO ishlamayotgandek tuyulsa, avval shuni ishga tushiring (loyiha papkasida, EZO ishlab turganda):
+
+```powershell
+docker compose exec api python -m ezo_api.doctor
+```
+
+U o‘zbekcha aytadi:
+- `.env` dagi AI kalitlari API ga yetib bordimi (faqat uzunligi, kalitning o‘zi chiqmaydi);
+- kalit to‘g‘ri ko‘rinishdami (Gemini `AIza…`, OpenAI `sk-…`);
+- har bir provayder kalitni qabul qildimi (bitta juda kichik haqiqiy so‘rov; o‘tkazib yuborish: `--no-probe`);
+- o‘zbekcha server ovozi yoqilganmi, OCR va Office→PDF bormi.
+
+Xuddi shu tekshiruv brauzerda ham bor: **Sozlamalar → Kalitlarni tekshirish**. Kalit rad etilsa,
+chat tepasida qizil ogohlantirish ham chiqadi. `.env` o‘zgarsa:
+`docker compose up -d --force-recreate api`.
+## PDF, DOCX, EPUB va skan qilingan hujjatlarni o‘qish (2026-11-18)
+
+Egasi ruxsati bilan (2026-11-18) hujjatlar faqat **sizning kompyuteringizda** shunday yoqiladi:
+
+1. `.env` faylining oxiriga bitta qator qo‘shing:
+   ```
+   COMPOSE_PROFILES=documents
+   ```
+2. Loyiha papkasida:
+   ```powershell
+   docker compose up -d --build
+   ```
+   Birinchi marta OCR (Tesseract) va LibreOffice o‘rnatiladigan hujjat obrazi yig‘iladi —
+   bir necha daqiqa ketadi.
+3. Chatga PDF/DOCX/EPUB/rasm tashlang (5 MB gacha). Fayl yonida avval «navbatda», keyin
+   «indekslandi» chiqadi; shundan keyin EZO hujjat bo‘yicha javob beradi.
+
+Qanday ishlaydi: `document-worker` har bir faylni alohida, qulflangan konteynerda ochadi
+(internetsiz, faqat o‘qish, 768 MB xotira, 64 jarayon, 25 soniya, hech qanday huquqsiz).
+Buning uchun ishchi Docker’ni boshqara oladi (`/var/run/docker.sock`) — shuning uchun bu
+profil faqat shaxsiy kompyuter uchun; umumiy serverda hujjat ishchisi alohida hostda turadi
+(`docs/deployment/EXECUTOR_REQUIREMENTS.md`). API’ning o‘zi Docker’ga hech qachon ulanmaydi.
+
+Agar ishlamasa: `docker compose logs document-worker` — xato shu yerda ko‘rinadi.
+Profil yoqilmagan bo‘lsa, chatda «PDF/DOCX/skan o‘qish yoqilmagan…» degan aniq xabar chiqadi.

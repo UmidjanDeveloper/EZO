@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # Files and knowledge (Milestone 2).
     storage_dir: Path = Field(default=API_DIR / "storage", alias="EZO_STORAGE_DIR")
     max_upload_mb: int = Field(default=25, alias="EZO_MAX_UPLOAD_MB")
+    # A local isolated document worker runs beside the API (docker compose profile
+    # "documents"): PDF/DOCX/EPUB/PNG/JPEG uploads go to it instead of being refused.
+    # Compose passes COMPOSE_PROFILES here, so "documents" in that list turns it on.
+    document_worker: Annotated[bool, NoDecode] = Field(default=False, alias="EZO_DOCUMENT_WORKER")
     vector_store: Literal["auto", "pgvector", "local"] = Field(
         default="auto", alias="EZO_VECTOR_STORE"
     )
@@ -291,6 +295,14 @@ class Settings(BaseSettings):
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("document_worker", mode="before")
+    @classmethod
+    def _document_worker(cls, value: object) -> object:
+        if isinstance(value, str):
+            names = {part.strip().lower() for part in value.split(",")}
+            return bool(names & {"documents", "1", "true", "yes", "on"})
         return value
 
     @field_validator("voice_providers", "elevenlabs_tts_languages", mode="before")

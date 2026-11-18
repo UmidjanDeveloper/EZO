@@ -130,7 +130,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compose file is valid (optional profiles included)
-        run: docker compose --profile voice --profile student config --quiet
+        run: docker compose --profile voice --profile student --profile documents config --quiet
       - name: Build API image
         run: docker build -t ezo-api:ci apps/api
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -180,6 +180,35 @@ jobs:
           docker run --rm --memory=1536m --user 10001 \
             -v "$PWD/apps/api/tests/container_native_reaping.py:/tmp/check-reaping.py:ro" \
             ezo-api-office:ci python /tmp/check-reaping.py
+      - name: Owner's local documents profile reads a real PDF end to end
+        # COMPOSE_PROFILES=documents on a normal Docker host: the API sends the PDF to the
+        # document worker, which opens it in its own isolated executor container.
+        run: |
+          set -eu
+          apps/api/.venv/bin/python - <<'PY'
+          from reportlab.pdfgen import canvas
+          page = canvas.Canvas("/tmp/ezo-fotosintez.pdf")
+          page.drawString(72, 720, "Fotosintez quyosh energiyasini kimyoviy energiyaga aylantiradi.")
+          page.save()
+          PY
+          export COMPOSE_PROFILES=documents
+          docker compose up -d --build --wait db api
+          docker compose up -d --build document-worker
+          trap 'docker compose logs --no-color api document-worker | tail -n 120; docker compose down -v' EXIT
+          id=$(curl -fsS -F "file=@/tmp/ezo-fotosintez.pdf;type=application/pdf" \
+            http://127.0.0.1:8000/api/knowledge/documents | python3 -c 'import json,sys; print(json.load(sys.stdin)["document"]["id"])')
+          for i in $(seq 1 90); do
+            doc=$(curl -fsS "http://127.0.0.1:8000/api/knowledge/documents/$id")
+            status=$(printf '%s' "$doc" | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+            echo "attempt $i: $status"
+            if [ "$status" = "indexed" ]; then
+              printf '%s' "$doc" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["chunk_count"] >= 1, d'
+              exit 0
+            fi
+            if [ "$status" = "failed" ]; then echo "$doc"; exit 1; fi
+            sleep 2
+          done
+          echo "The document was not indexed in time"; exit 1
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: Web runtime includes the patched zlib package

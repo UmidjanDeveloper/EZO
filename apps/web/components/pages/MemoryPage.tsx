@@ -410,7 +410,7 @@ export function MemoryPage() {
               <div className="sm:w-44">
                 <SelectField
                   label=" "
-                  aria-label="category"
+                  aria-label={m.memory.goalCategory}
                   value={category}
                   onChange={(e) => setCategory(e.target.value as MemoryCategory)}
                 >

@@ -119,6 +119,40 @@ async def status(services: ServicesDep, session: SessionDep, _: CurrentUser) -> 
     )
 
 
+@router.post("/status/providers/test", dependencies=[Depends(rate_limit("chat"))])
+async def test_providers(
+    services: ServicesDep, session: SessionDep, user: CurrentUser
+) -> dict[str, object]:
+    """The owner's "test keys" button: one tiny real request per configured provider.
+
+    Costs a few tokens each, so only the installation owner (or Super Admin) may run it.
+    Results are kinds such as "ok" or "auth"; nothing about a key is returned.
+    """
+    from ezo_api.account.entitlements import unlimited
+
+    if not unlimited(user, services.settings.owner_email):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "forbidden", "message": "Only the owner can test provider keys."},
+        )
+    router_ = services.router
+    warnings = key_warnings(services.settings)
+    results = []
+    for name in sorted(router_.providers):
+        result = await router_.probe(name)
+        audit(session, user.id, "provider.key_test", "provider", name, {"result": result})
+        results.append(
+            {
+                "name": name,
+                "display_name": KNOWN_PROVIDERS.get(name, name),
+                "result": result,
+                "key_warning": warnings.get(name),
+            }
+        )
+    await session.commit()
+    return {"offline": router_.is_offline, "providers": results}
+
+
 @router.get("/me", dependencies=limited)
 async def me(user: CurrentUser) -> UserOut:
     return user_out(user)
