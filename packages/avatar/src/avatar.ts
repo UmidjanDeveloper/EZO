@@ -45,7 +45,7 @@ export interface Gaze {
 const GAZE_HOLD_SECONDS = 1.5;
 
 const UNIFORMS = [
-  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef", "uGlow",
+  "uVP", "uTime", "uLevel", "uEnergy", "uWarmth", "uListen", "uThink", "uSpeak", "uError", "uWork", "uSuccess", "uOffline", "uYaw", "uPitch", "uPx", "uGlowPx", "uRef", "uGlow", "uLine",
   "uBlink", "uDroop", "uEyeX", "uEyeY", "uBrow", "uMouth", "uSmile",
 ] as const;
 const LOW_POWER_FRAME_MS = 1000 / 30;
@@ -66,6 +66,8 @@ interface GlState {
   buffers: WebGLBuffer[];
   attributes: { pos: number; data: number; extra: number; xy: number };
   silhouetteVertices: number;
+  /** Contour filaments: an element buffer of index pairs (null where indices cannot fit). */
+  lines: { buffer: WebGLBuffer; count: number; type: number } | null;
 }
 
 const STILL_TIME = 6.5; // the moment shown when motion is reduced
@@ -332,6 +334,18 @@ export class EzoAvatar {
         return buffer;
       };
       const buffers = [upload(this.figure.positions), upload(this.figure.data), upload(this.figure.extra), upload(this.figure.silhouette)];
+      // 32-bit indices need an extension in WebGL 1; 16-bit ones do while the figure is small.
+      let lines: GlState["lines"] = null;
+      const wide = gl.getExtension("OES_element_index_uint");
+      if (this.figure.lines.length && (wide || this.figure.count < 65536)) {
+        const buffer = gl.createBuffer();
+        if (buffer) {
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, wide ? this.figure.lines : Uint16Array.from(this.figure.lines), gl.STATIC_DRAW);
+          lines = { buffer, count: this.figure.lines.length, type: wide ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT };
+          buffers.push(buffer);
+        }
+      }
       const uniforms = Object.fromEntries(UNIFORMS.map((name) => [name, gl.getUniformLocation(points, name)])) as GlState["uniforms"];
       return {
         gl,
@@ -349,6 +363,7 @@ export class EzoAvatar {
           xy: gl.getAttribLocation(mask, "aXY"),
         },
         silhouetteVertices: this.figure.silhouette.length / 2,
+        lines,
       };
     } catch (error) {
       console.warn("EZO avatar: WebGL setup failed, using the still fallback.", error);
@@ -562,6 +577,13 @@ export class EzoAvatar {
       gl.drawArrays(gl.POINTS, 0, this.figure.count);
     }
     gl.uniform1f(u.uGlow, 0);
+    const lines = this.glState.lines;
+    if (lines) {
+      gl.uniform1f(u.uLine, 1);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lines.buffer);
+      gl.drawElements(gl.LINES, lines.count, lines.type, 0);
+      gl.uniform1f(u.uLine, 0);
+    }
     gl.drawArrays(gl.POINTS, 0, this.figure.count);
     gl.disableVertexAttribArray(attributes.pos);
     gl.disableVertexAttribArray(attributes.data);
