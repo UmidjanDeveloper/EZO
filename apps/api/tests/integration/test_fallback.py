@@ -31,8 +31,15 @@ async def test_all_providers_failing_returns_error_event(
     name, error = events[-1]
     assert name == "error"
     assert error["code"] == "all_providers_failed"
-    assert "API key" in error["hint"]
+    # In the conversation's language, with what to check and how to restart.
+    assert "AI kaliti rad etildi" in error["hint"]
+    assert "AIza" in error["hint"] and "--force-recreate" in error["hint"]
     assert len(error["attempts"]) == 2
+
+    # The status screen now knows the keys were rejected (no key content is exposed).
+    status = (await client.get("/api/status")).json()
+    results = {p["name"]: p["last_result"] for p in status["providers"] if p["configured"]}
+    assert results == {"anthropic": "auth", "openai": "auth"}
 
     run = (await client.get(f"/api/agent-runs/{error['run_id']}")).json()
     assert run["status"] == "failed"

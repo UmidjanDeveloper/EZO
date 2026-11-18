@@ -16,6 +16,40 @@ KNOWN_PROVIDERS: dict[str, str] = {
 }
 
 
+# Key shapes the providers issue today. A mismatch is a warning, never a refusal: shapes
+# can change, and the provider's own answer stays the final word.
+_KEY_PREFIXES: dict[str, tuple[str, ...]] = {
+    "gemini": ("AIza",),
+    "openai": ("sk-",),
+    "anthropic": ("sk-ant-",),
+}
+_DEFAULT_OPENAI_URL = "https://api.openai.com/v1"
+
+
+def key_warnings(settings: Settings) -> dict[str, str]:
+    """Providers whose configured key does not look like one they issue (code per provider).
+
+    Only the prefix is inspected; nothing about the key is returned or logged.
+    """
+    keys = {
+        "gemini": settings.gemini_api_key,
+        "openai": settings.openai_api_key,
+        "anthropic": settings.anthropic_api_key,
+    }
+    warnings: dict[str, str] = {}
+    for name, secret in keys.items():
+        if not secret:
+            continue
+        if (
+            name == "openai"
+            and (settings.openai_base_url or _DEFAULT_OPENAI_URL).rstrip("/") != _DEFAULT_OPENAI_URL
+        ):
+            continue  # an OpenAI-compatible service issues its own key format
+        if not secret.get_secret_value().strip().startswith(_KEY_PREFIXES[name]):
+            warnings[name] = "unexpected_key_format"
+    return warnings
+
+
 def build_providers(settings: Settings) -> dict[str, ModelProvider]:
     timeout = settings.provider_timeout_seconds
     providers: dict[str, ModelProvider] = {}

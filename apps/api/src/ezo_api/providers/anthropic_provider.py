@@ -9,7 +9,7 @@ from typing import Any
 import anthropic
 
 from ezo_api.providers.base import ModelProvider
-from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_status
+from ezo_api.providers.errors import ProviderError, ProviderErrorKind, kind_from_error
 from ezo_api.providers.types import (
     Capability,
     ChatMessage,
@@ -78,7 +78,10 @@ class AnthropicProvider(ModelProvider):
             raise ProviderError(self.name, ProviderErrorKind.UNAVAILABLE, str(exc)) from exc
         except anthropic.APIStatusError as exc:
             raise ProviderError(
-                self.name, kind_from_status(exc.status_code), exc.message, exc.status_code
+                self.name,
+                kind_from_error(exc.status_code, exc.message),
+                exc.message,
+                exc.status_code,
             ) from exc
 
         usage = getattr(final, "usage", None)

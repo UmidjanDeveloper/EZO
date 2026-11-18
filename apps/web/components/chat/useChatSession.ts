@@ -36,7 +36,7 @@ interface Options {
  * receiving the streamed reply. Shared by typed chat and voice conversation.
  */
 export function useChatSession({ conversationId: initialId, projectId }: Options) {
-  const { refreshConversations } = useApp();
+  const { refreshConversations, refreshStatus } = useApp();
   const pathname = usePathname();
 
   const [conversationId, setConversationId] = useState<string | undefined>(initialId);
@@ -225,6 +225,8 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
             signal({ type: "error" });
             final = null;
             updateLast((message) => ({ ...message, streaming: false, error, runId: error.run_id }));
+            // A provider failure updates what the status screen knows (e.g. a rejected key).
+            if (error.code === "all_providers_failed") void refreshStatus();
           }
         }
       } catch (error) {
@@ -241,7 +243,7 @@ export function useChatSession({ conversationId: initialId, projectId }: Options
       }
       return final;
     },
-    [conversationId, libraryId, projectId, refreshConversations, signal, streaming, updateLast],
+    [conversationId, libraryId, projectId, refreshConversations, refreshStatus, signal, streaming, updateLast],
   );
 
   const stop = useCallback(() => abortRef.current?.abort(), []);
