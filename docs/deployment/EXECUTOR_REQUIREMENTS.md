@@ -1,5 +1,11 @@
 # Separate executor host — requirements
 
+> **Owner's own PC (2026-11-18, owner approved):** the `documents` docker compose profile
+> runs the same per-document executor locally: `document-worker` (trusted controller, with
+> the Docker socket) + `executor-image`. It is for the local single-owner setup only; the
+> requirements below still apply to any shared or hosted deployment. See
+> `docs/master/EZO_OWNER_TEST_UZ.md`.
+
 - **Status:** BLOCKED (no host, no Oracle connector).
 - **Status:** REQUIRES OWNER APPROVAL.
 
