@@ -323,7 +323,7 @@ function LibraryGroup({
               type="button"
               onClick={() => setShowCapabilities(false)}
               className="text-ink-faint hover:text-ink"
-              aria-label="Close"
+              aria-label={m.common.close}
             >
               <X size={14} />
             </button>
