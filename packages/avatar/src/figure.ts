@@ -49,6 +49,50 @@ export interface Figure {
   counts: Record<KindName, number>;
   /** Filled silhouette (x, y pairs, triangles) used to hide what is behind the figure. */
   silhouette: Float32Array;
+  /**
+   * Pairs of point indices drawn as thin 1 px segments: neighbours along the same contour,
+   * ridge or vein, so the lines read as continuous filaments rather than dotted rows.
+   */
+  lines: Uint32Array;
+}
+
+// Point kinds that are drawn along their own sequence as contour filaments, and the longest
+// gap (in figure units) a segment may bridge before the line is considered broken.
+const LINE_GAP: Partial<Record<KindName, number>> = {
+  head: 0.03,
+  body: 0.05,
+  outline: 0.03,
+  vein: 0.03,
+  terrain: 0.25,
+};
+
+/** Segments between consecutive points of the same kind that lie close together. */
+export function contourLines(positions: Float32Array, data: Float32Array, count: number): Uint32Array {
+  const gaps = new Map<number, number>(Object.entries(LINE_GAP).map(([kind, gap]) => [KIND[kind as KindName], gap]));
+  const pairs: number[] = [];
+  const near = (a: number, b: number, gap: number) => {
+    const dx = positions[a * 3]! - positions[b * 3]!;
+    const dy = positions[a * 3 + 1]! - positions[b * 3 + 1]!;
+    const dz = positions[a * 3 + 2]! - positions[b * 3 + 2]!;
+    return dx * dx + dy * dy + dz * dz <= gap * gap;
+  };
+  let lastCrest = -1;
+  for (let i = 1; i < count; i++) {
+    const kind = data[i * 4]!;
+    const gap = gaps.get(kind);
+    if (gap === undefined) continue;
+    if (kind === KIND.terrain) {
+      // Ridges advance along x with dust below each crest: join crest to crest only
+      // (crests are the bright points, dust stays at or below half brightness).
+      if (data[i * 4 + 2]! <= 0.52) continue;
+      if (positions[i * 3 + 2]! < -4.2) continue; // distant ranges stay as dust, not wires
+      if (lastCrest >= 0 && near(lastCrest, i, gap)) pairs.push(lastCrest, i);
+      lastCrest = i;
+      continue;
+    }
+    if (data[(i - 1) * 4] === kind && near(i - 1, i, gap)) pairs.push(i - 1, i);
+  }
+  return new Uint32Array(pairs);
 }
 
 export const HEAD_CENTER = { x: 0, y: 0.62 } as const;
@@ -466,20 +510,24 @@ function addFeatures(b: Builder, density: number): void {
 
 function addTerrain(b: Builder, step: number, fill: number, seed: number): void {
   const r = b.random;
-  // Ridge lines at increasing distance: bright crests with dust below them.
-  for (let layer = 0; layer < 5; layer++) {
-    const z = -2.6 - layer * 1.5;
-    const base = -1.2 + layer * 0.14;
-    const amp = 1.0 + layer * 0.3;
-    const dx = step * (1 + layer * 0.45);
-    for (let x = -4 - layer * 1.6; x <= 4 + layer * 1.6; x += dx) {
+  // Ridge lines at increasing distance: bright crests with dust below them. Layer -1 is a
+  // near range beside the shoulders, the brightest, as in a landscape lit from the figure.
+  for (let layer = -1; layer < 5; layer++) {
+    const near = layer < 0;
+    const z = near ? -1.7 : -2.6 - layer * 1.5;
+    const base = near ? -1.45 : -1.2 + layer * 0.14;
+    const amp = near ? 0.75 : 1.0 + layer * 0.3;
+    const dx = step * (near ? 0.9 : 1 + layer * 0.45);
+    const reach = near ? 3.6 : 4 + layer * 1.6;
+    for (let x = -reach; x <= reach; x += dx) {
       const px = x + (r() - 0.5) * dx;
-      const sides = 0.2 + 0.8 * smoothstep(0.7, 2.6 + layer * 0.6, Math.abs(px)); // low behind the figure
+      if (near && Math.abs(px) < 1.55) continue; // only beside the shoulders
+      const sides = 0.2 + 0.8 * smoothstep(0.7, 2.6 + Math.max(0, layer) * 0.6, Math.abs(px)); // low behind the figure
       const ridge = ridges(px * 0.42 + layer * 3.1, layer * 7.3, seed);
       const crestY = base + amp * smoothstep(0.12, 0.62, ridge) * sides * 1.15;
       const lava = r() < 0.12 * sides ? 1 : 0;
       b.push("terrain", px, crestY, z, 0.55 + 0.45 * sides, lava);
-      for (let k = 0; k < fill; k++) {
+      for (let k = 0; k < (near ? Math.min(fill, 1) : fill); k++) {
         const drop = Math.abs(gaussian(r)) * 0.35 * (0.4 + sides);
         const glint = r() < 0.02 ? 1 : 0; // occasional warm spark on the slopes
         b.push("terrain", px + (r() - 0.5) * dx * 3, crestY - drop, z + (r() - 0.5) * 0.4, Math.max(0.08, 0.5 - drop) * sides, glint);
@@ -510,18 +558,22 @@ export function buildFigure(options: FigureOptions): Figure {
   addHead(b, high ? 0.026 : 0.034, high ? 175 : 112);
   addBodyContours(b, high ? 0.034 : 0.05, high ? 0.011 : 0.02);
   addOutline(b, high ? 0.006 : 0.011);
-  addHalo(b, high ? 5600 : 1500);
+  addHalo(b, high ? 5600 : 1200);
   addVeins(b, high ? 0.006 : 0.01);
   addCore(b, high ? 900 : 420);
   addEmblem(b);
   if (options.style !== "holographic") addFeatures(b, high ? 1 : 0.6);
   if (options.terrain) addTerrain(b, high ? 0.016 : 0.028, high ? 3 : 2, seed);
+  const count = Object.values(b.counts).reduce((sum, n) => sum + n, 0);
+  const positions = new Float32Array(b.positions);
+  const data = new Float32Array(b.data);
   return {
-    count: Object.values(b.counts).reduce((sum, n) => sum + n, 0),
-    positions: new Float32Array(b.positions),
-    data: new Float32Array(b.data),
+    count,
+    positions,
+    data,
     extra: new Float32Array(b.extra),
     counts: b.counts,
     silhouette: silhouette(0.02),
+    lines: contourLines(positions, data, count),
   };
 }

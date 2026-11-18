@@ -77,3 +77,23 @@ it("holographic profile keeps contour anatomy and voice light without illustrati
   for (const part of ["head", "body", "core", "terrain"] as const) expect(figure.counts[part]).toBeGreaterThan(0);
   expect(figure.positions.every(Number.isFinite)).toBe(true);
 });
+
+it("joins neighbouring points of one contour into short filaments, never across kinds", () => {
+  const figure = buildFigure({ quality: "high", terrain: true, style: "holographic" });
+  const { lines, positions, data } = figure;
+  expect(lines.length % 2).toBe(0);
+  expect(lines.length / 2).toBeGreaterThan(figure.count / 3);
+  const kinds = new Set<number>();
+  for (let k = 0; k < lines.length; k += 2) {
+    const a = lines[k]!;
+    const b = lines[k + 1]!;
+    expect(a).toBeLessThan(b);
+    expect(b).toBeLessThan(figure.count);
+    expect(data[a * 4]).toBe(data[b * 4]);
+    kinds.add(data[a * 4]!);
+    const d = Math.hypot(positions[a * 3]! - positions[b * 3]!, positions[a * 3 + 1]! - positions[b * 3 + 1]!, positions[a * 3 + 2]! - positions[b * 3 + 2]!);
+    expect(d).toBeLessThanOrEqual(0.25 + 1e-6);
+  }
+  for (const kind of [KIND.head, KIND.body, KIND.outline, KIND.vein, KIND.terrain]) expect(kinds.has(kind)).toBe(true);
+  expect(kinds.has(KIND.halo)).toBe(false); // the spray stays loose particles
+});
