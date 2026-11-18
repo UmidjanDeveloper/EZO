@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from ezo_api.core.text import normalize
+from ezo_api.developer.requests import is_build_request
+from ezo_api.language.targets import LANGUAGE_ACTIVITY
 
 
 class Intent(StrEnum):
@@ -58,6 +60,15 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\bspeak english\b", 3),
         (r"\bjob interview\b", 1.5),
         (r"\btil o'rgan", 2),
+        # Any practice language with an exam or practice word: "rus tilidan imtihon ol",
+        # "nemis tilida gaplashamiz", "test my French", "проверь мой испанский уровень".
+        (LANGUAGE_ACTIVITY, 3.5),
+        (
+            r"\b(imtihon ol|imtihonchi|examiner bo'l|be my examiner|darajamni (aniqla|tekshir|bil)|"
+            r"test my level|check my level|placement test|level test|проэкзаменуй|экзаменатор|"
+            r"провер\w* (мой )?уровень)",
+            3,
+        ),
         (r"\bлексик", 1),
     ],
     Intent.PRESENTATION: [
@@ -76,7 +87,7 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
     Intent.DEVELOPER: [
         (r"\bgithub\b", 3),
         (r"\bgit\b", 2),
-        (r"\bbug", 2.5),
+        (r"\bbug(s|gy|fix\w*)?\b|\bbaglar\b", 2.5),  # not "bugun" (today)
         (r"\bdebug", 3),
         (r"\brepo(sitory)?\b", 2.5),
         (r"\bpull request\b", 3),
@@ -268,6 +279,11 @@ def classify_intent(text: str) -> IntentResult:
             if found:
                 scores[intent] = scores.get(intent, 0.0) + weight
                 matched.setdefault(intent, []).append(found.group(0))
+
+    if is_build_request(text):
+        # "Kafe uchun sayt tuzib ber", "build me a todo app": the Developer Agent builds it.
+        scores[Intent.DEVELOPER] = scores.get(Intent.DEVELOPER, 0.0) + 4.0
+        matched.setdefault(Intent.DEVELOPER, []).append("build_request")
 
     readable_scores = {i.value: s for i, s in sorted(scores.items(), key=lambda kv: -kv[1])}
     if not scores:

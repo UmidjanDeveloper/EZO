@@ -71,6 +71,7 @@ async def start_session(
     mode: str,
     cefr: str | None,
     ui_language: str,
+    language: str = "en",
 ) -> LanguageSession:
     """Start a session; an unfinished one in the same conversation is closed as abandoned."""
     previous = await active_session(db, user_id, conversation_id)
@@ -87,7 +88,7 @@ async def start_session(
         conversation_id=conversation_id,
         project_id=project_id,
         mode=mode,
-        language="en",
+        language=language,
         cefr_target=cefr,
         status="active",
         ielts_part=1 if mode == "ielts" else None,

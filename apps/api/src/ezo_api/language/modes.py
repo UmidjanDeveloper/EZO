@@ -19,11 +19,20 @@ Mode = Literal[
     "job_interview",
     "travel",
     "business",
+    "exam",
 ]
 Command = Literal["practice", "finish", "progress"]
 
 _MODES: tuple[tuple[Mode, re.Pattern[str]], ...] = (
     ("ielts", re.compile(r"\b(ielts|mock (speaking )?test|speaking test|speaking exam)")),
+    (
+        "exam",
+        re.compile(
+            r"\b(imtihon|ekzamen|examiner|exam\b|darajam\w*|sinab ko'r|test my|check my level|"
+            r"level test|placement test|cefr test|экзамен|проэкзаменуй|тест на уровень|"
+            r"провер\w* (мой |мои )?(уровень|знани)|имтиҳон)"
+        ),
+    ),
     (
         "job_interview",
         re.compile(r"\b(job interview|interview practice|ish (uchun )?suhbat|собеседован)"),
@@ -119,6 +128,7 @@ MODE_GUIDE: dict[str, str] = {
     "debate": "Run a friendly debate: take the opposite position, give one argument at a time and ask the learner to respond.",
     "job_interview": "Act as a professional job interviewer. Ask one realistic interview question at a time and follow up on the answers.",
     "travel": "Role-play travel situations (airport, hotel, restaurant, directions). Play the other person in the scene.",
+    "exam": "",  # the exam simulator gives its own per-part instructions (language/exam.py)
     "business": "Practise business English: meetings, emails, negotiations and small talk with colleagues. Play the other person.",
 }
 
