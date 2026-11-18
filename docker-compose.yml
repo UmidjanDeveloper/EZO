@@ -6,6 +6,9 @@
 #
 #   docker compose --profile voice up   also start the optional VoiceStudio voice service
 #
+#   Reading PDF/DOCX/EPUB/scans: put COMPOSE_PROFILES=documents in .env, then
+#   docker compose up -d --build   (see the "document-worker" service below)
+#
 # Secrets (API keys) come from the .env file in this folder.
 
 services:
@@ -29,12 +32,15 @@ services:
 
   api:
     build: ./apps/api
+    image: ezo-api:local
     env_file:
       - path: .env
         required: false
     environment:
       DATABASE_URL: postgresql+psycopg://ezo:ezo@db:5432/ezo
       EZO_CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      # "documents" in COMPOSE_PROFILES sends PDF/DOCX/EPUB/images to the document worker.
+      EZO_DOCUMENT_WORKER: ${COMPOSE_PROFILES:-}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -75,6 +81,61 @@ services:
     memswap_limit: 512m
     pids_limit: 64
     stop_grace_period: 30s
+
+  # Reading PDF, DOCX, EPUB and scanned pages (OCR) on YOUR OWN PC. Turn on with
+  # COMPOSE_PROFILES=documents in .env. The worker is the trusted controller: it opens each
+  # uploaded file in its own locked-down container (no network, read-only, 768 MiB, 64
+  # processes, 25 s, no capabilities, UID 10001) and needs the Docker socket to do that.
+  # The owner approved this for the local single-owner setup (2026-11-18); do not use this
+  # profile on a shared server — there the executor runs on a separate host
+  # (docs/deployment/EXECUTOR_REQUIREMENTS.md). The API itself never gets the socket.
+  executor-image:
+    profiles: [documents]
+    build:
+      context: ./apps/api
+      dockerfile: src/ezo_api/documents/executor/Dockerfile
+      additional_contexts:
+        ezo-api-image: service:api
+      args:
+        API_IMAGE: ezo-api-image
+    image: ezo-executor:local
+    # Only builds the image; the worker starts one short-lived container per document.
+    entrypoint: ["/bin/true"]
+    network_mode: none
+    restart: "no"
+
+  document-worker:
+    profiles: [documents]
+    build:
+      context: ./apps/api
+      dockerfile: docker/document-worker.Dockerfile
+      additional_contexts:
+        ezo-api-image: service:api
+      args:
+        API_IMAGE: ezo-api-image
+    environment:
+      DATABASE_URL: postgresql+psycopg://ezo:ezo@db:5432/ezo
+      EZO_EXECUTOR_IMAGE: ezo-executor:local
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      executor-image:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    memswap_limit: 512m
+    pids_limit: 64
+    stop_grace_period: 40s
 
   web:
     build:

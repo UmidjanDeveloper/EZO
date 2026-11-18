@@ -58,6 +58,8 @@ _PUBLIC_META = (
 )
 # Counted per user and day for owner-managed accounts (the owner is unlimited).
 DOCUMENT_QUOTA = [Depends(require_quota("document_jobs_per_day"))]
+# Read only by the isolated document worker (never parsed in the API process).
+_WORKER_EXTENSIONS = (".pdf", ".docx", ".epub", ".png", ".jpg", ".jpeg")
 
 
 def _rejected(exc: UploadRejectedError | FetchError) -> HTTPException:
@@ -155,6 +157,7 @@ async def knowledge_status(
             ALLOWED_EXTENSIONS
             if native_fixtures_allowed()
             else [".txt", ".md", ".markdown", ".csv"]
+            + (list(_WORKER_EXTENSIONS) if services.settings.document_worker else [])
         ),
         documents=sum(by_status.values()),
         chunks=int(chunks or 0),
@@ -205,6 +208,12 @@ async def upload_document(
     project_id: uuid.UUID | None = Form(default=None),  # noqa: B008
 ) -> UploadOut:
     await _check_project(session, user.id, project_id)
+    filename = file.filename or "file"
+    native = filename.lower().endswith(_WORKER_EXTENSIONS) and not native_fixtures_allowed()
+    if native:
+        return await _upload_to_document_worker(
+            session, user, services, response, file, filename, project_id
+        )
     limit = services.settings.max_upload_bytes
     data = await file.read(limit + 1)
     if len(data) > limit:
@@ -240,6 +249,79 @@ async def upload_document(
         document=await _document_out(session, result.document),
         duplicate=result.duplicate,
         new_revision=result.new_revision,
+    )
+
+
+async def _upload_to_document_worker(
+    session: AsyncSession,
+    user: Any,
+    services: Any,
+    response: Response,
+    file: UploadFile,
+    filename: str,
+    project_id: uuid.UUID | None,
+) -> UploadOut:
+    """PDF/DOCX/EPUB/images go to the isolated document worker, never the API process.
+
+    The worker (docker compose profile "documents") reads each file in its own locked-down
+    container; the document becomes a normal knowledge document once it is indexed.
+    """
+    if not services.settings.document_worker:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "isolation_unavailable",
+                "message": "Reading PDF, DOCX, EPUB and images needs EZO's isolated document "
+                "worker. Add COMPOSE_PROFILES=documents to .env, then run: "
+                "docker compose up -d --build",
+            },
+        )
+    from ezo_api.documents.executor.protocol import MAX_INPUT_BYTES
+    from ezo_api.knowledge.jobs.service import JobError
+    from ezo_api.student.ingestion import StudentIngestion
+
+    data = await file.read(MAX_INPUT_BYTES + 1)
+    if len(data) > MAX_INPUT_BYTES:
+        raise HTTPException(
+            413, detail={"code": "too_large", "message": "Documents can be up to 5 MB."}
+        )
+    try:
+        job = await StudentIngestion(services.db).submit_raw(
+            user.id, project_id, filename, data, None
+        )
+    except JobError as exc:
+        raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
+    document = await session.get(KnowledgeDocument, job.document_id)
+    if document is None:  # pragma: no cover - created in the same call
+        raise HTTPException(500, detail={"code": "internal", "message": "Upload was lost."})
+    duplicate = document.status != "queued" or job.state != "queued"
+    if duplicate:
+        response.status_code = 200
+    else:
+        # Chat file tools (merge, split, convert) read the stored file; the worker reads its
+        # own immutable raw revision. Both hold the same bytes.
+        from ezo_api.knowledge.uploads import extension_of, sanitize_filename
+
+        key = (
+            f"uploads/{user.id}/{project_id or 'inbox'}/"
+            f"{document.content_hash[:2]}/{document.content_hash}"
+            f"{extension_of(sanitize_filename(filename))}"
+        )
+        await services.storage.put(key, data)
+        document.storage_key = key
+        audit(
+            session,
+            user.id,
+            "knowledge.upload",
+            "document",
+            document.id,
+            {"filename": document.filename, "worker": "isolated"},
+        )
+        await session.commit()
+    return UploadOut(
+        document=await _document_out(session, document),
+        duplicate=duplicate,
+        new_revision=not duplicate,
     )
 
 
