@@ -262,3 +262,23 @@ bilan) bo‘lishi kerak; aks holda sahifada sariq belgi chiqadi.
    Tuman markazida raqam yangilanadi (manba: telegram), «Xatlov qalay ketyapti?» shu bilan javob beradi.
 
 Notanish odamlarning xabarlariga bot javob bermaydi.
+
+## Kompyuterni boshqarish — har amal sizning tasdig‘ingiz bilan (2026-11-19)
+
+1. Kompyuteringizga **EZO desktop** ilovasini o‘rnating, **Sozlamalar → JARVIS → «Bu kompyuterni
+   ulash»** (kodni EZO’ning JARVIS sahifasida tasdiqlaysiz), keyin
+   **«Kompyuterni boshqarish»** belgisini yoqing (sukut bo‘yicha o‘chiq).
+2. Chatda yoki JARVIS sahifasida yozing:
+   - «Kalkulyatorni och», «Kompyuterda Wordni och» (Kalkulyator, Bloknot, Paint, Provodnik,
+     Word, Excel, PowerPoint);
+   - «Yuklamalar papkasida nima bor?» (Hujjatlar, Ish stoli ham);
+   - «Ish stolidagi hisobot.docx faylini och», bo‘sh joyli nom qo‘shtirnoqda:
+     «Yuklamalardagi «Oylik hisobot.xlsx» ni och»;
+   - «https://lex.uz saytini och».
+3. EZO vazifa yaratadi va **kutadi**: JARVIS sahifasida (yoki kompyuterdagi oynada) aniq nima
+   bajarilishi yoziladi — «Ruxsat beraman» bosganingizdagina kompyuter bajaradi va imzolangan
+   natijani qaytaradi.
+
+Hech qachon: .exe, .bat, skriptlar va boshqa dasturlar ochilmaydi; papkadan tashqariga chiqilmaydi;
+o‘chirish, o‘rnatish yoki buyruq qatori yo‘q. Rad etsangiz yoki «Kompyuterni boshqarish» o‘chiq
+bo‘lsa, hech narsa bajarilmaydi.

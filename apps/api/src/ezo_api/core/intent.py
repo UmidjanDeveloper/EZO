@@ -26,6 +26,9 @@ class Intent(StrEnum):
     DOCUMENT = "document"
     BUSINESS = "business"
     VISUAL = "visual"
+    COMPUTER = "computer"
+    """An action on the owner's paired computer (chosen by EzoCore's override when the words
+    name one of the fixed computer actions)."""
     CHANCERY = "chancery"
     """Devonxona: citizens' appeals, meetings and their tasks, office reports."""
     DISTRICT = "district"

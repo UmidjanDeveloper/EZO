@@ -29,7 +29,19 @@ import { createActions } from "./actions";
 import { createEzoClient, EzoApiError, type JarvisTaskView, type ServerStatus } from "./api";
 import { createAssistant } from "./assistant";
 import { findFiles, isInsideAllowed } from "./files";
-import { buildResult, generateDeviceKey, latestDocuments, pairingRequest, validWork, type DeviceKey } from "./jarvis";
+import {
+  buildPcResult,
+  buildResult,
+  generateDeviceKey,
+  latestDocuments,
+  pairingRequest,
+  runPcAction,
+  validPcWork,
+  validWork,
+  type DeviceKey,
+  type PcApp,
+  type PcDeps,
+} from "./jarvis";
 import type { Lang } from "./replies";
 import { runSelfTest } from "./selftest";
 import { ALLOWED_SHORTCUTS, sanitizeSettings, type DesktopSettings } from "./settings";
@@ -233,6 +245,21 @@ async function followTasks(): Promise<void> {
     }
     trackedTasks.set(taskId, task);
     const step = task.steps.find((s) => s.state === "awaiting_authorization" && s.scope_sha256);
+    if (step && !askedSteps.has(step.id) && step.output.pc) {
+      askedSteps.add(step.id);
+      tell("tasks", taskSummaries());
+      const { response } = await dialog.showMessageBox({
+        type: "warning",
+        buttons: [t().dialogs.pcAllow, t().dialogs.deny],
+        defaultId: 1,
+        cancelId: 1,
+        title: t().dialogs.jarvisApproveTitle,
+        message: t().dialogs.pcApprove,
+        detail: step.output.pc.description,
+      });
+      await api.decideJarvisStep(task.id, step.id, step.scope_sha256!, response === 0);
+      continue;
+    }
     if (step && !askedSteps.has(step.id)) {
       askedSteps.add(step.id);
       tell("tasks", taskSummaries());
@@ -271,6 +298,18 @@ async function pollJarvis(): Promise<void> {
   try {
     const api = client();
     for (const item of await api.deviceWork(deviceId)) {
+      if (validPcWork(item, deviceId, Math.floor(Date.now() / 1000))) {
+        // Approved on the server for exactly this action and computer; also needs the
+        // owner's switch on this computer.
+        const outcome = settings.allowPcControl
+          ? await runPcAction(item, pcDeps()).catch((error: unknown) => ({
+              refused: error instanceof Error ? error.message.slice(0, 200) : "The action failed.",
+            }))
+          : { refused: t().dialogs.pcOff };
+        const task = await api.submitDeviceResult(deviceId, buildPcResult(item, key, outcome));
+        tell("notice", task.report || format(t().dialogs.taskReport, { state: task.state }));
+        continue;
+      }
       if (!validWork(item, deviceId, Math.floor(Date.now() / 1000))) continue;
       let outcome: Parameters<typeof buildResult>[2];
       if (!settings.jarvisFolder) {
@@ -331,6 +370,25 @@ const actions = createActions({
   openPath: (target) => shell.openPath(target),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 });
+
+const OFFICE_APPS: Partial<Record<PcApp, string>> = { word: "winword", excel: "excel", powerpoint: "powerpnt" };
+
+function pcDeps(): PcDeps {
+  return {
+    folders: { downloads: app.getPath("downloads"), documents: app.getPath("documents"), desktop: app.getPath("desktop") },
+    async openApp(id) {
+      const office = OFFICE_APPS[id];
+      if (office) {
+        if (process.platform !== "win32") throw new Error("Office apps are opened on Windows only.");
+        await run("cmd.exe", ["/c", "start", "", office]); // fixed arguments, no user text
+        return;
+      }
+      await actions.openApp(id as "calculator" | "notepad" | "paint" | "explorer");
+    },
+    openPath: (target) => shell.openPath(target),
+    openExternal: (url) => shell.openExternal(url),
+  };
+}
 
 async function captureScreen(): Promise<Uint8Array> {
   const display = screen.getPrimaryDisplay();

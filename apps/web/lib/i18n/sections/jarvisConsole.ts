@@ -11,6 +11,10 @@ const uz = {
     documentConvertPdf: "PDF’ga aylantirish",
     documentReportPdf: "Foizlar hisoboti",
     telegramSend: "Telegram’ga yuborish",
+    pcOpenApp: "Kompyuterda dastur ochish",
+    pcListFolder: "Papka ro‘yxati",
+    pcOpenFile: "Kompyuterda fayl ochish",
+    pcOpenUrl: "Brauzerda sayt ochish",
   },
   states: {
     queued: "navbatda",
@@ -52,6 +56,7 @@ const uz = {
   approval: {
     /** {recipient} is the recipient label, optionally followed by the Telegram name in parentheses. */
     question: "Telegram’da {recipient}ga yuborilsinmi?",
+    pcQuestion: "Kompyuterda bajarilsinmi?",
     approve: "Ruxsat beraman",
     reject: "Rad etish",
   },
@@ -74,6 +79,10 @@ const en: Section = {
     documentConvertPdf: "Convert to PDF",
     documentReportPdf: "Percentage report",
     telegramSend: "Send on Telegram",
+    pcOpenApp: "Open an app on the computer",
+    pcListFolder: "Folder listing",
+    pcOpenFile: "Open a file on the computer",
+    pcOpenUrl: "Open a site in the browser",
   },
   states: {
     queued: "queued",
@@ -113,6 +122,7 @@ const en: Section = {
   },
   approval: {
     question: "Send to {recipient} on Telegram?",
+    pcQuestion: "Do this on the computer?",
     approve: "Allow",
     reject: "Decline",
   },
@@ -134,6 +144,10 @@ const ru: Section = {
     documentConvertPdf: "Преобразование в PDF",
     documentReportPdf: "Отчёт по процентам",
     telegramSend: "Отправка в Telegram",
+    pcOpenApp: "Открыть программу на компьютере",
+    pcListFolder: "Список папки",
+    pcOpenFile: "Открыть файл на компьютере",
+    pcOpenUrl: "Открыть сайт в браузере",
   },
   states: {
     queued: "в очереди",
@@ -173,6 +187,7 @@ const ru: Section = {
   },
   approval: {
     question: "Отправить {recipient} в Telegram?",
+    pcQuestion: "Выполнить на компьютере?",
     approve: "Разрешаю",
     reject: "Отклонить",
   },

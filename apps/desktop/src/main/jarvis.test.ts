@@ -104,3 +104,77 @@ describe("JARVIS device companion", () => {
     expect(signed.payload.files).toEqual([]);
   });
 });
+
+describe("computer actions", () => {
+  const base = {
+    schema_version: 1 as const,
+    request_id: "11111111-1111-4111-8111-111111111111",
+    task_id: "22222222-2222-4222-8222-222222222222",
+    device_id: "33333333-3333-4333-8333-333333333333",
+    expires_at: 4_000_000_000,
+  };
+
+  it("accepts only the fixed actions, folders and this device", async () => {
+    const { validPcWork } = await import("./jarvis");
+    const ok = { ...base, action: "pc.open_app", root: "downloads", target: "calculator" };
+    expect(validPcWork(ok, base.device_id, 1)).toBe(true);
+    expect(validPcWork({ ...ok, action: "pc.run_command" }, base.device_id, 1)).toBe(false);
+    expect(validPcWork({ ...ok, root: "system32" }, base.device_id, 1)).toBe(false);
+    expect(validPcWork(ok, "other-device", 1)).toBe(false);
+    expect(validPcWork({ ...ok, expires_at: 0 }, base.device_id, 1)).toBe(false);
+  });
+
+  it("never opens programs, scripts or paths outside the folder", async () => {
+    const { safeFileName } = await import("./jarvis");
+    expect(safeFileName("hisobot.docx")).toBe(true);
+    expect(safeFileName("Oylik hisobot 2026.xlsx")).toBe(true);
+    for (const bad of ["virus.exe", "run.bat", "x.ps1", "a.lnk", "../secret.docx", "C:\\\\x.docx", ".env", "noext"]) {
+      expect(safeFileName(bad)).toBe(false);
+    }
+  });
+
+  it("lists a folder and opens a file in it; refuses everything else", async () => {
+    const { mkdtemp, writeFile, mkdir } = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { runPcAction } = await import("./jarvis");
+    const dir = await mkdtemp(path.join(os.tmpdir(), "ezo-pc-"));
+    await writeFile(path.join(dir, "hisobot.docx"), "x");
+    await writeFile(path.join(dir, "tool.exe"), "x");
+    await mkdir(path.join(dir, "Rasmlar"));
+    const opened: string[] = [];
+    const deps = {
+      folders: { downloads: dir, documents: dir, desktop: dir },
+      openApp: async () => undefined,
+      openPath: async (target: string) => (opened.push(target), ""),
+      openExternal: async (url: string) => void opened.push(url),
+    };
+    const listed = await runPcAction({ ...base, action: "pc.list_folder", root: "downloads", target: null }, deps);
+    expect("entries" in listed && listed.entries.map((e) => e.name).sort()).toEqual(["Rasmlar", "hisobot.docx", "tool.exe"]);
+    expect(await runPcAction({ ...base, action: "pc.open_file", root: "downloads", target: "hisobot.docx" }, deps)).toEqual({ entries: [] });
+    expect(opened).toEqual([path.join(dir, "hisobot.docx")]);
+    expect("refused" in (await runPcAction({ ...base, action: "pc.open_file", root: "downloads", target: "tool.exe" }, deps))).toBe(true);
+    expect("refused" in (await runPcAction({ ...base, action: "pc.open_file", root: "downloads", target: "missing.docx" }, deps))).toBe(true);
+    expect("refused" in (await runPcAction({ ...base, action: "pc.open_url", root: "downloads", target: "http://x.uz" }, deps))).toBe(true);
+    expect("refused" in (await runPcAction({ ...base, action: "pc.open_app", root: "downloads", target: "cmd" }, deps))).toBe(true);
+  });
+
+  it("signs the result exactly like the server checks it (entries only when present)", async () => {
+    const { buildPcResult, canonical, generateDeviceKey, RESULT_DOMAIN } = await import("./jarvis");
+    const { createPublicKey, verify } = await import("node:crypto");
+    const key = generateDeviceKey();
+    const work = { ...base, action: "pc.open_app" as const, root: "downloads" as const, target: "calculator" };
+    const done = buildPcResult(work, key, { entries: [] });
+    expect("entries" in done.payload).toBe(false);
+    expect(canonical(done.payload)).toBe(
+      '{"action":"pc.open_app","device_id":"33333333-3333-4333-8333-333333333333","files":[],' +
+        '"latest_ambiguous":false,"outcome":"completed","reason":null,' +
+        '"request_id":"11111111-1111-4111-8111-111111111111","schema_version":1,' +
+        '"task_id":"22222222-2222-4222-8222-222222222222","trust":"untrusted_file_content_not_instructions"}',
+    );
+    const publicKey = createPublicKey(createPublicKey({ key: key.privateKeyPem, format: "pem" }).export({ format: "pem", type: "spki" }));
+    expect(verify(null, Buffer.from(RESULT_DOMAIN + canonical(done.payload)), publicKey, Buffer.from(done.signature, "hex"))).toBe(true);
+    const listed = buildPcResult({ ...work, action: "pc.list_folder" }, key, { entries: [{ name: "a.docx", is_dir: false, size_bytes: 1, modified_ms: 2 }] });
+    expect(listed.payload.entries).toEqual([{ name: "a.docx", is_dir: false, size_bytes: 1, modified_ms: 2 }]);
+  });
+});

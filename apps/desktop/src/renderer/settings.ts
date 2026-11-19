@@ -21,6 +21,7 @@ interface DesktopSettings {
   conversationId: string | null;
   jarvisFolder: string | null;
   jarvisDeviceId: string | null;
+  allowPcControl: boolean;
 }
 
 type SettingsStrings = Record<string, string>;
@@ -51,7 +52,7 @@ interface SettingsBridge {
 
 const bridge = (window as unknown as { ezoSettings: SettingsBridge }).ezoSettings;
 const byId = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "lowPower", "clapListening", "clapStartsListening"] as const;
+const FLAGS = ["allowVolume", "allowTyping", "allowScreen", "speakReplies", "allowMicrophone", "lowPower", "clapListening", "clapStartsListening", "allowPcControl"] as const;
 let t: SettingsStrings = {};
 let secure = true;
 let pairingPoll: number | undefined;
