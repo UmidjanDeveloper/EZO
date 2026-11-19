@@ -131,6 +131,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compose file is valid (optional profiles included)
         run: docker compose --profile voice --profile student --profile documents --profile skills config --quiet
+      - name: Primary-host Compose file is valid (deploy/primary)
+        working-directory: deploy/primary
+        run: |
+          set -eu
+          cp primary.env.example primary.env
+          printf 'EZO_DB_ADMIN_PASSWORD=ci\nEZO_DB_APP_PASSWORD=ci\nEZO_API_TOKEN=ci\n' > ci-secrets.env
+          docker compose --env-file ci-secrets.env --env-file primary.env --profile refresh config --quiet
+          bash -n deploy.sh install-backup-timer.sh backup.sh restore-check.sh bootstrap-secrets.sh
+          rm -f primary.env ci-secrets.env
       - name: Build API image
         run: docker build -t ezo-api:ci apps/api
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
