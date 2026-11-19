@@ -48,6 +48,9 @@ import type {
   TranslateRequest,
   TranslateResult,
   TransliterateResult,
+  Appeal,
+  GovMeeting,
+  GovTask,
   DistrictChannels,
   DistrictMember,
   DistrictNotice,
@@ -149,6 +152,26 @@ export function createApiClient(options: ApiClientOptions) {
         { method: "POST" },
       ),
     me: () => request<User>("/api/me"),
+
+    // Devonxona (office)
+    appeals: () => request<Appeal[]>("/api/chancery/appeals"),
+    createAppeal: (body: {
+      applicant: string;
+      summary: string;
+      contact?: string;
+      channel?: string;
+      received_on?: string | null;
+      due_on?: string | null;
+      assignee?: string;
+    }) => request<Appeal>("/api/chancery/appeals", { method: "POST", ...json(body) }),
+    updateAppeal: (id: string, body: { status?: Appeal["status"]; due_on?: string; assignee?: string }) =>
+      request<Appeal>(`/api/chancery/appeals/${id}`, { method: "PATCH", ...json(body) }),
+    govTasks: () => request<GovTask[]>("/api/chancery/tasks"),
+    createGovTask: (body: { title: string; assignee?: string; due_on?: string | null }) =>
+      request<GovTask>("/api/chancery/tasks", { method: "POST", ...json(body) }),
+    updateGovTask: (id: string, body: { status?: GovTask["status"]; due_on?: string }) =>
+      request<GovTask>(`/api/chancery/tasks/${id}`, { method: "PATCH", ...json(body) }),
+    meetings: () => request<GovMeeting[]>("/api/chancery/meetings"),
 
     // District center (Tuman markazi)
     districtChannels: () => request<DistrictChannels>("/api/district/channels"),

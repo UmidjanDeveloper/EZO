@@ -225,3 +225,24 @@ keyin `docker compose up -d --force-recreate api`.
   «amalda» deb da’vo qilmaydi.
 - **Butun bazani** (yuz minglab hujjat) birdaniga tortib olmaydi — bu kunlab davom etadi va
   saytga yuk bo‘ladi. Kerakli aktlar ishlatilgan sari bilim bazasi o‘zi boyib boradi.
+
+## Devonxona: murojaatlar, yig‘ilishlar, topshiriqlar, hisobotlar (2026-11-19)
+
+Chap menyuda **«Devonxona»** (kiruvchi quti belgisi). Hammasini chatda ham aytish mumkin:
+
+- «Yangi murojaat: Karimov Aziz, Navbahor MFY, ko‘cha chirog‘i yonmayapti, virtual qabulxona,
+  Aliyevga topshirilsin» → **M-2026-0001** raqam bilan ro‘yxatga olinadi, muddati 15 kun
+  (sahifada o‘zgartirish mumkin).
+- «M-2026-0001 ga javob xati tayyorla: shu hafta tuzatiladi» → blankada Word **qoralama**.
+  Imzolab yuborgach: «M-2026-0001 ga javob berildi».
+- «Yig‘ilish bayonnomasini tuz: …(qaydlaringiz)…» → bayonnoma (Word, blankada) va undagi har
+  bir topshiriq **T-2026-…** raqami bilan reestrga tushadi (mas’ul va muddati bilan).
+- «T-2026-0003 bajarildi» → bajarilgan deb belgilanadi.
+- «Muddati o‘tganlarni eslat» → mas’ullarga ogohlantirish **qoralamalari** (Tuman markazidagi
+  kabi faqat siz «Yuborish» bosganda SMS/Telegram ketadi).
+- «Haftalik hisobot tayyorla» / «Oylik hisobot» → murojaatlar, topshiriqlar va tuman
+  loyihalari bo‘yicha Word hisobot (faqat bazadagi raqamlar).
+- «Topshiriqlar holati» → muddati o‘tgan va yaqinlashganlar ro‘yxati.
+
+Mas’ul eslatma olishi uchun u **Tuman markazi**dagi mas’ullar ro‘yxatida (telefon yoki Telegram
+bilan) bo‘lishi kerak; aks holda sahifada sariq belgi chiqadi.

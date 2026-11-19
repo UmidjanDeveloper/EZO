@@ -976,3 +976,44 @@ export interface DistrictChannels {
   sms_sender: string | null;
   can_send: boolean;
 }
+
+// --- Devonxona (office) -----------------------------------------------------------------
+
+export type AppealState = "new" | "in_progress" | "answered" | "closed" | "overdue" | "due_soon";
+
+export interface Appeal {
+  id: string;
+  number: string;
+  applicant: string;
+  contact: string;
+  channel: string;
+  summary: string;
+  received_on: string;
+  due_on: string;
+  assignee: string;
+  assignee_known: boolean;
+  status: "new" | "in_progress" | "answered" | "closed";
+  state: AppealState;
+  answered_on: string | null;
+  answer_artifact_id: string | null;
+}
+
+export interface GovTask {
+  id: string;
+  number: string;
+  title: string;
+  assignee: string;
+  assignee_known: boolean;
+  due_on: string | null;
+  status: "open" | "done" | "cancelled";
+  state: "open" | "done" | "cancelled" | "overdue" | "due_soon";
+  done_on: string | null;
+  meeting_id: string | null;
+}
+
+export interface GovMeeting {
+  id: string;
+  title: string;
+  held_on: string;
+  minutes_artifact_id: string | null;
+}

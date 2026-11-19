@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from ezo_api.agents.base import Agent
 from ezo_api.agents.catalog import AGENTS, AgentSpec
+from ezo_api.agents.chancery import ChanceryAgent
 from ezo_api.agents.developer import DeveloperAgent
 from ezo_api.agents.district import DistrictAgent
 from ezo_api.agents.document import DocumentAgent
@@ -44,6 +45,7 @@ class AgentRegistry:
             LegalResearchAgent(),
             LearningAgent(),
             DistrictAgent(),
+            ChanceryAgent(),
             DeveloperAgent(),
         ]:
             self._agents[agent.spec.intent] = agent

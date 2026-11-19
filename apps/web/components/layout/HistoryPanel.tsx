@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   FileStack,
   FolderKanban,
+  Inbox,
   Landmark,
   GraduationCap,
   Layers,
@@ -49,12 +50,13 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/memory", label: m.nav.memory, icon: Brain },
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/district", label: m.nav.district, icon: Landmark },
+    { href: "/chancery", label: m.nav.chancery, icon: Inbox },
     { href: "/jarvis", label: m.nav.jarvis ?? "JARVIS", icon: Bot },
     { href: "/admin", label: m.nav.admin, icon: ShieldCheck },
   ].filter(
     (item) =>
       status?.deployment_profile !== "free-beta" ||
-      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district"].includes(item.href)
+      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district", "/chancery"].includes(item.href)
   );
 
   return (

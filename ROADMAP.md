@@ -153,6 +153,12 @@ images) plus the extended local checks listed for that phase.
 - Next: the real field mapping of the official API once its documentation is available;
   employees reporting their own progress through their accounts or the Telegram bot
 
+### Devonxona — alpha (2026-11-19)
+- Citizens' appeals register (M-YYYY-NNNN, 15-day default deadline, overdue/due-soon computed
+  daily), reply letters on the letterhead, meeting minutes from notes with a task register
+  (T-YYYY-NNNN), reminders as approval-gated notices, weekly/monthly Word reports from the
+  database (migration 0026)
+
 ### Knowledge OS — K1, K2 & K3 done (2026-10-19, Knowledge OS & SkillForge prompt)
 - K1 (done): named knowledge libraries; learned sources — documentation websites
   (one site and folder, robots.txt, polite pacing, page/depth/size/time budgets), GitHub
