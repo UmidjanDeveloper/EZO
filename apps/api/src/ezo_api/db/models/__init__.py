@@ -58,6 +58,7 @@ from ezo_api.db.models.official import LegalDocument, LegalRevision, OfficialSyn
 from ezo_api.db.models.organization import OrganizationAsset, OrganizationProfile
 from ezo_api.db.models.personal import PersonalGoal
 from ezo_api.db.models.project import Project
+from ezo_api.db.models.schedule import ScheduledJob, ScheduledRun
 from ezo_api.db.models.skills import Skill, SkillRun
 from ezo_api.db.models.student import StudentRawRevision
 from ezo_api.db.models.study import StudentLearningPath, StudyCard, StudyReview
@@ -109,6 +110,8 @@ __all__ = [
     "OrganizationProfile",
     "PersonalGoal",
     "Project",
+    "ScheduledJob",
+    "ScheduledRun",
     "Skill",
     "SkillRun",
     "SourceRefreshBlob",

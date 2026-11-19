@@ -226,6 +226,12 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   sheet operations, a document-viewer UI with page thumbnails beyond the first page
 
 ### Phase 5 — Durable tasks, jobs and worker
+- **Done (2026-11-19, Jadval):** recurring jobs stored in the database (migration 0029) and
+  run by the API's background scheduler with a lease per job (two processes never run one
+  job twice; missed times while EZO was off run once): weekly/monthly office report (Word),
+  deadline reminders, district project sync, LEX.UZ re-check; created from chat ("Har
+  dushanba soat 9 da haftalik hisobot tayyorla") or the Jadval page; results kept per run
+  and optionally sent to the owner's own linked Telegram chat; never to other people
 - Persistent Task / Job / JobEvent / JobArtifact / JobApproval, `services/worker` with a real
   durable queue, recovery after restarts; chat never depends on the worker being up.
   Student P1 proposes PostgreSQL leases/fencing first to avoid a mandatory new Redis

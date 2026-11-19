@@ -43,6 +43,7 @@ from ezo_api.api.routes import (
     presentations,
     projects,
     refresh,
+    schedule,
     skills,
     stories,
     student,
@@ -142,6 +143,23 @@ async def _telegram_poller(services: Services) -> None:
         await asyncio.sleep(services.settings.telegram_poll_seconds)
 
 
+async def _scheduler(services: Services) -> None:
+    """Jadval: run due jobs every `EZO_SCHEDULER_SECONDS`. Each job is claimed with a lease,
+    so a second API process never runs the same job at the same time."""
+    from ezo_api.schedule.service import tick
+
+    while True:
+        try:
+            ran = await tick(services)
+            if ran:
+                logger.info("Scheduler: ran %s job(s)", ran)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Scheduler tick failed")
+        await asyncio.sleep(services.settings.scheduler_seconds)
+
+
 def create_app(
     settings: Settings | None = None,
     providers: dict[str, ModelProvider] | None = None,
@@ -212,10 +230,19 @@ def create_app(
                 and settings.environment != "test"
                 else None
             )
+            scheduler = (
+                asyncio.create_task(_scheduler(services))
+                if settings.scheduler_seconds > 0
+                and settings.environment != "test"
+                and settings.deployment_profile != "free-beta"
+                else None
+            )
             yield
         finally:
             if "poller" in locals() and poller is not None:
                 poller.cancel()
+            if "scheduler" in locals() and scheduler is not None:
+                scheduler.cancel()
             if services.learning is not None:
                 await services.learning.shutdown()
             await services.ingestion.shutdown()
@@ -334,6 +361,7 @@ def create_app(
         district,
         chancery,
         skills,
+        schedule,
     ):
         app.include_router(module.router)
 
