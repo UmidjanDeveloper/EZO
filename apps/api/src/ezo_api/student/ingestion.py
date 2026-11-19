@@ -40,11 +40,12 @@ from ezo_api.knowledge.uploads import sanitize_filename
 MAX_PENDING_RAW_JOBS = 20
 MAX_RAW_BYTES_PER_USER = 200 * 1024 * 1024
 
-NativeFormat = Literal["pdf", "docx", "epub", "png", "jpeg"]
+NativeFormat = Literal["pdf", "docx", "epub", "xlsx", "png", "jpeg"]
 _EXTENSIONS: dict[str, NativeFormat] = {
     "pdf": "pdf",
     "docx": "docx",
     "epub": "epub",
+    "xlsx": "xlsx",
     "png": "png",
     "jpg": "jpeg",
     "jpeg": "jpeg",
@@ -53,12 +54,14 @@ _SIGNATURES: dict[NativeFormat, tuple[bytes, ...]] = {
     "pdf": (b"%PDF-",),
     "docx": (b"PK",),
     "epub": (b"PK",),
+    "xlsx": (b"PK",),
     "png": (b"\x89PNG\r\n\x1a\n",),
     "jpeg": (b"\xff\xd8\xff",),
 }
 _MIME: dict[NativeFormat, str] = {
     "pdf": "application/pdf",
     "epub": "application/epub+zip",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "png": "image/png",
     "jpeg": "image/jpeg",

@@ -212,8 +212,9 @@ async def run_sheet_action(ctx: GatherContext, gathered: Gathered) -> bool:
         return False
     # F20: parsing an uploaded workbook is untrusted-document processing. It belongs to
     # the isolated path like every other sheet tool; never open it in the API process.
+    # Without that path, use the table the isolated document worker already extracted.
     if not native_execution_allowed():
-        return False
+        return await _sheet_from_extracted(ctx, gathered, document)
     data = await ctx.tools.services.storage.get(document.storage_key)
     name = document.filename or f"{document.title}.xlsx"
     try:
@@ -258,3 +259,66 @@ async def run_sheet_action(ctx: GatherContext, gathered: Gathered) -> bool:
 def _step_dict(step: Any) -> dict[str, Any]:
     fields = ("op", "column", "descending", "comparison", "value", "columns", "agg")
     return {f: getattr(step, f) for f in fields if getattr(step, f) not in (None, [], False)}
+
+
+async def _sheet_from_extracted(ctx: GatherContext, gathered: Gathered, document: Any) -> bool:
+    """Sort/filter/total a workbook from its extracted rows (CSV text, or the XLSX text the
+    isolated worker produced); EZO writes the new XLSX itself."""
+    import hashlib
+
+    from ezo_api.analytics.table import TableError, load_tables
+    from ezo_api.documents.spreadsheet.ops import SheetOpError, run_steps
+    from ezo_api.documents.spreadsheet.writer import Sheet, coerce, render_xlsx
+    from ezo_api.tools.document_tools import artifact_entry
+
+    is_csv = getattr(document, "mime_type", "") == CSV_MIME or str(
+        getattr(document, "filename", "") or ""
+    ).lower().endswith(".csv")
+    if not is_csv and getattr(document, "current_revision_id", None) is None:
+        return False  # no text from the isolated worker yet; never open the workbook here
+    try:
+        tables = await load_tables(ctx.tools.session, ctx.tools.services.storage, document)
+    except TableError as exc:
+        gathered.notes.append(f"The spreadsheet could not be read: {exc.message} Say so.")
+        return True
+    table = tables[0]
+    sheet = Sheet(table.name, table.columns, [[coerce(v) for v in row] for row in table.rows])
+    steps = parse_sheet_request(ctx.turn.text, sheet.columns)
+    if not steps:
+        return False
+    try:
+        result = run_steps(sheet, steps)
+    except SheetOpError as exc:
+        gathered.notes.append(f"The spreadsheet could not be changed: {exc.message} Say so.")
+        return True
+    data = await asyncio.to_thread(render_xlsx, [result.sheet], document.title)
+    stem = (document.title or "jadval").rsplit(".", 1)[0][:80]
+    created = await ctx.tools.services.artifacts.create(
+        ctx.tools.session, ctx.tools.user_id, title=f"{stem} (edited)", artifact_type="spreadsheet",
+        filename=f"{stem} (edited).xlsx", data=data, project_id=ctx.tools.project_scope,
+        conversation_id=ctx.tools.conversation_id, created_by_agent="document",
+        generation_metadata={
+            "operation": "sheet_ops", "sheet": table.name, "report": result.report,
+            "warnings": result.warnings, "source": "extracted_text",
+            "output": {"sha256": hashlib.sha256(data).hexdigest(), "size": len(data)},
+        },
+        change_summary="Created",
+    )  # fmt: skip
+    gathered.artifacts.append(artifact_entry(created))
+    gathered.tool_calls.append(
+        {"tool": "sheet_ops", "ok": True, "summary": table.name, "error": None}
+    )
+    gathered.notes.append(
+        "\n".join(
+            [
+                f"Spreadsheet “{document.title}” processed by EZO (every number computed "
+                "by EZO — use these exact values):",
+                *[f"- {line}" for line in result.report],
+                *[f"- WARNING: {w}" for w in result.warnings],
+                f"Result: {len(result.sheet.rows)} rows; first rows {result.sheet.rows[:5]}.",
+                "The result is a new Excel file; the original is unchanged. Formatting "
+                "and formulas of the original are not carried over (values only).",
+            ]
+        )
+    )
+    return True

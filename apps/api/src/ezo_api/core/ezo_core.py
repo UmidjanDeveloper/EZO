@@ -221,6 +221,32 @@ async def _owned_attachments(
     return ids, [names[i] for i in ids]
 
 
+async def _wants_data_analysis(session: AsyncSession, user_id: uuid.UUID, turn: TurnInput) -> bool:
+    """Analysis words plus an attached spreadsheet (or, without attachments, a request that
+    names a table/Excel file while one was uploaded)."""
+    from ezo_api.agents.data_analyst import wants_analysis
+    from ezo_api.analytics.table import CSV_MIMES, XLSX_MIME
+
+    mimes = (XLSX_MIME, *CSV_MIMES)
+    if turn.attachments:
+        found = await session.scalar(
+            select(KnowledgeDocument.id).where(
+                KnowledgeDocument.id.in_(turn.attachments),
+                KnowledgeDocument.user_id == user_id,
+                KnowledgeDocument.mime_type.in_(mimes),
+            )
+        )
+        return found is not None and wants_analysis(turn.text, has_sheet=True)
+    return wants_analysis(turn.text, has_sheet=False) and (
+        await session.scalar(
+            select(KnowledgeDocument.id)
+            .where(KnowledgeDocument.user_id == user_id, KnowledgeDocument.mime_type.in_(mimes))
+            .limit(1)
+        )
+        is not None
+    )
+
+
 async def _names_district_project(session: AsyncSession, user_id: uuid.UUID, text: str) -> bool:
     names = list(
         await session.scalars(
@@ -326,6 +352,9 @@ class EzoCore:
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
+            elif turn.forced_agent is None and await _wants_data_analysis(session, user.id, turn):
+                # "Shu Excel'ni tahlil qil", "trend va prognoz": computed statistics + charts.
+                intent = IntentResult(Intent.DATA, 1.0, ("data_analysis",), intent.scores)
             elif turn.forced_agent is None and not turn.attachments and wants_schedule(turn.text):
                 # "Har dushanba soat 9 da haftalik hisobot tayyorla": a recurring job (Jadval).
                 intent = IntentResult(Intent.SCHEDULE, 1.0, ("recurring",), intent.scores)

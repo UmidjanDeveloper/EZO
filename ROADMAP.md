@@ -262,6 +262,13 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   ([docs/OPENCODE_INTEGRATION_PLAN.md](docs/OPENCODE_INTEGRATION_PLAN.md)); not installed
 
 ### Phase 10 — Data Analyst
+- **Done (2026-11-19, alpha):** DataAnalystAgent for an attached Excel/CSV: column
+  statistics, trends over a date column (sum per period, change, linear fit R²), a linear
+  forecast only when the fit is good (≥ 6 periods, R² ≥ 0.5, always called an estimate),
+  robust outlier detection (median/MAD), group totals and strong correlations — all computed
+  by EZO; an Excel report with native line and bar charts. The uploaded workbook is never
+  opened in the API: CSV is read as text, XLSX from the isolated document worker's text
+  (XLSX added to the worker's formats); sheet operations use the same path
 - DataAnalystAgent: computed (never guessed) statistics, anomalies, trends, forecasts where
   appropriate, charts, dashboards, reports
 

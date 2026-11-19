@@ -26,6 +26,7 @@ def test_available_agents_are_exactly_the_implemented_ones() -> None:
         "computer",
         "skill",
         "schedule",
+        "data_analyst",
         "developer",
     }
     registry = AgentRegistry()

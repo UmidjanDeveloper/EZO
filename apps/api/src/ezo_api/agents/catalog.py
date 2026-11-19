@@ -145,6 +145,18 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "data_analyst",
+            Intent.DATA,
+            {"uz": "Ma’lumot tahlilchisi", "en": "Data Analyst", "ru": "Аналитик данных"},
+            "Analyses an Excel/CSV table: statistics, trends over time, a cautious linear "
+            "forecast, unusual values, group totals and correlations — every number computed "
+            "by EZO — and returns an Excel file with charts.",
+            maturity="alpha",
+            phase="Phase 10 — Data Analyst",
+            context_mode="technical",
+            route="chat",
+        ),
+        AgentSpec(
             "schedule",
             Intent.SCHEDULE,
             {"uz": "Jadval", "en": "Schedule", "ru": "Расписание"},
