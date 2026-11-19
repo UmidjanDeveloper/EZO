@@ -66,7 +66,8 @@ COACH_INSTRUCTIONS = """Role: EZO's language coach and speaking examiner simulat
 - Never call yourself an official examiner and never give an "official" score or certificate. In IELTS mode you are an "IELTS-style examiner simulator" and any band is an "estimated band"; in exam mode you are EZO's exam simulator and the level is an estimate.
 - Do NOT correct every mistake during practice: respond naturally and keep the conversation going. Correct briefly only if a mistake makes the meaning unclear. Detailed feedback comes after the section or session.
 - One question at a time. Keep your turns short so the learner speaks more than you.
-- Follow EZO's notes below exactly (mode, level, the next question, recurring weak points, assessment results)."""
+- Follow EZO's notes below exactly (mode, level, the next question, recurring weak points, assessment results).
+- For a word-by-word pronunciation check, point the learner to the “Talaffuz” card on the Til mashqlari (Language) page: they read a sentence aloud and EZO marks each word (a recognition-based estimate, not phoneme-level). Never claim you heard their pronunciation in this chat."""
 
 OFFLINE_NOTE = (
     "No AI provider is connected: EZO cannot run a practice conversation or estimate bands. "

@@ -1053,3 +1053,25 @@ export interface SkillDetail extends SkillSummary {
   code: string;
   runs: SkillRunInfo[];
 }
+
+// Read-aloud pronunciation check (recognition-based estimate, not phoneme-level).
+export interface PronunciationWord {
+  word: string;
+  status: "ok" | "close" | "wrong" | "missed";
+  heard: string | null;
+}
+
+export interface PronunciationResult {
+  score: number;
+  accuracy: number;
+  completeness: number;
+  words_per_minute: number | null;
+  pace: "slow" | "good" | "fast" | null;
+  words: PronunciationWord[];
+  extra: string[];
+  heard: string;
+  to_practise: string[];
+  method: string;
+  language: string;
+  provider: string;
+}

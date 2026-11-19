@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
 import { useApiData } from "@/lib/use-api-data";
 import { PageFrame } from "../pages/PageFrame";
+import { PronunciationCard } from "./PronunciationCard";
 
 /** Format an estimated band range ("6", "5.5–6.5") or null when not assessed. */
 export function bandText(low: number | null, high: number | null): string | null {
@@ -44,6 +45,9 @@ export function LanguagePage() {
       <p className="mb-4 text-xs text-ink-faint" data-testid="language-disclaimer">
         {t.disclaimer}
       </p>
+      <div className="mb-4">
+        <PronunciationCard />
+      </div>
       {error ? (
         <p className="text-sm text-danger">{error.message}</p>
       ) : !progress || !sessions ? (

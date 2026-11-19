@@ -105,6 +105,9 @@ exports).
 - Mode, command and level detection is rule-based (uz/en/ru phrases). Unusual phrasing may
   start a free conversation instead of the intended mode.
 - The Part 2 preparation minute is not timed by the app.
-- Pronunciation is transcript-assisted at best until realtime/acoustic analysis (Phase 8).
+- Pronunciation: the “Talaffuz” read-aloud check (`POST /api/voice/pronunciation`) marks each
+  word by what the speech recognizer heard. It is recognition-based, not phoneme-level: a
+  recognizer that guesses the intended word can hide a small accent, so treat the score as a
+  practice estimate. Bands still exclude pronunciation.
 - Bands come from a language model checked by rules. They are practice estimates, not
   calibrated against real exam results.

@@ -147,3 +147,64 @@ async def speak(body: SpeakIn, services: ServicesDep, _: CurrentUser) -> Respons
         media_type=audio.mime_type,
         headers={"X-EZO-Voice-Provider": audio.provider, "Cache-Control": "no-store"},
     )
+
+
+@router.get("/pronunciation/samples")
+async def pronunciation_samples(_: CurrentUser) -> dict[str, list[str]]:
+    from ezo_api.language.pronunciation import SAMPLES
+
+    return SAMPLES
+
+
+@router.post("/pronunciation", dependencies=[Depends(rate_limit("chat"))])
+async def pronunciation(
+    services: ServicesDep,
+    _: CurrentUser,
+    audio: UploadFile = File(...),  # noqa: B008 (FastAPI dependency declaration)
+    reference: str = Form(min_length=1, max_length=600),
+    language: str = Form(default="en", pattern=r"^[a-z]{2}$"),
+    duration_ms: int | None = Form(default=None, ge=0, le=600_000),
+) -> dict[str, object]:
+    """Read-aloud check: the recognizer's transcript compared with the sentence to read."""
+    from ezo_api.language.pronunciation import score_reading
+    from ezo_api.language.targets import PRACTICE_LANGUAGES
+
+    if language not in PRACTICE_LANGUAGES:
+        raise HTTPException(
+            422, detail={"code": "bad_language", "message": "Unsupported practice language."}
+        )
+    if not services.voice.stt:
+        raise _not_configured("speech-to-text")
+    limit = services.settings.voice_max_audio_mb * 1024 * 1024
+    data = await audio.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(
+            413, detail={"code": "too_large", "message": "The recording is too large."}
+        )
+    kind = sniff_audio(data)
+    if kind is None:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "bad_audio",
+                "message": "The upload is not a supported audio recording.",
+            },
+        )
+    try:
+        result = await services.voice.transcribe(
+            data, kind.mime_type, f"speech.{kind.extension}", language
+        )
+    except AllVoiceProvidersFailedError as exc:
+        raise _all_failed(exc) from exc
+    finally:
+        del data  # never kept beyond this request
+    try:
+        scored = score_reading(reference, result.value.text, duration_ms)
+    except ValueError as exc:
+        raise HTTPException(422, detail={"code": "bad_reference", "message": str(exc)}) from exc
+    return {
+        **scored.as_dict(),
+        "language": language,
+        "provider": result.value.provider,
+        "attempts": [a.model_dump() for a in _attempts(result.attempts)],
+    }

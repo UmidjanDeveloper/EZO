@@ -51,6 +51,7 @@ import type {
   Appeal,
   GovMeeting,
   GovTask,
+  PronunciationResult,
   SkillDetail,
   SkillSummary,
   DistrictChannels,
@@ -398,6 +399,16 @@ export function createApiClient(options: ApiClientOptions) {
       form.append("audio", audio, filename);
       if (language) form.append("language", language);
       return request<VoiceTranscript>("/api/voice/transcribe", { method: "POST", body: form, signal });
+    },
+    pronunciationSamples: () => request<Record<string, string[]>>("/api/voice/pronunciation/samples"),
+    /** Read-aloud check: the recording is transcribed (not kept) and compared with `reference`. */
+    pronunciation: (audio: Blob, filename: string, reference: string, language: string, durationMs: number) => {
+      const form = new FormData();
+      form.append("audio", audio, filename);
+      form.append("reference", reference);
+      form.append("language", language);
+      form.append("duration_ms", String(Math.round(durationMs)));
+      return request<PronunciationResult>("/api/voice/pronunciation", { method: "POST", body: form });
     },
     /** Read text aloud with the server voice; resolves to MP3 audio. */
     speak: async (text: string, language?: string | null, signal?: AbortSignal): Promise<Blob> => {

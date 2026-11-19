@@ -90,6 +90,10 @@ images) plus the extended local checks listed for that phase.
   report artifact, progress answers from stored facts, goals
 - Exact computed metrics (incl. words per minute from measured voice time); pronunciation
   only transcript-assisted and excluded from bands; licensed knowledge via the user's own files
+- Read-aloud pronunciation check (2026-11-19): the learner reads a sentence, the recognizer
+  (told the language) transcribes it, each word is marked ok / close / wrong / missed with a
+  0–100 estimate and speaking pace; recognition-based, not phoneme-level; audio not kept
+  (`POST /api/voice/pronunciation`, “Talaffuz” card)
 - “Til mashg'ulotlari” page; details in [docs/LANGUAGE_COACH.md](docs/LANGUAGE_COACH.md)
 
 ### Phase 2 — Visual Agent — alpha
