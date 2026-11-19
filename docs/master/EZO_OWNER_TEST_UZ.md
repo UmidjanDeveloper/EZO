@@ -367,3 +367,12 @@ sabab emas. «Shu jadvalni … bo‘yicha sarala/filtrla/jamla» ham shu yo‘l 
 - Chatda: «Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko‘rsatkichlarini
   oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor». EZO JARVIS vazifasini
   yaratadi; kompyuter va Telegram qadamlari har biri sizning tasdig‘ingizdan keyin bajariladi.
+
+## Biznes agenti (2026-11-19)
+
+Chatda: «Nonvoyxona uchun biznes reja tuz: narxi 25 ming, tannarxi 12 ming, oyiga 300 ta,
+ijara va oylik 2,6 mln, boshlang‘ich xarajat 15 mln». EZO unit-iqtisodiyotni o‘zi hisoblaydi
+(marja, zararsizlik nuqtasi, oylik foyda, xarajat qoplanish muddati), bozor va raqobatchilar
+haqidagi raqamlarni faqat internet manbalaridan havola bilan keltiradi va har bir raqamni
+belgilaydi: [Fakt: n] — manbadan, [Hisob] — EZO hisoblagan, [Taxmin], [Faraz]. «Biznes reja»
+so‘ralsa Word fayl ham qaytadi.

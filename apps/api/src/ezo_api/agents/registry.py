@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ezo_api.agents.base import Agent
+from ezo_api.agents.business import BusinessAgent
 from ezo_api.agents.catalog import AGENTS, AgentSpec
 from ezo_api.agents.chancery import ChanceryAgent
 from ezo_api.agents.computer import ComputerAgent
@@ -54,6 +55,7 @@ class AgentRegistry:
             SkillAgent(),
             ScheduleAgent(),
             DataAnalystAgent(),
+            BusinessAgent(),
             DeveloperAgent(),
         ]:
             self._agents[agent.spec.intent] = agent

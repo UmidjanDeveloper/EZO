@@ -1,6 +1,8 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from ezo_api.agents.base import AgentTurn
 from ezo_api.agents.catalog import AGENTS
 from ezo_api.agents.general import GeneralAgent
@@ -47,7 +49,17 @@ def test_fixed_language_rule() -> None:
     assert "Always answer in English" in prompt
 
 
-def test_registry_falls_back_to_general_for_unavailable_agents() -> None:
+def test_registry_falls_back_to_general_for_unavailable_agents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Every catalog agent is implemented today; mark one planned to exercise the fallback.
+    from dataclasses import replace
+
+    from ezo_api.agents.catalog import AGENTS
+
+    monkeypatch.setitem(
+        AGENTS, Intent.BUSINESS, replace(AGENTS[Intent.BUSINESS], maturity="planned")
+    )
     selection = AgentRegistry().select(Intent.BUSINESS)
     assert selection.agent.spec.key == "general"
     assert selection.requested.key == "business"
