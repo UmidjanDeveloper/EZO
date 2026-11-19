@@ -1,24 +1,25 @@
 """LEX.UZ — the National Database of Legislation of the Republic of Uzbekistan.
 
-Proof-of-concept connector. Access method: the public document pages
-(``https://lex.uz/docs/<id>`` in Uzbek, ``https://lex.uz/ru/docs/<id>`` in Russian).
-No official API was found. The URL pattern and the page-title format
-(``LRU-682-сон 20.04.2021. On normative legal acts``) are documented in public
-sources (see `REVIEW.sources`). robots.txt and the site's terms could NOT be read
-from EZO's build environment (the host was unreachable), so the owner must review
-them before enabling this connector (``EZO_OFFICIAL_SOURCES=lexuz``).
+Access method: the public document pages (``https://lex.uz/docs/<id>`` in Uzbek,
+``https://lex.uz/ru/docs/<id>`` in Russian) and the public title search
+(``https://lex.uz/search/nat``), whose list marks each act in force or not. No official API
+was found. Page and list markup were checked live on 2026-11-19 (`elements_text`,
+`parse_search`); robots.txt has no rules and the owner reviewed the terms on that day.
 
-Parsing is deliberately conservative because the live markup was not available
-for verification: the title comes from the page ``<title>`` (or the main heading),
-the body from main-content extraction, number/type/date from the title, and the
-status only from an explicit status label. Everything else stays empty.
+Parsing stays conservative: the title, number and date come from the page ``<title>``, the
+text from the page's document elements (editorial notes left out), and the status only from
+an explicit label in the text or from LEX.UZ's own in-force mark in its list. Everything else
+stays empty.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import date
 from html import unescape
+from typing import Any
+from urllib.parse import urlencode
 
 from ezo_api.knowledge.fetch import FetchedPage
 from ezo_api.knowledge.parsers import ParseError
@@ -34,6 +35,7 @@ from ezo_api.official.base import (
     UnsupportedSourceError,
 )
 from ezo_api.official.legal_text import explicit_status, mark_articles, parse_title, script_of
+from ezo_api.translation.translit import to_cyrillic
 
 _ID = re.compile(r"^\d{1,10}$")
 _TITLE_TAG = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -41,17 +43,34 @@ _H1 = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
 _TAGS = re.compile(r"<[^>]+>")
 _SITE_SUFFIX = re.compile(r"\s*[|–—-]\s*(lex\.uz|LEX\.UZ).*$")
 MIN_TEXT_CHARS = 80
+# LEX.UZ document pages (checked live 2026-11-19): every heading, article and paragraph is a
+# `<div class="KIND lx_elem">` whose text sits in `<div name="ID" id="ID">…</div>`. Editorial
+# notes ("COMMENT", "INDEXES_ON_REF") are `lx_no_select` and are left out. Codes are several
+# MB of HTML, so the text is cut out with this pattern instead of a general HTML parser.
+_ELEMENT = re.compile(
+    r'<div class="([A-Z_]+) lx_elem"[^>]*>.*?<div name="\d+" id="\d+">(.*?)</div></div>',
+    re.DOTALL,
+)
+_HEADING_KINDS = {"TEXT_HEADER_DEFAULT": "## ", "CLAUSE_DEFAULT": "### "}
+# Search results (checked live 2026-11-19): one `<tr class="dd-table__main-item">` per act,
+# the act's state as `status_code_<letter>` (y: in force, r: lost force), its link and a
+# badge with its type, date and number.
+_ROW = re.compile(r'<tr class="dd-table__main-item">(.*?)</tr>', re.DOTALL)
+_ROW_STATUS = re.compile(r"status_code_([a-z])")
+_ROW_LINK = re.compile(r'href="/docs/(-?\d{1,10})"[^>]*>(.*?)</a>', re.DOTALL)
+_ROW_BADGE = re.compile(r'badge-nine">(.*?)</span>', re.DOTALL)
+LISTING_STATUS = {"y": "in_force", "r": "repealed"}
 
 REVIEW = AccessReview(
-    reviewed_on=date(2026, 10, 18),
+    reviewed_on=date(2026, 11, 19),
     official_api="None found (web search 2026-10-18). Uses public document pages only.",
     robots_txt=(
-        "Not verified: lex.uz was unreachable from EZO's build environment. EZO reads and "
-        "obeys robots.txt at run time and does not fetch if it cannot read it."
+        "Checked 2026-11-19: https://lex.uz/robots.txt redirects to the site's 404 page, so "
+        "there are no robots rules. EZO still reads and obeys robots.txt on every run."
     ),
     terms_of_use=(
-        "Not verified. A third-party project states the terms do not restrict reuse; the "
-        "owner must confirm on lex.uz before enabling."
+        "The owner reviewed the terms and enabled the connector on 2026-11-19. Official "
+        "documents are not objects of copyright (see legal basis)."
     ),
     formats="HTML document pages (Uzbek: /docs/<id>, Russian: /ru/docs/<id>).",
     rate_limits=(
@@ -84,14 +103,63 @@ POLICY = SourcePolicy(
     min_interval_seconds=5.0,
     supports_change_feed=False,
     notes=(
-        "Proof of concept. Tracks documents you name by their LEX.UZ ID and re-checks them; "
-        "discovering new acts automatically needs a verified feed or API."
+        "Reads the acts you name by LEX.UZ number, the ready-made core set for a hokimiyat, "
+        "and any act a question names (found with LEX.UZ's title search), then re-checks "
+        "them. It does not crawl the whole database."
     ),
 )
 
 
 def _clean(fragment: str) -> str:
     return " ".join(unescape(_TAGS.sub(" ", fragment)).split())
+
+
+def elements_text(html: str) -> str:
+    """The document text of a LEX.UZ page as Markdown-like lines (headings marked)."""
+    lines: list[str] = []
+    for kind, inner in _ELEMENT.findall(html):
+        text = _clean(inner)
+        if text:
+            lines.append(_HEADING_KINDS.get(kind, "") + text)
+    return "\n\n".join(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class SearchHit:
+    source_doc_id: str
+    title: str
+    status: str | None
+    """in_force / repealed as LEX.UZ's list marks it; None when the mark is not one of those."""
+    details: str
+    """Type, date and number as LEX.UZ shows them ("Ўзбекистон Республикасининг Қонуни, …")."""
+
+
+def parse_search(html: str) -> list[SearchHit]:
+    hits: list[SearchHit] = []
+    for row in _ROW.findall(html):
+        link = _ROW_LINK.search(row)
+        if not link or link.group(1).startswith("-"):
+            continue  # negative ids are departmental acts registered separately
+        state = _ROW_STATUS.search(row)
+        badge = _ROW_BADGE.search(row)
+        hits.append(
+            SearchHit(
+                source_doc_id=link.group(1),
+                title=_clean(link.group(2)),
+                status=LISTING_STATUS.get(state.group(1)) if state else None,
+                details=_clean(badge.group(1)) if badge else "",
+            )
+        )
+    return hits
+
+
+def search_url(title: str, *, exact: bool = False) -> str:
+    """LEX.UZ title search in Uzbek Cyrillic (lang=3), the language its titles are kept in."""
+    query = " ".join(to_cyrillic(title).split())[:100]
+    params = {"searchtitle": query, "lang": "3"}
+    if exact:
+        params["exact2"] = "1"
+    return "https://lex.uz/search/nat?" + urlencode(params)
 
 
 class LexUzConnector(OfficialSourceConnector):
@@ -115,6 +183,22 @@ class LexUzConnector(OfficialSourceConnector):
             f"LEX.UZ documents are available in uz and ru, not {ref.language}."
         )
 
+    async def search(self, client: Any, title: str, *, exact: bool = False) -> list[SearchHit]:
+        """Acts whose title contains `title` (Latin is converted to Cyrillic), newest first."""
+        if len(title.strip()) < 3:
+            return []
+        page = await client.get(search_url(title, exact=exact))
+        return parse_search(decode_text(page.data))
+
+    async def listing_status(self, client: Any, parsed: ParsedLegalDocument) -> str | None:
+        """LEX.UZ's own in-force mark for this act, from an exact title search (one request).
+        The document page states no status; the search list does."""
+        hits = await self.search(client, parsed.title, exact=True)
+        for hit in hits:
+            if hit.source_doc_id == parsed.source_doc_id:
+                return hit.status
+        return None
+
     def parse(self, page: FetchedPage, ref: DocumentRef) -> ParsedLegalDocument:
         html = decode_text(page.data)
         raw_title = ""
@@ -123,16 +207,19 @@ class LexUzConnector(OfficialSourceConnector):
             if match and _clean(match.group(1)):
                 raw_title = _SITE_SUFFIX.sub("", _clean(match.group(1)))
                 break
-        try:
-            parsed = parse_html(page.data, f"lexuz-{ref.source_doc_id}.html")
-        except ParseError as exc:
-            raise DocumentParseError(
-                f"No document text was found on the page ({exc.message})."
-            ) from exc
-        body = parsed.text.strip()
+        body = elements_text(html)
+        fallback_title = ""
+        if len(body) < MIN_TEXT_CHARS:
+            try:
+                parsed = parse_html(page.data, f"lexuz-{ref.source_doc_id}.html")
+            except ParseError as exc:
+                raise DocumentParseError(
+                    f"No document text was found on the page ({exc.message})."
+                ) from exc
+            body, fallback_title = parsed.text.strip(), parsed.title or ""
         if len(body) < MIN_TEXT_CHARS:
             raise DocumentParseError("The page does not contain a document text.")
-        info = parse_title(raw_title or parsed.title or "")
+        info = parse_title(raw_title or fallback_title)
         status = explicit_status(body)
         warnings = []
         if not info.number:

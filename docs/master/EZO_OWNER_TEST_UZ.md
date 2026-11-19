@@ -203,3 +203,25 @@ o‘zbek. Bu simulyator: rasmiy imtihon yoki sertifikat emas.
 «npm axios paketini o‘rgan», «pallets/flask repozitoriyasini o‘rgan». EZO hujjatlarni
 o‘qib, bilim kutubxonasiga qo‘shadi va keyingi savollarda shundan foydalanadi
 («Bilim» sahifasida holati ko‘rinadi). Hech narsa o‘rnatilmaydi va ishga tushirilmaydi.
+
+## LEX.UZ: qonunlarni o‘rganish va ular bo‘yicha javob (2026-11-19)
+
+Egasi ruxsati bilan (2026-11-19) LEX.UZ yoqildi. `.env` da shu qator bo‘lishi kerak:
+```
+EZO_OFFICIAL_SOURCES=lexuz
+```
+keyin `docker compose up -d --force-recreate api`.
+
+- **Asosiy to‘plam:** chatga «Hokimiyat uchun asosiy qonunlarni o‘rgan» deb yozing. EZO 12 ta
+  aktni (Konstitutsiya, Mahalliy davlat hokimiyati to‘g‘risida, Murojaatlar to‘g‘risida,
+  Normativ-huquqiy hujjatlar, Ma’muriy tartib-taomillar, Davlat fuqarolik xizmati, Korrupsiyaga
+  qarshi kurashish, Mehnat, Ma’muriy javobgarlik, Budjet, Yer va Soliq kodekslari) LEX.UZ’dan
+  orqa fonda o‘qiydi — taxminan 3 daqiqa. Har bir raqam lex.uz’da tekshirilgan.
+- **Boshqa har qanday akt:** savolda nomini aytsangiz kifoya — «Oila kodeksi bo‘yicha nikoh
+  yoshi necha?». Bazada bo‘lmasa, EZO uni LEX.UZ’dan topib o‘qiydi (15–30 soniya), keyin javob
+  beradi. Ikkinchi marta qayta qidirmaydi, faqat dolzarbligini tekshiradi.
+- **Har javobda:** akt nomi, raqami, sanasi, moddasi, havolasi va holati (LEX.UZ ro‘yxatida
+  «amaldagi» deb belgilangani). Holat aniq bo‘lmasa, EZO «tasdiqlanmagan» deydi va
+  «amalda» deb da’vo qilmaydi.
+- **Butun bazani** (yuz minglab hujjat) birdaniga tortib olmaydi — bu kunlab davom etadi va
+  saytga yuk bo‘ladi. Kerakli aktlar ishlatilgan sari bilim bazasi o‘zi boyib boradi.

@@ -20,6 +20,8 @@ import re
 import uuid
 from typing import Any
 
+from sqlalchemy import select
+
 from ezo_api.agents.base import (
     Agent,
     AgentPlan,
@@ -35,10 +37,29 @@ from ezo_api.core.text import normalize
 from ezo_api.db.models import LegalDocument
 from ezo_api.documents.compare import compare_texts
 from ezo_api.knowledge.retrieval.sources import SourceRef, number_sources
+from ezo_api.official.base import OfficialSourceError
+from ezo_api.official.collections import COLLECTIONS
+from ezo_api.official.lookup import find_act, named_act
 from ezo_api.official.sync import official_knowledge_ids
 from ezo_api.tools.official_tools import revision_texts
+from ezo_api.translation.translit import to_cyrillic
 
 MAX_LIVE_CHECKS = 2
+_COLLECTION = re.compile(
+    r"(asosiy|kerakli|barcha|hamma|zarur|основн|необходим|core|essential)\w*\s+"
+    r"(qonun|hujjat|akt|норматив|закон|документ|act|law)\w*.{0,60}?"
+    r"(o'rgan|yukla|o'qib chiq|sinxron|изучи|загрузи|learn|load)|"
+    r"hokimiyat\w*\s+(uchun\s+)?(to'plam|qonun|hujjat)\w*.{0,40}?(o'rgan|yukla)|"
+    r"lex\.?uz\w*.{0,40}?(o'rgan|yukla|o'qib chiq|изучи|learn)"
+)
+
+
+def wants_collection(text: str) -> bool:
+    """ "Hokimiyat uchun asosiy qonunlarni o'rgan", "lex.uz'ni o'rganib chiq" — the ready-made
+    set of core acts (not one named act: "Mehnat kodeksini o'rgan" reads that code)."""
+    return bool(_COLLECTION.search(normalize(text))) and named_act(text) is None
+
+
 _HISTORY = re.compile(
     r"\b(eski|oldingi|avvalgi|tahrir|redaksiya|tarix|o'zgargan|solishtir|previous|old version|"
     r"revision|history|compare|прежн|предыдущ|редакци|истори|сравн|изменил|эски|олдинги|таҳрир|солиштир)"
@@ -66,8 +87,8 @@ NO_SOURCES_NOTE = (
     "official text was consulted. Say this plainly. Give only general orientation; do NOT state "
     "document numbers, dates, article contents or whether an act is in force unless you are "
     "certain, and tell the user to verify on https://lex.uz. The owner can enable LEX.UZ "
-    "(EZO_OFFICIAL_SOURCES=lexuz, after reviewing its terms) and synchronize documents by their "
-    "LEX.UZ number."
+    "(EZO_OFFICIAL_SOURCES=lexuz in .env, after reviewing its terms); then EZO reads the core "
+    "acts (“hokimiyat uchun asosiy qonunlarni o‘rgan”) and any act a question names."
 )
 NO_MATCH_NOTE = (
     "The synchronized official documents contain nothing relevant to this question. Say so; do "
@@ -97,6 +118,11 @@ class LegalResearchAgent(Agent):
         tools = ctx.tools
         text = ctx.turn.text
         norm = normalize(text)
+        if "lexuz" in tools.services.settings.official_sources:
+            if wants_collection(text):
+                await self._start_collection(ctx, gathered)
+                return gathered
+            await self._fetch_named_act(ctx, gathered)
         if not await official_knowledge_ids(tools.session, tools.user_id, include_outdated=True):
             gathered.notes.append(NO_SOURCES_NOTE)
             return gathered
@@ -151,6 +177,110 @@ class LegalResearchAgent(Agent):
                 gathered.notes.append(note)
         gathered.sources = number_sources(sources)
         return gathered
+
+    async def _start_collection(self, ctx: GatherContext, gathered: Gathered) -> None:
+        """ "Hokimiyat uchun asosiy qonunlarni o'rgan": read the ready-made set in the
+        background (about 15 s per act at LEX.UZ's polite pace)."""
+        tools = ctx.tools
+        services = tools.services
+        collection = COLLECTIONS["hokimiyat"]
+        try:
+            run_id = await services.official.start_detached(
+                services.db.sessionmaker,
+                tools.user_id,
+                collection.connector,
+                [i.source_doc_id for i in collection.items],
+                collection.language,
+            )
+        except OfficialSourceError as exc:
+            gathered.tool_calls.append(
+                {"tool": "official_collection", "ok": False, "summary": "", "error": exc.message}
+            )
+            gathered.notes.append(f"Starting the LEX.UZ reading failed: {exc.message}. Say so.")
+            return
+        gathered.tool_calls.append(
+            {
+                "tool": "official_collection",
+                "ok": True,
+                "summary": f"{collection.key}: {len(collection.items)} acts, run {run_id}",
+                "error": None,
+            }
+        )
+        minutes = max(1, round(len(collection.items) * 15 / 60))
+        titles = "; ".join(i.title for i in collection.items)
+        gathered.notes.append(
+            f"EZO STARTED reading {len(collection.items)} core acts from LEX.UZ in the background "
+            f"(about {minutes} minutes at LEX.UZ's polite pace; nothing is finished yet): "
+            f"{titles}. Tell the user the list in their language, that EZO reads each act's "
+            "full official text and its status from LEX.UZ, and that they can ask questions "
+            "about these acts once it is done. Any other act is fetched when a question names "
+            "it (e.g. “Oila kodeksi bo‘yicha …”)."
+        )
+
+    async def _fetch_named_act(self, ctx: GatherContext, gathered: Gathered) -> None:
+        """The question names an act EZO has not read yet: find it on LEX.UZ and read it now
+        (one act per question; about 15–30 s)."""
+        tools = ctx.tools
+        services = tools.services
+        act = named_act(ctx.turn.text)
+        if act is None:
+            return
+        want = to_cyrillic(act.queries()[0]).lower() if act.queries() else ""
+        titles = await tools.session.scalars(
+            select(LegalDocument.title).where(LegalDocument.user_id == tools.user_id)
+        )
+        if want and any(want in to_cyrillic(t or "").lower() for t in titles):
+            return
+        if tools.on_activity is not None:
+            tools.on_activity("searching")
+        try:
+            connector = services.official.connector("lexuz")
+            client = services.official.client(connector, max_requests=4)
+            hit = await find_act(connector, client, act)  # type: ignore[arg-type]
+        except OfficialSourceError as exc:
+            gathered.tool_calls.append(
+                {"tool": "lexuz_find", "ok": False, "summary": "", "error": exc.message}
+            )
+            gathered.notes.append(
+                f"EZO tried to find the act on LEX.UZ but could not ({exc.message}). Say so."
+            )
+            return
+        if hit is None:
+            gathered.tool_calls.append(
+                {"tool": "lexuz_find", "ok": True, "summary": "no match", "error": None}
+            )
+            gathered.notes.append(
+                "EZO searched LEX.UZ for the act the user named and found no matching act. "
+                "Say so and ask for its exact title or LEX.UZ number."
+            )
+            return
+        gathered.tool_calls.append(
+            {"tool": "lexuz_find", "ok": True, "summary": f"{hit.source_doc_id}", "error": None}
+        )
+        if tools.on_activity is not None:
+            tools.on_activity("reading")
+        async with services.db.sessionmaker() as session:
+            try:
+                run = await services.official.start(
+                    session, tools.user_id, "lexuz", [hit.source_doc_id], "uz"
+                )
+            except OfficialSourceError as exc:
+                gathered.notes.append(f"Reading the act from LEX.UZ failed: {exc.message}.")
+                return
+            ok = run.status in ("completed",) and not run.counts.get("failed")
+            gathered.tool_calls.append(
+                {
+                    "tool": "official_sync",
+                    "ok": ok,
+                    "summary": f"lexuz {hit.source_doc_id}: {run.status}",
+                    "error": run.error,
+                }
+            )
+            if ok:
+                gathered.notes.append(
+                    f"EZO just read «{hit.title}» (LEX.UZ {hit.source_doc_id}) from LEX.UZ for "
+                    "this question; mention that in one short line."
+                )
 
     async def _comparison(self, ctx: GatherContext, sources: list[SourceRef]) -> str | None:
         ids = _distinct_legal_ids(sources)

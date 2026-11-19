@@ -103,8 +103,9 @@ async def test_new_document_is_stored_with_metadata_and_indexed(env: Env) -> Non
     env.site.routes[f"/docs/{LRU_682}"] = html(UZ_LATIN)
     run = await env.sync.start(env.session, env.user_id, "lexuz", [LRU_682], "uz")
     assert run.status == "completed" and run.counts["new"] == 1
-    assert env.site.log == ["/robots.txt", f"/docs/{LRU_682}"]
-    assert run.requests_made == 2
+    # robots.txt, the document, then LEX.UZ's list for the act's status (none listed here)
+    assert env.site.log == ["/robots.txt", f"/docs/{LRU_682}", "/search/nat"]
+    assert run.requests_made == 3
 
     row = await legal(env)
     assert row.document_number == "O‘RQ-682" and row.document_type == "law"
@@ -269,8 +270,9 @@ async def test_requests_are_spaced_by_the_minimum_interval(env: Env) -> None:
             amended(UZ_LATIN).replace("3-modda", f"{doc_id}-modda")
         )
     await env.sync.start(env.session, env.user_id, "lexuz", ["51", "52", "53"], "uz")
-    # robots + 3 documents → 3 waits; each at least the connector floor (5 s > setting 2 s)
-    assert len(env.sleeps.calls) == 3 and all(wait >= 4.9 for wait in env.sleeps.calls)
+    # robots + 3 documents + 3 status lookups → 6 waits; each at least the connector floor
+    # (5 s > setting 2 s)
+    assert len(env.sleeps.calls) == 6 and all(wait >= 4.9 for wait in env.sleeps.calls)
 
 
 async def test_unsupported_and_disabled_sources(env: Env, database_url: str) -> None:
@@ -319,3 +321,40 @@ async def test_live_verification_and_honest_failure(env: Env) -> None:
     assert failed.state == "failed" and failed.last_verified_at == verified_at
     assert verified_at is not None and first_retrieval is not None
     assert row.last_check_error and row.last_retrieved_at == verified_at
+
+
+def listing(rows: list[tuple[str, str, str]]) -> httpx.Response:
+    """LEX.UZ's search list as checked live on 2026-11-19 (status letter, id, title)."""
+    body = "".join(
+        f'<tr class="dd-table__main-item"><td><span class="lx_act_state">'
+        f'<i class="fa fa-check-circle status_code_{state}"></i></span>'
+        f'<div class="dd-table__main-left-desc"><a class="lx_link " href="/docs/{doc_id}" '
+        f'target="_blank">{title}</a></div><div class="dd-table__main-extra"><div>'
+        f'<span class="badge badge-pill badge-nine">Qonuni</span></div></div></td></tr>'
+        for state, doc_id, title in rows
+    )
+    return httpx.Response(
+        200, headers={"content-type": "text/html; charset=utf-8"}, text=f"<table>{body}</table>"
+    )
+
+
+async def test_status_comes_from_the_official_list_when_the_page_states_none(env: Env) -> None:
+    env.site.routes[f"/docs/{LRU_682}"] = html(UZ_LATIN)
+    env.site.routes["/search/nat"] = listing(
+        [("y", "999", "Another act"), ("y", LRU_682, "Normativ-huquqiy hujjatlar toʻgʻrisida")]
+    )
+    run = await env.sync.start(env.session, env.user_id, "lexuz", [LRU_682], "uz")
+    assert run.status == "completed"
+    row = await legal(env)
+    assert row.status == "in_force" and row.status_source == "official_listing"
+    assert row.status_verified_at is not None
+    from ezo_api.tools.official_tools import status_line
+
+    assert status_line(row).startswith("in force (as marked in the official source's list")
+
+    # Lost force in the list → repealed, never "in force".
+    env.site.routes["/search/nat"] = listing([("r", LRU_682, "x")])
+    env.site.routes[f"/docs/{LRU_682}"] = html(amended(UZ_LATIN))
+    await env.sync.start(env.session, env.user_id, "lexuz", [LRU_682], "uz")
+    await env.session.refresh(row)
+    assert row.status == "repealed" and row.status_source == "official_listing"

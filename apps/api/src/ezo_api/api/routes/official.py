@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -270,3 +270,56 @@ async def verify_document(
         last_verified_at=check.last_verified_at,
         message=check.message,
     )
+
+
+@router.get("/collections", dependencies=[Depends(rate_limit("default"))])
+async def list_collections(session: SessionDep, user: CurrentUser) -> list[dict[str, Any]]:
+    """Ready-made sets of acts (numbers checked on LEX.UZ) and which of them EZO has read."""
+    from ezo_api.official.collections import COLLECTIONS
+
+    read = set(
+        await session.scalars(
+            select(LegalDocument.source_doc_id).where(LegalDocument.user_id == user.id)
+        )
+    )
+    return [
+        {
+            "key": c.key,
+            "connector": c.connector,
+            "names": c.names,
+            "items": [
+                {
+                    "source_doc_id": i.source_doc_id,
+                    "title": i.title,
+                    "read": i.source_doc_id in read,
+                }
+                for i in c.items
+            ],
+        }
+        for c in COLLECTIONS.values()
+    ]
+
+
+@router.post("/collections/{key}/sync", status_code=202, dependencies=[Depends(rate_limit("chat"))])
+async def sync_collection(
+    key: str, session: SessionDep, user: CurrentUser, services: ServicesDep
+) -> dict[str, Any]:
+    """Read a whole set in the background; follow the run in GET /api/official/runs."""
+    from ezo_api.official.collections import COLLECTIONS
+
+    collection = COLLECTIONS.get(key)
+    if collection is None:
+        raise HTTPException(404, detail={"code": "not_found", "message": "Unknown collection."})
+    try:
+        run_id = await services.official.start_detached(
+            services.db.sessionmaker,
+            user.id,
+            collection.connector,
+            [i.source_doc_id for i in collection.items],
+            collection.language,
+        )
+    except OfficialSourceError as exc:
+        raise _error(exc) from exc
+    audit(session, user.id, "official.collection_sync", "official_sync_run", run_id, {"key": key})
+    await session.commit()
+    return {"run_id": str(run_id), "documents": len(collection.items)}
