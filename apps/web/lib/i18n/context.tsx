@@ -2,10 +2,9 @@
 
 import type { LanguageCode } from "@ezo/shared";
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
-import { createStoredValue } from "../stored-value";
+import { storedUiLanguage } from "./language";
 import { dictionaries, format, type Messages } from "./messages";
 
-const STORAGE_KEY = "ezo-ui-language";
 export const UI_LANGUAGES: { code: LanguageCode; label: string }[] = [
   { code: "uz", label: "O‘zbekcha" },
   { code: "en", label: "English" },
@@ -21,11 +20,7 @@ interface I18nValue {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-export const storedUiLanguage = createStoredValue<LanguageCode>(
-  STORAGE_KEY,
-  "uz",
-  (value): value is LanguageCode => value === "uz" || value === "en" || value === "ru",
-);
+export { storedUiLanguage };
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const language = storedUiLanguage.useValue();

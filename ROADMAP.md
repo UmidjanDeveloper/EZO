@@ -238,13 +238,12 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   (“3/5 steps”), approval cards for external-impact actions
 
 ### Phase 7 — Uzbekistan government and legal intelligence
-- **Foundation done early (experimental, 2026-10-18):** `OfficialSourceConnector` framework,
-  legal documents with revisions (migration 0005), rate-limited resumable sync, live
-  verification, LegalResearchAgent, LEX.UZ proof-of-concept connector — **off by default,
-  live access not yet verified**; see [docs/OFFICIAL_SOURCES.md](docs/OFFICIAL_SOURCES.md)
-- Next: verify LEX.UZ live with the owner's permission; access reviews and connectors for
-  president.uz, E-qaror, gov.uz and ministry/education sites; a verified change feed;
-  scheduled re-checks (needs Phase 5 jobs); publication/effective dates
+- **Done (2026-11-19):** `OfficialSourceConnector` framework, legal documents with revisions,
+  rate-limited resumable sync; LEX.UZ connector **verified live** with the owner's
+  permission (text, number, status from the official listing, search, fetch by name,
+  hokimiyat collection of 12 acts); see [docs/OFFICIAL_SOURCES.md](docs/OFFICIAL_SOURCES.md)
+- Next: connectors for president.uz, E-qaror, gov.uz and ministry sites (each after an
+  access review); a verified change feed; scheduled re-checks; publication/effective dates
 
 ### Phase 8 — Realtime voice
 - Streaming STT → streaming response → streaming TTS, barge-in, turn detection, low latency;
@@ -277,20 +276,15 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   mature; see [docs/RUFLO_INTEGRATION_PLAN.md](docs/RUFLO_INTEGRATION_PLAN.md). Off by default.
 
 ### Phase 15 — JARVIS Mode & OpenJarvis Local Device Companion
-- **Status (verified 2026-10-23): foundation only — the reference scenario does NOT run.**
-- Works: `/api/jarvis/capabilities` (real tool registry; every device feature reports its
-  missing prerequisites), `/api/jarvis/percentages` (exact decimal arithmetic on values the
-  owner enters, with a stored receipt that records no external delivery),
-  `/api/jarvis/receipts/{id}`, `/api/jarvis/inspect-plan` (static tool-graph check, nothing
-  executes), and a signed read-only Linux companion CLI that is not yet wired to the API.
-- Not implemented: device pairing/registry, stored or executed task plans, per-task
-  authorization, opening device files, document → PDF on a device, Telegram sending,
-  Windows/mobile companions, voice-to-task. The 2026-10-22 prototype that claimed these
-  (fabricated "delivered" receipts, hardcoded contacts and pairing token) was removed in
-  `2d15a12`; the web page and Chrome extension were corrected to the real API in
-  `claude/master-audit-remediation`.
-- Reference scenario (target, not yet working):
-  `"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko'rsatkichlarini oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor."`
+- **Done (2026-11-19):** device pairing (code confirmed on the JARVIS page), stored task
+  plans with per-step owner authorization bound to a scope hash, signed device results,
+  Telegram recipient linking and sending (district notices, employee self-reports), and
+  computer control on the paired PC — open an allowed app, list or open a file in
+  Downloads/Documents/Desktop, open an https address — each action approved first and off
+  by default in the desktop app ("Kompyuterni boshqarish").
+- Next: the full reference chain
+  (`"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, … va Telegram orqali Baxtiyorga yubor."`):
+  "latest file", convert to PDF on the device, send that file by Telegram, each step approved.
 - Upstream status per project: [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
 
 ## Known limitations (current)
@@ -307,7 +301,8 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 - Voice is turn-by-turn; realtime voice is Phase 8.
 - The rate limiter is in memory (one API process).
 - Single-owner authentication; no multi-user accounts.
-- Some API status/error texts are English-only (new texts are added in uz/en/ru).
+- The web app shows API errors in uz/ru by their code (`apps/web/lib/i18n/errors.ts`); a
+  code not in that list still shows the server's English text.
 - Default model names in `apps/api/config/models.toml` and the image model settings must be
   kept current.
 - Not yet: Qdrant vector store, S3 storage, model-based reranker (interfaces exist).

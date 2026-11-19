@@ -73,6 +73,22 @@ describe("createApiClient", () => {
     });
   });
 
+  it("shows a known error code in the user's language and keeps the code", async () => {
+    const client = createApiClient({
+      baseUrl: "http://api",
+      fetchImpl: async () =>
+        Response.json({ error: { code: "not_found", message: "Skill not found." } }, { status: 404 }),
+      localizeError: (code) => (code === "not_found" ? "Topilmadi." : undefined),
+    });
+    await expect(client.getProject("x")).rejects.toMatchObject({ code: "not_found", message: "Topilmadi." });
+    const plain = createApiClient({
+      baseUrl: "http://api",
+      fetchImpl: async () => Response.json({ error: { code: "other", message: "Kept." } }, { status: 400 }),
+      localizeError: () => undefined,
+    });
+    await expect(plain.getProject("x")).rejects.toMatchObject({ message: "Kept." });
+  });
+
   it("reports network failures clearly", async () => {
     const client = createApiClient({
       baseUrl: "http://api",
