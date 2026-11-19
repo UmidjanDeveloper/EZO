@@ -1,4 +1,6 @@
 import { createApiClient } from "@ezo/shared";
+import { localizedError } from "./i18n/errors";
+import { storedUiLanguage } from "./i18n/language";
 import { createStoredValue } from "./stored-value";
 
 /** Optional API token (EZO_AUTH_MODE=token), kept only in this browser. */
@@ -20,4 +22,5 @@ export function apiUrl(): string {
 export const api = createApiClient({
   baseUrl: apiUrl,
   getToken: () => storedToken.get().trim() || null,
+  localizeError: (code) => localizedError(storedUiLanguage.get(), code),
 });

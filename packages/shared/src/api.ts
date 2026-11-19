@@ -81,6 +81,9 @@ export interface ApiClientOptions {
   /** Returns the API token when EZO runs with EZO_AUTH_MODE=token. */
   getToken?: () => string | null | undefined;
   fetchImpl?: typeof fetch;
+  /** Returns the error text in the user's language for a known error code (else undefined:
+   * the server's own message is kept). */
+  localizeError?: (code: string, status: number) => string | undefined;
 }
 
 const STREAM_EVENTS = new Set(["meta", "activity", "delta", "done", "error"]);
@@ -114,11 +117,15 @@ export function createApiClient(options: ApiClientOptions) {
       throw new ApiError(
         0,
         "network_error",
-        "Cannot reach the EZO API. Is it running?",
+        options.localizeError?.("network_error", 0) ?? "Cannot reach the EZO API. Is it running?",
         `Tried ${base}. Start it with: python scripts/ezo.py dev`,
       );
     }
-    if (!response.ok) throw await toApiError(response);
+    if (!response.ok) {
+      const error = await toApiError(response);
+      const text = options.localizeError?.(error.code, error.status);
+      throw text ? new ApiError(error.status, error.code, text, error.hint) : error;
+    }
     return response;
   }
 
