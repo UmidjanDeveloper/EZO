@@ -154,9 +154,11 @@ async def test_spreadsheet_analysis_uses_computed_facts(
     rows: list[list[object]] = [["Oy", "Savdo"], ["Yanvar", 120], ["Fevral", 180], ["Mart", 150]]
     await upload(client, "savdo.xlsx", make_xlsx(rows))
     fake_anthropic.replies = ["Savdo jami 450."]
-    await stream_chat(client, message="Shu excel jadvalni tahlil qil")
+    events = await stream_chat(client, message="Shu excel jadvalni tahlil qil")
+    # Analysis requests go to the data analyst (computed statistics + Excel with charts).
+    assert events[0][1]["agent"] == "data_analyst"
     system = fake_anthropic.requests[-1].system or ""
-    assert "Spreadsheet facts computed by EZO" in system
+    assert "Analysis computed by EZO" in system
     assert "sum 450" in system and "mean 150" in system
 
 

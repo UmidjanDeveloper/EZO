@@ -39,7 +39,7 @@ from ezo_api.documents.executor.protocol import (
 )
 from ezo_api.documents.isolation import verified_executor_workload
 from ezo_api.knowledge.parsers.base import Section
-from ezo_api.knowledge.parsers.office import parse_docx
+from ezo_api.knowledge.parsers.office import parse_docx, parse_xlsx
 from ezo_api.knowledge.parsers.pdf import parse_pdf
 
 if TYPE_CHECKING:
@@ -162,6 +162,12 @@ def extract(request: ExtractionRequest, data: bytes) -> ExtractionResult:
         parsed = parse_epub(data)
         sections, members = parsed.sections, parsed.metadata.get("section_sources") or None
         needs_ocr = parsed.needs_ocr
+    elif request.format == "xlsx":
+        from ezo_api.documents.ooxml_limits import validate_ooxml
+
+        validate_ooxml(data)  # bounded expansion before openpyxl reads it
+        parsed = parse_xlsx(data, "book.xlsx")
+        sections = parsed.sections
     elif request.format == "docx":
         parsed = parse_docx(data, "document.docx")
         sections, members = parsed.sections, parsed.metadata.get("section_sources") or None

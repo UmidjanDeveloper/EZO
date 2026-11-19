@@ -344,3 +344,17 @@ Har bir xodim faqat o‘z suhbatlari, fayllari, jadvali va ma’lumotlarini ko�
 boshqarish, ko‘nikmalarga ruxsat berish va SMS/Telegram ogohlantirish yuborish faqat sizda.
 Parol faqat scrypt izi sifatida saqlanadi; kirish urinishlari cheklangan (daqiqasiga 10 ta).
 Xodimni «O‘chirish» bilan to‘xtatsangiz, uning barcha kirishlari darhol bekor bo‘ladi.
+
+## Ma’lumot tahlilchisi — Excel/CSV ni tahlil qilish (2026-11-19)
+
+1. Excel (.xlsx) uchun `COMPOSE_PROFILES` da `documents` bo‘lsin — Excel fayl xavfsiz
+   ishchida o‘qiladi. CSV hamma joyda ishlaydi.
+2. Faylni chatga biriktiring va yozing: «Shu jadvalni tahlil qil», «Trend va prognoz
+   chiqar», «Grafik chiz», «G‘ayrioddiy qiymatlarni top».
+3. EZO javob beradi va Excel fayl qaytaradi: ma’lumot, statistika (jami, o‘rtacha, mediana,
+   eng kam/ko‘p), trend varag‘i chiziqli grafik bilan, guruhlar bo‘yicha jami ustunli grafik
+   bilan va tekshirish kerak bo‘lgan g‘ayrioddiy qiymatlar.
+
+Barcha raqamlarni EZO o‘zi hisoblaydi (model taxmin qilmaydi). Prognoz faqat ma’lumot to‘g‘ri
+chiziqqa yaxshi tushsa beriladi va har doim «taxmin» deb yoziladi. Korrelyatsiya — bog‘liqlik,
+sabab emas. «Shu jadvalni … bo‘yicha sarala/filtrla/jamla» ham shu yo‘l bilan ishlaydi.

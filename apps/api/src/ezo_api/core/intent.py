@@ -28,6 +28,8 @@ class Intent(StrEnum):
     VISUAL = "visual"
     SKILL = "skill"
     """EZO writing a small tool for itself (draft → owner approval → locked container)."""
+    DATA = "data"
+    """Data analyst: statistics, trends, outliers and charts for an attached Excel/CSV."""
     SCHEDULE = "schedule"
     """Jadval: EZO's recurring jobs ("har dushanba soat 9 da haftalik hisobot")."""
     COMPUTER = "computer"

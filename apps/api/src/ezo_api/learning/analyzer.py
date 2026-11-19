@@ -338,6 +338,7 @@ EZO_AGENT_PROFILES: dict[str, dict[str, Any]] = {
     "computer": {"title": "Computer (JARVIS)", "domain": "device"},
     "skill": {"title": "Skills (SkillForge)", "domain": "coding"},
     "schedule": {"title": "Schedule (Jadval)", "domain": "productivity"},
+    "data_analyst": {"title": "Data Analyst", "domain": "research"},
 }
 
 

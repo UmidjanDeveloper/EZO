@@ -59,7 +59,7 @@ _PUBLIC_META = (
 # Counted per user and day for owner-managed accounts (the owner is unlimited).
 DOCUMENT_QUOTA = [Depends(require_quota("document_jobs_per_day"))]
 # Read only by the isolated document worker (never parsed in the API process).
-_WORKER_EXTENSIONS = (".pdf", ".docx", ".epub", ".png", ".jpg", ".jpeg")
+_WORKER_EXTENSIONS = (".pdf", ".docx", ".epub", ".xlsx", ".png", ".jpg", ".jpeg")
 
 
 def _rejected(exc: UploadRejectedError | FetchError) -> HTTPException:

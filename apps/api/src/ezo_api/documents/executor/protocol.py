@@ -34,7 +34,7 @@ MAX_CONVERTED_PDF_BYTES = 10 * 1024 * 1024
 MAX_CONVERTED_PAGES = 500
 CONVERT_SECONDS = 20.0
 
-ExtractFormat = Literal["pdf", "docx", "epub", "png", "jpeg"]
+ExtractFormat = Literal["pdf", "docx", "epub", "xlsx", "png", "jpeg"]
 
 
 class ExtractionRequest(BaseModel):
