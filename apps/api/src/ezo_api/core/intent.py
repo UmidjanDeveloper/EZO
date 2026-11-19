@@ -26,6 +26,8 @@ class Intent(StrEnum):
     DOCUMENT = "document"
     BUSINESS = "business"
     VISUAL = "visual"
+    CHANCERY = "chancery"
+    """Devonxona: citizens' appeals, meetings and their tasks, office reports."""
     DISTRICT = "district"
     """District center: the account's district projects (chosen by EzoCore's override when a
     project of the account is named; "xatlov" is a signal of its own)."""
@@ -204,6 +206,21 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\b(fayl|file|файл)\s*(qilib|sifatida|ko'?rinishida|as\b)", 2.5),
         (r"\bsolishtir", 1),
         (r"\bcompare (the|these|two)\b", 2),
+    ],
+    Intent.CHANCERY: [
+        (r"\bmurojaat", 3),
+        (r"\bмурожаат", 3),
+        (r"\bобращени", 2.5),
+        # "Bayonnoma shablonini tayyorla" is an empty template (the writing agent's job).
+        (r"\bbayonnoma(?!\w*\s+(shablon|namuna|blank|template))", 3.5),
+        (r"\bбаённома|\bпротокол\w* (заседан|совещан|собран)", 3.5),
+        (r"\btopshiriq", 3),
+        (r"\bтопшириқ|\bпоручени", 3),
+        (r"\b(haftalik|oylik)\s+hisobot", 4),
+        (r"\b(недельн|месячн|еженедельн|ежемесячн)\w*\s+отч", 4),
+        (r"\b[mt]-\d{4}-\d{4}\b", 5),
+        (r"\bmuddati (o'tgan|yaqin)", 3),
+        (r"\bмуддати (ўтган|яқин)|\bпросроч", 3),
     ],
     Intent.DISTRICT: [
         (r"\bxatlov", 3),

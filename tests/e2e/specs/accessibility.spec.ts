@@ -51,6 +51,7 @@ const pages: [string, string][] = [
   ["jarvis console", "/jarvis"],
   ["memory", "/memory"],
   ["district center", "/district"],
+  ["devonxona", "/chancery"],
 ];
 
 for (const [name, url] of pages) {

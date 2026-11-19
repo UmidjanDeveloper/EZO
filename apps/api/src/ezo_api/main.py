@@ -24,6 +24,7 @@ from ezo_api.api.routes import (
     accounts,
     artifacts,
     career,
+    chancery,
     chat,
     conversations,
     district,
@@ -292,6 +293,7 @@ def create_app(
         learning,
         accounts,
         district,
+        chancery,
     ):
         app.include_router(module.router)
 

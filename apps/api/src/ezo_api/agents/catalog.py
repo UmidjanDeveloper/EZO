@@ -145,6 +145,17 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "chancery",
+            Intent.CHANCERY,
+            {"uz": "Devonxona", "en": "Office (devonxona)", "ru": "Канцелярия"},
+            "Citizens' appeals register with deadlines and reply letters, meeting minutes with "
+            "a task register, reminders (sent only after approval) and weekly/monthly reports.",
+            maturity="alpha",
+            phase="District",
+            context_mode="professional",
+            route="chat",
+        ),
+        AgentSpec(
             "district",
             Intent.DISTRICT,
             {"uz": "Tuman markazi", "en": "District Center", "ru": "Районный центр"},

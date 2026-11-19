@@ -10,6 +10,7 @@ from ezo_api.db.models.artifacts import (
     StoryTimeline,
 )
 from ezo_api.db.models.career import CareerProfile
+from ezo_api.db.models.chancery import Appeal, GovTask, Meeting
 from ezo_api.db.models.conversation import Conversation, Message
 from ezo_api.db.models.district import (
     DistrictAssignment,
@@ -63,6 +64,7 @@ from ezo_api.db.models.user import UsageEvent, User, UserToken
 
 __all__ = [
     "AgentRun",
+    "Appeal",
     "Artifact",
     "ArtifactVersion",
     "AuditLog",
@@ -77,6 +79,7 @@ __all__ = [
     "DocumentJobPublication",
     "DocumentRevision",
     "GlossaryTerm",
+    "GovTask",
     "JarvisAuthorization",
     "JarvisDevice",
     "JarvisTask",
@@ -95,6 +98,7 @@ __all__ = [
     "LegalDocument",
     "LegalRevision",
     "LongDocPart",
+    "Meeting",
     "Memory",
     "Message",
     "OcrPage",
