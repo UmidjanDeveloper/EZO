@@ -48,7 +48,7 @@ from ezo_api.jarvis.device_protocol import (
     verify_result,
 )
 from ezo_api.jarvis.planner import DocumentWorkflowPlan, PlanError, plan_document_workflow
-from ezo_api.jarvis.telegram import TelegramClient, TelegramError
+from ezo_api.jarvis.telegram import StartMessage, TelegramClient, TelegramError
 
 PAIRING_CODE_TTL = timedelta(minutes=10)
 LINK_CODE_TTL = timedelta(minutes=30)
@@ -263,10 +263,18 @@ class JarvisService:
             raise JarvisError("wrong_code", "This link code does not belong to the recipient.", 422)
         if recipient.link_expires_at is None or recipient.link_expires_at < utcnow():
             raise JarvisError("code_expired", "The link expired; create a new one.")
-        try:
-            start = await self._telegram().find_start(code)
-        except TelegramError as exc:
-            raise JarvisError("telegram_unavailable", exc.message, 502) from exc
+        from ezo_api.district.telegram_reports import find_start as inbox_start
+
+        # The bot's inbox first: when EZO reads the bot's messages in the background, Telegram
+        # no longer keeps them, and the /start message is stored there.
+        stored = await inbox_start(self.session, code)
+        if stored is not None:
+            start: StartMessage | None = StartMessage(stored.chat_id, stored.sender_name)
+        else:
+            try:
+                start = await self._telegram().find_start(code)
+            except TelegramError as exc:
+                raise JarvisError("telegram_unavailable", exc.message, 502) from exc
         if start is None:
             raise JarvisError(
                 "not_started",

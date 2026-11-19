@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = Field(default=None, alias="EZO_TELEGRAM_BOT_TOKEN")
     # District center: SMS through the owner's Eskiz.uz account, and the official data API's
     # token. Never logged, stored in the database or returned by the API.
+    telegram_poll_seconds: float = Field(
+        default=20.0, ge=0, le=3600, alias="EZO_TELEGRAM_POLL_SECONDS"
+    )
+    """How often EZO reads its bot's messages (employees' reports, /start links); 0 = never."""
     eskiz_email: str | None = Field(default=None, alias="EZO_ESKIZ_EMAIL")
     eskiz_password: SecretStr | None = Field(default=None, alias="EZO_ESKIZ_PASSWORD")
     eskiz_sender: str = Field(default="4546", alias="EZO_ESKIZ_SENDER")

@@ -246,3 +246,19 @@ Chap menyuda **«Devonxona»** (kiruvchi quti belgisi). Hammasini chatda ham ayt
 
 Mas’ul eslatma olishi uchun u **Tuman markazi**dagi mas’ullar ro‘yxatida (telefon yoki Telegram
 bilan) bo‘lishi kerak; aks holda sahifada sariq belgi chiqadi.
+
+## Xodimlar Telegram orqali hisobot beradi (2026-11-19)
+
+`.env` da `EZO_TELEGRAM_BOT_TOKEN` bo‘lsa, EZO o‘z botining xabarlarini har 20 soniyada o‘qiydi
+(`EZO_TELEGRAM_POLL_SECONDS`, 0 — o‘chiq).
+
+1. Mas’ulni bog‘lang: JARVIS sahifasida Telegram kontakt qo‘shing (u botga havola orqali
+   /start bosadi), keyin **Tuman markazi → Mas’ullar bilan aloqa**da shu kontaktni tanlang.
+2. Mas’ul botga yozadi:
+   - «12» — bugun 12 ta qo‘shildi (bitta loyihasi bo‘lsa);
+   - «xatlov 12» — aynan «Xatlov…» loyihasiga;
+   - «jami 45» — umumiy son 45.
+3. Bot darhol javob beradi: «✅ Qabul qilindi: «Xatlov 2026» — 17 / 100 xonadon (17%)».
+   Tuman markazida raqam yangilanadi (manba: telegram), «Xatlov qalay ketyapti?» shu bilan javob beradi.
+
+Notanish odamlarning xabarlariga bot javob bermaydi.
