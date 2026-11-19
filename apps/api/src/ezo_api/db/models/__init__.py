@@ -25,6 +25,7 @@ from ezo_api.db.models.jarvis import (
     JarvisDevice,
     JarvisTask,
     JarvisTaskStep,
+    TelegramInboxMessage,
     TelegramRecipient,
 )
 from ezo_api.db.models.knowledge import (
@@ -119,6 +120,7 @@ __all__ = [
     "StudentRawRevision",
     "StudyCard",
     "StudyReview",
+    "TelegramInboxMessage",
     "TelegramRecipient",
     "ToolCall",
     "UsageEvent",

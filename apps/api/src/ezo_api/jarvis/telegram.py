@@ -199,3 +199,44 @@ async def send_text(client: TelegramClient, chat_id: str, text: str) -> TextRece
             "unverified", "Telegram's answer does not confirm this delivery.", outcome_unknown=True
         )
     return TextReceipt(chat_id=str(chat_id), message_id=int(result["message_id"]))
+
+
+@dataclass(frozen=True, slots=True)
+class IncomingText:
+    update_id: int
+    chat_id: str
+    name: str
+    text: str
+    date: int
+
+
+async def get_updates(client: TelegramClient, offset: int | None) -> list[IncomingText]:
+    """Private text messages after `offset` (Telegram forgets the earlier ones once asked with
+    a higher offset, so callers store what they read)."""
+    data: dict[str, Any] = {"limit": 100, "timeout": 0, "allowed_updates": '["message"]'}
+    if offset is not None:
+        data["offset"] = offset
+    result = await client._call("getUpdates", data=data)
+    out: list[IncomingText] = []
+    for update in result if isinstance(result, list) else []:
+        if not isinstance(update, dict) or not isinstance(update.get("update_id"), int):
+            continue
+        message = update.get("message")
+        if not isinstance(message, dict) or not isinstance(message.get("text"), str):
+            out.append(IncomingText(update["update_id"], "", "", "", 0))  # skip, but move past it
+            continue
+        chat = message.get("chat") or {}
+        sender = message.get("from") or {}
+        name = " ".join(
+            str(part) for part in (sender.get("first_name"), sender.get("last_name")) if part
+        ) or str(sender.get("username") or "")
+        out.append(
+            IncomingText(
+                update["update_id"],
+                str(chat.get("id")) if chat.get("type") == "private" else "",
+                name[:120],
+                message["text"][:4000],
+                int(message.get("date") or 0),
+            )
+        )
+    return out

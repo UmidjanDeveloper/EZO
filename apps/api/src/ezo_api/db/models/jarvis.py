@@ -11,7 +11,15 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ezo_api.db.base import Base, Timestamps, UTCDateTime, UUIDPrimaryKey
@@ -149,3 +157,22 @@ class TelegramRecipient(UUIDPrimaryKey, Timestamps, Base):
     chat_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     telegram_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+
+
+class TelegramInboxMessage(UUIDPrimaryKey, Base):
+    """A private text message EZO's bot received (kept 7 days).
+
+    EZO reads the bot's updates once and confirms them to Telegram, so every reader (recipient
+    linking, employees' progress reports) works from this table instead of Telegram's queue.
+    """
+
+    __tablename__ = "telegram_inbox"
+    __table_args__ = (Index("ix_telegram_inbox_chat", "chat_id", "received_at"),)
+
+    update_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    chat_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    sender_name: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    outcome: Mapped[str] = mapped_column(String(40), default="", nullable=False)

@@ -112,6 +112,35 @@ def _user_token_validator(services: Services) -> Callable[[str], Awaitable[str |
     return validate
 
 
+async def _telegram_poller(services: Services) -> None:
+    """Read EZO's bot messages in the background: employees' progress reports and /start
+    links. Stops for good when Telegram says another reader (a webhook) owns the bot."""
+    from ezo_api.district.telegram_reports import poll_once
+    from ezo_api.jarvis.telegram import TelegramClient, TelegramError
+
+    token = services.settings.telegram_bot_token
+    if token is None:
+        return
+    client = TelegramClient(token.get_secret_value())
+    while True:
+        try:
+            async with services.db.sessionmaker() as session:
+                stored, handled = await poll_once(session, client)
+                await session.commit()
+            if stored or handled:
+                logger.info("Telegram: %s new message(s), %s report(s) handled", stored, handled)
+        except asyncio.CancelledError:
+            raise
+        except TelegramError as exc:
+            if "webhook" in exc.message.lower() or "conflict" in exc.message.lower():
+                logger.warning("Telegram polling stopped: %s", exc.message)
+                return
+            logger.warning("Telegram polling failed: %s", exc.message)
+        except Exception:
+            logger.exception("Telegram polling failed")
+        await asyncio.sleep(services.settings.telegram_poll_seconds)
+
+
 def create_app(
     settings: Settings | None = None,
     providers: dict[str, ModelProvider] | None = None,
@@ -175,8 +204,17 @@ def create_app(
                     relearn = await services.learning.resume_unfinished()
                     if relearn:
                         logger.info("Resumed reading of %s learned source(s)", relearn)
+            poller = (
+                asyncio.create_task(_telegram_poller(services))
+                if settings.telegram_bot_token
+                and settings.telegram_poll_seconds > 0
+                and settings.environment != "test"
+                else None
+            )
             yield
         finally:
+            if "poller" in locals() and poller is not None:
+                poller.cancel()
             if services.learning is not None:
                 await services.learning.shutdown()
             await services.ingestion.shutdown()
