@@ -43,6 +43,7 @@ from ezo_api.agents.convert_office import (
 )
 from ezo_api.agents.docx_office import find_docx, run_replace_action, transform_docx
 from ezo_api.agents.education_office import make_material
+from ezo_api.agents.handwriting import run_handwriting_action
 from ezo_api.agents.llm import complete, extract_json, sources_block
 from ezo_api.agents.longdoc_office import (
     answer_sources,
@@ -447,6 +448,7 @@ class DocumentAgent(Agent):
             return gathered
         for action in (
             run_glossary_action,
+            run_handwriting_action,
             run_ocr_export_action,
             run_ocr_action,
             run_replace_action,

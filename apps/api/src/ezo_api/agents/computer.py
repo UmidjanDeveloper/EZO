@@ -14,6 +14,7 @@ from ezo_api.agents.base import Agent, AgentPlan, AgentTurn, GatherContext, Gath
 from ezo_api.agents.catalog import AGENTS
 from ezo_api.core.intent import Intent
 from ezo_api.jarvis.pc import parse_pc_command
+from ezo_api.jarvis.planner import PlanError, plan_document_workflow
 from ezo_api.jarvis.service import JarvisError, JarvisService
 
 INSTRUCTIONS = (
@@ -39,9 +40,15 @@ class ComputerAgent(Agent):
         gathered = Gathered()
         tools = ctx.tools
         command = parse_pc_command(ctx.turn.text)
+        workflow = None
         if command is None:
-            gathered.notes.append("No computer action was recognised. Say so briefly.")
-            return gathered
+            try:
+                workflow = plan_document_workflow(ctx.turn.text)
+            except PlanError as exc:
+                gathered.notes.append(
+                    f"No computer action was recognised: {exc.message} Say so briefly."
+                )
+                return gathered
         key = hashlib.sha256(
             f"{tools.conversation_id}:{ctx.turn.text}:{int(time.time() // 60)}".encode()
         ).hexdigest()[:40]
@@ -64,9 +71,26 @@ class ComputerAgent(Agent):
         gathered.tool_calls.append(
             {"tool": "jarvis_pc_task", "ok": True, "summary": str(task.id), "error": None}
         )
+        if command is not None:
+            what = command.description
+        else:
+            assert workflow is not None
+            parts = ["take the newest file in Downloads"]
+            if workflow.compare_previous:
+                parts.append("compare it with the previous one")
+            if workflow.percentages:
+                parts.append("prepare the percentages")
+            if workflow.convert_pdf:
+                parts.append("make a PDF")
+            if workflow.recipient:
+                parts.append(f"send it by Telegram to «{workflow.recipient}»")
+            what = (
+                ", ".join(parts)
+                + f" ({len(task.steps) if hasattr(task, 'steps') else 'several'} steps)"
+            )
         gathered.notes.append(
-            f"EZO created a JARVIS task for the paired computer: {command.description}. It is "
-            "WAITING for the owner's approval (JARVIS page, or the dialog on that computer); "
-            "nothing has run yet."
+            f"EZO created a JARVIS task for the paired computer: {what}. It is WAITING for the "
+            "owner's approval (JARVIS page, or the dialog on that computer); nothing has run yet. "
+            "Sending by Telegram is approved separately, for the exact recipient and files."
         )
         return gathered

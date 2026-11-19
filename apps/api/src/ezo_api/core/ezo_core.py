@@ -221,6 +221,20 @@ async def _owned_attachments(
     return ids, [names[i] for i in ids]
 
 
+def _is_device_workflow(text: str) -> bool:
+    """ "Downloads ichidagi eng oxirgi faylni PDF'ga aylantir va Telegram orqali Baxtiyorga
+    yubor": the JARVIS document workflow on the paired computer (each step approved)."""
+    from ezo_api.jarvis.planner import PlanError, plan_document_workflow
+
+    try:
+        plan_document_workflow(text)
+    except PlanError as exc:
+        # A Downloads + "latest" request with a missing detail still belongs to the computer
+        # agent, which explains what is missing.
+        return exc.code == "recipient_unclear"
+    return True
+
+
 async def _wants_data_analysis(session: AsyncSession, user_id: uuid.UUID, turn: TurnInput) -> bool:
     """Analysis words plus an attached spreadsheet (or, without attachments, a request that
     names a table/Excel file while one was uploaded)."""
@@ -370,7 +384,7 @@ class EzoCore:
                 turn.forced_agent is None
                 and not turn.attachments
                 and intent.intent in (Intent.GENERAL, Intent.DEVELOPER, Intent.DOCUMENT)
-                and parse_pc_command(turn.text) is not None
+                and (parse_pc_command(turn.text) is not None or _is_device_workflow(turn.text))
             ):
                 # "Kalkulyatorni och", "Yuklamalar papkasida nima bor?": one approved action on
                 # the owner's paired computer.

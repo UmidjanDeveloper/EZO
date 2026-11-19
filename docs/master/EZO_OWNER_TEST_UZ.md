@@ -358,3 +358,12 @@ Xodimni «O‘chirish» bilan to‘xtatsangiz, uning barcha kirishlari darhol be
 Barcha raqamlarni EZO o‘zi hisoblaydi (model taxmin qilmaydi). Prognoz faqat ma’lumot to‘g‘ri
 chiziqqa yaxshi tushsa beriladi va har doim «taxmin» deb yoziladi. Korrelyatsiya — bog‘liqlik,
 sabab emas. «Shu jadvalni … bo‘yicha sarala/filtrla/jamla» ham shu yo‘l bilan ishlaydi.
+
+## Qo‘lyozma va kompyuter zanjiri chatdan (2026-11-19)
+
+- Qo‘lda yozilgan ariza yoki varaq rasmini (PNG/JPEG) biriktiring: «Shu qo‘lyozmani matnga
+  aylantir». EZO AI provayderning ko‘rish (vision) modeli bilan o‘qiydi, o‘qib bo‘lmagan
+  so‘zlarni [?] bilan belgilaydi va Word fayl qaytaradi. Bu mashina o‘qishi — tekshirib chiqing.
+- Chatda: «Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, foiz ko‘rsatkichlarini
+  oldingi fayldagidek tayyorla va Telegram orqali Baxtiyorga yubor». EZO JARVIS vazifasini
+  yaratadi; kompyuter va Telegram qadamlari har biri sizning tasdig‘ingizdan keyin bajariladi.
