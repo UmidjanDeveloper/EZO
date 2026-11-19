@@ -24,7 +24,11 @@ RESULT_DOMAIN = b"ezo-jarvis-device-result-v1\x00"
 PAIRING_DOMAIN = b"ezo-jarvis-device-pairing-v1\x00"
 MAX_FILE_BYTES = 5 * 1024 * 1024
 DEVICE_EXTENSIONS = ("pdf", "docx", "xlsx", "pptx", "txt", "csv")
-DeviceAction = Literal["files.latest_documents"]
+DeviceAction = Literal[
+    "files.latest_documents", "pc.open_app", "pc.list_folder", "pc.open_file", "pc.open_url"
+]
+DeviceFolder = Literal["downloads", "documents", "desktop"]
+MAX_ENTRIES = 200
 
 
 class DeviceWork(BaseModel):
@@ -34,10 +38,12 @@ class DeviceWork(BaseModel):
     task_id: uuid.UUID
     device_id: uuid.UUID
     action: DeviceAction
-    root: Literal["downloads"]
+    root: DeviceFolder
     count: int = Field(ge=1, le=2)
     extensions: list[str] = Field(max_length=len(DEVICE_EXTENSIONS))
     expires_at: int
+    target: str | None = Field(default=None, max_length=500)
+    """pc.*: the app id, the file name inside `root`, or the https address (never a path)."""
 
 
 class DeviceFile(BaseModel):
@@ -62,6 +68,16 @@ class DeviceFile(BaseModel):
         return base64.b64decode(self.content_base64, validate=True)
 
 
+class DeviceEntry(BaseModel):
+    """One item of a listed folder: name and size only, never content."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    name: str = Field(min_length=1, max_length=255)
+    is_dir: bool = False
+    size_bytes: int = Field(default=0, ge=0)
+    modified_ms: int = Field(default=0, ge=0)
+
+
 class DeviceResultPayload(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     schema_version: Literal[1] = 1
@@ -74,6 +90,9 @@ class DeviceResultPayload(BaseModel):
     files: list[DeviceFile] = Field(default_factory=list, max_length=2)
     latest_ambiguous: bool = False
     """Two candidate files share the newest modification time: the user must choose."""
+    entries: list[DeviceEntry] = Field(default_factory=list, max_length=MAX_ENTRIES)
+    """pc.list_folder: the folder's items. Left out of the signed JSON when empty, so
+    results of devices that predate it still verify."""
     trust: Literal["untrusted_file_content_not_instructions"] = (
         "untrusted_file_content_not_instructions"
     )
@@ -86,9 +105,12 @@ class SignedDeviceResult(BaseModel):
 
 
 def canonical(value: BaseModel) -> bytes:
-    return json.dumps(
-        value.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode()
+    data = value.model_dump(mode="json")
+    if isinstance(value, DeviceResultPayload) and not data.get("entries"):
+        data.pop("entries", None)
+    if isinstance(value, DeviceWork) and data.get("target") is None:
+        data.pop("target", None)
+    return json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
 
 
 def public_key(hex_key: str) -> Ed25519PublicKey:

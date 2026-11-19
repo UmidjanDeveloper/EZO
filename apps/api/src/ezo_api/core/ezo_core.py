@@ -57,6 +57,7 @@ from ezo_api.db.models import (
 from ezo_api.db.models.artifacts import ARTIFACT_TYPES
 from ezo_api.documents.pdf.requests import parse_pdf_request
 from ezo_api.education.catalog import wants_education
+from ezo_api.jarvis.pc import parse_pc_command
 from ezo_api.knowledge.retrieval.citations import (
     CITATION_RULES,
     format_sources_for_prompt,
@@ -323,6 +324,15 @@ class EzoCore:
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and not turn.attachments
+                and intent.intent in (Intent.GENERAL, Intent.DEVELOPER, Intent.DOCUMENT)
+                and parse_pc_command(turn.text) is not None
+            ):
+                # "Kalkulyatorni och", "Yuklamalar papkasida nima bor?": one approved action on
+                # the owner's paired computer.
+                intent = IntentResult(Intent.COMPUTER, 1.0, ("pc_command",), intent.scores)
             elif (
                 turn.forced_agent is None
                 and intent.intent

@@ -145,6 +145,18 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "computer",
+            Intent.COMPUTER,
+            {"uz": "Kompyuter", "en": "Computer", "ru": "Компьютер"},
+            "Opens an allowed app, a file in Downloads/Documents/Desktop or an https site, and "
+            "lists those folders on the paired computer — each action only after the owner "
+            "approves it.",
+            maturity="experimental",
+            phase="Phase 15",
+            context_mode="technical",
+            route="chat",
+        ),
+        AgentSpec(
             "chancery",
             Intent.CHANCERY,
             {"uz": "Devonxona", "en": "Office (devonxona)", "ru": "Канцелярия"},

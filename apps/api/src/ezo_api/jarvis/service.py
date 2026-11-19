@@ -47,6 +47,7 @@ from ezo_api.jarvis.device_protocol import (
     verify_pairing,
     verify_result,
 )
+from ezo_api.jarvis.pc import PC_ACTIONS, PcCommand, parse_pc_command
 from ezo_api.jarvis.planner import DocumentWorkflowPlan, PlanError, plan_document_workflow
 from ezo_api.jarvis.telegram import StartMessage, TelegramClient, TelegramError
 
@@ -88,6 +89,11 @@ def _sha(value: Any) -> str:
 
 def _code() -> str:
     return f"{secrets.randbelow(10**6):06d}"
+
+
+def _pc_scope(action: str, params: dict[str, Any], device_id: uuid.UUID | None) -> str:
+    """What the owner approves: this action, these parameters, this computer."""
+    return _sha({"action": action, "params": params, "device_id": str(device_id)})
 
 
 def _hash_code(code: str) -> str:
@@ -156,7 +162,7 @@ class JarvisService:
             status="pending",
             code_sha256=_hash_code(code),
             code_expires_at=utcnow() + PAIRING_CODE_TTL,
-            capabilities=[c for c in capabilities if c in ("files.latest_documents",)],
+            capabilities=[c for c in capabilities if c in ("files.latest_documents", *PC_ACTIONS)],
         )
         self.session.add(device)
         await self.session.flush()
@@ -331,6 +337,11 @@ class JarvisService:
         )
         if existing is not None:
             return existing
+        command = parse_pc_command(text)
+        if command is not None:
+            return await self._create_pc_task(
+                user_id, text, idempotency_key, device_id, language, command, admit
+            )
         try:
             plan = plan_document_workflow(text)
         except PlanError as exc:
@@ -365,6 +376,56 @@ class JarvisService:
             self.session.add(
                 JarvisTaskStep(task_id=task.id, position=position, action=action, params=params)
             )
+        await self.session.flush()
+        self._audit(user_id, "jarvis.task.created", task.id, {"plan": task.plan})
+        return task
+
+    async def _create_pc_task(
+        self,
+        user_id: uuid.UUID,
+        text: str,
+        idempotency_key: str,
+        device_id: uuid.UUID | None,
+        language: str,
+        command: PcCommand,
+        admit: Callable[[], Awaitable[None]] | None,
+    ) -> JarvisTask:
+        """One computer action, waiting for the owner's approval of exactly this action on
+        exactly this device before anything is sent to the computer."""
+        device = await self._choose_device(user_id, device_id)
+        if command.action not in (device.capabilities or []):
+            raise JarvisError(
+                "device_cannot",
+                "The paired computer's EZO app is too old for computer actions; update it and "
+                "pair again (or turn on “Kompyuterni boshqarish” in its settings).",
+                422,
+            )
+        if admit is not None:
+            await admit()
+        task = JarvisTask(
+            user_id=user_id,
+            device_id=device.id,
+            idempotency_key=idempotency_key,
+            kind="pc_action",
+            request_text=text[:2000],
+            language=language,
+            state="awaiting_authorization",
+            plan={"action": command.action, **command.params(), "description": command.description},
+        )
+        self.session.add(task)
+        await self.session.flush()
+        params = command.params()
+        self.session.add(
+            JarvisTaskStep(
+                task_id=task.id,
+                position=1,
+                action=command.action,
+                params=params,
+                state="awaiting_authorization",
+                scope_sha256=_pc_scope(command.action, params, device.id),
+                output={"pc": {"description": command.description, "device": device.name}},
+            )
+        )
         await self.session.flush()
         self._audit(user_id, "jarvis.task.created", task.id, {"plan": task.plan})
         return task
@@ -565,6 +626,21 @@ class JarvisService:
                 continue
             if step.device_request_expires_at < utcnow():
                 continue
+            if step.action in PC_ACTIONS:
+                work.append(
+                    DeviceWork(
+                        request_id=step.device_request_id,
+                        task_id=task.id,
+                        device_id=device.id,
+                        action=step.action,
+                        root=step.params.get("root") or "downloads",
+                        count=1,
+                        extensions=[],
+                        expires_at=int(step.device_request_expires_at.timestamp()),
+                        target=step.params.get("target"),
+                    )
+                )
+                continue
             work.append(
                 DeviceWork(
                     request_id=step.device_request_id,
@@ -606,10 +682,26 @@ class JarvisService:
         if step.device_request_expires_at is None or step.device_request_expires_at < utcnow():
             await self._fail(step, "device_timeout", "The device answered too late.")
             return task
+        if payload.action != step.action:
+            raise JarvisError("wrong_action", "The result is for another action.", 422)
         if payload.outcome != "completed":
             await self._fail(
                 step, "device_" + payload.outcome, payload.reason or "The device refused."
             )
+            return task
+        if step.action in PC_ACTIONS:
+            step.output = {
+                **(step.output or {}),
+                "entries": [e.model_dump() for e in payload.entries],
+            }
+            step.receipt = {
+                "device_id": str(device.id),
+                "request_id": str(payload.request_id),
+                "signature_verified": True,
+            }
+            step.state, step.finished_at = "completed", utcnow()
+            task.state = "queued"
+            self._audit(user_id, "jarvis.device.pc_action", step.id, {"action": step.action})
             return task
         if payload.latest_ambiguous:
             await self._fail(
@@ -736,6 +828,27 @@ class JarvisService:
         outputs = {s.action: s.output for s in steps if s.state == "completed"}
         files: list[dict[str, Any]] = outputs.get("files.latest_documents", {}).get("files", [])
         try:
+            if step.action in PC_ACTIONS:
+                approval = await self.session.scalar(
+                    select(JarvisAuthorization)
+                    .where(JarvisAuthorization.step_id == step.id)
+                    .order_by(JarvisAuthorization.decided_at.desc())
+                    .limit(1)
+                )
+                scope = _pc_scope(step.action, step.params, task.device_id)
+                if (
+                    approval is None
+                    or approval.decision != "approved"
+                    or approval.scope_sha256 != scope
+                ):
+                    step.scope_sha256 = scope
+                    step.state, step.started_at = "awaiting_authorization", None
+                    task.state = "awaiting_authorization"
+                    return "wait"
+                step.device_request_id = uuid.uuid4()
+                step.device_request_expires_at = utcnow() + DEVICE_WORK_TTL
+                step.state = "awaiting_device"
+                return "wait"
             if step.action == "files.latest_documents":
                 step.device_request_id = uuid.uuid4()
                 step.device_request_expires_at = utcnow() + DEVICE_WORK_TTL
@@ -984,6 +1097,10 @@ class JarvisService:
             "document.convert_pdf": "PDF'ga aylantirish",
             "document.report_pdf": "Foizlar hisoboti (PDF)",
             "telegram.send": "Telegram orqali yuborish",
+            "pc.open_app": "Kompyuterda dastur ochish",
+            "pc.list_folder": "Papka ro'yxati",
+            "pc.open_file": "Kompyuterda fayl ochish",
+            "pc.open_url": "Brauzerda sayt ochish",
         }
         for step in await self.steps(task.id):
             name = labels.get(step.action, step.action)
@@ -991,6 +1108,14 @@ class JarvisService:
                 detail = ""
                 if step.action == "files.latest_documents":
                     detail = ": " + ", ".join(f["name"] for f in step.output.get("files", []))
+                elif step.action in PC_ACTIONS:
+                    detail = ": " + str((step.output or {}).get("pc", {}).get("description", ""))
+                    entries = (step.output or {}).get("entries") or []
+                    if step.action == "pc.list_folder":
+                        names = ", ".join(
+                            e["name"] + ("/" if e.get("is_dir") else "") for e in entries[:40]
+                        )
+                        detail += f" — {len(entries)} ta: {names}" if entries else " — bo'sh"
                 elif step.action == "telegram.send":
                     ids = [str(r["message_id"]) for r in step.receipt.get("delivered", [])]
                     detail = f" — Telegram xabar ID: {', '.join(ids)}"

@@ -33,6 +33,9 @@ export interface DesktopSettings {
   jarvisFolder: string | null;
   /** This computer's paired JARVIS device id (the private key is stored encrypted). */
   jarvisDeviceId: string | null;
+  /** Computer actions EZO's owner approved (open an app, a file or a site, list a folder).
+   * Off until switched on here; each action is still approved one by one. */
+  allowPcControl: boolean;
 }
 
 export const DEFAULT_SETTINGS: DesktopSettings = {
@@ -54,6 +57,7 @@ export const DEFAULT_SETTINGS: DesktopSettings = {
   conversationId: null,
   jarvisFolder: null,
   jarvisDeviceId: null,
+  allowPcControl: false,
 };
 
 const SHORTCUTS = new Set(["Control+Alt+Space", "Control+Shift+Space", "Alt+Space", "Control+Alt+E"]);
@@ -99,6 +103,7 @@ export function sanitizeSettings(raw: unknown): DesktopSettings {
     onboarded: bool("onboarded", false),
     clapListening: bool("clapListening", false),
     clapStartsListening: bool("clapStartsListening", false),
+    allowPcControl: bool("allowPcControl", false),
     voiceVolume: typeof input.voiceVolume === "number" && Number.isFinite(input.voiceVolume) ? Math.min(1, Math.max(0, input.voiceVolume)) : 1,
     shortcut: typeof input.shortcut === "string" && SHORTCUTS.has(input.shortcut) ? input.shortcut : DEFAULT_SETTINGS.shortcut,
     conversationId:

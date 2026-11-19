@@ -30,6 +30,10 @@ function stepLabels(t: JarvisConsoleTexts): Record<string, string> {
     "document.convert_pdf": t.steps.documentConvertPdf,
     "document.report_pdf": t.steps.documentReportPdf,
     "telegram.send": t.steps.telegramSend,
+    "pc.open_app": t.steps.pcOpenApp,
+    "pc.list_folder": t.steps.pcListFolder,
+    "pc.open_file": t.steps.pcOpenFile,
+    "pc.open_url": t.steps.pcOpenUrl,
   };
 }
 
@@ -253,7 +257,12 @@ function NewTask({ act }: { act: Act }) {
 function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act: Act }) {
   const { m, f } = useI18n();
   const t = m.jarvisConsole.approval;
-  const output = step.output as { recipient?: string; telegram_name?: string; documents?: { filename: string; sha256: string }[] };
+  const output = step.output as {
+    recipient?: string;
+    telegram_name?: string;
+    documents?: { filename: string; sha256: string }[];
+    pc?: { description: string; device?: string };
+  };
   const recipient = `${output.recipient ?? ""}${output.telegram_name ? ` (${output.telegram_name})` : ""}`;
   const decide = (approve: boolean) =>
     act(() =>
@@ -266,8 +275,14 @@ function Approval({ task, step, act }: { task: JarvisTask; step: JarvisStep; act
     <div className="mt-2 rounded-lg border border-warning/40 bg-warning/8 p-3 text-sm" data-testid="jarvis-approval">
       <p className="font-medium text-ink">
         <Send className="mr-1 inline h-3.5 w-3.5" aria-hidden />
-        {f(t.question, { recipient })}
+        {output.pc ? t.pcQuestion : f(t.question, { recipient })}
       </p>
+      {output.pc ? (
+        <p className="my-1 text-sm text-ink-soft" data-testid="jarvis-pc-action">
+          {output.pc.description}
+          {output.pc.device ? <span className="text-xs text-ink-faint"> — {output.pc.device}</span> : null}
+        </p>
+      ) : null}
       <ul className="my-1 list-disc pl-5 text-xs text-ink-muted">
         {(output.documents ?? []).map((d) => (
           <li key={d.sha256}>

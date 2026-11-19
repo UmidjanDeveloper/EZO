@@ -253,6 +253,11 @@ export interface JarvisTaskView {
     action: string;
     state: string;
     scope_sha256: string | null;
-    output: { recipient?: string; telegram_name?: string; documents?: { filename: string; sha256: string }[] };
+    output: {
+      recipient?: string;
+      telegram_name?: string;
+      documents?: { filename: string; sha256: string }[];
+      pc?: { description: string; device?: string };
+    };
   }[];
 }
