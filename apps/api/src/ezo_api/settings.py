@@ -128,6 +128,8 @@ class Settings(BaseSettings):
     # "documents"): PDF/DOCX/EPUB/PNG/JPEG uploads go to it instead of being refused.
     # Compose passes COMPOSE_PROFILES here, so "documents" in that list turns it on.
     document_worker: Annotated[bool, NoDecode] = Field(default=False, alias="EZO_DOCUMENT_WORKER")
+    scheduler_seconds: int = Field(default=30, ge=0, le=3600, alias="EZO_SCHEDULER_SECONDS")
+    """How often the Jadval scheduler looks for due jobs (0 = off)."""
     skill_worker: Annotated[bool, NoDecode] = Field(default=False, alias="EZO_SKILL_WORKER")
     """The Compose "skills" profile runs the skill worker (owner-approved skills in a locked
     container); like EZO_DOCUMENT_WORKER, it is set from COMPOSE_PROFILES."""

@@ -77,6 +77,7 @@ from ezo_api.providers.router import (
     StreamInterruptedError,
 )
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
+from ezo_api.schedule.requests import wants_schedule
 from ezo_api.skills.service import find_skill
 from ezo_api.tools.base import ToolContext
 from ezo_api.translation.requests import wants_translation
@@ -325,6 +326,9 @@ class EzoCore:
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
+            elif turn.forced_agent is None and not turn.attachments and wants_schedule(turn.text):
+                # "Har dushanba soat 9 da haftalik hisobot tayyorla": a recurring job (Jadval).
+                intent = IntentResult(Intent.SCHEDULE, 1.0, ("recurring",), intent.scores)
             elif (
                 turn.forced_agent is None
                 and not turn.attachments

@@ -5,6 +5,7 @@ import {
   Award,
   Bot,
   Brain,
+  CalendarClock,
   FileSpreadsheet,
   FileStack,
   FolderKanban,
@@ -52,13 +53,14 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/district", label: m.nav.district, icon: Landmark },
     { href: "/chancery", label: m.nav.chancery, icon: Inbox },
+    { href: "/schedule", label: m.nav.schedule, icon: CalendarClock },
     { href: "/skills", label: m.nav.skills, icon: Wrench },
     { href: "/jarvis", label: m.nav.jarvis ?? "JARVIS", icon: Bot },
     { href: "/admin", label: m.nav.admin, icon: ShieldCheck },
   ].filter(
     (item) =>
       status?.deployment_profile !== "free-beta" ||
-      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district", "/chancery", "/skills"].includes(item.href)
+      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district", "/chancery", "/schedule", "/skills"].includes(item.href)
   );
 
   return (

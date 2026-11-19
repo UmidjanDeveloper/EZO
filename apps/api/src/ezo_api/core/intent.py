@@ -28,6 +28,8 @@ class Intent(StrEnum):
     VISUAL = "visual"
     SKILL = "skill"
     """EZO writing a small tool for itself (draft → owner approval → locked container)."""
+    SCHEDULE = "schedule"
+    """Jadval: EZO's recurring jobs ("har dushanba soat 9 da haftalik hisobot")."""
     COMPUTER = "computer"
     """An action on the owner's paired computer (chosen by EzoCore's override when the words
     name one of the fixed computer actions)."""
@@ -217,6 +219,12 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\bo'zing(ga|ni).{0,60}?(qo'sh|o'rgat|kuchaytir|yarat)", 5),
         (r"\b(create|build|write|add) (a |an |yourself )?(new )?(skill|tool)\b", 5),
         (r"\b(создай|добавь|напиши) (себе )?(новый )?(навык|инструмент)", 5),
+    ],
+    Intent.SCHEDULE: [
+        (r"\bjadval(im|ingiz)?(ni)?\s+(ko'rsat|qanday|nima)", 6),
+        (r"\brejalashtirilgan\s+(ish|vazifa)", 6),
+        (r"\b(show|list)\s+(my\s+)?schedule\b|\bscheduled jobs\b", 6),
+        (r"покажи\s+расписание|мо[её]\s+расписание", 6),
     ],
     Intent.CHANCERY: [
         (r"\bmurojaat", 3),

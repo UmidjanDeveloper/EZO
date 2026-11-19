@@ -311,3 +311,20 @@ egasi beradi; «O‘chirish» bilan istalgan vaqtda to‘xtatasiz.
    yaqin, qizil boshqa so‘z eshitildi yoki tushib qoldi — va «Mashq qiling» ro‘yxati.
 
 Bu taxminiy baho: nutqni tanish asosida, fonema darajasida emas. Yozuv saqlanmaydi.
+
+## Jadval — EZO o‘zi bajaradigan takroriy ishlar (2026-11-19)
+
+Chatda yozing (yoki chap menyudagi **«Jadval»** sahifasida qo‘shing):
+- «Har dushanba soat 9 da haftalik hisobot tayyorla» — Devonxona hisoboti Word faylda;
+- «Har oyning 1-kuni oylik hisobot tayyorla»;
+- «Har kuni ertalab 8:30 da muddatlarni eslat» — muddati o‘tgan va 3 kunda tugaydigan
+  murojaat va topshiriqlar;
+- «Ish kunlari kechqurun 6 da xatlov loyihalarini yangila» — rasmiy API’dan o‘qib, jami;
+- «Har yakshanba lex.uz qonunlarni qayta tekshir»;
+- «Jadvalimni ko‘rsat», «Haftalik hisobot jadvalini to‘xtat».
+
+Natijalar «Jadval» sahifasida saqlanadi («Hozir bajarish» tugmasi ham bor). Natijani
+Telegram’ingizga olish uchun: JARVIS sahifasida **«Men»** nomli qabul qiluvchi qo‘shing va
+o‘z Telegram’ingizdan botga /start yuboring, keyin jadvalda uni tanlang (yoki chatda
+«… telegramga yubor» deng). Jadval hech qachon boshqa odamlarga xabar yubormaydi.
+EZO o‘chiq bo‘lgan paytdagi o‘tkazib yuborilgan vaqt yoqilganda bir marta bajariladi.

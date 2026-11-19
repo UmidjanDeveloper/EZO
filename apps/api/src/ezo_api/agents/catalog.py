@@ -145,6 +145,17 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "schedule",
+            Intent.SCHEDULE,
+            {"uz": "Jadval", "en": "Schedule", "ru": "Расписание"},
+            "Runs EZO's recurring jobs in the background — weekly/monthly office report, "
+            "deadline reminders, district project sync, LEX.UZ re-check — and keeps the results.",
+            maturity="alpha",
+            phase="Phase 5 — Durable tasks, jobs and worker",
+            context_mode="technical",
+            route="chat",
+        ),
+        AgentSpec(
             "skill",
             Intent.SKILL,
             {"uz": "Ko‘nikmalar", "en": "Skills", "ru": "Навыки"},

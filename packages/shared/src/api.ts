@@ -52,6 +52,9 @@ import type {
   GovMeeting,
   GovTask,
   PronunciationResult,
+  ScheduledJobInfo,
+  ScheduledRunInfo,
+  ScheduleKind,
   SkillDetail,
   SkillSummary,
   DistrictChannels,
@@ -182,6 +185,22 @@ export function createApiClient(options: ApiClientOptions) {
     updateGovTask: (id: string, body: { status?: GovTask["status"]; due_on?: string }) =>
       request<GovTask>(`/api/chancery/tasks/${id}`, { method: "PATCH", ...json(body) }),
     meetings: () => request<GovMeeting[]>("/api/chancery/meetings"),
+
+    // Jadval (schedule)
+    schedule: () => request<{ jobs: ScheduledJobInfo[]; runs: ScheduledRunInfo[] }>("/api/schedule"),
+    createScheduledJob: (body: {
+      kind: ScheduleKind;
+      weekdays?: string;
+      at_time?: string;
+      month_day?: number | null;
+      notify_recipient_id?: string | null;
+    }) => request<ScheduledJobInfo>("/api/schedule", { method: "POST", ...json(body) }),
+    updateScheduledJob: (
+      id: string,
+      body: { enabled?: boolean; notify_recipient_id?: string | null; clear_notify?: boolean },
+    ) => request<ScheduledJobInfo>(`/api/schedule/${id}`, { method: "PATCH", ...json(body) }),
+    runScheduledJob: (id: string) => request<ScheduledRunInfo>(`/api/schedule/${id}/run`, { method: "POST" }),
+    deleteScheduledJob: (id: string) => request<void>(`/api/schedule/${id}`, { method: "DELETE" }),
 
     // Skills (Ko'nikmalar)
     skills: () => request<{ worker: boolean; skills: SkillSummary[] }>("/api/skills"),

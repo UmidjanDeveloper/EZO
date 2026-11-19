@@ -1075,3 +1075,33 @@ export interface PronunciationResult {
   language: string;
   provider: string;
 }
+
+// Jadval: EZO's recurring jobs (never message other people).
+export type ScheduleKind = "weekly_report" | "monthly_report" | "deadline_digest" | "district_sync" | "lexuz_recheck";
+
+export interface ScheduledJobInfo {
+  id: string;
+  kind: ScheduleKind;
+  title: string;
+  when: string;
+  weekdays: string;
+  at_time: string;
+  month_day: number | null;
+  enabled: boolean;
+  notify_recipient_id: string | null;
+  next_run_at: string;
+  last_run_at: string | null;
+  last_status: "completed" | "failed" | "running" | null;
+}
+
+export interface ScheduledRunInfo {
+  id: string;
+  job_id?: string;
+  status: "running" | "completed" | "failed";
+  summary: string;
+  error: string | null;
+  artifact_id: string | null;
+  notified: boolean;
+  started_at: string;
+  finished_at: string | null;
+}
