@@ -71,7 +71,10 @@ async def test_without_official_documents_ezo_says_so(
     meta = events[0][1]
     assert meta["agent"] == "legal_research" and meta["requested_agent_available"] is True
     assert "No synchronized official legal documents" in system_of(fake_anthropic)
-    assert legal.site.log == []  # nothing fetched without a reason
+    # The question names a code, so EZO looked for it on LEX.UZ (found nothing here) —
+    # one search, never a crawl.
+    assert legal.site.log == ["/robots.txt", "/search/nat"]
+    assert "EZO tried to find the act on LEX.UZ but could not" in system_of(fake_anthropic)
 
 
 async def test_answer_uses_official_text_with_metadata_and_live_check(
@@ -158,7 +161,7 @@ async def test_official_api_lists_reviews_documents_and_revisions(legal: Legal) 
     sources = (await legal.client.get("/api/official/sources")).json()
     by_key = {s["key"]: s for s in sources}
     assert by_key["lexuz"]["enabled"] is True and by_key["lexuz"]["access"] == "public_web_pages"
-    assert "Not verified" in by_key["lexuz"]["review"]["robots_txt"]
+    assert "Checked 2026-11-19" in by_key["lexuz"]["review"]["robots_txt"]
     for key in ("govuz", "presidentuz", "eqaror", "ministries"):
         assert by_key[key]["can_be_enabled"] is False and by_key[key]["enabled"] is False
 
@@ -193,3 +196,67 @@ async def test_sources_are_off_by_default(client: AsyncClient) -> None:
     assert "EZO_OFFICIAL_SOURCES=lexuz" in response.json()["error"]["message"]
     sources = (await client.get("/api/official/sources")).json()
     assert not any(s["enabled"] for s in sources)
+
+
+def listing(rows: list[tuple[str, str, str]]) -> httpx.Response:
+    """LEX.UZ's search list, as its markup was checked live on 2026-11-19."""
+    body = "".join(
+        f'<tr class="dd-table__main-item"><td><i class="fa status_code_{state}"></i>'
+        f'<a class="lx_link " href="/docs/{doc_id}" target="_blank">{title}</a>'
+        '<span class="badge badge-pill badge-nine">Қонун</span></td></tr>'
+        for state, doc_id, title in rows
+    )
+    return httpx.Response(200, headers={"content-type": "text/html; charset=utf-8"}, text=body)
+
+
+async def test_an_act_named_in_a_question_is_fetched_from_lexuz_once(
+    legal: Legal, fake_anthropic: FakeProvider
+) -> None:
+    legal.site.routes["/search/nat"] = listing(
+        [
+            (
+                "y",
+                "999",
+                "«Норматив-ҳуқуқий ҳужжатлар тўғрисида»ги Қонунга ўзгартириш киритиш тўғрисида",
+            ),
+            ("y", LRU_682, "Норматив-ҳуқуқий ҳужжатлар тўғрисида"),
+        ]
+    )
+    fake_anthropic.reply = "Javob [1]."
+    question = "Normativ-huquqiy hujjatlar to'g'risidagi qonunning 1-moddasi nima deydi?"
+    events = await stream_chat(legal.client, message=question)
+    assert events[0][1]["agent"] == "legal_research"
+    assert f"/docs/{LRU_682}" in legal.site.log and "/docs/999" not in legal.site.log
+    system = system_of(fake_anthropic)
+    assert f"EZO just read «Норматив-ҳуқуқий ҳужжатлар тўғрисида» (LEX.UZ {LRU_682})" in system
+    assert "in force (as marked in the official source's list" in system
+
+    # Asked again: the act is already read, so it is not searched for again; only the usual
+    # live re-check of the act (its page and its status in the list) happens.
+    before = len(legal.site.log)
+    await stream_chat(legal.client, message=question)
+    new = [p for p in legal.site.log[before:] if p != "/robots.txt"]
+    assert new == [f"/docs/{LRU_682}", "/search/nat"]
+
+
+async def test_core_acts_collection_is_read_in_the_background(
+    legal: Legal, fake_anthropic: FakeProvider
+) -> None:
+    import asyncio
+
+    from ezo_api.official.collections import COLLECTIONS
+
+    for item in COLLECTIONS["hokimiyat"].items:
+        legal.site.routes[f"/docs/{item.source_doc_id}"] = html(
+            UZ_LATIN.replace("Normativ-huquqiy hujjatlar", item.title)
+        )
+    fake_anthropic.reply = "Boshladim."
+    events = await stream_chat(legal.client, message="Hokimiyat uchun asosiy qonunlarni o'rgan")
+    assert events[0][1]["agent"] == "legal_research"
+    assert "EZO STARTED reading 12 core acts from LEX.UZ" in system_of(fake_anthropic)
+    await asyncio.gather(*list(legal.services.official._tasks))
+    listed = (await legal.client.get("/api/official/collections")).json()
+    [hokimiyat] = listed
+    assert all(item["read"] for item in hokimiyat["items"])
+    [run] = (await legal.client.get("/api/official/runs")).json()
+    assert run["status"] in ("completed", "partial") and run["counts"]["new"] == 12

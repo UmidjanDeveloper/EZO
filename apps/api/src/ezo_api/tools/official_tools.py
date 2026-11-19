@@ -37,6 +37,12 @@ def status_line(legal: LegalDocument) -> str:
     if legal.status_source == "source_text" and legal.status in STATUS_TEXT:
         when = _day(legal.status_verified_at)
         return f"{STATUS_TEXT[legal.status]} (stated by the official source, checked {when})"
+    if legal.status_source == "official_listing" and legal.status in STATUS_TEXT:
+        when = _day(legal.status_verified_at)
+        return (
+            f"{STATUS_TEXT[legal.status]} (as marked in the official source's list of acts, "
+            f"checked {when})"
+        )
     return "not confirmed (the official source does not state it; do not assume it is in force)"
 
 

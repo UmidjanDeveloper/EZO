@@ -16,6 +16,7 @@ limits are honoured (Retry-After up to a cap, otherwise the run stops `partial`)
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import time
@@ -23,7 +24,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,6 +88,7 @@ class OfficialSyncService:
         self.storage = storage
         self._sleep = sleep
         self._clock = clock
+        self._tasks: set[asyncio.Task[None]] = set()
 
     @property
     def enabled(self) -> list[str]:
@@ -133,6 +135,8 @@ class OfficialSyncService:
         key: str,
         source_doc_ids: list[str],
         language: str,
+        *,
+        execute: bool = True,
     ) -> OfficialSyncRun:
         connector = self.connector(key)
         if language not in connector.policy.languages:
@@ -162,8 +166,41 @@ class OfficialSyncService:
         )
         session.add(run)
         await session.commit()
-        await self._execute(session, run, connector)
+        if execute:
+            await self._execute(session, run, connector)
         return run
+
+    async def start_detached(
+        self,
+        sessionmaker: Callable[[], Any],
+        user_id: uuid.UUID,
+        key: str,
+        source_doc_ids: list[str],
+        language: str,
+    ) -> uuid.UUID:
+        """Like `start`, but the documents are read in the background (a set of codes takes
+        minutes at LEX.UZ's polite pace). The run row shows the progress; a run cut off by a
+        restart is marked interrupted and can be resumed."""
+        async with sessionmaker() as session:
+            run = await self.start(session, user_id, key, source_doc_ids, language, execute=False)
+            run_id = run.id
+
+        async def work() -> None:
+            async with sessionmaker() as session:
+                row = await session.get(OfficialSyncRun, run_id)
+                if row is None:
+                    return
+                try:
+                    await self._execute(session, row, self.connector(row.connector))
+                except Exception:  # the run must never stay "running" silently
+                    logger.exception("Detached official sync %s failed", run_id)
+                    row.status, row.error, row.finished_at = "failed", "Unexpected error.", utcnow()
+                    await session.commit()
+
+        task = asyncio.create_task(work())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return run_id
 
     async def resume(
         self, session: AsyncSession, user_id: uuid.UUID, run_id: uuid.UUID
@@ -196,7 +233,8 @@ class OfficialSyncService:
         self, session: AsyncSession, run: OfficialSyncRun, connector: OfficialSourceConnector
     ) -> None:
         # robots.txt + one request per document, plus room for one Retry-After retry.
-        client = self.client(connector, max_requests=2 * len(run.requested) + 2)
+        # robots.txt + the document + one status lookup each, plus room for a Retry-After retry.
+        client = self.client(connector, max_requests=3 * len(run.requested) + 2)
         failures = 0
         status = "completed"
         errors: list[str] = []
@@ -252,8 +290,26 @@ class OfficialSyncService:
         ref: DocumentRef,
     ) -> Outcome:
         page = await self._fetch(client, connector.document_url(ref))
-        parsed = connector.parse(page, ref)
+        parsed = await self._with_listing_status(connector, client, connector.parse(page, ref))
         return await self.store(session, user_id, connector, parsed, page)
+
+    @staticmethod
+    async def _with_listing_status(
+        connector: OfficialSourceConnector, client: OfficialHttpClient, parsed: ParsedLegalDocument
+    ) -> ParsedLegalDocument:
+        """Fill an unstated status from the source's official listing. A failed lookup leaves
+        the status unverified; it never fails the document."""
+        if parsed.status_source != "unverified":
+            return parsed
+        try:
+            status = await connector.listing_status(client, parsed)
+        except (TemporaryFetchError, RateLimitedError, BudgetExhaustedError, DocumentParseError):
+            return parsed
+        if status:
+            parsed.status = status
+            parsed.status_source = "official_listing"
+            parsed.warnings = [w for w in parsed.warnings if "states no status" not in w]
+        return parsed
 
     async def _fetch(self, client: OfficialHttpClient, url: str) -> FetchedPage:
         try:
@@ -400,7 +456,9 @@ class OfficialSyncService:
     def _apply_status(legal: LegalDocument, parsed: ParsedLegalDocument, now: datetime) -> None:
         legal.status = parsed.status
         legal.status_source = parsed.status_source
-        legal.status_verified_at = now if parsed.status_source == "source_text" else None
+        legal.status_verified_at = (
+            now if parsed.status_source in ("source_text", "official_listing") else None
+        )
 
     # ------------------------------------------------------------------ live check
 
@@ -411,12 +469,12 @@ class OfficialSyncService:
             connector = self.connector(legal.connector)
         except OfficialSourceError as exc:
             return LiveCheck("disabled", None, last, exc.message)
-        client = self.client(connector, max_requests=3)
+        client = self.client(connector, max_requests=4)
         ref = DocumentRef(legal.source_doc_id, legal.language)
         now = utcnow()
         try:
             page = await client.get(connector.document_url(ref))
-            parsed = connector.parse(page, ref)
+            parsed = await self._with_listing_status(connector, client, connector.parse(page, ref))
             outcome = await self.store(session, legal.user_id, connector, parsed, page)
         except OfficialSourceError as exc:
             legal.last_checked_at = now

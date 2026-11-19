@@ -15,7 +15,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from ezo_api.knowledge.fetch import FetchedPage
 
@@ -147,6 +147,11 @@ class OfficialSourceConnector(ABC):
     @abstractmethod
     def parse(self, page: FetchedPage, ref: DocumentRef) -> ParsedLegalDocument:
         """Turn a fetched page into a document. Raise `DocumentParseError` when it is not one."""
+
+    async def listing_status(self, client: Any, parsed: ParsedLegalDocument) -> str | None:
+        """The act's status as the source's official listing marks it (None: not known).
+        Only used when the document text itself states no status."""
+        return None
 
     def changed_since(self) -> None:
         """Discovering new or changed documents needs a verified change feed or API."""

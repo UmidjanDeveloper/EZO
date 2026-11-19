@@ -259,4 +259,96 @@ def test_only_verified_and_enabled_sources_can_be_used() -> None:
     with pytest.raises(UnsupportedSourceError, match="Unknown"):
         get_connector("example", enabled=["example"])
     review = POLICY.review
-    assert "Not verified" in review.robots_txt and "Not verified" in review.terms_of_use
+    assert "Checked 2026-11-19" in review.robots_txt and "owner reviewed" in review.terms_of_use
+
+
+# --- LEX.UZ live markup (checked 2026-11-19) ------------------------------------------------
+
+_LX = (
+    '<div class="{kind} lx_elem" onmousemove="lx_mo(event,{n})"><div class="lx_elem2">'
+    '<div class="lx_elem3"><span onclick="lx_sf({n})"><img src="/img/cmt.svg" />Ҳужжатга '
+    'таклиф юбориш</span></div></div><div name="{n}" id="{n}">{text}</div></div>'
+)
+
+
+def _lx_page(title: str, parts: list[tuple[str, str]]) -> bytes:
+    body = "".join(_LX.format(kind=k, n=1000 + i, text=t) for i, (k, t) in enumerate(parts))
+    note = (
+        '<div class="COMMENT lx_no_select"><div name="edi1" id="edi1">'
+        "Олдинги таҳрирга қаранг.</div></div>"
+    )
+    return f"<html><head><title>{title}</title></head><body>{body}{note}</body></html>".encode()
+
+
+def test_lexuz_page_text_comes_from_its_elements_with_headings_and_without_notes() -> None:
+    from ezo_api.knowledge.fetch import FetchedPage
+    from ezo_api.official.base import DocumentRef
+    from ezo_api.official.lexuz import LexUzConnector
+
+    data = _lx_page(
+        "&nbsp; 28.10.2022.&nbsp;Ўзбекистон Республикасининг Меҳнат кодекси",
+        [
+            ("TEXT_HEADER_DEFAULT", "УМУМИЙ ҚИСМ"),
+            ("CLAUSE_DEFAULT", "1-модда. Ушбу Кодекс билан тартибга солинадиган муносабатлар"),
+            ("ACT_TEXT", "Ушбу Кодекс ходимлар, иш берувчилар ва давлат манфаатларининг "
+                         "мувозанатини таъминлаш асосида меҳнат муносабатларини тартибга солади."),
+            ("BY_DEFAULT", ""),
+        ],
+    )  # fmt: skip
+    page = FetchedPage("u", "https://lex.uz/docs/6257288", "text/html", data, 0.0)
+    parsed = LexUzConnector().parse(page, DocumentRef("6257288", "uz"))
+    assert parsed.title == "Ўзбекистон Республикасининг Меҳнат кодекси"
+    assert str(parsed.adopted_on) == "2022-10-28"
+    assert "## УМУМИЙ ҚИСМ" in parsed.text and "### 1-модда." in parsed.text
+    assert "Олдинги таҳрирга" not in parsed.text  # editorial notes are not law text
+    assert parsed.status_source == "unverified"  # the page itself states no status
+
+
+def test_lexuz_search_list_and_url() -> None:
+    from ezo_api.official.lexuz import parse_search, search_url
+
+    html = (
+        '<tr class="dd-table__main-item"><td><i class="fa status_code_y"></i>'
+        '<a class="lx_link " href="/docs/6257288" target="_blank">Меҳнат кодекси</a>'
+        '<span class="badge badge-pill badge-nine">Кодекс</span></td></tr>'
+        '<tr class="dd-table__main-item"><td><i class="fa status_code_r"></i>'
+        '<a class="lx_link " href="/docs/142859" target="_blank">Эски кодекс</a></td></tr>'
+        '<tr class="dd-table__main-item"><td><i class="fa status_code_y"></i>'
+        '<a class="lx_link " href="/docs/-8586150" target="_blank">Идоравий</a></td></tr>'
+    )
+    hits = parse_search(html)
+    assert [(h.source_doc_id, h.status) for h in hits] == [
+        ("6257288", "in_force"),
+        ("142859", "repealed"),
+    ]
+    assert hits[0].details == "Кодекс"
+    url = search_url("Mehnat kodeksi", exact=True)
+    assert url.startswith("https://lex.uz/search/nat?searchtitle=") and "lang=3" in url
+    assert "exact2=1" in url and "%D0%9C%D0%B5%D2%B3%D0%BD%D0%B0%D1%82" in url  # Меҳнат
+
+
+@pytest.mark.parametrize(
+    ("raw", "number", "adopted", "title"),
+    [
+        ("913-XII-сон 02.09.1993. О государственной власти на местах", "913-XII", "1993-09-02",
+         "О государственной власти на местах"),
+        ("  30.04.2023. Ўзбекистон Республикаси Конституцияси", None, "2023-04-30",
+         "Ўзбекистон Республикаси Конституцияси"),
+    ],
+)  # fmt: skip
+def test_lexuz_title_forms(raw: str, number: str | None, adopted: str, title: str) -> None:
+    from ezo_api.official.legal_text import parse_title
+
+    info = parse_title(raw)
+    assert (info.number, str(info.adopted_on), info.title) == (number, adopted, title)
+
+
+def test_hokimiyat_collection_is_well_formed() -> None:
+    from ezo_api.official.collections import COLLECTIONS
+    from ezo_api.official.lexuz import LexUzConnector
+
+    items = COLLECTIONS["hokimiyat"].items
+    ids = [i.source_doc_id for i in items]
+    assert len(ids) == len(set(ids)) >= 10
+    for doc_id in ids:
+        assert LexUzConnector().validate_id(doc_id) == doc_id

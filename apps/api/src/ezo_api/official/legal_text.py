@@ -87,10 +87,27 @@ def normalize_prefix(prefix: str) -> str:
     return cleaned
 
 
+_OLD_NUMBER = re.compile(r"^(\d{1,5}-[IVXLC]{1,6})\s*[-–]?\s*(?:сон|son)\b\.?\s*", re.IGNORECASE)
+_DATED_TITLE = re.compile(r"^(\d{2})\.(\d{2})\.(\d{4})\.?\s+(.+)$")
+
+
 def parse_title(raw: str) -> TitleInfo:
     """Number, type, authority and date from a title such as
-    ``ЎРҚ-682-сон 20.04.2021. Норматив-ҳуқуқий ҳужжатлар тўғрисида``."""
-    text = " ".join((raw or "").split())
+    ``ЎРҚ-682-сон 20.04.2021. Норматив-ҳуқуқий ҳужжатлар тўғрисида``. LEX.UZ also writes
+    older acts as ``913-XII-сон 02.09.1993. …`` and codes as ``30.04.2023. Title``."""
+    text = " ".join((raw or "").replace("\u00a0", " ").split())
+    old = _OLD_NUMBER.match(text)
+    if old and not _NUMBER.search(text):
+        rest = text[old.end() :]
+        dated = _DATED_TITLE.match(rest)
+        if dated:
+            return TitleInfo(
+                old.group(1), None, None, _date(*dated.groups()[:3]), dated.group(4).strip()
+            )
+        return TitleInfo(old.group(1), None, None, None, rest.strip() or text)
+    dated = _DATED_TITLE.match(text)
+    if dated and not _NUMBER.search(text):
+        return TitleInfo(None, None, None, _date(*dated.groups()[:3]), dated.group(4).strip())
     number = document_type = authority = None
     adopted: date | None = None
     rest = text

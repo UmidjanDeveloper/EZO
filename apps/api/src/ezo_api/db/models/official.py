@@ -24,7 +24,7 @@ from ezo_api.db.models.types import JSONType
 
 LEGAL_STATUSES = ("in_force", "amended", "repealed", "expired", "not_yet_in_force", "unknown")
 """`unknown` unless the source itself states the status."""
-STATUS_SOURCES = ("source_text", "unverified")
+STATUS_SOURCES = ("source_text", "official_listing", "unverified")
 SYNC_STATUSES = ("running", "completed", "partial", "failed", "blocked", "interrupted")
 
 

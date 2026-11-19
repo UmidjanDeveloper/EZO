@@ -30,6 +30,24 @@ a real live page.
 | Rate limits | None published that could be found. EZO waits ≥ 5 s between requests and honours `Crawl-delay` and HTTP 429 `Retry-After`. |
 | Legal basis (secondary sources; confirm with the official texts) | Copyright law LRU-42 art. 8: official documents are not objects of copyright. Law LRU-682 names the National Database of Legislation as an official source and lets electronic reference systems reproduce acts after official publication, with the source identified. |
 
+## Live check and owner approval (2026-11-19)
+
+- lex.uz was reached from EZO's build environment. `robots.txt` redirects to the site's 404
+  page (no rules). The owner reviewed the terms and enabled the connector.
+- Document pages: the text is taken from the page's `… lx_elem` blocks (headings and articles
+  kept, editorial notes left out). Codes of 3–7 MB HTML parse in under 0.1 s; checked on the
+  Constitution, the Labour, Tax and Civil codes.
+- Status: document pages state none. The public title search (`/search/nat`) marks each act
+  (`status_code_y` in force, `status_code_r` lost force); EZO stores that as
+  `status_source = official_listing`. Any other mark leaves the status "not confirmed".
+- Finding acts: a question that names an act ("Mehnat kodeksi bo'yicha …", "… to'g'risidagi
+  qonun") is searched by title (Latin is converted to Cyrillic), amendment and approval acts are
+  skipped, and the base act is read once. Checked live on the Labour, Land, Family and
+  Administrative Liability codes and four laws.
+- Core set for a hokimiyat (`official/collections.py`, 12 acts, numbers checked live):
+  "hokimiyat uchun asosiy qonunlarni o'rgan" in chat or `POST /api/official/collections/hokimiyat/sync`.
+- EZO does not crawl the whole database (hundreds of thousands of acts; days at a polite pace).
+
 ## Enabling LEX.UZ (owner)
 
 1. Open <https://lex.uz> and read its terms of use and `/robots.txt`. Continue only if
