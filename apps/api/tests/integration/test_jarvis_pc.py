@@ -9,7 +9,7 @@ from httpx import AsyncClient
 
 from ezo_api.jarvis.device_protocol import RESULT_DOMAIN, DeviceResultPayload, canonical
 from tests.integration.test_jarvis_tasks import Device as FilesOnlyDevice
-from tests.integration.test_jarvis_tasks import pair, start
+from tests.integration.test_jarvis_tasks import pair, start, telegram  # noqa: F401 (fixture)
 
 
 class Device(FilesOnlyDevice):
@@ -165,3 +165,35 @@ async def test_chat_without_a_paired_computer_explains_pairing(
     events = await stream_chat(client, message="Kalkulyatorni och")
     assert events[0][1]["agent"] == "computer"
     assert "Bu kompyuterni ulash" in (fake_anthropic.requests[-1].system or "")
+
+
+async def test_chat_starts_the_reference_document_chain(
+    client: AsyncClient,
+    fake_anthropic,
+    telegram,  # noqa: F811 (pytest fixture)
+) -> None:  # type: ignore[no-untyped-def]
+    from tests.integration.helpers import stream_chat
+    from tests.integration.test_jarvis_tasks import REFERENCE, link_recipient
+
+    device = Device()
+    await pair(client, device)
+    await link_recipient(client, telegram)
+    fake_anthropic.reply = "Vazifa yaratildi, tasdiqlang."
+    events = await stream_chat(client, message=REFERENCE)
+    assert events[0][1]["agent"] == "computer"
+    system = fake_anthropic.requests[-1].system or ""
+    assert "take the newest file in Downloads" in system and "«Baxtiyor»" in system
+    [task] = (await client.get("/api/jarvis/tasks")).json()
+    assert [s["action"] for s in task["steps"]][-1] == "telegram.send"
+    assert telegram.sent == []  # nothing is sent before the owner approves
+
+
+async def test_chat_asks_who_receives_it(client: AsyncClient, fake_anthropic) -> None:  # type: ignore[no-untyped-def]
+    from tests.integration.helpers import stream_chat
+
+    fake_anthropic.reply = "Kimga?"
+    events = await stream_chat(
+        client, message="Downloads ichidagi eng oxirgi faylni PDF qilib Telegram orqali yubor"
+    )
+    assert events[0][1]["agent"] == "computer"
+    assert "Who should receive it on Telegram" in (fake_anthropic.requests[-1].system or "")

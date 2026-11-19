@@ -222,7 +222,9 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   limit is gone
 - **Done (2026-10-18, Stage A):** Word/Excel → PDF with LibreOffice (in the Docker image
   and CI), export regression fixtures, conversion limits
-- **Not yet:** editing Word footnotes/comments/charts, handwriting OCR, an LLM planner for
+- **Done (2026-11-19):** handwriting → text: a handwritten page goes to the AI provider's
+  vision model (Tesseract reads print only); unclear words marked [?]; editable Word result
+- **Not yet:** editing Word footnotes/comments/charts, an LLM planner for
   sheet operations, a document-viewer UI with page thumbnails beyond the first page
 
 ### Phase 5 — Durable tasks, jobs and worker
@@ -295,9 +297,9 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   computer control on the paired PC — open an allowed app, list or open a file in
   Downloads/Documents/Desktop, open an https address — each action approved first and off
   by default in the desktop app ("Kompyuterni boshqarish").
-- Next: the full reference chain
-  (`"Downloads ichidagi eng oxirgi faylni och, PDF'ga aylantir, … va Telegram orqali Baxtiyorga yubor."`):
-  "latest file", convert to PDF on the device, send that file by Telegram, each step approved.
+- Also done: the reference document chain (newest Downloads file → previous-file percentages
+  → PDF → Telegram to a linked recipient, each external step approved) — from the JARVIS
+  page and, since 2026-11-19, straight from chat.
 - Upstream status per project: [docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md](docs/master/UPSTREAM_IMPLEMENTATION_MATRIX.md).
 
 ## Known limitations (current)
