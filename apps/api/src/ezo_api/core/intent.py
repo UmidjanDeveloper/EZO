@@ -26,6 +26,8 @@ class Intent(StrEnum):
     DOCUMENT = "document"
     BUSINESS = "business"
     VISUAL = "visual"
+    SKILL = "skill"
+    """EZO writing a small tool for itself (draft → owner approval → locked container)."""
     COMPUTER = "computer"
     """An action on the owner's paired computer (chosen by EzoCore's override when the words
     name one of the fixed computer actions)."""
@@ -209,6 +211,12 @@ _SIGNALS: dict[Intent, list[tuple[str, float]]] = {
         (r"\b(fayl|file|файл)\s*(qilib|sifatida|ko'?rinishida|as\b)", 2.5),
         (r"\bsolishtir", 1),
         (r"\bcompare (the|these|two)\b", 2),
+    ],
+    Intent.SKILL: [
+        (r"\b(ko'nikma|vosita|qobiliyat)\w*.{0,60}?(yoz|yarat|qo'sh|tuz|o'rgan)", 5),
+        (r"\bo'zing(ga|ni).{0,60}?(qo'sh|o'rgat|kuchaytir|yarat)", 5),
+        (r"\b(create|build|write|add) (a |an |yourself )?(new )?(skill|tool)\b", 5),
+        (r"\b(создай|добавь|напиши) (себе )?(новый )?(навык|инструмент)", 5),
     ],
     Intent.CHANCERY: [
         (r"\bmurojaat", 3),

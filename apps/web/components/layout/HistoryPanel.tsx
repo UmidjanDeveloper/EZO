@@ -17,6 +17,7 @@ import {
   Presentation,
   ShieldCheck,
   Trash2,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -51,12 +52,13 @@ export function HistoryPanel({ onNavigate, onClose }: { onNavigate?: () => void;
     { href: "/projects", label: m.nav.projects, icon: FolderKanban },
     { href: "/district", label: m.nav.district, icon: Landmark },
     { href: "/chancery", label: m.nav.chancery, icon: Inbox },
+    { href: "/skills", label: m.nav.skills, icon: Wrench },
     { href: "/jarvis", label: m.nav.jarvis ?? "JARVIS", icon: Bot },
     { href: "/admin", label: m.nav.admin, icon: ShieldCheck },
   ].filter(
     (item) =>
       status?.deployment_profile !== "free-beta" ||
-      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district", "/chancery"].includes(item.href)
+      !["/student", "/presentations", "/language", "/knowledge", "/jarvis", "/admin", "/district", "/chancery", "/skills"].includes(item.href)
   );
 
   return (

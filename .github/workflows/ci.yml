@@ -130,7 +130,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Compose file is valid (optional profiles included)
-        run: docker compose --profile voice --profile student --profile documents config --quiet
+        run: docker compose --profile voice --profile student --profile documents --profile skills config --quiet
       - name: Build API image
         run: docker build -t ezo-api:ci apps/api
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -209,6 +209,26 @@ jobs:
             sleep 2
           done
           echo "The document was not indexed in time"; exit 1
+      - name: A skill runs in its locked container and cannot reach the network
+        run: |
+          set -eu
+          image=$(docker image inspect --format '{{.Id}}' ezo-api:ci)
+          apps/api/.venv/bin/python - "$image" <<'PY'
+          import sys
+          from ezo_api.skills.sandbox import SkillSandbox
+          box = SkillSandbox(sys.argv[1])
+          ok = box.run("def run(data):\n    return data['a'] * 2\n", {"a": 21})
+          assert ok.ok and ok.result == 42, ok
+          net = box.run(
+              "def run(data):\n    import socket\n"
+              "    socket.create_connection(('1.1.1.1', 53), timeout=3)\n    return 'reached'\n",
+              {},
+          )
+          assert not net.ok, net
+          disk = box.run("def run(data):\n    open('/app/x', 'w')\n    return 'wrote'\n", {})
+          assert not disk.ok, disk
+          print("skill sandbox:", ok, net.error, disk.error)
+          PY
       - name: Build web image
         run: docker build -t ezo-web:ci -f apps/web/Dockerfile .
       - name: Web runtime includes the patched zlib package

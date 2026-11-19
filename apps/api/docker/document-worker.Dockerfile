@@ -12,6 +12,8 @@ RUN apt-get update \
         || apt-get install -y --no-install-recommends docker.io) \
     && rm -rf /var/lib/apt/lists/*
 COPY --chmod=0555 docker/document-worker.sh /usr/local/bin/ezo-document-worker
+# The skill worker (profile "skills") uses this same image with its own entrypoint.
+COPY --chmod=0555 docker/skill-worker.sh /usr/local/bin/ezo-skill-worker
 ENV DOCKER_CONFIG=/tmp/docker
 HEALTHCHECK NONE
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/ezo-document-worker"]

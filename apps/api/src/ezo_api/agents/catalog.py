@@ -145,6 +145,17 @@ AGENTS: dict[Intent, AgentSpec] = {
             route="chat",
         ),
         AgentSpec(
+            "skill",
+            Intent.SKILL,
+            {"uz": "Ko‘nikmalar", "en": "Skills", "ru": "Навыки"},
+            "Writes small Python tools for itself; each runs only after the owner approves its "
+            "exact code, and only in a locked container without network.",
+            maturity="experimental",
+            phase="Knowledge OS — K1, K2 & K3 done (2026-10-19, Knowledge OS & SkillForge prompt)",
+            context_mode="technical",
+            route="coding",
+        ),
+        AgentSpec(
             "computer",
             Intent.COMPUTER,
             {"uz": "Kompyuter", "en": "Computer", "ru": "Компьютер"},

@@ -128,6 +128,9 @@ class Settings(BaseSettings):
     # "documents"): PDF/DOCX/EPUB/PNG/JPEG uploads go to it instead of being refused.
     # Compose passes COMPOSE_PROFILES here, so "documents" in that list turns it on.
     document_worker: Annotated[bool, NoDecode] = Field(default=False, alias="EZO_DOCUMENT_WORKER")
+    skill_worker: Annotated[bool, NoDecode] = Field(default=False, alias="EZO_SKILL_WORKER")
+    """The Compose "skills" profile runs the skill worker (owner-approved skills in a locked
+    container); like EZO_DOCUMENT_WORKER, it is set from COMPOSE_PROFILES."""
     vector_store: Literal["auto", "pgvector", "local"] = Field(
         default="auto", alias="EZO_VECTOR_STORE"
     )
@@ -305,6 +308,14 @@ class Settings(BaseSettings):
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("skill_worker", mode="before")
+    @classmethod
+    def _skill_worker(cls, value: object) -> object:
+        if isinstance(value, str):
+            names = {part.strip().lower() for part in value.split(",")}
+            return bool(names & {"skills", "1", "true", "yes", "on"})
         return value
 
     @field_validator("document_worker", mode="before")
