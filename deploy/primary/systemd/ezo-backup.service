@@ -1,0 +1,15 @@
+[Unit]
+Description=EZO nightly encrypted backup (database + files)
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Set in /etc/ezo/backup.env (mode 600): EZO_BACKUP_AGE_RECIPIENT=age1… (public key only)
+# and optionally EZO_BACKUP_RCLONE_REMOTE=r2:ezo-backups
+EnvironmentFile=/etc/ezo/backup.env
+WorkingDirectory=@EZO_DIR@/deploy/primary
+ExecStart=@EZO_DIR@/deploy/primary/backup.sh @EZO_DIR@/deploy/primary/backups
+# Keep the last 14 local archives.
+ExecStartPost=/bin/sh -c 'ls -1t @EZO_DIR@/deploy/primary/backups/*.tar.age 2>/dev/null | tail -n +15 | xargs -r rm -f'
+Nice=10
