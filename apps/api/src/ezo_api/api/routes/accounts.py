@@ -196,3 +196,51 @@ async def revoke_token(
     audit(session, admin.id, "account.token_revoked", "user", user.id, {"token": str(token.id)})
     await session.commit()
     return _token_out(token)
+
+
+INVITE_PREFIX = "ezo_i_"
+INVITE_DAYS = 7
+
+
+@router.post("/api/admin/users/{user_id}/invite", status_code=201)
+async def invite_user(
+    user_id: uuid.UUID, admin: SuperAdminUser, session: SessionDep, services: ServicesDep
+) -> dict[str, Any]:
+    """A one-time link (7 days) the person opens to set their own password. Only the
+    link's SHA-256 is stored; a new invite cancels the earlier unused ones."""
+    from ezo_api.db.models import UserInvite
+
+    if services.settings.auth_mode != "token":
+        raise HTTPException(
+            409,
+            detail={
+                "code": "local_mode",
+                "message": "Invites need EZO_AUTH_MODE=token (local mode: everyone is the owner).",
+            },
+        )
+    user = await _managed(session, admin, user_id)
+    if user.status != "active":
+        raise HTTPException(409, detail="The account is disabled.")
+    now = utcnow()
+    for old in (
+        await session.scalars(
+            select(UserInvite).where(
+                UserInvite.user_id == user.id,
+                UserInvite.used_at.is_(None),
+                UserInvite.revoked_at.is_(None),
+            )
+        )
+    ).all():
+        old.revoked_at = now
+    code = INVITE_PREFIX + secrets.token_urlsafe(32)
+    invite = UserInvite(
+        user_id=user.id,
+        code_sha256=token_hash(code),
+        created_by=admin.id,
+        expires_at=now + timedelta(days=INVITE_DAYS),
+    )
+    session.add(invite)
+    audit(session, admin.id, "account.invite_created", "user", user.id, {})
+    await session.commit()
+    # Shown once. The code is in the URL fragment, so it never reaches a server log.
+    return {"code": code, "path": f"/join#code={code}", "expires_at": invite.expires_at.isoformat()}

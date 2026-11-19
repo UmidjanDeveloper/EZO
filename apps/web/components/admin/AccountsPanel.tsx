@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Card } from "@ezo/ui";
-import { KeyRound, UserPlus, Users } from "lucide-react";
+import { KeyRound, Link2, UserPlus, Users } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { apiUrl, storedToken } from "@/lib/api";
 import { useI18n } from "@/lib/i18n/context";
@@ -49,7 +49,7 @@ export function AccountsPanel() {
   const { m, f } = useI18n();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [tokens, setTokens] = useState<Record<string, AccountToken[]>>({});
-  const [secret, setSecret] = useState<{ email: string; token: string } | null>(null);
+  const [secret, setSecret] = useState<{ email: string; token: string; invite?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -80,6 +80,11 @@ export function AccountsPanel() {
       .then((list) => setTokens((t) => ({ ...t, [id]: list })))
       .catch((e: Error) => setError(e.message));
 
+  const invite = (account: Account) =>
+    call<{ path: string }>(`/api/admin/users/${account.id}/invite`, { method: "POST" })
+      .then((r) => setSecret({ email: account.email, token: `${window.location.origin}${r.path}`, invite: true }))
+      .catch((e: Error) => setError(e.message));
+
   const issue = (account: Account) =>
     call<{ token: string }>(`/api/admin/users/${account.id}/tokens`, {
       method: "POST",
@@ -108,9 +113,12 @@ export function AccountsPanel() {
       {secret && (
         <div className="p-3 rounded-xl border border-warning/40 bg-warning/5 text-sm" data-testid="account-secret">
           <p className="text-ink">
-            <strong>{secret.email}</strong> {m.accounts.secretAfterEmail}
+            <strong>{secret.email}</strong> {secret.invite ? m.accounts.inviteAfterEmail : m.accounts.secretAfterEmail}
           </p>
-          <code className="block mt-2 break-all font-mono text-xs text-ink">{secret.token}</code>
+          <code className="block mt-2 break-all font-mono text-xs text-ink" data-testid="account-secret-value">{secret.token}</code>
+          <Button variant="secondary" className="mt-2 mr-2 h-7 text-xs" onClick={() => void navigator.clipboard?.writeText(secret.token)}>
+            {m.accounts.copy}
+          </Button>
           <Button variant="secondary" className="mt-2 h-7 text-xs" onClick={() => setSecret(null)}>
             {m.accounts.hide}
           </Button>
@@ -213,6 +221,12 @@ export function AccountsPanel() {
                   >
                     {a.status === "active" ? m.accounts.disable : m.accounts.enable}
                   </Button>
+                  {a.status === "active" && (
+                    <Button variant="secondary" className="h-7 text-xs gap-1" onClick={() => void invite(a)} data-testid="account-invite">
+                      <Link2 size={12} />
+                      {m.accounts.invite}
+                    </Button>
+                  )}
                   {a.status === "active" && (
                     <Button variant="secondary" className="h-7 text-xs gap-1" onClick={() => void issue(a)}>
                       <KeyRound size={12} />

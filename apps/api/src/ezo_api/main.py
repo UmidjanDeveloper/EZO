@@ -23,6 +23,7 @@ from ezo_api.api.routes import (
     academic,
     accounts,
     artifacts,
+    auth,
     career,
     chancery,
     chat,
@@ -362,6 +363,7 @@ def create_app(
         chancery,
         skills,
         schedule,
+        auth,
     ):
         app.include_router(module.router)
 
