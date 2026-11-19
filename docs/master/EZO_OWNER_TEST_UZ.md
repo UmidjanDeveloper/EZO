@@ -300,3 +300,14 @@ Qafas: har ishga tushirish uchun yangi konteyner — internet yo‘q, disk faqat
 modullari bo‘lishi mumkin (math, datetime, json, re, …); `os`, `socket`, `open`, `eval` va
 shunga o‘xshashlar tekshiruvdan o‘tmaydi va ularga ruxsat berib bo‘lmaydi. Ruxsatni faqat EZO
 egasi beradi; «O‘chirish» bilan istalgan vaqtda to‘xtatasiz.
+
+## Talaffuzni tekshirish — ovoz chiqarib o‘qish (2026-11-19)
+
+1. Ovoz provayderi kerak (masalan `.env` da `OPENAI_API_KEY` — nutqni tanish uchun).
+2. **Til mashg‘ulotlari** sahifasida «Talaffuz» kartasi: tilni tanlang (EN, RU, DE, FR, ES, TR,
+   UZ), tayyor gapni qoldiring yoki o‘zingiz yozing, **«O‘qishni boshlash»** → o‘qing →
+   **«To‘xtatish»**.
+3. Natija: 0–100 baho, sur’at (so‘z/daqiqa), har bir so‘z rangda — yashil to‘g‘ri, sariq
+   yaqin, qizil boshqa so‘z eshitildi yoki tushib qoldi — va «Mashq qiling» ro‘yxati.
+
+Bu taxminiy baho: nutqni tanish asosida, fonema darajasida emas. Yozuv saqlanmaydi.
