@@ -41,7 +41,7 @@ async def test_existing_student_data_survives_additive_master_migrations(client,
                 )
         migrate(database_url, "head")
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0029"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0030"
             if postgres:
                 names = [
                     "source_refresh_policies",

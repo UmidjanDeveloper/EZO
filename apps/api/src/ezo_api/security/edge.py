@@ -33,7 +33,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ezo_api.security.rate_limit import RateLimitExceededError, SlidingWindowRateLimiter
 
-PUBLIC_PATHS = frozenset({"/api/health"})
+PUBLIC_PATHS = frozenset(
+    # Sign-in for invited accounts: rate limited in the routes themselves.
+    {"/api/health", "/api/auth/invite", "/api/auth/accept-invite", "/api/auth/login"}
+)
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 AUTHENTICATED = "ezo.authenticated"
 PRINCIPAL = "ezo.principal"

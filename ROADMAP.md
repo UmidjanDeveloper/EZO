@@ -306,7 +306,8 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
 - Ingestion runs in the API process (resumed at startup); no separate worker yet.
 - Voice is turn-by-turn; realtime voice is Phase 8.
 - The rate limiter is in memory (one API process).
-- Single-owner authentication; no multi-user accounts.
+- Accounts: the owner creates them and sends one-time invite links (EZO_AUTH_MODE=token);
+  employees set their own password. No self-signup and no billing.
 - The web app shows API errors in uz/ru by their code (`apps/web/lib/i18n/errors.ts`); a
   code not in that list still shows the server's English text.
 - Default model names in `apps/api/config/models.toml` and the image model settings must be

@@ -71,6 +71,9 @@ const UZ: Record<string, string> = {
   permission_required: "Avval ruxsat bering.",
   not_awaiting: "Bu vazifa endi tasdiq kutmayapti.",
   login_failed: "Kirish muvaffaqiyatsiz: login yoki parol noto‘g‘ri.",
+  invite_invalid: "Taklif havolasi noto‘g‘ri yoki muddati tugagan. Egadan yangisini so‘rang.",
+  weak_password: "Parol juda oddiy: kamida 8 belgi, faqat raqam bo‘lmasin.",
+  local_mode: "Bu imkoniyat uchun EZO_AUTH_MODE=token kerak (hozir hammasi egasi nomidan ishlaydi).",
 };
 
 const RU: Record<string, string> = {
@@ -143,6 +146,9 @@ const RU: Record<string, string> = {
   permission_required: "Сначала дайте разрешение.",
   not_awaiting: "Эта задача больше не ждёт подтверждения.",
   login_failed: "Вход не удался: неверный логин или пароль.",
+  invite_invalid: "Ссылка-приглашение неверна или устарела. Попросите у владельца новую.",
+  weak_password: "Пароль слишком простой: не меньше 8 символов и не только цифры.",
+  local_mode: "Для этого нужен EZO_AUTH_MODE=token (сейчас всё работает от имени владельца).",
 };
 
 const BY_LANGUAGE: Partial<Record<LanguageCode, Record<string, string>>> = { uz: UZ, ru: RU };

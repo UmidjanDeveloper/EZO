@@ -21,6 +21,10 @@ const uz = {
   tokenNoExpiry: "cheksiz",
   tokenLastUsed: "oxirgi: {date}",
   revoke: "Bekor qilish",
+  invite: "Taklif havolasi",
+  inviteAfterEmail:
+    "uchun taklif havolasi (7 kun, bir marta). Uni xodimga yuboring — u o‘z parolini qo‘yadi va o‘z hisobi bilan kiradi:",
+  copy: "Nusxa olish",
 };
 export type Section = typeof uz;
 const en: Section = {
@@ -45,6 +49,10 @@ const en: Section = {
   tokenNoExpiry: "never",
   tokenLastUsed: "last used: {date}",
   revoke: "Revoke",
+  invite: "Invite link",
+  inviteAfterEmail:
+    "invite link (7 days, one use). Send it to the employee — they set their own password and sign in with their own account:",
+  copy: "Copy",
 };
 const ru: Section = {
   title: "Пользователи и токены",
@@ -68,5 +76,9 @@ const ru: Section = {
   tokenNoExpiry: "бессрочно",
   tokenLastUsed: "последнее использование: {date}",
   revoke: "Отозвать",
+  invite: "Ссылка-приглашение",
+  inviteAfterEmail:
+    "— ссылка-приглашение (7 дней, один раз). Отправьте её сотруднику — он задаст свой пароль и войдёт в свой аккаунт:",
+  copy: "Копировать",
 };
 export const accounts = { uz, en, ru };

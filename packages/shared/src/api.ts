@@ -186,6 +186,21 @@ export function createApiClient(options: ApiClientOptions) {
       request<GovTask>(`/api/chancery/tasks/${id}`, { method: "PATCH", ...json(body) }),
     meetings: () => request<GovMeeting[]>("/api/chancery/meetings"),
 
+    // Sign-in for owner-invited accounts (EZO_AUTH_MODE=token)
+    inviteInfo: (code: string) =>
+      request<{ email: string; display_name: string; expires_at: string }>("/api/auth/invite", { method: "POST", ...json({ code }) }),
+    acceptInvite: (code: string, password: string) =>
+      request<{ token: string; user: { email: string; display_name: string } }>("/api/auth/accept-invite", {
+        method: "POST",
+        ...json({ code, password }),
+      }),
+    login: (email: string, password: string) =>
+      request<{ token: string; user: { email: string; display_name: string } }>("/api/auth/login", {
+        method: "POST",
+        ...json({ email, password }),
+      }),
+    logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+
     // Jadval (schedule)
     schedule: () => request<{ jobs: ScheduledJobInfo[]; runs: ScheduledRunInfo[] }>("/api/schedule"),
     createScheduledJob: (body: {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { HumorPreference, LanguageCode, ResponseLanguage, User } from "@ezo/shared";
-import { Badge, Card, SelectField, Spinner, TextField } from "@ezo/ui";
+import { Badge, Button, Card, SelectField, Spinner, TextField } from "@ezo/ui";
 import { useCallback, useState } from "react";
 import { api, storedToken } from "@/lib/api";
 import { useApp } from "@/lib/app-state";
@@ -151,6 +151,26 @@ export function SettingsPage() {
               onBlur={() => void refreshStatus()}
               hint={m.settings.apiTokenHint}
             />
+            {token.startsWith("ezo_u_") ? (
+              <div className="mt-2 flex items-center gap-2 text-sm">
+                {user?.email ? <span className="text-ink-muted">{f(m.auth.signedInAs, { email: user.email })}</span> : null}
+                <Button
+                  variant="secondary"
+                  data-testid="logout"
+                  onClick={() => {
+                    void api
+                      .logout()
+                      .catch(() => undefined)
+                      .finally(() => {
+                        storedToken.set(null);
+                        window.location.replace(`${window.location.origin}/login`);
+                      });
+                  }}
+                >
+                  {m.auth.logout}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </Card>
 

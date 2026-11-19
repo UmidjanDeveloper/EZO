@@ -63,7 +63,7 @@ from ezo_api.db.models.skills import Skill, SkillRun
 from ezo_api.db.models.student import StudentRawRevision
 from ezo_api.db.models.study import StudentLearningPath, StudyCard, StudyReview
 from ezo_api.db.models.translation import GlossaryTerm
-from ezo_api.db.models.user import UsageEvent, User, UserToken
+from ezo_api.db.models.user import UsageEvent, User, UserInvite, UserToken
 
 __all__ = [
     "AgentRun",
@@ -131,6 +131,7 @@ __all__ = [
     "ToolCall",
     "UsageEvent",
     "User",
+    "UserInvite",
     "UserToken",
     "VectorEntry",
 ]

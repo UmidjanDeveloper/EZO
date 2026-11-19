@@ -328,3 +328,19 @@ Telegram’ingizga olish uchun: JARVIS sahifasida **«Men»** nomli qabul qiluvc
 o‘z Telegram’ingizdan botga /start yuboring, keyin jadvalda uni tanlang (yoki chatda
 «… telegramga yubor» deng). Jadval hech qachon boshqa odamlarga xabar yubormaydi.
 EZO o‘chiq bo‘lgan paytdagi o‘tkazib yuborilgan vaqt yoqilganda bir marta bajariladi.
+
+## Xodimlarni taklif qilish — har kimning o‘z hisobi (2026-11-19)
+
+1. `.env` da `EZO_AUTH_MODE=token` va uzun tasodifiy `EZO_API_TOKEN` qo‘ying (bu sizning,
+   egasining kaliti). `docker compose up -d --build`. Brauzerda **Sozlamalar → API token**
+   ga shu kalitni kiriting.
+2. **Boshqaruv → Foydalanuvchilar**: xodimning email va ismini kiritib «Qo‘shish», keyin
+   **«Taklif havolasi»**. Havola bir marta ko‘rsatiladi (7 kun, bir marta ishlaydi) —
+   «Nusxa olish» bilan xodimga yuboring.
+3. Xodim havolani ochadi, o‘z parolini qo‘yadi (kamida 8 belgi) va EZO’ga kiradi. Keyingi
+   safar `/login` sahifasida email va parol bilan kiradi; «Sozlamalar → Chiqish».
+
+Har bir xodim faqat o‘z suhbatlari, fayllari, jadvali va ma’lumotlarini ko‘radi. Hisoblarni
+boshqarish, ko‘nikmalarga ruxsat berish va SMS/Telegram ogohlantirish yuborish faqat sizda.
+Parol faqat scrypt izi sifatida saqlanadi; kirish urinishlari cheklangan (daqiqasiga 10 ta).
+Xodimni «O‘chirish» bilan to‘xtatsangiz, uning barcha kirishlari darhol bekor bo‘ladi.
