@@ -43,6 +43,7 @@ from ezo_api.api.routes import (
     presentations,
     projects,
     refresh,
+    skills,
     stories,
     student,
     student_paths,
@@ -332,6 +333,7 @@ def create_app(
         accounts,
         district,
         chancery,
+        skills,
     ):
         app.include_router(module.router)
 

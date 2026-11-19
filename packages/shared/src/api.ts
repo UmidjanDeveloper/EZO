@@ -51,6 +51,8 @@ import type {
   Appeal,
   GovMeeting,
   GovTask,
+  SkillDetail,
+  SkillSummary,
   DistrictChannels,
   DistrictMember,
   DistrictNotice,
@@ -172,6 +174,14 @@ export function createApiClient(options: ApiClientOptions) {
     updateGovTask: (id: string, body: { status?: GovTask["status"]; due_on?: string }) =>
       request<GovTask>(`/api/chancery/tasks/${id}`, { method: "PATCH", ...json(body) }),
     meetings: () => request<GovMeeting[]>("/api/chancery/meetings"),
+
+    // Skills (Ko'nikmalar)
+    skills: () => request<{ worker: boolean; skills: SkillSummary[] }>("/api/skills"),
+    skill: (id: string) => request<SkillDetail>(`/api/skills/${id}`),
+    approveSkill: (id: string, code_sha256: string) =>
+      request<SkillDetail>(`/api/skills/${id}/approve`, { method: "POST", ...json({ code_sha256 }) }),
+    disableSkill: (id: string) => request<SkillDetail>(`/api/skills/${id}/disable`, { method: "POST" }),
+    deleteSkill: (id: string) => request<void>(`/api/skills/${id}`, { method: "DELETE" }),
 
     // District center (Tuman markazi)
     districtChannels: () => request<DistrictChannels>("/api/district/channels"),

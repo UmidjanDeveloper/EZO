@@ -175,9 +175,16 @@ images) plus the extended local checks listed for that phase.
   comparison, evidence grading (directly_supported/inferred/unverified), cross-source deduplication,
   prompt-injection containment, read-only status guarantee, library & source capability APIs,
   chat analyzer intent, web UI capability inspection panel.
-- Next: K4 secure sandbox (hard prerequisite for running any generated
-  code); K5 skill builder and verification; K6 skill registry and runtime; K7 updates
-- Nothing read from a source is executed or installed; no skill exists before K4–K6
+- K4–K6 (done, experimental, 2026-11-19, owner decision "Qafasda + tasdiq bilan"): the skill
+  worker (Compose profile `skills`, owner's own PC) runs each skill in a fresh container from
+  the pinned API image — no network, read-only root, 256 MiB, 32 PIDs, 20 s, no capabilities,
+  UID 10001; EZO drafts a skill from chat ("O'zingga … vositasini qo'sh"), static checks
+  (pure-computation imports only), the owner approves the exact code SHA-256 on the
+  Ko'nikmalar page (audit-logged), new code clears the approval, the worker re-checks the hash
+  before running; chat runs an approved skill by name and answers from its real output;
+  migration 0028
+- Next: K7 updates (re-learning sources); skills that read the user's own files
+- Nothing read from a source is executed or installed; only owner-approved skill code runs
 
 ### Orchestration foundation — experimental
 - `OrchestrationProvider` interface, native mission runner (in memory), deterministic

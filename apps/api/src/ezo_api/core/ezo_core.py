@@ -77,6 +77,7 @@ from ezo_api.providers.router import (
     StreamInterruptedError,
 )
 from ezo_api.providers.types import ChatMessage, ChatRequest, StreamEnd, TextDelta, Usage
+from ezo_api.skills.service import find_skill
 from ezo_api.tools.base import ToolContext
 from ezo_api.translation.requests import wants_translation
 from ezo_api.visual.kinds import wants_edit as wants_visual_edit
@@ -324,6 +325,14 @@ class EzoCore:
                 # "Shu website'ni o'rgan: https://…", "github:owner/repo ni o'rgan",
                 # "O'rgangan manbalaringni ko'rsat": the Knowledge OS reads the source.
                 intent = IntentResult(Intent.LEARNING, 1.0, ("learning",), intent.scores)
+            elif (
+                turn.forced_agent is None
+                and not turn.attachments
+                and intent.intent != Intent.SKILL
+                and await find_skill(session, user.id, turn.text) is not None
+            ):
+                # "Kredit kalkulyatori: 50 mln, 24 oy" names an approved skill of the owner.
+                intent = IntentResult(Intent.SKILL, 1.0, ("approved_skill",), intent.scores)
             elif (
                 turn.forced_agent is None
                 and not turn.attachments

@@ -1017,3 +1017,39 @@ export interface GovMeeting {
   held_on: string;
   minutes_artifact_id: string | null;
 }
+
+// Skills (Ko'nikmalar): small tools EZO wrote for itself, run only after the owner approved
+// the exact code (its SHA-256), in a locked container.
+export interface SkillChecks {
+  ok?: boolean;
+  problems?: string[];
+  imports?: string[];
+}
+
+export interface SkillSummary {
+  id: string;
+  name: string;
+  description: string;
+  input_hint: string;
+  status: "draft" | "approved" | "disabled";
+  code_sha256: string;
+  approved: boolean;
+  approved_at: string | null;
+  checks: SkillChecks;
+  updated_at: string | null;
+}
+
+export interface SkillRunInfo {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed";
+  input: unknown;
+  output: unknown;
+  error: string | null;
+  duration_ms: number | null;
+  created_at: string | null;
+}
+
+export interface SkillDetail extends SkillSummary {
+  code: string;
+  runs: SkillRunInfo[];
+}

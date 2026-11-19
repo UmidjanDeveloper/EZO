@@ -41,6 +41,8 @@ services:
       EZO_CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       # "documents" in COMPOSE_PROFILES sends PDF/DOCX/EPUB/images to the document worker.
       EZO_DOCUMENT_WORKER: ${COMPOSE_PROFILES:-}
+      # "skills" in COMPOSE_PROFILES lets owner-approved skills run in the skill worker.
+      EZO_SKILL_WORKER: ${COMPOSE_PROFILES:-}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -136,6 +138,43 @@ services:
     memswap_limit: 512m
     pids_limit: 64
     stop_grace_period: 40s
+
+  # Skills EZO wrote for itself (Ko'nikmalar page). Turn on with COMPOSE_PROFILES=skills
+  # (e.g. COMPOSE_PROFILES=documents,skills). A skill runs only after the owner approved its
+  # exact code; each run is a fresh container from the pinned EZO API image with no network,
+  # read-only root, 256 MiB, 32 processes, 20 s, no capabilities, UID 10001. Like the document
+  # worker it needs the Docker socket, so it is for the owner's own PC only.
+  skill-worker:
+    profiles: [skills]
+    build:
+      context: ./apps/api
+      dockerfile: docker/document-worker.Dockerfile
+      additional_contexts:
+        ezo-api-image: service:api
+      args:
+        API_IMAGE: ezo-api-image
+    entrypoint: ["/usr/bin/tini", "--", "/usr/local/bin/ezo-skill-worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://ezo:ezo@db:5432/ezo
+      EZO_SKILL_IMAGE: ezo-api:local
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    memswap_limit: 384m
+    pids_limit: 64
+    stop_grace_period: 30s
 
   web:
     build:

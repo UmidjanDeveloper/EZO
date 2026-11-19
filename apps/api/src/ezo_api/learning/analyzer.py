@@ -336,6 +336,7 @@ EZO_AGENT_PROFILES: dict[str, dict[str, Any]] = {
     "district": {"title": "District Center", "domain": "government"},
     "chancery": {"title": "Devonxona (office)", "domain": "government"},
     "computer": {"title": "Computer (JARVIS)", "domain": "device"},
+    "skill": {"title": "Skills (SkillForge)", "domain": "coding"},
 }
 
 

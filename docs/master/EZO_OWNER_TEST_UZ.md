@@ -282,3 +282,21 @@ Notanish odamlarning xabarlariga bot javob bermaydi.
 Hech qachon: .exe, .bat, skriptlar va boshqa dasturlar ochilmaydi; papkadan tashqariga chiqilmaydi;
 o‘chirish, o‘rnatish yoki buyruq qatori yo‘q. Rad etsangiz yoki «Kompyuterni boshqarish» o‘chiq
 bo‘lsa, hech narsa bajarilmaydi.
+
+## Ko‘nikmalar — EZO o‘zi uchun dastur yozadi, siz ruxsat berasiz (2026-11-19)
+
+1. `.env` faylida `COMPOSE_PROFILES=documents,skills` qiling va `docker compose up -d --build`
+   (yangi `skill-worker` xizmati ishga tushadi).
+2. Chatda yozing: «O‘zingga kredit kalkulyatori vositasini qo‘sh». EZO kod yozadi va uni
+   **qoralama** sifatida saqlaydi — hali ishlamaydi.
+3. Chap menyudagi **«Ko‘nikmalar»** sahifasini oching → «Kodni ko‘rish». Kodni o‘qing,
+   avtomatik tekshiruv natijasini ko‘ring va **«Ruxsat beraman»** ni bosing. Ruxsat aynan shu
+   kodga (SHA-256 izi) beriladi: EZO keyin kodni o‘zgartirsa, ruxsat avtomatik bekor bo‘ladi.
+4. Chatda ishlating: «Kredit kalkulyatori: 50 mln, 24 oy, 22%». EZO ko‘nikmani yopiq qafasda
+   ishga tushiradi va **haqiqiy natija** bilan javob beradi (oylik to‘lov 2 593 908 so‘m).
+
+Qafas: har ishga tushirish uchun yangi konteyner — internet yo‘q, disk faqat o‘qish uchun,
+256 MB xotira, 32 jarayon, 20 soniya, hech qanday imtiyoz yo‘q. Kodda faqat hisob-kitob va matn
+modullari bo‘lishi mumkin (math, datetime, json, re, …); `os`, `socket`, `open`, `eval` va
+shunga o‘xshashlar tekshiruvdan o‘tmaydi va ularga ruxsat berib bo‘lmaydi. Ruxsatni faqat EZO
+egasi beradi; «O‘chirish» bilan istalgan vaqtda to‘xtatasiz.

@@ -17,6 +17,7 @@ from ezo_api.agents.learning import LearningAgent
 from ezo_api.agents.legal_research import LegalResearchAgent
 from ezo_api.agents.presentation import PresentationAgent
 from ezo_api.agents.research import ResearchAgent
+from ezo_api.agents.skills import SkillAgent
 from ezo_api.agents.visual import VisualAgent
 from ezo_api.core.intent import Intent
 
@@ -48,6 +49,7 @@ class AgentRegistry:
             DistrictAgent(),
             ChanceryAgent(),
             ComputerAgent(),
+            SkillAgent(),
             DeveloperAgent(),
         ]:
             self._agents[agent.spec.intent] = agent
