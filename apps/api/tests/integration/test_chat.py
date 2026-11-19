@@ -1,3 +1,4 @@
+import pytest
 from httpx import AsyncClient
 
 from tests.fakes import FakeProvider
@@ -49,8 +50,20 @@ async def test_history_and_system_prompt_reach_the_provider(
 
 
 async def test_agent_routing_for_unavailable_agent(
-    client: AsyncClient, fake_anthropic: FakeProvider
+    client: AsyncClient, fake_anthropic: FakeProvider, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Every catalog agent is implemented today; mark one planned to exercise the fallback.
+    from dataclasses import replace
+
+    from ezo_api.agents.catalog import AGENTS
+    from ezo_api.core.intent import Intent
+
+    planned = replace(
+        AGENTS[Intent.BUSINESS],
+        maturity="planned",
+        limitation_note="Label every estimate and never invent market statistics.",
+    )
+    monkeypatch.setitem(AGENTS, Intent.BUSINESS, planned)
     events = await stream_chat(client, message="Ezo, biznesim uchun SWOT tahlil qil.")
     meta = events[0][1]
     assert meta["intent"] == "business"
@@ -134,7 +147,7 @@ async def test_status_reports_providers_agents_and_routes(client: AsyncClient) -
     assert status["offline_mode"] is False
     agents = {a["key"]: a["available"] for a in status["agents"]}
     assert agents["general"] is True and agents["presentation"] is True
-    assert agents["document"] is True and agents["visual"] is True and agents["business"] is False
+    assert agents["document"] is True and agents["visual"] is True and agents["business"] is True
     assert status["routing"]["routes"]["chat"]["active_candidates"][0]["provider"] == "anthropic"
 
 

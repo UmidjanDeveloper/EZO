@@ -283,6 +283,10 @@ business) → Phases 8–13 · J single-user beta · K SaaS (deferred until the 
   (OpenMontage only as an optional external AGPL service; licences re-checked first)
 
 ### Phase 13 — Business
+- **Done (2026-11-19, alpha):** BusinessAgent — the owner's own numbers read into JSON and
+  the unit economics computed by EZO (margin, break-even, monthly profit, payback); market and
+  competitor facts only from cited web results; every number labelled [Fakt: n] / [Hisob] /
+  [Taxmin] / [Faraz]; "Biznes reja tuz" also returns a Word plan
 - BusinessAgent: idea, competitor and market analysis, pricing, unit economics, SWOT, pitch;
   every number marked as source-backed fact, estimate or assumption
 

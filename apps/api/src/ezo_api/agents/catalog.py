@@ -123,16 +123,13 @@ AGENTS: dict[Intent, AgentSpec] = {
             "business",
             Intent.BUSINESS,
             {"uz": "Biznes agenti", "en": "Business Agent", "ru": "Бизнес-агент"},
-            "Idea evaluation, market and competitor research, strategy.",
-            maturity="planned",
+            "Idea evaluation, market and competitor research (web, cited), pricing, unit "
+            "economics computed by EZO, SWOT and a business plan; every number labelled as a "
+            "sourced fact, a computation, an estimate or an assumption.",
+            maturity="alpha",
             phase="Phase 13",
             context_mode="professional",
             route="reasoning",
-            limitation_note=(
-                "The Business Agent with live market data is not available yet. You can "
-                "reason about strategy, but label every estimate and assumption clearly and "
-                "never invent market statistics."
-            ),
         ),
         AgentSpec(
             "visual",
