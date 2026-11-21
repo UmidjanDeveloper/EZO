@@ -18,7 +18,7 @@
     "@ezo/avatar": "workspace:*",
     "@ezo/perception-client": "workspace:*",
     "@types/node": "22.20.5",
-    "electron": "44.10.2",
+    "electron": "44.11.4",
     "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "typescript": "6.0.3",
