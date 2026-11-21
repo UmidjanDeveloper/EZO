@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # EZO web image. Build context: the repository root (needs the pnpm workspace).
-FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS deps
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS deps
 ARG NODE_USE_ENV_PROXY
 RUN corepack enable
 WORKDIR /repo
@@ -20,7 +20,7 @@ COPY apps/web ./apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --filter @ezo/web build
 
-FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS run
+FROM node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS run
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
